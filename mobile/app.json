@@ -1,26 +1,64 @@
 {
-  "expo": {
-    "name": "CLIMS Mobile",
-    "slug": "clims-mobile",
-    "version": "2.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "platforms": ["ios", "android"],
-    "extra": {
-      "releaseVersion": "2.0.0"
-    }
-  }
+	"expo": {
+		"name": "last_mile_condom_distribution",
+		"slug": "lmd",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/images/icon.png",
+		"scheme": "lmd",
+		"userInterfaceStyle": "automatic",
+		"updates": {
+			"fallbackToCacheTimeout": 0
+		},
+		"assetBundlePatterns": [
+			"**/*"
+		],
+		"ios": {
+			"supportsTablet": true
+		},
+		"android": {
+			"package": "com.moh.last_mile_condom_distribution",
+			"versionCode": 1,
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/images/adaptive-icon.png",
+				"backgroundColor": "#ffffff"
+			},
+			"permissions": [
+				"READ_EXTERNAL_STORAGE",
+				"WRITE_EXTERNAL_STORAGE"
+			]
+		},
+		"web": {
+			"bundler": "metro",
+			"output": "static",
+			"favicon": "./assets/images/favicon.png"
+		},
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/images/splash.png",
+					"imageWidth": 200,
+					"resizeMode": "contain",
+					"backgroundColor": "#F3F8F3",
+					"dark": {
+						"image": "./assets/images/splash.png",
+						"backgroundColor": "#0C120D"
+					}
+				}
+			]
+		],
+		"experiments": {
+			"typedRoutes": true
+		},
+		"extra": {
+			"router": {
+				"origin": false
+			},
+			"eas": {
+				"projectId": "34fc2cbe-c7f6-460e-ae08-a69ce4573a85"
+			}
+		}
+	}
 }
