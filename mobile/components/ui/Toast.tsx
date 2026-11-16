@@ -29,7 +29,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { colors, radius, shadows } = useTheme();
   const insets = useSafeAreaInsets();
   const [toast, setToast] = useState<{ id: number; message: string; type: ToastType } | null>(null);
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hide = useCallback(() => {
