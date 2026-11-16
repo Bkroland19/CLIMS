@@ -35,7 +35,7 @@ const OfflineBanner: React.FC = () => {
     >
       <Ionicons name="cloud-offline-outline" size={16} color={colors.warning} />
       <AppText variant="caption" style={{ color: colors.warning, marginLeft: 6 }}>
-        You're offline
+        You&apos;re offline
       </AppText>
     </View>
   );
