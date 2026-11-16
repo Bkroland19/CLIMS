@@ -11,24 +11,23 @@ import logout from "../assets/icons/logout.png";
 import eyeHide from "../assets/icons/eye-hide.png";
 import eye from "../assets/icons/eye.png";
 import play from "../assets/icons/play.png";
-import piechart from "../assets/icons/pie-chart.png"
-import hotspot from "../assets/icons/hotel.png"
-
+import piechart from "../assets/icons/pie-chart.png";
+import hotspot from "../assets/icons/hotel.png";
 
 export default {
-    play,
-    bookmark,
-    home,
-    plus,
-    profile,
-    leftArrow,
-    menu,
-    search,
-    upload,
-    rightArrow,
-    logout,
-    eyeHide,
-    eye,
-    piechart,
-    hotspot
+  play,
+  bookmark,
+  home,
+  plus,
+  profile,
+  leftArrow,
+  menu,
+  search,
+  upload,
+  rightArrow,
+  logout,
+  eyeHide,
+  eye,
+  piechart,
+  hotspot,
 };
