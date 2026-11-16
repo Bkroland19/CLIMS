@@ -12,7 +12,9 @@ import ConfirmDialog, { ConfirmOptions } from "@/components/ui/ConfirmDialog";
  * (a second native modal can't show above an open one unless it is nested inside it).
  */
 export function useConfirm() {
-  const [opts, setOpts] = useState<ConfirmOptions | null>(null);
+  // Options are kept after closing so the exit animation can finish with the same content.
+  const [opts, setOpts] = useState<ConfirmOptions>({ title: "" });
+  const [open, setOpen] = useState(false);
   const resolver = useRef<((v: boolean) => void) | null>(null);
 
   const confirm = useCallback(
@@ -20,6 +22,7 @@ export function useConfirm() {
       new Promise<boolean>((resolve) => {
         resolver.current = resolve;
         setOpts(options);
+        setOpen(true);
       }),
     [],
   );
@@ -27,17 +30,13 @@ export function useConfirm() {
   const settle = (value: boolean) => {
     resolver.current?.(value);
     resolver.current = null;
-    setOpts(null);
+    setOpen(false);
   };
-
-  // Keep the last options while the exit animation plays.
-  const last = useRef<ConfirmOptions>({ title: "" });
-  if (opts) last.current = opts;
 
   const dialog = (
     <ConfirmDialog
-      {...last.current}
-      visible={!!opts}
+      {...opts}
+      visible={open}
       onConfirm={() => settle(true)}
       onCancel={() => settle(false)}
     />
