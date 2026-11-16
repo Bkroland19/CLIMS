@@ -10,6 +10,8 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "export": "expo export --platform ios --platform android",
     "optimize": "expo-optimize"
   },
   "jest": {
