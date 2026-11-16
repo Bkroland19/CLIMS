@@ -206,7 +206,7 @@ const Home: React.FC = () => {
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="cloud-offline-outline" size={22} color={colors.danger} />
               <AppText variant="bodyStrong" color="danger" style={{ marginLeft: 10, flex: 1 }}>
-                Couldn't load deliveries
+                Couldn&apos;t load deliveries
               </AppText>
             </View>
             <AppText variant="caption" color="danger" style={{ marginTop: 4 }}>
