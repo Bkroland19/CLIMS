@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Modal, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/theme/ThemeProvider";
@@ -45,11 +45,13 @@ const ConfirmDialog: React.FC<Props> = ({
   const { colors, radius, shadows } = useTheme();
   const { isCompact } = useResponsive();
   const [mounted, setMounted] = useState(visible);
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
+
+  // Mount the modal as soon as it is asked to show; unmounting waits for the exit animation.
+  if (visible && !mounted) setMounted(true);
 
   useEffect(() => {
     if (visible) {
-      setMounted(true);
       Animated.spring(progress, { toValue: 1, useNativeDriver: true, friction: 9 }).start();
     } else if (mounted) {
       Animated.timing(progress, { toValue: 0, duration: 140, useNativeDriver: true }).start(
