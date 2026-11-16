@@ -136,12 +136,14 @@ const Stock: React.FC = () => {
   // Arriving from Home's "Add stock" quick action opens the form straight away.
   useEffect(() => {
     if (add === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacts to the route param, then clears it
       setFormOpen(true);
       router.setParams({ add: "" });
     }
   }, [add]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the form to the route param
     if (hotspotId) setForm((prev) => ({ ...prev, hotspot_id: hotspotId }));
   }, [hotspotId]);
 
@@ -320,8 +322,8 @@ const Stock: React.FC = () => {
       <View style={{ marginBottom: 16 }}>
         <AppText variant="title">Stock</AppText>
         <AppText variant="body" color="textMuted">
-          {user?.hotspot?.name ? `${user.hotspot.name} · ` : ""}what's on hand and what's been
-          delivered
+          {user?.hotspot?.name ? `${user.hotspot.name} · ` : ""}what&apos;s on hand and what&apos;s
+          been delivered
         </AppText>
       </View>
 
