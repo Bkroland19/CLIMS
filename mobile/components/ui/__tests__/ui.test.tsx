@@ -1,7 +1,8 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { AppThemeProvider } from "@/context/theme/ThemeProvider";
-import { Badge, Button, EmptyState } from "@/components/ui";
+import { Badge, Button, EmptyState, Fab, FormModal } from "@/components/ui";
+import { Text } from "react-native";
 
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
@@ -49,9 +50,6 @@ test("EmptyState renders title and action", async () => {
   });
   expect(JSON.stringify(tree.toJSON())).toContain("Nothing here");
 });
-
-import { Fab, FormModal } from "@/components/ui";
-import { Text } from "react-native";
 
 test("Fab is an accessible button that fires onPress", async () => {
   const onPress = jest.fn();
