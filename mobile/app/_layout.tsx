@@ -1,7 +1,7 @@
 import { useFonts } from "expo-font";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -9,19 +9,9 @@ import { AppThemeProvider, useTheme } from "@/context/theme/ThemeProvider";
 import { OfflineBanner, ToastProvider } from "@/components/ui";
 
 import ReactQueryProvider from "./providers/ReactQueryProvider";
-import * as SecureStore from "expo-secure-store";
-import GlobalProvider, { useGlobalContext } from "@/context/auth/GlobalProvider";
-import { QueryClient } from "@tanstack/react-query";
+import GlobalProvider from "@/context/auth/GlobalProvider";
 
 SplashScreen.preventAutoHideAsync();
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: true,
-    },
-  },
-});
 
 /** Bridges our tokens into React Navigation + the status bar. */
 function ThemedShell({ children }: { children: React.ReactNode }) {
