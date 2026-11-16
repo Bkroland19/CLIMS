@@ -36,15 +36,7 @@ const QuantityField: React.FC<Props> = ({
     onChange(Math.max(0, current + delta));
   };
 
-  const StepButton = ({
-    icon,
-    delta,
-    name,
-  }: {
-    icon: "remove" | "add";
-    delta: number;
-    name: string;
-  }) => (
+  const renderStepButton = (icon: "remove" | "add", delta: number, name: string) => (
     <Pressable
       onPress={() => step(delta)}
       accessibilityRole="button"
@@ -76,7 +68,7 @@ const QuantityField: React.FC<Props> = ({
           borderColor: error ? colors.danger : focused ? colors.brand : colors.border,
         }}
       >
-        <StepButton icon="remove" delta={-1} name="Decrease" />
+        {renderStepButton("remove", -1, "Decrease")}
         <TextInput
           value={current ? String(current) : ""}
           placeholder="0"
@@ -98,7 +90,7 @@ const QuantityField: React.FC<Props> = ({
             paddingVertical: 10,
           }}
         />
-        <StepButton icon="add" delta={1} name="Increase" />
+        {renderStepButton("add", 1, "Increase")}
       </View>
       {quickAdds?.length ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
