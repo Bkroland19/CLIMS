@@ -1,9 +1,8 @@
-import { Link, Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/theme/ThemeProvider";
 import { AppText, Button } from "@/components/ui";
-import { router } from "expo-router";
 
 export default function NotFoundScreen() {
   const { colors } = useTheme();
@@ -33,7 +32,7 @@ export default function NotFoundScreen() {
           <Ionicons name="compass-outline" size={40} color={colors.brandText} />
         </View>
         <AppText variant="title" style={{ textAlign: "center" }}>
-          We couldn't find that page
+          We couldn&apos;t find that page
         </AppText>
         <AppText variant="body" color="textMuted" style={{ textAlign: "center", marginTop: 6 }}>
           It may have moved or no longer exists.
