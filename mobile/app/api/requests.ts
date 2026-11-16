@@ -54,7 +54,7 @@ export const getRegions = async () => {
   try {
     const { data } = await axios.get(`${BASE_URL}/regions`);
     return data || [];
-  } catch (error: any) {
+  } catch {
     return []; // Return empty array instead of undefined
   }
 };
@@ -67,14 +67,14 @@ export const getDistricts = async (regionId: string) => {
   try {
     const { data } = await axios.get(`${BASE_URL}/districts/${regionId}`);
     return data || [];
-  } catch (error: any) {
+  } catch {
     // If the main API fails, try the fallback URL
     try {
       const { data } = await axios.get(
         `https://codezoneug.com/clims_backend/clims/public/api/districts/${regionId}`,
       );
       return data || [];
-    } catch (fallbackError: any) {
+    } catch {
       return []; // Return empty array instead of undefined
     }
   }
