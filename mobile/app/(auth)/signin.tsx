@@ -101,7 +101,7 @@ const SignIn = () => {
                   Welcome back
                 </AppText>
                 <AppText variant="body" color="textMuted" style={{ marginTop: 6 }}>
-                  Sign in to manage your hotspot's stock.
+                  Sign in to manage your hotspot&apos;s stock.
                 </AppText>
 
                 {/* Form sits directly on the page (no card) */}
