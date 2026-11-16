@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Modal, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,11 +19,13 @@ const BottomSheet: React.FC<Props> = ({ visible, title, onClose, children, scrol
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
+
+  // Mount the modal as soon as it is asked to show; unmounting waits for the exit animation.
+  if (visible && !mounted) setMounted(true);
 
   useEffect(() => {
     if (visible) {
-      setMounted(true);
       Animated.timing(progress, { toValue: 1, duration: 240, useNativeDriver: true }).start();
     } else if (mounted) {
       Animated.timing(progress, { toValue: 0, duration: 180, useNativeDriver: true }).start(
