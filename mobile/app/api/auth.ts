@@ -1,6 +1,6 @@
 // app/api/auth.ts
 import { BASE_URL } from "@/constants/baseUrl";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 
 export type LoginData = {
   username: string;
@@ -24,7 +24,7 @@ export const login = async (data: LoginData): Promise<LoginResponse> => {
     console.log("[login] response:", response.status, response.data);
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
+    if (isAxiosError(error)) {
       if (error.response) {
         // Server replied with an error status
         console.log("[login] server error:", error.response.status, error.response.data);
