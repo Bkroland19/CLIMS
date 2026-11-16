@@ -40,7 +40,10 @@ const Row: React.FC<{
   );
 };
 
-const HotspotCard: React.FC<HotspotCardProps> = React.memo(({ hotspot, onEdit }) => {
+const HotspotCard: React.FC<HotspotCardProps> = React.memo(function HotspotCard({
+  hotspot,
+  onEdit,
+}) {
   const { colors, radius } = useTheme();
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const h: any = hotspot;
