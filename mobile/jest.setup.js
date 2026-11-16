@@ -1,3 +1,4 @@
+/* global jest */
 // Reanimated needs a native runtime. Tests only need the pieces the app uses.
 jest.mock("react-native-reanimated", () => {
   const { View } = require("react-native");
