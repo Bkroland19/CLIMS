@@ -65,7 +65,7 @@ const MonthYearPicker: React.FC<Props> = ({ value, onChange, max, minYear }) => 
     latest,
   );
 
-  const Arrow = ({ dir, enabled }: { dir: -1 | 1; enabled: boolean }) => (
+  const renderArrow = (dir: -1 | 1, enabled: boolean) => (
     <Pressable
       onPress={() => step(dir)}
       disabled={!enabled}
@@ -101,7 +101,7 @@ const MonthYearPicker: React.FC<Props> = ({ value, onChange, max, minYear }) => 
           borderColor: colors.border,
         }}
       >
-        <Arrow dir={-1} enabled={canPrev} />
+        {renderArrow(-1, canPrev)}
         <Pressable
           onPress={() => {
             setSheetYear(value.year);
@@ -128,7 +128,7 @@ const MonthYearPicker: React.FC<Props> = ({ value, onChange, max, minYear }) => 
             style={{ marginLeft: 4 }}
           />
         </Pressable>
-        <Arrow dir={1} enabled={canNext} />
+        {renderArrow(1, canNext)}
       </View>
 
       <BottomSheet visible={open} title="Choose a month" onClose={() => setOpen(false)}>
