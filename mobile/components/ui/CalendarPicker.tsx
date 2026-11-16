@@ -60,7 +60,7 @@ const CalendarPicker: React.FC<Props> = ({ value, onSelect, maxDate, minDate }) 
     !minDate || new Date(view.getFullYear(), view.getMonth(), 0) >= startOfDay(minDate);
   const shift = (n: number) => setView(new Date(view.getFullYear(), view.getMonth() + n, 1));
 
-  const Arrow = ({ dir, enabled }: { dir: -1 | 1; enabled: boolean }) => (
+  const renderArrow = (dir: -1 | 1, enabled: boolean) => (
     <Pressable
       onPress={() => shift(dir)}
       disabled={!enabled}
@@ -85,11 +85,11 @@ const CalendarPicker: React.FC<Props> = ({ value, onSelect, maxDate, minDate }) 
   return (
     <View>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Arrow dir={-1} enabled={canPrev} />
+        {renderArrow(-1, canPrev)}
         <AppText variant="bodyStrong" accessibilityLiveRegion="polite">
           {MONTHS[view.getMonth()]} {view.getFullYear()}
         </AppText>
-        <Arrow dir={1} enabled={canNext} />
+        {renderArrow(1, canNext)}
       </View>
 
       <View style={{ flexDirection: "row", marginTop: 4 }}>
