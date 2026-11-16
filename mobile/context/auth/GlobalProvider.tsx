@@ -64,6 +64,7 @@ const GlobalProvider: React.FC<GlobalProviderProps> = ({ children }) => {
 
   // Load user data on component mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of the persisted session
     loadUserData();
   }, []);
 
