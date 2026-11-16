@@ -26,7 +26,7 @@ const StockActions: React.FC<Props> = ({ onAdd, onNotify }) => {
     fn();
   };
 
-  const Action = ({
+  const renderAction = ({
     icon,
     label,
     sub,
@@ -91,39 +91,37 @@ const StockActions: React.FC<Props> = ({ onAdd, onNotify }) => {
 
   return (
     <View style={{ flexDirection: "row", gap: 12 }}>
-      {onAdd ? (
-        <Action
-          icon="add-circle"
-          label="Add stock"
-          sub="Record a delivery"
-          onPress={onAdd}
-          bg={colors.brandSoft}
-          fg={colors.brandText}
-          a11y="Add stock. Record a delivery"
-        />
-      ) : null}
-      {outOfStock ? (
-        <Action
-          icon="notifications"
-          label="Out of stock"
-          sub="Notify focal person"
-          onPress={onNotify}
-          bg={colors.danger}
-          fg="#FFFFFF"
-          a11y="Out of stock. Notify the district focal person"
-        />
-      ) : (
-        <Action
-          icon="notifications-outline"
-          label="Running low?"
-          sub="Notify focal person"
-          onPress={onNotify}
-          bg={colors.warningSoft}
-          fg={colors.warning}
-          border={colors.warning}
-          a11y="Running low? Notify the district focal person"
-        />
-      )}
+      {onAdd
+        ? renderAction({
+            icon: "add-circle",
+            label: "Add stock",
+            sub: "Record a delivery",
+            onPress: onAdd,
+            bg: colors.brandSoft,
+            fg: colors.brandText,
+            a11y: "Add stock. Record a delivery",
+          })
+        : null}
+      {outOfStock
+        ? renderAction({
+            icon: "notifications",
+            label: "Out of stock",
+            sub: "Notify focal person",
+            onPress: onNotify,
+            bg: colors.danger,
+            fg: "#FFFFFF",
+            a11y: "Out of stock. Notify the district focal person",
+          })
+        : renderAction({
+            icon: "notifications-outline",
+            label: "Running low?",
+            sub: "Notify focal person",
+            onPress: onNotify,
+            bg: colors.warningSoft,
+            fg: colors.warning,
+            border: colors.warning,
+            a11y: "Running low? Notify the district focal person",
+          })}
     </View>
   );
 };
