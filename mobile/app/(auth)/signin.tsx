@@ -1,206 +1,94 @@
-import React, { useRef, useState } from "react";
-import { router } from "expo-router";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as SecureStore from "expo-secure-store";
-import MohLogo from "@/components/MohLogo";
-import { LoginData, LoginResponse, login } from "../api/auth";
-import { useGlobalContext } from "@/context/auth/GlobalProvider";
-import { useTheme } from "@/context/theme/ThemeProvider";
-import { AppText, Button, Input } from "@/components/ui";
-import { friendlyError } from "@/utils/errors";
+import React, { useState } from "react";
+import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { router, type Href } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useT } from "@/lib/theme";
+import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
+import { loginErrorMessage } from "@/lib/api";
+import { ROOT } from "@/lib/nav";
+import { DCFP } from "@/lib/seed";
+import { ROLE_LABEL, useSession } from "@/lib/session";
+import type { AppRole } from "@/lib/types";
+import { call } from "@/screens/common";
 
-const SignIn = () => {
-  const queryClient = useQueryClient();
-  const { setIsLogged, setUser } = useGlobalContext();
-  const { colors, radius } = useTheme();
-  const passwordRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+export default function SignIn() {
+  const T = useT();
+  const insets = useSafeAreaInsets();
+  const { signIn, signInDemo } = useSession();
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [forgot, setForgot] = useState(false);
+  const [demo, setDemo] = useState(false);
 
-  const [form, setForm] = useState<LoginData>({ username: "", password: "" });
-  const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
-  const [serverError, setServerError] = useState<string | null>(null);
+  const enter = async () => {
+    setErr("");
+    setBusy(true);
+    try {
+      await signIn(email, pw);
+      router.replace("/");
+    } catch (e) {
+      setErr(loginErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const { mutate, isPending } = useMutation<LoginResponse, Error, LoginData>({
-    mutationFn: login,
-    onSuccess: async (data) => {
-      queryClient.setQueryData(["login"], data);
-      queryClient.invalidateQueries({ queryKey: ["login"], exact: true });
-
-      if (data.code === 200) {
-        await SecureStore.setItemAsync("user", JSON.stringify(data?.user));
-        setIsLogged(true);
-        setUser(data.user);
-        router.replace("/home");
-      } else {
-        setServerError("Incorrect username or password. Please try again.");
-      }
-    },
-    onError: (error) => {
-      setServerError(friendlyError(error, "We couldn't sign you in. Please try again."));
-    },
-  });
-
-  const submit = () => {
-    setServerError(null);
-    const next: typeof errors = {};
-    if (!form.username.trim()) next.username = "Enter your username";
-    if (!form.password) next.password = "Enter your password";
-    setErrors(next);
-    if (Object.keys(next).length) return;
-
-    mutate(form);
+  const tryDemo = async (role: AppRole) => {
+    setDemo(false);
+    await signInDemo(role);
+    router.replace(`/${ROOT[role]}` as Href);
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ flexGrow: 1, padding: 24 }}
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }}>
+        <View style={{ alignItems: "center", paddingHorizontal: 24, marginBottom: 28, gap: 10 }}>
+          <View
+            accessible
+            accessibilityLabel="Ministry of Health, Republic of Uganda"
+            style={{ width: 88, height: 88, borderRadius: T.ios ? 20 : 24, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: T.sep }}
           >
-            <View
-              style={{
-                flex: 1,
-                width: "100%",
-                maxWidth: 480,
-                alignSelf: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <View>
-                {/* Back to the welcome screen */}
-                <Pressable
-                  onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-                  accessibilityRole="button"
-                  accessibilityLabel="Go back"
-                  hitSlop={8}
-                  style={{ width: 48, height: 48, justifyContent: "center", marginLeft: -12 }}
-                >
-                  <Ionicons name="arrow-back" size={24} color={colors.text} />
-                </Pressable>
+            <Image source={require("../../assets/images/coat-of-arms.png")} style={{ width: 64, height: 64 }} resizeMode="contain" />
+          </View>
+          <Txt accessibilityRole="header" style={{ fontSize: 34, fontWeight: "700", letterSpacing: 0.5 }}>CLIMS</Txt>
+          <Txt style={{ color: T.fg2, fontSize: 15 }}>Ministry of Health · Uganda</Txt>
+          <Txt style={{ color: T.fg2, fontSize: 15, textAlign: "center", lineHeight: 21, marginTop: 4 }}>
+            Sign in with the email and password your district focal person gave you.
+          </Txt>
+        </View>
 
-                <View style={{ marginTop: 4 }}>
-                  <MohLogo />
-                </View>
+        {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
 
-                <AppText variant="display" style={{ marginTop: 28 }} accessibilityRole="header">
-                  Welcome back
-                </AppText>
-                <AppText variant="body" color="textMuted" style={{ marginTop: 6 }}>
-                  Sign in to manage your hotspot&apos;s stock.
-                </AppText>
+        <Fields>
+          <Input label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" ph="name@example.org" />
+          <Input label="Password" value={pw} onChangeText={setPw} secure autoCapitalize="none" autoComplete="password" />
+        </Fields>
+        <Btns>
+          <Btn label={busy ? "Signing in…" : "Sign in"} onPress={enter} dis={busy || !email.trim() || !pw} />
+          <Btn label="Forgot password?" kind="text" onPress={() => setForgot(true)} />
+          {__DEV__ ? <Btn label="Try with sample data" kind="secondary" onPress={() => setDemo(true)} /> : null}
+        </Btns>
+        <Note center text="You stay signed in on this phone. CLIMS keeps working when there is no network." />
+      </ScrollView>
 
-                {/* Form sits directly on the page (no card) */}
-                <View style={{ marginTop: 32 }}>
-                  {serverError ? (
-                    <View
-                      accessibilityRole="alert"
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        backgroundColor: colors.dangerSoft,
-                        borderWidth: 1,
-                        borderColor: colors.danger,
-                        borderRadius: radius.md,
-                        padding: 12,
-                        marginBottom: 20,
-                      }}
-                    >
-                      <Ionicons name="alert-circle" size={20} color={colors.danger} />
-                      <AppText variant="caption" color="danger" style={{ marginLeft: 8, flex: 1 }}>
-                        {serverError}
-                      </AppText>
-                    </View>
-                  ) : null}
+      <Sheet visible={forgot} title="Forgot password" onClose={() => setForgot(false)}>
+        <Txt style={{ marginHorizontal: 24, marginBottom: 16, fontSize: 15, lineHeight: 21, color: T.fg }}>
+          {`Only your district focal person can reset your password. Call ${DCFP.name} to get a new one by SMS.`}
+        </Txt>
+        <Btns>
+          <Btn label={`Call ${DCFP.name.split(" ")[0]}`} icon="phone" onPress={() => { setForgot(false); call(DCFP.phone); }} />
+        </Btns>
+      </Sheet>
 
-                  <Input
-                    label="Username"
-                    icon="person-outline"
-                    value={form.username}
-                    onChangeText={(v) => setForm({ ...form, username: v })}
-                    error={errors.username}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    textContentType="username"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                  />
-
-                  <Input
-                    ref={passwordRef}
-                    label="Password"
-                    icon="lock-closed-outline"
-                    secure
-                    value={form.password}
-                    onChangeText={(v) => setForm({ ...form, password: v })}
-                    error={errors.password}
-                    autoCapitalize="none"
-                    textContentType="password"
-                    returnKeyType="go"
-                    onSubmitEditing={submit}
-                    containerStyle={{ marginTop: 20 }}
-                  />
-
-                  <Button
-                    title="Sign in"
-                    onPress={submit}
-                    loading={isPending}
-                    style={{ marginTop: 28 }}
-                  />
-
-                  <Pressable
-                    onPress={() => router.push("/help")}
-                    accessibilityRole="link"
-                    accessibilityLabel="Need help signing in? Open Help and support"
-                    style={{
-                      minHeight: 48,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginTop: 8,
-                    }}
-                  >
-                    <AppText variant="label" color="brandText">
-                      Need help signing in?
-                    </AppText>
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Footer stays at the bottom on tall screens, flows below on short ones */}
-              <View style={{ marginTop: 32, alignItems: "center" }}>
-                <AppText variant="caption" color="textMuted" style={{ textAlign: "center" }}>
-                  By signing in you agree to the{" "}
-                  <AppText
-                    variant="caption"
-                    color="brandText"
-                    accessibilityRole="link"
-                    onPress={() => router.push("/terms")}
-                    style={{ textDecorationLine: "underline" }}
-                  >
-                    Terms & conditions
-                  </AppText>
-                </AppText>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+      <Sheet visible={demo} title="Sample data" onClose={() => setDemo(false)}>
+        <List h="Sign in as" f="Development builds only. Sample Wakiso data is kept on this phone; the API has no hotspot or order endpoints yet.">
+          {(["vht", "hm", "rider"] as AppRole[]).map((r) => (
+            <Row key={r} t={ROLE_LABEL[r]} ic={r === "vht" ? "pin" : r === "hm" ? "home" : "truck"} chev onPress={() => tryDemo(r)} />
+          ))}
+        </List>
+      </Sheet>
+    </KeyboardAvoidingView>
   );
-};
-
-export default SignIn;
+}
