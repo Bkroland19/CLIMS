@@ -101,9 +101,7 @@ COMMIT;
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("name", nargs="?", default=os.getenv("MIGRATION_NAME"))
-    parser.add_argument(
-        "--permission", nargs=2, action="append", metavar=("CODE", "DESCRIPTION")
-    )
+    parser.add_argument("--permission", nargs=2, action="append", metavar=("CODE", "DESCRIPTION"))
     args = parser.parse_args()
     try:
         create_migration(args.name, permissions=args.permission)

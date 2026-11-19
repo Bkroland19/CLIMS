@@ -5,9 +5,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-schema = (
-    ROOT / "backend/internal/database/migrations/000001_init_schema.up.sql"
-).read_text()
+schema = (ROOT / "backend/internal/database/migrations/000001_init_schema.up.sql").read_text()
 seed = (ROOT / "infra/database/clims_postgres_seed.sql").read_text()
 
 print("BEGIN;")
