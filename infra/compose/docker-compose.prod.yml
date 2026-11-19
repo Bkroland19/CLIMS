@@ -8,6 +8,12 @@ services:
       context: ../..
       dockerfile: infra/docker/postgres/Dockerfile.prod
 
+  seaweedfs:
+    image: clims-seaweedfs:prod
+    build:
+      context: ../..
+      dockerfile: infra/docker/seaweedfs/Dockerfile.prod
+
   backend:
     image: ${BACKEND_IMAGE:-clims-backend:prod}
     build:

@@ -1,0 +1,2 @@
+FROM chrislusf/seaweedfs:3.80
+# Credentials, storage, and host access belong to the Compose environment.

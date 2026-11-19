@@ -12,6 +12,7 @@ base = root / "infra/compose/docker-compose.yml"
 with tempfile.NamedTemporaryFile(mode="w", suffix=".env") as environment:
     environment.write(
         "DB_PASSWORD=validation-only\nJWT_SECRET=validation-only\nEXPO_PUBLIC_API_URL=https://example.invalid/api/v1\n"
+        "S3_ACCESS_KEY=validation-only\nS3_SECRET_KEY=validation-only\n"
     )
     environment.flush()
     models = {}
@@ -39,7 +40,7 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env") as environment:
         model = json.loads(result.stdout)
         models[mode] = model
         services = model["services"]
-        assert set(services) == {"backend", "frontend", "mobile", "postgres", "nginx"}
+        assert set(services) == {"backend", "frontend", "mobile", "postgres", "seaweedfs", "nginx"}
         for name, service in services.items():
             build = service["build"]
             assert build["dockerfile"].endswith(f"Dockerfile.{mode}"), (mode, name)
@@ -49,15 +50,16 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env") as environment:
             assert model["name"] == "clims", "Development volume namespace changed"
             assert len(services["nginx"]["ports"]) == 2
             assert services["postgres"].get("ports")
+            assert services["seaweedfs"].get("ports")
             for name in ("backend", "frontend", "mobile"):
                 assert any(m["type"] == "bind" for m in services[name]["volumes"])
             assert "mobile" in services["nginx"]["depends_on"]
         else:
             assert model["name"] == "clims-prod"
             assert len(services["nginx"]["ports"]) == 1
-            for name in ("backend", "frontend", "postgres"):
+            for name in ("backend", "frontend", "postgres", "seaweedfs"):
                 assert not services[name].get("ports"), name
-            for name in ("backend", "frontend", "postgres", "nginx"):
+            for name in ("backend", "frontend", "postgres", "seaweedfs", "nginx"):
                 assert not any(m["type"] == "bind" for m in services[name].get("volumes", [])), name
             assert services["mobile"]["profiles"] == ["artifacts"]
             assert "mobile" not in services["nginx"]["depends_on"]
@@ -96,6 +98,10 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env") as environment:
         models["dev"]["volumes"]["postgres_data"]["name"]
         != models["prod"]["volumes"]["postgres_data"]["name"]
     )
+    assert (
+        models["dev"]["volumes"]["seaweedfs_data"]["name"]
+        != models["prod"]["volumes"]["seaweedfs_data"]["name"]
+    )
 print(
-    "PASS: dev/prod Dockerfile parity, development mounts, production isolation, gateway ports, separate database volumes, and release image overrides."
+    "PASS: dev/prod Dockerfile parity, development mounts, production isolation, gateway ports, separate database and object storage volumes, and release image overrides."
 )

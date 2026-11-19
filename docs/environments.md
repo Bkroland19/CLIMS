@@ -12,13 +12,14 @@ Run all commands from the repository root. `ENVIRONMENT=dev` is the default. Sel
 
 Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<service>/`:
 
-| Service  | Development                                                         | Production                                            |
-| -------- | ------------------------------------------------------------------- | ----------------------------------------------------- |
-| backend  | Go toolchain, Air reloads, mounted source/docs, module/build caches | Compiled binary and bundled API docs, nonroot runtime |
-| frontend | Next.js dev server, mounted source, dependency/build volumes        | Standalone Next.js server, Node user, built assets    |
-| mobile   | Expo Metro, mounted source, dependency volume                       | Optional iOS/Android JavaScript artifact export job   |
-| postgres | PostgreSQL 16, localhost database port                              | PostgreSQL 16, internal database port only            |
-| nginx    | Mounted development config, HTTP and Metro listeners                | Baked configuration, HTTP listener only               |
+| Service   | Development                                                         | Production                                            |
+| --------- | ------------------------------------------------------------------- | ----------------------------------------------------- |
+| backend   | Go toolchain, Air reloads, mounted source/docs, module/build caches | Compiled binary and bundled API docs, nonroot runtime |
+| frontend  | Next.js dev server, mounted source, dependency/build volumes        | Standalone Next.js server, Node user, built assets    |
+| mobile    | Expo Metro, mounted source, dependency volume                       | Optional iOS/Android JavaScript artifact export job   |
+| postgres  | PostgreSQL 16, localhost database port                              | PostgreSQL 16, internal database port only            |
+| seaweedfs | SeaweedFS object storage, localhost S3 port 8333                    | SeaweedFS object storage, internal S3 port only       |
+| nginx     | Mounted development config, HTTP and Metro listeners                | Baked configuration, HTTP listener only               |
 
 Both PostgreSQL Dockerfiles intentionally use the same upstream image. Runtime configuration belongs in Compose. Images are tagged `clims-<service>:dev` or `clims-<service>:prod`.
 
@@ -31,7 +32,7 @@ make check-stack
 make dev-down
 ```
 
-Development uses `infra/env/dev.env`, project name `clims`, and the existing `clims_postgres_data` volume. It publishes web/API/Swagger on localhost:8080, Metro on localhost:19000, and PostgreSQL on localhost:5432. Source changes reload Go, Next.js, and Metro. Nginx config edits require restarting Nginx. See [client setup](clients.md) for physical devices.
+Development uses `infra/env/dev.env`, project name `clims`, and the existing `clims_postgres_data` volume. It publishes web/API/Swagger on localhost:8080, Metro on localhost:19000, PostgreSQL on localhost:5432, and the SeaweedFS S3 API on localhost:8333. Source changes reload Go, Next.js, and Metro. Nginx config edits require restarting Nginx. See [client setup](clients.md) for physical devices.
 
 Client containers refresh dependencies from their lockfiles at startup. Cache volumes survive shutdown; database volumes also survive. Do not use `down -v` to refresh dependencies: it removes the database volume too.
 
@@ -46,7 +47,7 @@ STACK_URL=http://localhost:8088 make ENVIRONMENT=prod check-stack
 make prod-down
 ```
 
-Set `DB_PASSWORD` and a strong `JWT_SECRET` in `infra/env/prod.env`; empty values fail Compose validation. The env file is ignored by Git. Set `NGINX_PORT` and `BIND_ADDRESS` for the deployment. The example binds localhost:8088, allowing both stacks to run on the same machine. To expose HTTP directly, configure the bind address explicitly. The supplied gateway serves HTTP; configure a TLS edge or certificates for an HTTPS deployment.
+Set `DB_PASSWORD`, a strong `JWT_SECRET`, and `S3_ACCESS_KEY`/`S3_SECRET_KEY` in `infra/env/prod.env`; empty values fail Compose validation. SeaweedFS serves an S3-compatible API at `http://seaweedfs:8333` on the container network; use any S3 client with path-style addressing and those credentials. Objects persist in the `seaweedfs_data` volume. The env file is ignored by Git. Set `NGINX_PORT` and `BIND_ADDRESS` for the deployment. The example binds localhost:8088, allowing both stacks to run on the same machine. To expose HTTP directly, configure the bind address explicitly. The supplied gateway serves HTTP; configure a TLS edge or certificates for an HTTPS deployment.
 
 Production uses project name `clims-prod` and volume `clims-prod_postgres_data`, separate from development. It starts PostgreSQL, API, frontend, and Nginx. Server services have no source/config bind mounts, and only Nginx publishes a host port. Source and config changes require rebuilding the images. Existing database passwords are not changed by editing the env file: PostgreSQL initialization variables apply only to a new data directory.
 
