@@ -20,10 +20,10 @@ The supplied legacy dataset has no order rows. The migration archives any rows f
 ## Hotspot stockout workflow
 
 1. A hotspot manager reports a stockout using `POST /api/v1/orders/stockouts`. The order joins the district queue and generates a district notification. Configure `order_hot_spot_routes` to link each hotspot to its district store.
-2. The DCFP runs `review` and `check-stock`. The check reserves the full request when available and sends a confirmation to the reporter. An insufficient balance puts the order on hold.
-3. The DCFP uses `request-replenishment` on a held order with `warehouse_store_id`. This creates a linked request and notifies the warehouse. Warehouse staff review it, check stock and dispatch it. Warehouse staff can review and recheck a held request after replenishing warehouse stock.
-4. The district runs `receive` on the dispatched warehouse request with the counted `quantity_received`. A mismatch requires a `discrepancy_note`. Receipt credits the counted quantity once, and the DCFP can list held orders and review and recheck them.
-5. After confirmation, the district runs `dispatch` with the active district rider’s `rider_id`. The rider runs `deliver` with a `delivery_note`. The reporter receives a delivery notification.
+2. The DCFP runs `check-stock` on the queued order; the district review is automatic. The check reserves the full request when available and sends a confirmation to the reporter. An insufficient balance puts the order on hold. `review` is still accepted but no longer required for hotspot orders.
+3. The DCFP uses `request-replenishment` on a held order with `warehouse_store_id`. This creates a linked request and notifies the warehouse. Warehouse staff review it, check stock and dispatch it. After replenishing warehouse stock, warehouse staff rerun `check-stock` on a held request.
+4. The district runs `receive` on the dispatched warehouse request with the counted `quantity_received`. A mismatch requires a `discrepancy_note`. Receipt credits the counted quantity once and, in the same step, reserves stock for the held hotspot order and confirms it to the reporter. If the receipt is not enough, the order stays on hold for another `check-stock` or replenishment.
+5. After confirmation, the district runs `dispatch` with the active district rider’s `rider_id`. Dispatch issues the full quantity unless `quantity_issued` gives a smaller amount, which closes the order with the remainder released; the hotspot manager reports a new stockout for any shortfall. The rider runs `deliver` with a `delivery_note`. The reporter receives a delivery notification.
 
 Workflow actions use `POST /api/v1/orders/{id}/actions/{action}`. Run `GET /api/v1/orders?status=on_hold` to review held orders, `GET /api/v1/orders/{id}/events` for audit history and `GET /api/v1/orders/notifications` for the in-app inbox. Notifications are persisted for polling.
 
