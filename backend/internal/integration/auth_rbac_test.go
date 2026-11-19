@@ -18,6 +18,7 @@ import (
 
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
@@ -105,7 +106,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if legacyAdmin.Role == nil || legacyAdmin.Role.Name != "admin" || len(legacyAdmin.Role.Permissions) != 6 {
+	if legacyAdmin.Role == nil || legacyAdmin.Role.Name != "admin" || !legacyAdmin.HasPermission("orders:all_stores") {
 		t.Fatal("legacy admin role not resolved")
 	}
 	// Keep the access tests independent of real legacy account credentials.
@@ -139,6 +140,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwtMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(pool), jwtMiddleware, activeUser)
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
 		t.Helper()
@@ -289,6 +291,64 @@ func TestAuthRBACIntegration(t *testing.T) {
 	created := map[string]any{"username": "second-admin", "email": "second-admin@example.test", "password": "test-password-123", "role_ids": []string{adminRole, hotspotRole}}
 	secondID := request("POST", "/users", created, adminToken, 201)["data"].(map[string]any)["user_id"].(string)
 
+	// Orders exercise the migrated schema and both sides of store authorization.
+	var sourceID, destinationID, condomID, unitID string
+	if err = pool.QueryRow(ctx, `
+		WITH source AS (SELECT id FROM stores WHERE code = 'jms'),
+		     region AS (INSERT INTO regions(uid, name) VALUES ('test-region', 'Test region') RETURNING id),
+		     district AS (INSERT INTO districts(uid, name, region_id)
+		         SELECT 'test-district', 'Test district', id FROM region RETURNING id),
+		     destination AS (INSERT INTO stores(code, name, store_type, district_id)
+		         SELECT 'test-district', 'Test district store', 'district', id FROM district RETURNING id),
+		     product AS (SELECT id FROM condoms ORDER BY id LIMIT 1),
+		     unit AS (SELECT id FROM unit_of_measures ORDER BY id LIMIT 1)
+		SELECT source.id, destination.id, product.id, unit.id FROM source, destination, product, unit
+	`).Scan(&sourceID, &destinationID, &condomID, &unitID); err != nil {
+		t.Fatal(err)
+	}
+	orderBody := map[string]any{
+		"condom_id": condomID, "quantity_needed": 100, "order_date": "2026-11-19",
+		"ordered_from_store_id": sourceID, "ordered_for_store_id": destinationID,
+		"unit_of_measure_id": unitID,
+	}
+	request("GET", "/orders", nil, "", 401)
+	request("GET", "/orders", nil, userToken, 403)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{hotspotRole}}, adminToken, 200)
+	request("PUT", "/roles/"+hotspotRole+"/permissions",
+		map[string]any{"permissions": []string{"orders:read", "orders:create", "orders:fulfill"}}, adminToken, 200)
+	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=$1 WHERE id=$2`, sourceID, id); err != nil {
+		t.Fatal(err)
+	}
+	request("POST", "/orders", orderBody, userToken, 403)
+	order := request("POST", "/orders", orderBody, adminToken, 201)["data"].(map[string]any)
+	if order["ordered_by_id"] != adminID || order["order_status"] != "pending" ||
+		order["order_date"] != "2026-11-19" || order["quantity_issued"] != nil || order["handled_by_id"] != nil {
+		t.Fatalf("unexpected new order: %v", order)
+	}
+	orderPath := "/orders/" + order["id"].(string)
+	request("GET", orderPath, nil, userToken, 200)
+	request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 101}, userToken, 422)
+	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=$1 WHERE id=$2`, destinationID, id); err != nil {
+		t.Fatal(err)
+	}
+	request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 80}, userToken, 403)
+	request("POST", "/orders", orderBody, userToken, 201)
+	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=$1 WHERE id=$2`, sourceID, id); err != nil {
+		t.Fatal(err)
+	}
+	issued := request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 80}, userToken, 200)["data"].(map[string]any)
+	if issued["handled_by_id"] != id || issued["quantity_issued"] != float64(80) || issued["order_status"] != "fulfilled" {
+		t.Fatalf("unexpected fulfillment: %v", issued)
+	}
+	request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 80}, userToken, 409)
+	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=NULL WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	request("GET", orderPath, nil, userToken, 404)
+	if visible := request("GET", "/orders", nil, userToken, 200)["data"]; len(visible.([]any)) != 0 {
+		t.Fatalf("orders leaked to unassigned user: %v", visible)
+	}
+
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
 	for _, userID := range []string{adminID, secondID} {
@@ -335,6 +395,11 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if _, err = upgrade.Exec(ctx, string(seed)); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = upgrade.Exec(ctx, `INSERT INTO orders
+		(ordered_by, ordered_for, ordered_from, order_status, quantity_needed, order_date, comment)
+		VALUES ('1', 'district', 'jms', 'pending', '20', '2026-11-19', 'legacy order fixture')`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = upgrade.Exec(ctx, `CREATE TABLE schema_migrations(version bigint NOT NULL PRIMARY KEY,dirty boolean NOT NULL); INSERT INTO schema_migrations VALUES(1,false)`); err != nil {
 		t.Fatal(err)
 	}
@@ -376,6 +441,16 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	if !sameAssignment {
 		t.Fatal("upgrade changed an existing RBAC UUID or assignment")
+	}
+
+	var archived, current int
+	if err = upgrade.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM legacy_orders WHERE comment = 'legacy order fixture'),
+		(SELECT count(*) FROM orders)`).Scan(&archived, &current); err != nil {
+		t.Fatal(err)
+	}
+	if archived != 1 || current != 0 {
+		t.Fatalf("legacy orders upgrade: archived=%d current=%d", archived, current)
 	}
 
 }

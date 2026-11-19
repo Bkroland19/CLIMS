@@ -41,7 +41,7 @@ The repository joins roles and permission mappings when looking up users. Postgr
 
 ## Work context
 
-Administrator creation accepts existing `organisation_unit_id` and `hot_spot_id` UUIDs. Migration 5 resolves unambiguous legacy references to these UUIDs, and the legacy import uses the same lookup. User profiles include nullable `store_id` and `subcounty_id` fields. Those assignments await the corresponding reference tables and are currently read-only.
+Administrator creation accepts existing `organisation_unit_id` and `hot_spot_id` UUIDs. Migration 5 resolves unambiguous legacy references to these UUIDs, and the legacy import uses the same lookup. User profiles include nullable `store_id` and `subcounty_id` fields. The orders API uses `store_id` to scope order access. Both assignments are read-only through the users API.
 
 ## Access changes and administrator protection
 

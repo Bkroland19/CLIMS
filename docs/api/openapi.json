@@ -3,7 +3,7 @@
   "info": {
     "title": "CLIMS API",
     "version": "2.0.1",
-    "description": "Current Go/Fiber API for authentication, users, RBAC, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
+    "description": "Current Go/Fiber API for authentication, users, RBAC, orders, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
   },
   "servers": [
     {
@@ -22,6 +22,9 @@
       "name": "RBAC"
     },
     {
+      "name": "Orders"
+    },
+    {
       "name": "Health"
     }
   ],
@@ -31,6 +34,220 @@
     }
   ],
   "paths": {
+    "/api/v1/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "listOrders",
+        "summary": "List orders",
+        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store. Add orders:all_stores for cross-store access.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "createOrder",
+        "summary": "Request stock",
+        "description": "Requires orders:create. The requesting store must match the current user\u2019s store unless they have orders:all_stores. The date defaults to the database current date.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "getOrder",
+        "summary": "Get an order",
+        "description": "Requires orders:read. An order is visible to either store or users with orders:all_stores.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/fulfill": {
+      "patch": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "fulfillOrder",
+        "summary": "Record quantities issued",
+        "description": "Requires orders:fulfill and the supplying store, or orders:all_stores in addition to orders:fulfill. Fulfillment records a single issuance up to the quantity requested.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FulfillOrderRequest"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "tags": ["Auth"],
@@ -671,6 +888,185 @@
       }
     },
     "schemas": {
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": [
+          "condom_id",
+          "quantity_needed",
+          "ordered_for_store_id",
+          "ordered_from_store_id",
+          "unit_of_measure_id"
+        ],
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_needed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "order_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "ordered_for_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordered_from_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FulfillOrderRequest": {
+        "type": "object",
+        "required": [
+          "quantity_issued"
+        ],
+        "properties": {
+          "quantity_issued": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "id",
+          "condom_id",
+          "quantity_needed",
+          "order_date",
+          "ordered_for_store_id",
+          "ordered_from_store_id",
+          "unit_of_measure_id",
+          "comment",
+          "ordered_by_id",
+          "handled_by_id",
+          "quantity_issued",
+          "order_status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_needed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "order_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "ordered_for_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordered_from_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "ordered_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "handled_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "quantity_issued": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "nullable": true
+          },
+          "order_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "fulfilled"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OrderResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Order"
+          }
+        }
+      },
+      "OrderListResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        }
+      },
       "RegisterRequest": {
         "type": "object",
         "additionalProperties": false,

@@ -40,11 +40,12 @@ for match in re.finditer(r'^CREATE TABLE "(\w+)" \(\n(.*?)\n\);', schema, re.M |
         if table == "notifications" and column == "id":
             value += "::uuid"
         values.append(value)
+    target_table = "legacy_orders" if table == "orders" else table
     target_list = ", ".join(targets)
     value_list = ", ".join(values)
     conflict = " ON CONFLICT (legacy_id) DO NOTHING" if table == "roles" else ""
     print(
-        f'INSERT INTO public."{table}" ({target_list}) '
+        f'INSERT INTO public."{target_table}" ({target_list}) '
         f'SELECT {value_list} FROM pg_temp."{table}" source{conflict};'
     )
 
