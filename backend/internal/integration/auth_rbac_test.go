@@ -188,8 +188,25 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("GET", "/roles", nil, adminToken, 200)
 	request("GET", "/permissions", nil, adminToken, 200)
 
-	registration := map[string]any{"username": "newuser", "email": " NewUser@example.test ", "password": "test-password-123"}
-	for _, field := range []string{"role_id", "role", "status"} {
+	var facilityID, hotSpotID string
+	if err = pool.QueryRow(ctx, `SELECT (SELECT id FROM organization_units LIMIT 1), (SELECT id FROM hot_spots LIMIT 1)`).Scan(&facilityID, &hotSpotID); err != nil {
+		t.Fatal(err)
+	}
+	account := map[string]any{
+		"username": "assigned-user", "email": "assigned@example.test", "password": "test-password-123",
+		"role_id": hotspotRole, "organisation_unit_id": unknownID, "hot_spot_id": hotSpotID,
+	}
+	request("POST", "/users", account, adminToken, 422)
+	account["organisation_unit_id"] = facilityID
+	request("POST", "/users", account, adminToken, 201)
+	assignedToken := login("assigned@example.test", "test-password-123", 200)
+	assignedProfile := request("GET", "/auth/me", nil, assignedToken, 200)["data"].(map[string]any)
+	if assignedProfile["organisation_unit_id"] != facilityID || assignedProfile["hot_spot_id"] != hotSpotID {
+		t.Fatalf("account assignment did not round-trip: %v", assignedProfile)
+	}
+
+	registration := map[string]any{"username": "newuser", "email": " NewUser@example.test ", "password": "test-password-123", "first_name": "New", "lastname": "User", "location": "Kampala"}
+	for _, field := range []string{"role_id", "role", "status", "organisation_unit_id", "hot_spot_id", "remember_token"} {
 		bad := map[string]any{"username": "bad", "email": "bad@example.test", "password": "test-password-123", field: 1}
 		request("POST", "/auth/register", bad, "", 400)
 	}
@@ -206,6 +223,16 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	userToken := login("newuser@example.test", "test-password-123", 200)
 	me := request("GET", "/auth/me", nil, userToken, 200)["data"].(map[string]any)
+	loginData := request("POST", "/auth/login", map[string]any{"email": "newuser@example.test", "password": "test-password-123"}, "", 200)["data"].(map[string]any)
+	for _, profile := range []map[string]any{me, loginData["user"].(map[string]any)} {
+		if profile["first_name"] != "New" || profile["last_name"] != "User" || profile["location"] != "Kampala" ||
+			profile["created_at"] == nil || profile["updated_at"] == nil {
+			t.Fatalf("profile fields did not round-trip: %v", profile)
+		}
+		if _, present := profile["remember_token"]; present {
+			t.Fatal("profile exposed a remember token")
+		}
+	}
 	if me["role"] != nil {
 		t.Fatal("public registration assigned a role")
 	}
