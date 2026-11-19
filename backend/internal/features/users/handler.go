@@ -1,7 +1,6 @@
 package users
 
 import (
-	"context"
 	"errors"
 	"strconv"
 
@@ -14,21 +13,20 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type RoleCatalog interface {
-	RoleExists(context.Context, int) (bool, error)
-}
 type Handler struct {
 	Repo    *Repository
 	Service *Service
-	Roles   RoleCatalog
 }
 
-func NewHandler(repo *Repository, service *Service, roles RoleCatalog) *Handler {
-	return &Handler{Repo: repo, Service: service, Roles: roles}
+func NewHandler(repo *Repository, service *Service) *Handler {
+	return &Handler{Repo: repo, Service: service}
 }
 
-func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleID int) error {
-	id, err := h.Service.Create(c.Context(), req, roleID)
+func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleIDs []int) error {
+	id, err := h.Service.CreateWithRoles(c.Context(), req, roleIDs)
+	if errors.Is(err, ErrUnknownRole) {
+		return response.Error(c, 422, "unknown role_id", nil)
+	}
 	if errors.Is(err, ErrHashPassword) {
 		return response.Error(c, 500, "failed to hash password", nil)
 	}
@@ -88,14 +86,13 @@ func (h *Handler) CreateUser(c fiber.Ctx) error {
 	if len(req.Password) > 72 {
 		return response.Error(c, 422, "password must not exceed 72 bytes", nil)
 	}
-	exists, err := h.Roles.RoleExists(c.Context(), req.RoleID)
-	if err != nil {
-		return response.Error(c, 500, "failed to load role", nil)
+	if (req.RoleID == 0) == (req.RoleIDs == nil) {
+		return response.Error(c, 422, "provide either role_id or role_ids", nil)
 	}
-	if !exists {
-		return response.Error(c, 422, "unknown role_id", nil)
+	if req.RoleIDs != nil {
+		return h.createUser(c, req.AccountInput, *req.RoleIDs)
 	}
-	return h.createUser(c, req.AccountInput, req.RoleID)
+	return h.createUser(c, req.AccountInput, []int{req.RoleID})
 }
 
 func (h *Handler) AssignRole(c fiber.Ctx) error {
@@ -114,6 +111,27 @@ func (h *Handler) AssignRole(c fiber.Ctx) error {
 		return accessError(c, err)
 	}
 	return response.Success(c, 200, "role assigned", nil)
+}
+
+func (h *Handler) SetRoles(c fiber.Ctx) error {
+	id, err := request.PositiveID(c)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	var req SetRolesRequest
+	if err := request.DecodeJSON(c, &req); err != nil {
+		return response.Error(c, 400, "invalid request body", err.Error())
+	}
+	if err := validator.Validate.Struct(req); err != nil {
+		return response.Error(c, 422, "validation failed", validator.FormatErrors(err))
+	}
+	if err := h.Repo.SetUserRoles(c.Context(), id, *req.RoleIDs); err != nil {
+		if errors.Is(err, ErrUnknownRole) {
+			return response.Error(c, 422, err.Error(), nil)
+		}
+		return accessError(c, err)
+	}
+	return response.Success(c, 200, "user roles updated", nil)
 }
 
 func (h *Handler) SetStatus(c fiber.Ctx) error {
@@ -135,7 +153,7 @@ func (h *Handler) SetStatus(c fiber.Ctx) error {
 }
 
 func accessError(c fiber.Ctx, err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, ErrUnknownRole) {
 		return response.Error(c, 404, "user or role not found", nil)
 	}
 	if errors.Is(err, ErrLastAdmin) {

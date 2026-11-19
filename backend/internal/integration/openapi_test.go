@@ -27,7 +27,7 @@ func documentationApp() *fiber.App {
 	active := users.ActiveUser(repo)
 	v1 := app.Group("/api/v1")
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwt, active)
-	users.RegisterRoutes(v1, users.NewHandler(repo, service, roles), jwt, active)
+	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwt, active)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roles), jwt, active)
 	health.RegisterRoutes(app, health.NewHandler(nil, "test", "test", "test"))
 	apidocs.RegisterRoutes(app, os.DirFS(filepath.Join("..", "..", "..", "docs", "api")))

@@ -211,8 +211,8 @@
       "post": {
         "tags": ["Users"],
         "operationId": "createUser",
-        "summary": "Create a user with a role",
-        "description": "Create a user with a role Requires all permissions: users:create, roles:assign.",
+        "summary": "Create a user with roles",
+        "description": "Creates an account with one or more existing roles. Requires users:create and roles:assign.",
         "responses": {
           "201": {
             "description": "Success",
@@ -309,7 +309,7 @@
         "tags": ["Users"],
         "operationId": "assignRole",
         "summary": "Assign a user role",
-        "description": "Assigns an existing CLIMS role. Changes affect the next protected request. Demoting the last active admin is rejected. Requires all permissions: roles:assign.",
+        "description": "Replaces all assigned roles with one existing CLIMS role. Changes affect the next protected request. Demoting the last active admin is rejected. Requires roles:assign.",
         "responses": {
           "200": {
             "description": "Success",
@@ -600,6 +600,70 @@
         },
         "security": []
       }
+    },
+    "/api/v1/users/{id}/roles": {
+      "put": {
+        "tags": ["Users"],
+        "operationId": "setUserRoles",
+        "summary": "Replace a user’s roles",
+        "description": "Replaces the complete set of role assignments. Duplicate role IDs are ignored. An empty array removes every assignment. Unknown roles return 422. Removing the last active admin is rejected. Requires roles:assign.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["roles:assign"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRolesRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -656,7 +720,7 @@
       "CreateUserRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["username", "email", "password", "role_id"],
+        "required": ["username", "email", "password"],
         "properties": {
           "username": {
             "type": "string",
@@ -698,8 +762,27 @@
             "minimum": 1,
             "example": 7,
             "description": "Existing CLIMS role ID."
+          },
+          "role_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": [2, 7]
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": ["role_id"]
+          },
+          {
+            "required": ["role_ids"]
+          }
+        ]
       },
       "LoginRequest": {
         "type": "object",
@@ -810,7 +893,8 @@
           "lastname",
           "phone_number",
           "status",
-          "role"
+          "role",
+          "roles"
         ],
         "properties": {
           "id": {
@@ -840,6 +924,12 @@
           },
           "role": {
             "$ref": "#/components/schemas/NullableRole"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            }
           }
         }
       },
@@ -922,7 +1012,7 @@
           }
         },
         "nullable": true,
-        "description": "Null for an unassigned account or an unresolved legacy role."
+        "description": "First assigned role by numeric ID for backwards compatibility. Null when the account has no assigned roles."
       },
       "CreatedUserResponse": {
         "type": "object",
@@ -1133,6 +1223,23 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "SetRolesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role_ids"],
+        "properties": {
+          "role_ids": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": [2, 7]
           }
         }
       }

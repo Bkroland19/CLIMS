@@ -8,7 +8,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Handler struct{ Repo *Repository }
@@ -58,8 +57,7 @@ func accessError(c fiber.Ctx, err error) error {
 	if errors.Is(err, ErrAdminRole) {
 		return response.Error(c, 409, err.Error(), nil)
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+	if errors.Is(err, ErrUnknownPermission) {
 		return response.Error(c, 422, "unknown permission", nil)
 	}
 	return response.Error(c, 500, "failed to update or retrieve access", nil)

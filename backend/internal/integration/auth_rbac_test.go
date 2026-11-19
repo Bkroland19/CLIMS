@@ -109,7 +109,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	jwtMiddleware := middleware.NewJWTMiddleware("test-secret")
 	activeUser := users.ActiveUser(repo)
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwtMiddleware, activeUser)
-	users.RegisterRoutes(v1, users.NewHandler(repo, service, roleRepo), jwtMiddleware, activeUser)
+	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtMiddleware, activeUser)
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
@@ -199,6 +199,24 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{"users:create"}}, adminToken, 200)
 	request("POST", "/users", map[string]any{"username": "escalation", "email": "escalation@example.test", "password": "test-password-123", "role_id": 1}, userToken, 403)
 	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{}}, adminToken, 200)
+	rolePath := fmt.Sprintf("/users/%d/roles", id)
+	request("PUT", rolePath, map[string]any{"role_ids": []int{2, 7}}, userToken, 403)
+	request("PUT", rolePath, map[string]any{"role_ids": []int{2, 7, 7}}, adminToken, 200)
+	request("PUT", "/roles/2/permissions", map[string]any{"permissions": []string{"roles:read"}}, adminToken, 200)
+	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{"users:read"}}, adminToken, 200)
+	request("GET", "/roles", nil, userToken, 200)
+	request("GET", "/users?limit=1", nil, userToken, 200)
+	me = request("GET", "/auth/me", nil, userToken, 200)["data"].(map[string]any)
+	if len(me["roles"].([]any)) != 2 {
+		t.Fatal("role assignments were lost or duplicated")
+	}
+	request("PUT", rolePath, map[string]any{"role_ids": []int{2, 9999}}, adminToken, 422)
+	request("GET", "/users?limit=1", nil, userToken, 200)
+	request("PUT", rolePath, map[string]any{"role_ids": nil}, adminToken, 422)
+	request("PUT", rolePath, map[string]any{"role_ids": []int{}}, adminToken, 200)
+	request("GET", "/roles", nil, userToken, 403)
+	request("GET", "/users", nil, userToken, 403)
+	request("PUT", fmt.Sprintf("/users/%d/roles", adminID), map[string]any{"role_ids": []int{2, 7}}, adminToken, 409)
 	request("PUT", "/roles/1/permissions", map[string]any{"permissions": []string{}}, adminToken, 409)
 	request("PATCH", fmt.Sprintf("/users/%d/status", id), map[string]any{"status": "disabled"}, adminToken, 200)
 	request("GET", "/auth/me", nil, userToken, 403)
@@ -211,7 +229,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("GET", "/users/9999999", nil, adminToken, 404)
 	request("PATCH", fmt.Sprintf("/users/%d/status", adminID), map[string]any{"status": "disabled"}, adminToken, 409)
 	request("PATCH", fmt.Sprintf("/users/%d/role", adminID), map[string]any{"role_id": 2}, adminToken, 409)
-	created := map[string]any{"username": "second-admin", "email": "second-admin@example.test", "password": "test-password-123", "role_id": 1}
+	created := map[string]any{"username": "second-admin", "email": "second-admin@example.test", "password": "test-password-123", "role_ids": []int{1, 7}}
 	secondID := int(request("POST", "/users", created, adminToken, 201)["data"].(map[string]any)["user_id"].(float64))
 
 	// Two simultaneous updates must leave at least one administrator active.
@@ -266,7 +284,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM role_permissions WHERE role_id<>1)`).Scan(&userCount, &roleCount); err != nil {
+	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM role_permission rp JOIN roles r ON r.rbac_id = rp.role_id WHERE r.id<>1)`).Scan(&userCount, &roleCount); err != nil {
 		t.Fatal(err)
 	}
 	if userCount != 455 || roleCount != 0 {
