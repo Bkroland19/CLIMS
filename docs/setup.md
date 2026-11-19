@@ -11,6 +11,8 @@ make setup
 make docker-up
 ```
 
+The Makefile works on macOS, Linux, and Windows. On Windows it needs GNU Make and Git for Windows; it runs recipes with Git's `sh` from any terminal and calls Python as `python` (override with `PYTHON=...`). Helper scripts need Python 3.12+.
+
 The Go toolchain must be 1.26+ when running or testing the backend outside Docker. Docker supplies its own toolchain.
 
 `make setup` copies `infra/env/dev.env.example` only if your environment file does not exist. Compose starts PostgreSQL, the Go API, the Next.js web app, Expo Metro, and Nginx. The backend embeds and applies versioned schema migrations at startup. PostgreSQL stores its data in a named volume; restarting the stack preserves it.

@@ -2,82 +2,117 @@ import { z } from 'zod';
 
 import { decimalNumber } from '@/lib/validation';
 
-import type { Hotspot } from './api';
+import type { Hotspot, HotspotSubmission } from './api';
 
-const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/;
+const PHONE_PATTERN = /^\+?[0-9 ()-]{7,15}$/;
 
-export const hotspotSchema = z.object({
-  hotspot_name: z.string().trim().min(1, 'Enter the hotspot name.').max(150),
-  contact_person_name: z.string().trim().min(1, 'Enter the contact person.').max(150),
-  contact_person_telephone: z
+export const DISPENSER_CONDITIONS = ['Good', 'Poor', 'Broken'] as const;
+
+/** Optional text, blank becomes `null`; limits match the hotspot columns. */
+function optional(limit: number) {
+  return z
     .string()
     .trim()
-    .min(1, 'Enter a contact phone number.')
-    .regex(PHONE_PATTERN, 'Enter a phone number, e.g. +256 700 000000.'),
-  latitude: decimalNumber('a latitude', { min: -90, max: 90 }),
-  longitude: decimalNumber('a longitude', { min: -180, max: 180 }),
-  organization_unit_id: z.string().min(1, 'Choose an organisation unit.'),
-  hotspot_status: z.string().min(1, 'Choose a status.'),
-});
+    .max(limit, `Use at most ${limit} characters.`)
+    .transform((value) => value || null);
+}
 
-export type HotspotFormInput = z.input<typeof hotspotSchema>;
-export type HotspotFormOutput = z.output<typeof hotspotSchema>;
+/** An optional coordinate: blank is `null`, anything else must be a decimal in range. */
+function optionalCoordinate(noun: string, range: { min: number; max: number }) {
+  const coordinate = decimalNumber(noun, range);
+  return z.string().transform((value, ctx) => {
+    if (value.trim() === '') return null;
+    const result = coordinate.safeParse(value);
+    if (result.success) return result.data;
+    for (const issue of result.error.issues)
+      ctx.addIssue({ code: 'custom', message: issue.message });
+    return z.NEVER;
+  });
+}
 
-export const HOTSPOT_FIELDS = [
-  'hotspot_name',
+export const submissionSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Enter the hotspot name.').max(40, 'Use at most 40 characters.'),
+    district_id: z.string().min(1, 'Choose the district.'),
+    type: optional(40),
+    village: optional(20),
+    contact_person_name: optional(40),
+    contact_person_telephone: z
+      .string()
+      .trim()
+      .refine((value) => value === '' || PHONE_PATTERN.test(value), {
+        message: 'Enter a phone number, e.g. +256 700000000.',
+      })
+      .transform((value) => value || null),
+    has_condom_dispenser: z.enum(['', 'yes', 'no']),
+    dispenser_condition: z.string(),
+    latitude: optionalCoordinate('a latitude', { min: -90, max: 90 }),
+    longitude: optionalCoordinate('a longitude', { min: -180, max: 180 }),
+    comment: optional(100),
+  })
+  .superRefine((values, ctx) => {
+    if (values.has_condom_dispenser === 'yes' && values.dispenser_condition === '') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dispenser_condition'],
+        message: 'Choose the dispenser condition.',
+      });
+    }
+    if ((values.latitude === null) !== (values.longitude === null)) {
+      const missing = values.latitude === null ? 'latitude' : 'longitude';
+      ctx.addIssue({
+        code: 'custom',
+        path: [missing],
+        message: 'Enter both coordinates, or neither.',
+      });
+    }
+  })
+  .transform((values): HotspotSubmission => ({
+    ...values,
+    has_condom_dispenser:
+      values.has_condom_dispenser === '' ? null : values.has_condom_dispenser === 'yes',
+    dispenser_condition: values.has_condom_dispenser === 'yes' ? values.dispenser_condition : null,
+  }));
+
+export type SubmissionFormInput = z.input<typeof submissionSchema>;
+
+export const SUBMISSION_FIELDS = [
+  'name',
+  'district_id',
+  'type',
+  'village',
   'contact_person_name',
   'contact_person_telephone',
+  'has_condom_dispenser',
+  'dispenser_condition',
   'latitude',
   'longitude',
-  'organization_unit_id',
-  'hotspot_status',
-] as const satisfies readonly (keyof HotspotFormInput)[];
+  'comment',
+] as const satisfies readonly (keyof SubmissionFormInput)[];
 
-/** The API calls longitude "longtitude"; its validation errors use that name too. */
-export const HOTSPOT_SERVER_FIELD_MAP = { longtitude: 'longitude' } as const;
+export const EMPTY_SUBMISSION: SubmissionFormInput = {
+  name: '',
+  district_id: '',
+  type: '',
+  village: '',
+  contact_person_name: '',
+  contact_person_telephone: '',
+  has_condom_dispenser: '',
+  dispenser_condition: '',
+  latitude: '',
+  longitude: '',
+  comment: '',
+};
 
-const STANDARD_STATUSES = ['active', 'pending', 'inactive'] as const;
-
-/**
- * Status choices for the form. A record saved with some other status keeps it
- * as an extra option, so opening and saving a hotspot never silently rewrites it.
- */
-export function statusOptions(current: string | null): { value: string; label: string }[] {
-  const values: string[] = [...STANDARD_STATUSES];
-  const existing = current?.trim();
-  if (existing && !values.some((value) => value === existing.toLowerCase())) values.push(existing);
-  return values.map((value) => ({
-    value,
-    label: value.charAt(0).toUpperCase() + value.slice(1),
-  }));
+export function hotspotLabel(hotspot: Pick<Hotspot, 'name'>): string {
+  return hotspot.name ?? 'Unnamed hotspot';
 }
 
-/** The form value for a stored status: the standard spelling when it is one, else as stored. */
-function statusValue(current: string | null): string {
-  const existing = current?.trim() ?? '';
-  const standard = STANDARD_STATUSES.find((value) => value === existing.toLowerCase());
-  return standard ?? existing;
-}
-
-export function hotspotFormDefaults(hotspot: Hotspot | null): HotspotFormInput {
-  return {
-    hotspot_name: hotspot?.hotspot_name ?? '',
-    contact_person_name: hotspot?.contact_person_name ?? '',
-    contact_person_telephone: hotspot?.contact_person_telephone ?? '',
-    latitude:
-      hotspot?.latitude === null || hotspot?.latitude === undefined ? '' : String(hotspot.latitude),
-    longitude:
-      hotspot?.longitude === null || hotspot?.longitude === undefined
-        ? ''
-        : String(hotspot.longitude),
-    organization_unit_id:
-      hotspot?.organization_unit_id === null || hotspot?.organization_unit_id === undefined
-        ? ''
-        : String(hotspot.organization_unit_id),
-    hotspot_status: statusValue(hotspot?.hotspot_status ?? null),
-  };
-}
-
-export function hotspotLabel(hotspot: Pick<Hotspot, 'id' | 'hotspot_name'>): string {
-  return hotspot.hotspot_name ?? `Hotspot #${hotspot.id}`;
+/** "Yes, in good condition" style summary of the dispenser answers. */
+export function dispenserSummary(
+  hotspot: Pick<Hotspot, 'has_condom_dispenser' | 'dispenser_condition'>,
+) {
+  if (hotspot.has_condom_dispenser === null) return null;
+  if (!hotspot.has_condom_dispenser) return 'No';
+  return hotspot.dispenser_condition ? `Yes, ${hotspot.dispenser_condition.toLowerCase()}` : 'Yes';
 }

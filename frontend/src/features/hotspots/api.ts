@@ -1,59 +1,104 @@
 import { z } from 'zod';
 
-import { idSchema, optionalNumber, optionalText, parseList, type HttpClient } from '@/lib/api';
+import { optionalNumber, optionalText, parseList, type HttpClient } from '@/lib/api';
 
-/**
- * The API spells longitude "longtitude". That spelling is its contract, so it
- * is used on the wire and nowhere else: responses are mapped to `longitude`
- * here and requests mapped back in `toWire`.
- */
-const hotspotSchema = z
-  .object({
-    id: idSchema,
-    hotspot_name: optionalText,
-    contact_person_name: optionalText,
-    contact_person_telephone: optionalText,
-    latitude: optionalNumber,
-    longtitude: optionalNumber,
-    organization_unit_id: optionalNumber,
-    hotspot_status: optionalText,
-  })
-  .transform(({ longtitude, ...rest }) => ({ ...rest, longitude: longtitude }));
+/** Ids are UUIDs from the Go API. */
+const uuidSchema = z.string().min(1);
+const optionalId = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? null);
+
+const hotspotSchema = z.object({
+  id: uuidSchema,
+  name: optionalText,
+  type: optionalText,
+  village: optionalText,
+  contact_person_name: optionalText,
+  contact_person_telephone: optionalText,
+  has_condom_dispenser: z
+    .boolean()
+    .nullish()
+    .transform((value) => value ?? null),
+  dispenser_condition: optionalText,
+  latitude: optionalNumber,
+  longitude: optionalNumber,
+  comment: optionalText,
+  status: optionalText,
+  rejection_reason: optionalText,
+  district_id: optionalId,
+  submitted_by_id: optionalId,
+  created_at: optionalText,
+});
 
 export type Hotspot = z.infer<typeof hotspotSchema>;
 
-export interface HotspotInput {
-  hotspot_name: string;
-  contact_person_name: string;
-  contact_person_telephone: string;
-  latitude: number;
-  longitude: number;
-  organization_unit_id: string;
-  hotspot_status: string;
+/** What a VHT sends to submit a newly identified hotspot. */
+export interface HotspotSubmission {
+  name: string;
+  district_id: string;
+  type: string | null;
+  village: string | null;
+  contact_person_name: string | null;
+  contact_person_telephone: string | null;
+  has_condom_dispenser: boolean | null;
+  dispenser_condition: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  comment: string | null;
 }
 
-function toWire({ longitude, ...rest }: HotspotInput) {
-  return { ...rest, longtitude: longitude };
-}
+/** The DCFP's steps: verify then activate a submission, or reject it with a reason. */
+export type HotspotAction = 'verify' | 'activate' | 'reject';
 
+const eventSchema = z.object({
+  id: uuidSchema,
+  hot_spot_id: uuidSchema,
+  action: z.string(),
+  status: z.string(),
+  created_at: z.string(),
+});
+
+export type HotspotEvent = z.infer<typeof eventSchema>;
+
+const districtSchema = z.object({ id: uuidSchema, name: z.string() });
+
+export type District = z.infer<typeof districtSchema>;
+
+// shortcut: one page of the 100 most recent hotspots; page through the API when a district has more.
 export async function listHotspots(http: HttpClient, signal?: AbortSignal): Promise<Hotspot[]> {
-  return parseList(hotspotSchema, await http.get('/hotSpots', { signal }), 'hotspots');
+  return parseList(hotspotSchema, await http.get('/hotspots?limit=100', { signal }), 'hotspots');
 }
 
-export async function createHotspot(http: HttpClient, input: HotspotInput): Promise<void> {
-  await http.post('/hotSpots', toWire(input));
+export async function submitHotspot(http: HttpClient, input: HotspotSubmission): Promise<void> {
+  await http.post('/hotspots', input);
 }
 
-export async function updateHotspot(
+export async function actOnHotspot(
   http: HttpClient,
-  id: number,
-  input: HotspotInput,
+  id: string,
+  action: HotspotAction,
+  reason?: string,
 ): Promise<void> {
-  await http.put(`/hotSpots/${id}`, toWire(input));
+  await http.post(
+    `/hotspots/${encodeURIComponent(id)}/actions/${action}`,
+    action === 'reject' ? { reason } : undefined,
+  );
 }
 
-export async function deleteHotspot(http: HttpClient, id: number): Promise<void> {
-  await http.delete(`/hotSpots/${id}`);
+export async function listHotspotNotifications(
+  http: HttpClient,
+  signal?: AbortSignal,
+): Promise<HotspotEvent[]> {
+  return parseList(
+    eventSchema,
+    await http.get('/hotspots/notifications', { signal }),
+    'hotspot notifications',
+  );
+}
+
+export async function listDistricts(http: HttpClient, signal?: AbortSignal): Promise<District[]> {
+  return parseList(districtSchema, await http.get('/hotspots/districts', { signal }), 'districts');
 }
 
 export interface MappableHotspot extends Hotspot {
