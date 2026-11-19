@@ -168,3 +168,15 @@ jobs:
             args+=(--prerelease)
           fi
           gh release create "$RELEASE_TAG" release/images.json release/images.env "${args[@]}"
+
+  deploy:
+    name: Deploy production server
+    needs: [prepare, release]
+    if: github.event_name == 'push' && needs.prepare.outputs.prerelease == 'false'
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      release_tag: ${{ needs.prepare.outputs.version }}
+    secrets: inherit

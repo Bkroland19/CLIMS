@@ -24,7 +24,7 @@ import (
 
 // Version variables injected at build time via -ldflags
 var (
-	Version    = "2.0.0"
+	Version    = "2.0.1"
 	CommitHash = "none"
 	BuildTime  = "unknown"
 )
@@ -77,7 +77,7 @@ func main() {
 	activeUser := users.ActiveUser(userRepo)
 
 	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret), jwtAuthMiddleware, activeUser)
-	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService, roleRepo), jwtAuthMiddleware, activeUser)
+	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)

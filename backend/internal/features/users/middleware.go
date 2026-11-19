@@ -13,8 +13,8 @@ import (
 // ActiveUser resolves identity and permissions from PostgreSQL for each request.
 func ActiveUser(repo *Repository) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		id, ok := c.Locals("user_id").(int)
-		if !ok || id <= 0 {
+		id, ok := c.Locals("user_id").(string)
+		if !ok || id == "" {
 			return response.Error(c, 401, "unauthorized", nil)
 		}
 		user, err := repo.GetUserByID(c.Context(), id)

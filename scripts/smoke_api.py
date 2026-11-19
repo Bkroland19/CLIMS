@@ -33,6 +33,7 @@ account = {
     "password": "smoke-password-123",
 }
 user_id = request("/api/v1/auth/register", 201, account)["data"]["user_id"]
+assert str(uuid.UUID(user_id)) == user_id
 request("/api/v1/auth/register", 409, account)
 request("/api/v1/auth/login", 401, {"email": account["email"], "password": "incorrect"})
 token = request(

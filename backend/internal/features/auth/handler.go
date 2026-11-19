@@ -2,7 +2,6 @@ package auth
 
 import (
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
@@ -41,10 +40,10 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	if len(req.Password) > 72 {
 		return response.Error(c, 422, "password must not exceed 72 bytes", nil)
 	}
-	return h.createUser(c, req.AccountInput, 0)
+	return h.createUser(c, req.AccountInput, "")
 }
 
-func (h *Handler) createUser(c fiber.Ctx, req users.AccountInput, roleID int) error {
+func (h *Handler) createUser(c fiber.Ctx, req users.AccountInput, roleID string) error {
 	id, err := h.Service.Create(c.Context(), req, roleID)
 	if errors.Is(err, users.ErrHashPassword) {
 		return response.Error(c, 500, "failed to hash password", nil)
@@ -84,7 +83,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	if user.Status != "active" {
 		return response.Error(c, 403, "account is disabled", nil)
 	}
-	claims := jwt.MapClaims{"sub": strconv.Itoa(user.ID), "iat": time.Now().Unix(), "exp": time.Now().Add(24 * time.Hour).Unix()}
+	claims := jwt.MapClaims{"sub": user.ID, "iat": time.Now().Unix(), "exp": time.Now().Add(24 * time.Hour).Unix()}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.JWTSecret))
 	if err != nil {
 		return response.Error(c, 500, "failed to generate token", nil)
