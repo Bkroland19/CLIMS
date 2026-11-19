@@ -2,7 +2,20 @@ import React, { useState } from "react";
 import { Share } from "react-native";
 import { useT } from "@/lib/theme";
 import Screen from "@/components/m/Screen";
-import { Banner, Btn, Btns, Check, Done, Fields, Hero, Input, List, Row, Stepper, type StepItem } from "@/components/m/kit";
+import {
+  Banner,
+  Btn,
+  Btns,
+  Check,
+  Done,
+  Fields,
+  Hero,
+  Input,
+  List,
+  Row,
+  Stepper,
+  type StepItem,
+} from "@/components/m/kit";
 import { MapCard, PhotoField, SignaturePad } from "@/components/m/media";
 import { ago, chip, type ChipDef, items, lineRows, num, PRODUCTS, toInt } from "@/lib/format";
 import { useNav } from "@/lib/nav";
@@ -28,7 +41,9 @@ function useRider() {
 export function RiderDeliveries() {
   const nav = useNav();
   const { mine, H } = useRider();
-  const actv = mine.filter((o) => o.status === "dispatched" || o.status === "in_transit").sort((a, b) => b.delivery!.at - a.delivery!.at);
+  const actv = mine
+    .filter((o) => o.status === "dispatched" || o.status === "in_transit")
+    .sort((a, b) => b.delivery!.at - a.delivery!.at);
   const first = actv[0];
   const fh = first ? H(first.hotspotId) : undefined;
   return (
@@ -39,17 +54,37 @@ export function RiderDeliveries() {
           title={first.hotspot}
           sub={`${first.delivery!.dn} · ${items(first.approved)} · ${fh?.village ?? ""}`}
           chip={RC[first.status]}
-          msg={first.status === "dispatched" ? "Collect the stock and delivery note at the Wakiso district store." : `Ride to ${fh?.village} and hand over to ${fh?.contact}.`}
+          msg={
+            first.status === "dispatched"
+              ? "Collect the stock and delivery note at the Wakiso district store."
+              : `Ride to ${fh?.village} and hand over to ${fh?.contact}.`
+          }
         >
-          <Btn label={first.status === "dispatched" ? "Start collection" : "Continue delivery"} onPress={() => nav.go(`delivery/${first.id}`)} />
+          <Btn
+            label={first.status === "dispatched" ? "Start collection" : "Continue delivery"}
+            onPress={() => nav.go(`delivery/${first.id}`)}
+          />
         </Hero>
       ) : (
-        <Done tone="neutral" icon="truck" title="No deliveries right now" body="You get a notification when the district assigns you a delivery." />
+        <Done
+          tone="neutral"
+          icon="truck"
+          title="No deliveries right now"
+          body="You get a notification when the district assigns you a delivery."
+        />
       )}
       {actv.length > 1 ? (
         <List h="Also assigned">
           {actv.slice(1).map((o) => (
-            <Row key={o.id} t={o.hotspot} s={`${o.delivery!.dn} · ${items(o.approved)}`} chip={RC[o.status]} ic="truck" chev onPress={() => nav.go(`delivery/${o.id}`)} />
+            <Row
+              key={o.id}
+              t={o.hotspot}
+              s={`${o.delivery!.dn} · ${items(o.approved)}`}
+              chip={RC[o.status]}
+              ic="truck"
+              chev
+              onPress={() => nav.go(`delivery/${o.id}`)}
+            />
           ))}
         </List>
       ) : null}
@@ -92,18 +127,32 @@ function Collect({ o }: { o: Order }) {
     ...PRODUCTS.filter((p) => o.approved[p.k] > 0).map((p): [string, string, string] => [
       p.k,
       `${p.name} · ${num(o.approved[p.k])}`,
-      alloc.filter((a) => a.k === p.k).map((a) => `${a.batch} (exp ${a.exp})`).join(", ") || p.brand,
+      alloc
+        .filter((a) => a.k === p.k)
+        .map((a) => `${a.batch} (exp ${a.exp})`)
+        .join(", ") || p.brand,
     ]),
   ];
   return (
     <>
       <Fields h="Before you leave the store" f="Tick each item as you load it.">
         {list.map(([k, t, sub]) => (
-          <Check key={k} label={t} sub={sub} value={!!d[k]} onChange={(v) => setD((x) => ({ ...x, [k]: v }))} />
+          <Check
+            key={k}
+            label={t}
+            sub={sub}
+            value={!!d[k]}
+            onChange={(v) => setD((x) => ({ ...x, [k]: v }))}
+          />
         ))}
       </Fields>
       <Btns>
-        <Btn label="Start trip" icon="truck" dis={!list.every(([k]) => d[k])} onPress={() => send("pickup", { id: o.id }, `Start trip · ${dl.dn}`)} />
+        <Btn
+          label="Start trip"
+          icon="truck"
+          dis={!list.every(([k]) => d[k])}
+          onPress={() => send("pickup", { id: o.id }, `Start trip · ${dl.dn}`)}
+        />
       </Btns>
     </>
   );
@@ -131,24 +180,50 @@ function Handover({ o, contact }: { o: Order; contact: string }) {
     <>
       <Fields h="Handed over">
         {lines.map((p) => (
-          <Stepper key={p.k} label={p.name} sub={`Note says ${num(o.approved[p.k])}`} value={v[`q_${p.k}`] ?? String(o.approved[p.k])} onChange={set(`q_${p.k}`)} step={10} />
+          <Stepper
+            key={p.k}
+            label={p.name}
+            sub={`Note says ${num(o.approved[p.k])}`}
+            value={v[`q_${p.k}`] ?? String(o.approved[p.k])}
+            onChange={set(`q_${p.k}`)}
+            step={10}
+          />
         ))}
       </Fields>
       <Fields h="Already at the hotspot" f="Enter 0 if there was nothing left.">
         {lines.map((p) => (
-          <Stepper key={p.k} label={p.name} sub="Count before you hand over" value={v[`f_${p.k}`] ?? ""} onChange={set(`f_${p.k}`)} step={10} />
+          <Stepper
+            key={p.k}
+            label={p.name}
+            sub="Count before you hand over"
+            value={v[`f_${p.k}`] ?? ""}
+            onChange={set(`f_${p.k}`)}
+            step={10}
+          />
         ))}
       </Fields>
       <Fields h="Received by">
         <Input label="Name" value={recipient} onChangeText={setRecipient} autoCapitalize="words" />
       </Fields>
       <SignaturePad who={`Signed by ${recipient || "…"}`} value={sig} onChange={setSig} />
-      <PhotoField h="Signed delivery note" value={photo} onChange={setPhoto} hint="Photograph the delivery note after it is signed." when="Taken just now on this phone" />
+      <PhotoField
+        h="Signed delivery note"
+        value={photo}
+        onChange={setPhoto}
+        hint="Photograph the delivery note after it is signed."
+        when="Taken just now on this phone"
+      />
       <Btns>
         <Btn
           label="Confirm handover"
           dis={!photo || !sig || !recipient.trim() || missing}
-          onPress={() => send("deliver", { id: o.id, qty, found, recipient: recipient.trim(), photo, sig }, `Delivery · ${dl.dn}`)}
+          onPress={() =>
+            send(
+              "deliver",
+              { id: o.id, qty, found, recipient: recipient.trim(), photo, sig },
+              `Delivery · ${dl.dn}`,
+            )
+          }
         />
       </Btns>
     </>
@@ -161,33 +236,84 @@ export function RiderDelivery({ id }: { id: string }) {
   const { mine, H } = useRider();
   const pend = usePending(id);
   const o = mine.find((x) => x.id === id);
-  if (!o) return <Screen title="Delivery" backLabel="Deliveries"><Banner tone="neutral" title="That delivery isn't available" body="It may have been reassigned." /></Screen>;
+  if (!o)
+    return (
+      <Screen title="Delivery" backLabel="Deliveries">
+        <Banner
+          tone="neutral"
+          title="That delivery isn't available"
+          body="It may have been reassigned."
+        />
+      </Screen>
+    );
   const h = H(o.hotspotId);
   const st = o.status;
   const dl = o.delivery!;
   const steps: StepItem[] = [
-    { label: "Collect stock", st: st === "dispatched" ? "cur" : "done", sub: dl.pickedAt != null ? ago(dl.pickedAt) : "Wakiso district store" },
-    { label: "Ride to hotspot", st: st === "in_transit" ? "cur" : st === "dispatched" ? "todo" : "done", sub: h?.village },
-    { label: "Hand over", st: st === "in_transit" ? "cur" : st === "dispatched" ? "todo" : "done", sub: dl.deliveredAt != null ? ago(dl.deliveredAt) : "Signature and photo" },
-    { label: "Hotspot confirms", st: st === "received" ? "done" : st === "delivered" ? "cur" : "todo", sub: o.receipt ? ago(o.receipt.at) : "" },
+    {
+      label: "Collect stock",
+      st: st === "dispatched" ? "cur" : "done",
+      sub: dl.pickedAt != null ? ago(dl.pickedAt) : "Wakiso district store",
+    },
+    {
+      label: "Ride to hotspot",
+      st: st === "in_transit" ? "cur" : st === "dispatched" ? "todo" : "done",
+      sub: h?.village,
+    },
+    {
+      label: "Hand over",
+      st: st === "in_transit" ? "cur" : st === "dispatched" ? "todo" : "done",
+      sub: dl.deliveredAt != null ? ago(dl.deliveredAt) : "Signature and photo",
+    },
+    {
+      label: "Hotspot confirms",
+      st: st === "received" ? "done" : st === "delivered" ? "cur" : "todo",
+      sub: o.receipt ? ago(o.receipt.at) : "",
+    },
   ];
   const done = st === "delivered" || st === "received";
   return (
     <Screen title={dl.dn} backLabel="Deliveries">
       <Hero title={o.hotspot} sub={`${dl.dn} · ${items(o.approved)}`} chip={RC[st]} steps={steps} />
-      {pend ? <Banner tone="warning" title="Saved on this phone" body={`${pend.label} sends when you are back online.`} /> : null}
+      {pend ? (
+        <Banner
+          tone="warning"
+          title="Saved on this phone"
+          body={`${pend.label} sends when you are back online.`}
+        />
+      ) : null}
       {done ? (
         <Banner
           tone={st === "received" ? "success" : "info"}
-          title={st === "received" ? `Confirmed by ${h?.contact}` : `Delivered ${ago(dl.deliveredAt)}`}
-          body={st === "received" ? "This delivery is closed." : `${h?.contact} has been asked to confirm receipt.`}
+          title={
+            st === "received" ? `Confirmed by ${h?.contact}` : `Delivered ${ago(dl.deliveredAt)}`
+          }
+          body={
+            st === "received"
+              ? "This delivery is closed."
+              : `${h?.contact} has been asked to confirm receipt.`
+          }
           act={{ label: "View receipt", onPress: () => nav.go(`receipt/${o.id}`) }}
         />
       ) : null}
-      {!done && h?.lat != null ? <MapCard h="Drop-off" lat={h.lat} lng={h.lng} cap={h.name} cap2={`${h.village}, ${h.subcounty}`} link={T.ios ? "Open in Maps" : "Directions"} /> : null}
+      {!done && h?.lat != null ? (
+        <MapCard
+          h="Drop-off"
+          lat={h.lat}
+          lng={h.lng}
+          cap={h.name}
+          cap2={`${h.village}, ${h.subcounty}`}
+          link={T.ios ? "Open in Maps" : "Directions"}
+        />
+      ) : null}
       {!done && h ? (
         <List>
-          <Row t={h.contact} s={`Contact person · ${h.phone}`} ic="phone" onPress={() => call(h.phone)} />
+          <Row
+            t={h.contact}
+            s={`Contact person · ${h.phone}`}
+            ic="phone"
+            onPress={() => call(h.phone)}
+          />
         </List>
       ) : null}
       {st === "dispatched" && !pend ? <Collect o={o} /> : null}
@@ -204,7 +330,12 @@ export function RiderDelivery({ id }: { id: string }) {
 export function RiderReceipt({ id }: { id: string }) {
   const { mine, H } = useRider();
   const o = mine.find((x) => x.id === id);
-  if (!o?.delivery?.deliveredAt) return <Screen title="Receipt" backLabel="History"><Banner tone="neutral" title="No receipt yet" body="Receipts appear after the handover." /></Screen>;
+  if (!o?.delivery?.deliveredAt)
+    return (
+      <Screen title="Receipt" backLabel="History">
+        <Banner tone="neutral" title="No receipt yet" body="Receipts appear after the handover." />
+      </Screen>
+    );
   const h = H(o.hotspotId);
   const dl = o.delivery;
   const st = o.status;
@@ -215,19 +346,29 @@ export function RiderReceipt({ id }: { id: string }) {
         `CLIMS delivery receipt · ${dl.dn}`,
         `${o.hotspot} · ${ago(dl.deliveredAt)}`,
         `Handed over: ${items(handed)}`,
-        dl.found ? `Already at the hotspot: ${items(dl.found) === "—" ? "None" : items(dl.found)}` : "",
+        dl.found
+          ? `Already at the hotspot: ${items(dl.found) === "—" ? "None" : items(dl.found)}`
+          : "",
         `Received by: ${dl.recipient ?? "—"}`,
         `Rider: ${dl.rider} · ${dl.plate}`,
-      ].filter(Boolean).join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
     }).catch(() => {});
   return (
     <Screen title="Receipt" backLabel="History">
-      <Hero title={`Delivery note ${dl.dn}`} sub={`${o.hotspot} · ${ago(dl.deliveredAt)}`} chip={RC[st]} />
+      <Hero
+        title={`Delivery note ${dl.dn}`}
+        sub={`${o.hotspot} · ${ago(dl.deliveredAt)}`}
+        chip={RC[st]}
+      />
       <List h="Handed over">
         {PRODUCTS.filter((p) => handed[p.k] > 0).map((p) => (
           <Row key={p.k} t={p.name} v={num(handed[p.k])} />
         ))}
-        {dl.found ? <Row t="Already at the hotspot" v={items(dl.found) === "—" ? "None" : items(dl.found)} /> : null}
+        {dl.found ? (
+          <Row t="Already at the hotspot" v={items(dl.found) === "—" ? "None" : items(dl.found)} />
+        ) : null}
       </List>
       <List h="Batches">
         {lineRows(dl.lines).map((a) => (
@@ -238,11 +379,28 @@ export function RiderReceipt({ id }: { id: string }) {
         <Row t="Received by" v={dl.recipient || "—"} />
         {dl.sig ? <Row t="Signature" sig={dl.sig} /> : <Row t="Signature" v="On the paper note" />}
       </List>
-      {dl.photo ? <PhotoField h="Signed delivery note" value={dl.photo} edit={false} when="Photographed at handover" /> : null}
+      {dl.photo ? (
+        <PhotoField
+          h="Signed delivery note"
+          value={dl.photo}
+          edit={false}
+          when="Photographed at handover"
+        />
+      ) : null}
       <Banner
         tone={st === "received" ? "success" : "info"}
-        title={st === "received" ? `Confirmed by ${h?.contact} ${ago(o.receipt?.at)}` : `Waiting for ${h?.contact} to confirm`}
-        body={st === "received" ? (o.receipt?.issue ? `Reported: ${o.receipt.issue}` : "Counts matched.") : "You will be notified when the hotspot confirms."}
+        title={
+          st === "received"
+            ? `Confirmed by ${h?.contact} ${ago(o.receipt?.at)}`
+            : `Waiting for ${h?.contact} to confirm`
+        }
+        body={
+          st === "received"
+            ? o.receipt?.issue
+              ? `Reported: ${o.receipt.issue}`
+              : "Counts matched."
+            : "You will be notified when the hotspot confirms."
+        }
       />
       <Btns>
         <Btn label="Share receipt" icon="receipt" kind="secondary" onPress={share} />

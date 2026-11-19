@@ -4,7 +4,9 @@ import axios, { isAxiosError } from "axios";
  * API base. Defaults to production; for local development set EXPO_PUBLIC_API_URL in
  * mobile/.env.local (or infra/env/dev.env for Compose), e.g. http://192.168.1.50:8080/api/v1.
  */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || "https://clims.health.go.ug/api/v1").replace(/\/$/, "");
+export const API_URL = (
+  process.env.EXPO_PUBLIC_API_URL || "https://clims.health.go.ug/api/v1"
+).replace(/\/$/, "");
 
 export const api = axios.create({ baseURL: API_URL, timeout: 15000 });
 

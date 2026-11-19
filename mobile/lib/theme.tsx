@@ -34,7 +34,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const scheme: Scheme = mode === "system" ? (system === "dark" ? "dark" : "light") : mode;
-  const value = useMemo(() => ({ T: tokensFor(scheme), mode, scheme, setMode }), [scheme, mode, setMode]);
+  const value = useMemo(
+    () => ({ T: tokensFor(scheme), mode, scheme, setMode }),
+    [scheme, mode, setMode],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

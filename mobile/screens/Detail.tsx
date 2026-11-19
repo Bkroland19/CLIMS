@@ -27,7 +27,11 @@ export default function Detail() {
     case "hotspot":
       return id ? <VhtHotspot id={id} /> : null;
     case "request":
-      return me.role === "hm" ? <RequestForm hotspotId={HM_HOTSPOT} fixed /> : <RequestForm hotspotId={id} />;
+      return me.role === "hm" ? (
+        <RequestForm hotspotId={HM_HOTSPOT} fixed />
+      ) : (
+        <RequestForm hotspotId={id} />
+      );
     case "map":
       return id ? <VhtMapDone id={id} /> : <VhtMap />;
     case "delivery":

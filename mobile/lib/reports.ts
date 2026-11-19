@@ -31,13 +31,30 @@ export const FORMS: Record<ReportForm, FormDef> = {
     stock: [
       { k: "open", label: "Opening balance", hint: "Last month's closing balance", sys: true },
       { k: "recv", label: "Received", hint: "Deliveries confirmed in CLIMS", sys: true },
-      { k: "dist", label: "Distributed to clients", hint: "Taken from the dispenser or handed out" },
+      {
+        k: "dist",
+        label: "Distributed to clients",
+        hint: "Taken from the dispenser or handed out",
+      },
       { k: "loss", label: "Losses & adjustments", hint: "Expired, damaged or missing" },
       { k: "close", label: "Closing balance", hint: "Physical count at month end" },
     ],
     other: [
-      { k: "daysOut", label: "Days out of stock", hint: "Days with nothing in the dispenser", type: "num", req: true, max: "days" },
-      { k: "dispenser", label: "Dispenser condition", type: "sel", opts: ["Working", "Broken", "No dispenser"], req: true },
+      {
+        k: "daysOut",
+        label: "Days out of stock",
+        hint: "Days with nothing in the dispenser",
+        type: "num",
+        req: true,
+        max: "days",
+      },
+      {
+        k: "dispenser",
+        label: "Dispenser condition",
+        type: "sel",
+        opts: ["Working", "Broken", "No dispenser"],
+        req: true,
+      },
     ],
   },
   vht: {
@@ -109,12 +126,16 @@ export function validateReport(F: FormDef, v: ReportValues, ctx: ValidateCtx): R
     const exp = had - out;
     if (out > had) {
       E.push({
-        type: "bal", field: `${p.k}.dist`, where: `${p.short} · ${lbl("dist")}`,
+        type: "bal",
+        field: `${p.k}.dist`,
+        where: `${p.short} · ${lbl("dist")}`,
         msg: `Distributed plus losses (${fmt(out)}) is more than you had (${fmt(had)}).`,
       });
     } else if (g("close") !== exp) {
       E.push({
-        type: "bal", field: `${p.k}.close`, where: `${p.short} · ${lbl("close")}`,
+        type: "bal",
+        field: `${p.k}.close`,
+        where: `${p.short} · ${lbl("close")}`,
         msg: `Doesn't balance — should be ${fmt(exp)}. Recount, or record the difference as a loss.`,
       });
     }
@@ -124,7 +145,12 @@ export function validateReport(F: FormDef, v: ReportValues, ctx: ValidateCtx): R
     const x = v[f.k];
     if (blank(x)) {
       if (f.req) {
-        E.push({ type: "req", field: f.k, where: f.label, msg: f.type === "sel" ? "Choose one." : "Required. Enter 0 if none." });
+        E.push({
+          type: "req",
+          field: f.k,
+          where: f.label,
+          msg: f.type === "sel" ? "Choose one." : "Required. Enter 0 if none.",
+        });
       }
       return;
     }
@@ -135,15 +161,25 @@ export function validateReport(F: FormDef, v: ReportValues, ctx: ValidateCtx): R
     const mx = f.max === "days" ? ctx.days : f.max === "cover" ? ctx.cover : null;
     if (mx != null && +x > mx) {
       E.push({
-        type: "range", field: f.k, where: f.label,
-        msg: f.max === "days" ? `${ctx.month} has ${mx} days. Enter 0–${mx}.` : `You cover ${mx} hotspots. Enter 0–${mx}.`,
+        type: "range",
+        field: f.k,
+        where: f.label,
+        msg:
+          f.max === "days"
+            ? `${ctx.month} has ${mx} days. Enter 0–${mx}.`
+            : `You cover ${mx} hotspots. Enter 0–${mx}.`,
       });
     }
   });
 
   const anyLoss = PRODUCTS.some((p) => whole(v[p.k]?.loss) && +v[p.k].loss > 0);
   if (anyLoss && blank(v.lossReason)) {
-    E.push({ type: "req", field: "lossReason", where: "Reason for losses", msg: "Say why stock was lost or adjusted." });
+    E.push({
+      type: "req",
+      field: "lossReason",
+      where: "Reason for losses",
+      msg: "Say why stock was lost or adjusted.",
+    });
   }
   return E;
 }

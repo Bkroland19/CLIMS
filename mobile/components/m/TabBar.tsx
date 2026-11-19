@@ -15,11 +15,17 @@ import { Txt } from "./kit";
 function useBadges(): Partial<Record<TabKey, number>> {
   const { s } = useStore();
   const me = useMe();
-  const mine = s.hotspots.filter((h) => h.vhts.includes(me.name) || h.contact === me.name).map((h) => h.id);
+  const mine = s.hotspots
+    .filter((h) => h.vhts.includes(me.name) || h.contact === me.name)
+    .map((h) => h.id);
   return {
     requests: s.orders.filter((o) => mine.includes(o.hotspotId) && o.status === "delivered").length,
     orders: s.orders.filter((o) => o.hotspotId === HM_HOTSPOT && o.status === "delivered").length,
-    deliveries: s.orders.filter((o) => o.delivery?.riderId === RIDER.id && (o.status === "dispatched" || o.status === "in_transit")).length,
+    deliveries: s.orders.filter(
+      (o) =>
+        o.delivery?.riderId === RIDER.id &&
+        (o.status === "dispatched" || o.status === "in_transit"),
+    ).length,
     reports: s.reports.filter((r) => r.own === me.role && r.status !== "sent").length,
   };
 }
@@ -66,20 +72,45 @@ export default function TabBar({ state, emitter, navigateToTab }: BottomTabBarPr
             style={{ flex: 1, alignItems: "center", gap: T.ios ? 2 : 4, minHeight: 48 }}
           >
             {/* Active tab: icon and label turn the brand colour; no background pill. */}
-            <View style={{ width: 32, height: T.ios ? 28 : 32, alignItems: "center", justifyContent: "center" }}>
+            <View
+              style={{
+                width: 32,
+                height: T.ios ? 28 : 32,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <Icon name={d.icon} size={T.ios ? 25 : 24} color={fg} strokeWidth={on ? 2.4 : 2} />
               {b > 0 ? (
                 <View
                   style={{
-                    position: "absolute", top: T.ios ? -2 : 0, left: 20, minWidth: 18, height: 18, borderRadius: 9,
-                    paddingHorizontal: 5, backgroundColor: T.ios ? "#ff3b30" : "#ba1a1a", alignItems: "center", justifyContent: "center",
+                    position: "absolute",
+                    top: T.ios ? -2 : 0,
+                    left: 20,
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    paddingHorizontal: 5,
+                    backgroundColor: T.ios ? "#ff3b30" : "#ba1a1a",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <Txt style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{b > 99 ? "99+" : String(b)}</Txt>
+                  <Txt style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>
+                    {b > 99 ? "99+" : String(b)}
+                  </Txt>
                 </View>
               ) : null}
             </View>
-            <Txt style={{ fontSize: T.ios ? 10 : 12, color: fg, fontWeight: on ? (T.ios ? "500" : "700") : "500" }}>{d.label}</Txt>
+            <Txt
+              style={{
+                fontSize: T.ios ? 10 : 12,
+                color: fg,
+                fontWeight: on ? (T.ios ? "500" : "700") : "500",
+              }}
+            >
+              {d.label}
+            </Txt>
           </Pressable>
         );
       })}

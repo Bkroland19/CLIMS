@@ -105,8 +105,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     async (role: AppRole) => {
       const name = DEFAULT_PERSONAS[role];
       const username = name.toLowerCase().replace(/\s+/g, ".");
-      const phone = { vht: "+256 776 902 331", hm: "+256 772 418 903", rider: "+256 701 334 920" }[role];
-      await persist({ id: `demo-${role}`, name, username, email: "", phone, role, demo: true }, null, 0);
+      const phone = { vht: "+256 776 902 331", hm: "+256 772 418 903", rider: "+256 701 334 920" }[
+        role
+      ];
+      await persist(
+        { id: `demo-${role}`, name, username, email: "", phone, role, demo: true },
+        null,
+        0,
+      );
     },
     [persist],
   );

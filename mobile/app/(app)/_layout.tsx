@@ -7,14 +7,25 @@ import TabBar from "@/components/m/TabBar";
 import { useSession } from "@/lib/session";
 import { StoreProvider, useStore } from "@/lib/store";
 
-const TAB_ROUTES = ["hotspots", "requests", "dashboard", "orders", "deliveries", "history", "reports", "me"];
+const TAB_ROUTES = [
+  "hotspots",
+  "requests",
+  "dashboard",
+  "orders",
+  "deliveries",
+  "history",
+  "reports",
+  "me",
+];
 
 function Signed() {
   const T = useT();
   const { ready } = useStore();
   if (!ready) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: T.bg }}>
+      <View
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: T.bg }}
+      >
         <ActivityIndicator color={T.tint} />
       </View>
     );

@@ -35,7 +35,9 @@ export default function PushBanner() {
       Animated.spring(y, { toValue: 0, useNativeDriver: true }).start();
     }, 900);
     const t2 = setTimeout(() => {
-      Animated.timing(y, { toValue: -160, duration: 220, useNativeDriver: true }).start(() => setEv(null));
+      Animated.timing(y, { toValue: -160, duration: 220, useNativeDriver: true }).start(() =>
+        setEv(null),
+      );
     }, 6400);
     return () => {
       clearTimeout(t1);
@@ -45,7 +47,16 @@ export default function PushBanner() {
 
   if (!ev) return null;
   return (
-    <Animated.View style={{ position: "absolute", left: 8, right: 8, top: insets.top + (T.ios ? 4 : 8), transform: [{ translateY: y }], zIndex: 50 }}>
+    <Animated.View
+      style={{
+        position: "absolute",
+        left: 8,
+        right: 8,
+        top: insets.top + (T.ios ? 4 : 8),
+        transform: [{ translateY: y }],
+        zIndex: 50,
+      }}
+    >
       <Pressable
         onPress={() => {
           setEv(null);
@@ -54,17 +65,38 @@ export default function PushBanner() {
         accessibilityRole="button"
         accessibilityLabel={`Notification from ${orgOf(ev)}: ${ev.text}`}
         style={{
-          flexDirection: "row", gap: 12, padding: 14, borderRadius: T.ios ? 22 : 18,
+          flexDirection: "row",
+          gap: 12,
+          padding: 14,
+          borderRadius: T.ios ? 22 : 18,
           backgroundColor: T.pushBg,
-          shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6,
+          shadowColor: "#000",
+          shadowOpacity: 0.18,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 6,
         }}
       >
-        <View style={{ width: 38, height: 38, borderRadius: T.ios ? 9 : 19, backgroundColor: T.b1Bg, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: T.ios ? 9 : 19,
+            backgroundColor: T.b1Bg,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <Icon name="bell" size={20} color={T.b1Fg} />
         </View>
         <View style={{ flex: 1 }}>
-          <Txt style={{ fontSize: 13, color: T.fg2 }} numberOfLines={1}>{`CLIMS · ${orgOf(ev)} · ${ev.ref}`}</Txt>
-          <Txt style={{ fontSize: 15, fontWeight: "500" }} numberOfLines={2}>{ev.text}</Txt>
+          <Txt
+            style={{ fontSize: 13, color: T.fg2 }}
+            numberOfLines={1}
+          >{`CLIMS · ${orgOf(ev)} · ${ev.ref}`}</Txt>
+          <Txt style={{ fontSize: 15, fontWeight: "500" }} numberOfLines={2}>
+            {ev.text}
+          </Txt>
         </View>
       </Pressable>
     </Animated.View>

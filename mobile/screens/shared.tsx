@@ -23,7 +23,14 @@ const ORG: Record<string, (e: AppEvent) => string> = {
 };
 export const orgOf = (e: AppEvent) => (ORG[e.role] ? ORG[e.role](e) : e.actor);
 
-const NOTE_IC: Record<string, IconName> = { DCFP: "building", Rider: "truck", MOH: "shield", "Hotspot manager": "pin", VHT: "user", System: "info" };
+const NOTE_IC: Record<string, IconName> = {
+  DCFP: "building",
+  Rider: "truck",
+  MOH: "shield",
+  "Hotspot manager": "pin",
+  VHT: "user",
+  System: "info",
+};
 
 export function useOpenNote() {
   const nav = useNav();
@@ -58,14 +65,28 @@ export function Inbox() {
   );
 
   const row = (e: AppEvent) => (
-    <Row key={e.id} t={e.text} s={`${orgOf(e)} · ${e.ref} · ${ago(e.t)}`} dot={e.t > rd} ic={NOTE_IC[e.role] ?? "bell"} onPress={() => open(e)} />
+    <Row
+      key={e.id}
+      t={e.text}
+      s={`${orgOf(e)} · ${e.ref} · ${ago(e.t)}`}
+      dot={e.t > rd}
+      ic={NOTE_IC[e.role] ?? "bell"}
+      onPress={() => open(e)}
+    />
   );
   const fresh = notes.filter((e) => e.t > rd);
   const old = notes.filter((e) => e.t <= rd);
   return (
     <Screen title="Notifications" backLabel={TAB_LABEL[nav.tab]}>
       {fresh.length ? <List h="New">{fresh.map(row)}</List> : null}
-      <List h={fresh.length ? "Earlier" : undefined} empty={fresh.length ? undefined : "No notifications yet. You will be notified here when something needs you."}>
+      <List
+        h={fresh.length ? "Earlier" : undefined}
+        empty={
+          fresh.length
+            ? undefined
+            : "No notifications yet. You will be notified here when something needs you."
+        }
+      >
         {old.map(row)}
       </List>
     </Screen>
@@ -85,7 +106,12 @@ export function Me() {
   const nq = s.outbox.length;
   const area =
     me.role === "vht"
-      ? ["Area", [...new Set(s.hotspots.filter((h) => h.vhts.includes(me.name)).map((h) => h.subcounty))].join(" & ") || "—"]
+      ? [
+          "Area",
+          [
+            ...new Set(s.hotspots.filter((h) => h.vhts.includes(me.name)).map((h) => h.subcounty)),
+          ].join(" & ") || "—",
+        ]
       : me.role === "hm"
         ? ["Hotspot", s.hotspots.find((h) => h.id === HM_HOTSPOT)?.name ?? "—"]
         : ["Motorbike", RIDER.plate];
@@ -95,7 +121,9 @@ export function Me() {
         <View style={{ alignItems: "center", gap: 8, paddingVertical: 8 }}>
           <Avatar ini={initials(me.name)} size={72} />
           <Txt style={{ fontSize: 22, fontWeight: T.ios ? "700" : "500" }}>{me.name}</Txt>
-          <Txt style={{ color: T.fg2, fontSize: 15 }}>{`${ROLE_LABEL[me.role]} · ${DCFP.district}`}</Txt>
+          <Txt
+            style={{ color: T.fg2, fontSize: 15 }}
+          >{`${ROLE_LABEL[me.role]} · ${DCFP.district}`}</Txt>
         </View>
       </Section>
       <List h="Account">
@@ -103,20 +131,57 @@ export function Me() {
         {me.phone ? <Row t="Phone" v={me.phone} /> : null}
         <Row t={area[0]} v={area[1]} />
       </List>
-      <Fields h="Appearance" f={mode === "system" ? "Follows your phone's light or dark setting." : undefined}>
-        <Seg<ThemeMode> label="Theme" options={[["system", "System"], ["light", "Light"], ["dark", "Dark"]]} value={mode} onChange={setMode} />
+      <Fields
+        h="Appearance"
+        f={mode === "system" ? "Follows your phone's light or dark setting." : undefined}
+      >
+        <Seg<ThemeMode>
+          label="Theme"
+          options={[
+            ["system", "System"],
+            ["light", "Light"],
+            ["dark", "Dark"],
+          ]}
+          value={mode}
+          onChange={setMode}
+        />
       </Fields>
       <Fields h="Notifications">
-        <Toggle label="Push notifications" sub="Order and delivery updates" value={push} onChange={setPush} />
-        {me.role !== "rider" ? <Toggle label="Report reminders" sub="Before the 20th of each month" value={rem} onChange={setRem} /> : null}
+        <Toggle
+          label="Push notifications"
+          sub="Order and delivery updates"
+          value={push}
+          onChange={setPush}
+        />
+        {me.role !== "rider" ? (
+          <Toggle
+            label="Report reminders"
+            sub="Before the 20th of each month"
+            value={rem}
+            onChange={setRem}
+          />
+        ) : null}
       </Fields>
-      <List h="Offline" f="Anything you do without network is saved on this phone and sent automatically when you are back online.">
+      <List
+        h="Offline"
+        f="Anything you do without network is saved on this phone and sent automatically when you are back online."
+      >
         <Row t="Connection" v={offline ? "Offline" : "Online"} vfg={offline ? T.warnFg : T.fg2} />
-        <Row t="Waiting to send" v={String(nq)} chev={nq > 0} onPress={nq ? () => setOutbox(true) : undefined} />
+        <Row
+          t="Waiting to send"
+          v={String(nq)}
+          chev={nq > 0}
+          onPress={nq ? () => setOutbox(true) : undefined}
+        />
       </List>
       <List h="Support">
         <Row t="Help & guides" ic="help" chev onPress={() => nav.go("help")} />
-        <Row t="Call district focal person" s={`${DCFP.name} · ${DCFP.phone}`} ic="phone" onPress={() => call(DCFP.phone)} />
+        <Row
+          t="Call district focal person"
+          s={`${DCFP.name} · ${DCFP.phone}`}
+          ic="phone"
+          onPress={() => call(DCFP.phone)}
+        />
       </List>
       {me.demo ? (
         <List h="Demo" f="You're using sample Wakiso data. It stays on this phone.">
@@ -134,7 +199,11 @@ export function Me() {
         />
       </List>
       <Sheet visible={outbox} title="Waiting to send" onClose={() => setOutbox(false)}>
-        {offline ? <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, fontSize: 14 }}>These will send automatically when the phone is back online.</Txt> : null}
+        {offline ? (
+          <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, fontSize: 14 }}>
+            These will send automatically when the phone is back online.
+          </Txt>
+        ) : null}
         <List empty="Nothing waiting.">
           {s.outbox.map((it) => (
             <Row key={it.id} t={it.label} s={`Saved ${ago(it.at)}`} ic="upload" />
@@ -147,19 +216,43 @@ export function Me() {
 
 const GUIDES: Record<string, [string, string][]> = {
   vht: [
-    ["Mapping a hotspot", "Stand at the entrance and capture GPS. Add the contact person and a photo of the dispenser."],
-    ["Requesting stock for a hotspot", "Count what is left with the contact person, then send. The district reviews it within a day."],
-    ["Monthly outreach report", "Due on the 20th. The app checks your figures before they reach MOH."],
+    [
+      "Mapping a hotspot",
+      "Stand at the entrance and capture GPS. Add the contact person and a photo of the dispenser.",
+    ],
+    [
+      "Requesting stock for a hotspot",
+      "Count what is left with the contact person, then send. The district reviews it within a day.",
+    ],
+    [
+      "Monthly outreach report",
+      "Due on the 20th. The app checks your figures before they reach MOH.",
+    ],
   ],
   hm: [
-    ["Reporting a stockout", "Tap Report stockout on Home. Count what is left and say how much you need."],
-    ["When the rider arrives", "Count the condoms with the rider, sign the delivery note, then confirm receipt in the app."],
+    [
+      "Reporting a stockout",
+      "Tap Report stockout on Home. Count what is left and say how much you need.",
+    ],
+    [
+      "When the rider arrives",
+      "Count the condoms with the rider, sign the delivery note, then confirm receipt in the app.",
+    ],
     ["Monthly report", "Due on the 20th. The app checks your figures before they reach MOH."],
   ],
   rider: [
-    ["Collecting stock", "Check the delivery note and batch numbers against what you load at the district store."],
-    ["At the hotspot", "Count with the contact person, get their signature and photograph the signed delivery note."],
-    ["No network at the hotspot", "Finish the handover anyway. It sends when you have network again."],
+    [
+      "Collecting stock",
+      "Check the delivery note and batch numbers against what you load at the district store.",
+    ],
+    [
+      "At the hotspot",
+      "Count with the contact person, get their signature and photograph the signed delivery note.",
+    ],
+    [
+      "No network at the hotspot",
+      "Finish the handover anyway. It sends when you have network again.",
+    ],
   ],
 };
 
@@ -172,8 +265,16 @@ export function Help() {
           <Row key={t} t={t} s={s} fw="500" />
         ))}
       </List>
-      <List h="Contact" f="Working without network? Keep going — the app saves your work and sends it later.">
-        <Row t={`Call ${DCFP.name}`} s={`District focal person · ${DCFP.district}`} ic="phone" onPress={() => call(DCFP.phone)} />
+      <List
+        h="Contact"
+        f="Working without network? Keep going — the app saves your work and sends it later."
+      >
+        <Row
+          t={`Call ${DCFP.name}`}
+          s={`District focal person · ${DCFP.district}`}
+          ic="phone"
+          onPress={() => call(DCFP.phone)}
+        />
       </List>
     </Screen>
   );

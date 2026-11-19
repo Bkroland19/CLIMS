@@ -4,14 +4,7 @@ import type { AppRole } from "./types";
 import type { IconName } from "@/components/m/Icon";
 
 export type TabKey =
-  | "hotspots"
-  | "requests"
-  | "dashboard"
-  | "orders"
-  | "deliveries"
-  | "history"
-  | "reports"
-  | "me";
+  "hotspots" | "requests" | "dashboard" | "orders" | "deliveries" | "history" | "reports" | "me";
 
 export const TABS: Record<AppRole, { key: TabKey; label: string; icon: IconName }[]> = {
   vht: [
@@ -33,11 +26,21 @@ export const TABS: Record<AppRole, { key: TabKey; label: string; icon: IconName 
   ],
 };
 
-export const ROOT: Record<AppRole, TabKey> = { vht: "hotspots", hm: "dashboard", rider: "deliveries" };
+export const ROOT: Record<AppRole, TabKey> = {
+  vht: "hotspots",
+  hm: "dashboard",
+  rider: "deliveries",
+};
 
 export const TAB_LABEL: Record<TabKey, string> = {
-  hotspots: "Hotspots", requests: "Requests", dashboard: "Home", orders: "Orders", deliveries: "Deliveries",
-  history: "History", reports: "Reports", me: "Me",
+  hotspots: "Hotspots",
+  requests: "Requests",
+  dashboard: "Home",
+  orders: "Orders",
+  deliveries: "Deliveries",
+  history: "History",
+  reports: "Reports",
+  me: "Me",
 };
 
 /**

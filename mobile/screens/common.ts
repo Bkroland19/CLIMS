@@ -4,10 +4,15 @@ import { LOW, num, PRODUCTS } from "@/lib/format";
 import type { Stat } from "@/components/m/kit";
 import type { Hotspot, ProductKey } from "@/lib/types";
 
-export const call = (phone: string) => Linking.openURL(`tel:${phone.replace(/[^0-9+]/g, "")}`).catch(() => {});
+export const call = (phone: string) =>
+  Linking.openURL(`tel:${phone.replace(/[^0-9+]/g, "")}`).catch(() => {});
 
 export const stockTone = (T: Tokens, q: number, k: ProductKey): [string, string] =>
-  q === 0 ? [T.danger, "Out of stock"] : q < LOW[k] ? [T.warnFg, "Running low"] : [T.fg, "In stock"];
+  q === 0
+    ? [T.danger, "Out of stock"]
+    : q < LOW[k]
+      ? [T.warnFg, "Running low"]
+      : [T.fg, "In stock"];
 
 export const stockStats = (T: Tokens, h: Hotspot): Stat[] =>
   PRODUCTS.map((p) => {

@@ -17,7 +17,11 @@ describe("validateReport", () => {
   });
 
   it("flags blanks as required", () => {
-    const errs = validateReport(FORMS.hotspot, { male: { open: 10, recv: 0 }, female: { open: 0, recv: 0 } }, ctx);
+    const errs = validateReport(
+      FORMS.hotspot,
+      { male: { open: 10, recv: 0 }, female: { open: 0, recv: 0 } },
+      ctx,
+    );
     expect(errs.filter((e) => e.type === "req").map((e) => e.field)).toEqual(
       expect.arrayContaining(["male.dist", "male.loss", "male.close", "daysOut", "dispenser"]),
     );
@@ -32,23 +36,42 @@ describe("validateReport", () => {
 
   it("rejects distributing more than was held", () => {
     const v = { ...balanced, female: { ...balanced.female, dist: 500, close: 0 } };
-    expect(validateReport(FORMS.hotspot, v, ctx)[0]).toMatchObject({ type: "bal", field: "female.dist" });
+    expect(validateReport(FORMS.hotspot, v, ctx)[0]).toMatchObject({
+      type: "bal",
+      field: "female.dist",
+    });
   });
 
   it("keeps days out of stock within the month", () => {
     const errs = validateReport(FORMS.hotspot, { ...balanced, daysOut: "40" }, ctx);
-    expect(errs).toEqual([expect.objectContaining({ type: "range", field: "daysOut", msg: "October has 31 days. Enter 0–31." })]);
+    expect(errs).toEqual([
+      expect.objectContaining({
+        type: "range",
+        field: "daysOut",
+        msg: "October has 31 days. Enter 0–31.",
+      }),
+    ]);
   });
 
   it("asks why stock was lost", () => {
     const v = { ...balanced, male: { ...balanced.male, loss: 60, close: 2000 } };
-    expect(validateReport(FORMS.hotspot, v, ctx)).toEqual([expect.objectContaining({ field: "lossReason" })]);
+    expect(validateReport(FORMS.hotspot, v, ctx)).toEqual([
+      expect.objectContaining({ field: "lossReason" }),
+    ]);
     expect(validateReport(FORMS.hotspot, { ...v, lossReason: "Damaged" }, ctx)).toEqual([]);
   });
 
   it("limits hotspots visited to the VHT's coverage", () => {
-    const v = { male: balanced.male, female: balanced.female, visited: "9", sessions: "2", reached: "40" };
-    expect(validateReport(FORMS.vht, v, ctx)).toEqual([expect.objectContaining({ type: "range", field: "visited" })]);
+    const v = {
+      male: balanced.male,
+      female: balanced.female,
+      visited: "9",
+      sessions: "2",
+      reached: "40",
+    };
+    expect(validateReport(FORMS.vht, v, ctx)).toEqual([
+      expect.objectContaining({ type: "range", field: "visited" }),
+    ]);
   });
 });
 
@@ -65,7 +88,12 @@ describe("format helpers", () => {
     expect(orderChip("in_transit")).toEqual({ label: "On the way", tone: "info" });
   });
   it("derives the reporting period and due date", () => {
-    expect(periodOf("2026-10")).toEqual({ label: "October 2026", month: "October", days: 31, due: "20 Nov 2026" });
+    expect(periodOf("2026-10")).toEqual({
+      label: "October 2026",
+      month: "October",
+      days: 31,
+      due: "20 Nov 2026",
+    });
     expect(currentPeriod(new Date(2026, 10, 19).getTime())).toBe("2026-10");
   });
 });
@@ -76,6 +104,11 @@ describe("seed", () => {
     expect(s.hotspots.some((h) => h.vhts.includes(DEFAULT_PERSONAS.vht))).toBe(true);
     expect(s.orders.some((o) => o.status === "dispatched")).toBe(true);
     expect(s.orders.some((o) => o.status === "in_transit" && o.hotspotId === "HS-0231")).toBe(true);
-    expect(s.reports.filter((r) => r.status !== "sent").map((r) => r.own).sort()).toEqual(["hm", "vht"]);
+    expect(
+      s.reports
+        .filter((r) => r.status !== "sent")
+        .map((r) => r.own)
+        .sort(),
+    ).toEqual(["hm", "vht"]);
   });
 });

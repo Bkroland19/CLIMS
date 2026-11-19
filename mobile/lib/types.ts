@@ -122,14 +122,7 @@ export interface Report {
 }
 
 export type EventRole =
-  | "DCFP"
-  | "Rider"
-  | "MOH"
-  | "NMS"
-  | "JMS"
-  | "System"
-  | "Hotspot manager"
-  | "VHT";
+  "DCFP" | "Rider" | "MOH" | "NMS" | "JMS" | "System" | "Hotspot manager" | "VHT";
 
 export interface AppEvent {
   id: string;
@@ -152,13 +145,7 @@ export interface OutboxItem {
 }
 
 export type ActionType =
-  | "notify"
-  | "mapHotspot"
-  | "confirmReceipt"
-  | "pickup"
-  | "deliver"
-  | "rptSave"
-  | "rptSend";
+  "notify" | "mapHotspot" | "confirmReceipt" | "pickup" | "deliver" | "rptSave" | "rptSend";
 
 export interface DomainState {
   hotspots: Hotspot[];

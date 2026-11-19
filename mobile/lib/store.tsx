@@ -1,4 +1,12 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { items as fmtItems } from "./format";
@@ -49,11 +57,25 @@ const roleOfEvent: Record<string, EventRole> = { VHT: "VHT", "Hotspot manager": 
 
 type Applied = { next: DomainState; id?: string };
 
-function apply(s: DomainState, type: ActionType, p: any, role: AppRole, me: string, now: number): Applied {
-  const ev = (e: Omit<AppEvent, "id" | "t">): AppEvent => ({ id: `EV-${now}-${Math.random().toString(36).slice(2, 7)}`, t: now, ...e });
-  const setOrder = (id: string, f: (o: DomainState["orders"][number]) => DomainState["orders"][number]) =>
-    s.orders.map((o) => (o.id === id ? f(o) : o));
-  const setHotspot = (id: string, f: (h: Hotspot) => Hotspot) => s.hotspots.map((h) => (h.id === id ? f(h) : h));
+function apply(
+  s: DomainState,
+  type: ActionType,
+  p: any,
+  role: AppRole,
+  me: string,
+  now: number,
+): Applied {
+  const ev = (e: Omit<AppEvent, "id" | "t">): AppEvent => ({
+    id: `EV-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    t: now,
+    ...e,
+  });
+  const setOrder = (
+    id: string,
+    f: (o: DomainState["orders"][number]) => DomainState["orders"][number],
+  ) => s.orders.map((o) => (o.id === id ? f(o) : o));
+  const setHotspot = (id: string, f: (h: Hotspot) => Hotspot) =>
+    s.hotspots.map((h) => (h.id === id ? f(h) : h));
 
   switch (type) {
     case "notify": {
@@ -63,22 +85,54 @@ function apply(s: DomainState, type: ActionType, p: any, role: AppRole, me: stri
       if (!h) return { next: s };
       const items: Qty = p.items;
       const order = {
-        id, hotspotId: h.id, hotspot: h.name, status: "queued" as const, items, approved: items,
-        remaining: p.remaining, reason: p.reason, note: p.note || "", by: me, byRole: p.byRole, createdAt: now,
+        id,
+        hotspotId: h.id,
+        hotspot: h.name,
+        status: "queued" as const,
+        items,
+        approved: items,
+        remaining: p.remaining,
+        reason: p.reason,
+        note: p.note || "",
+        by: me,
+        byRole: p.byRole,
+        createdAt: now,
       };
       const to: AppRole[] = role === "vht" ? (h.id === HM_HOTSPOT ? ["hm"] : []) : ["vht"];
       const events = to.length
-        ? [ev({ ref: id, role: roleOfEvent[p.byRole] ?? "System", actor: me, text: `${p.reason} at ${h.name} · asked for ${fmtItems(items)}`, to }), ...s.events]
+        ? [
+            ev({
+              ref: id,
+              role: roleOfEvent[p.byRole] ?? "System",
+              actor: me,
+              text: `${p.reason} at ${h.name} · asked for ${fmtItems(items)}`,
+              to,
+            }),
+            ...s.events,
+          ]
         : s.events;
       return {
         id,
-        next: { ...s, seq, orders: [order, ...s.orders], hotspots: setHotspot(h.id, (x) => ({ ...x, stock: p.remaining })), events },
+        next: {
+          ...s,
+          seq,
+          orders: [order, ...s.orders],
+          hotspots: setHotspot(h.id, (x) => ({ ...x, stock: p.remaining })),
+          events,
+        },
       };
     }
     case "mapHotspot": {
       const nums = s.hotspots.map((h) => parseInt(h.id.replace(/\D/g, ""), 10) || 0);
       const id = `HS-${String(Math.max(0, ...nums) + 1).padStart(4, "0")}`;
-      const h: Hotspot = { ...p.hotspot, id, district: "Wakiso", status: "Active", stock: { male: 0, female: 0 }, mappedAt: now };
+      const h: Hotspot = {
+        ...p.hotspot,
+        id,
+        district: "Wakiso",
+        status: "Active",
+        stock: { male: 0, female: 0 },
+        mappedAt: now,
+      };
       return { id, next: { ...s, hotspots: [h, ...s.hotspots] } };
     }
     case "confirmReceipt": {
@@ -88,10 +142,24 @@ function apply(s: DomainState, type: ActionType, p: any, role: AppRole, me: stri
       return {
         next: {
           ...s,
-          orders: setOrder(o.id, (x) => ({ ...x, status: "received", receipt: { at: now, qty, issue: p.issue || "", by: me } })),
-          hotspots: setHotspot(o.hotspotId, (h) => ({ ...h, stock: { male: h.stock.male + qty.male, female: h.stock.female + qty.female }, lastDelivery: now })),
+          orders: setOrder(o.id, (x) => ({
+            ...x,
+            status: "received",
+            receipt: { at: now, qty, issue: p.issue || "", by: me },
+          })),
+          hotspots: setHotspot(o.hotspotId, (h) => ({
+            ...h,
+            stock: { male: h.stock.male + qty.male, female: h.stock.female + qty.female },
+            lastDelivery: now,
+          })),
           events: [
-            ev({ ref: o.id, role: "Hotspot manager", actor: me, text: `Confirmed receipt at ${o.hotspot} · ${p.issue ? `reported: ${p.issue}` : "counts matched"}`, to: ["rider", "vht"] }),
+            ev({
+              ref: o.id,
+              role: "Hotspot manager",
+              actor: me,
+              text: `Confirmed receipt at ${o.hotspot} · ${p.issue ? `reported: ${p.issue}` : "counts matched"}`,
+              to: ["rider", "vht"],
+            }),
             ...s.events,
           ],
         },
@@ -103,8 +171,21 @@ function apply(s: DomainState, type: ActionType, p: any, role: AppRole, me: stri
       return {
         next: {
           ...s,
-          orders: setOrder(o.id, (x) => ({ ...x, status: "in_transit", delivery: { ...x.delivery!, pickedAt: now } })),
-          events: [ev({ ref: o.id, role: "Rider", actor: me, text: "Collected the stock at the district store and is on the way", to: ["hm", "vht"] }), ...s.events],
+          orders: setOrder(o.id, (x) => ({
+            ...x,
+            status: "in_transit",
+            delivery: { ...x.delivery!, pickedAt: now },
+          })),
+          events: [
+            ev({
+              ref: o.id,
+              role: "Rider",
+              actor: me,
+              text: "Collected the stock at the district store and is on the way",
+              to: ["hm", "vht"],
+            }),
+            ...s.events,
+          ],
         },
       };
     }
@@ -117,15 +198,39 @@ function apply(s: DomainState, type: ActionType, p: any, role: AppRole, me: stri
           orders: setOrder(o.id, (x) => ({
             ...x,
             status: "delivered",
-            delivery: { ...x.delivery!, deliveredAt: now, qty: p.qty, found: p.found, recipient: p.recipient, photo: p.photo, sig: p.sig },
+            delivery: {
+              ...x.delivery!,
+              deliveredAt: now,
+              qty: p.qty,
+              found: p.found,
+              recipient: p.recipient,
+              photo: p.photo,
+              sig: p.sig,
+            },
           })),
           hotspots: setHotspot(o.hotspotId, (h) => ({ ...h, stock: p.found })),
-          events: [ev({ ref: o.id, role: "Rider", actor: me, text: `Delivered to ${o.hotspot}. ${p.recipient} needs to confirm receipt`, to: ["hm", "vht"] }), ...s.events],
+          events: [
+            ev({
+              ref: o.id,
+              role: "Rider",
+              actor: me,
+              text: `Delivered to ${o.hotspot}. ${p.recipient} needs to confirm receipt`,
+              to: ["hm", "vht"],
+            }),
+            ...s.events,
+          ],
         },
       };
     }
     case "rptSave":
-      return { next: { ...s, reports: s.reports.map((r) => (r.id === p.id ? { ...r, values: p.values, savedAt: now } : r)) } };
+      return {
+        next: {
+          ...s,
+          reports: s.reports.map((r) =>
+            r.id === p.id ? { ...r, values: p.values, savedAt: now } : r,
+          ),
+        },
+      };
     case "rptSend": {
       const r = s.reports.find((x) => x.id === p.id);
       if (!r) return { next: s };
@@ -135,10 +240,29 @@ function apply(s: DomainState, type: ActionType, p: any, role: AppRole, me: stri
           ...s,
           reports: s.reports.map((x) =>
             x.id === p.id
-              ? { ...x, values: p.values, status: "sent", errors: [], runs: x.runs + 1, savedAt: now, sentAt: now, receipt, reporter: me }
+              ? {
+                  ...x,
+                  values: p.values,
+                  status: "sent",
+                  errors: [],
+                  runs: x.runs + 1,
+                  savedAt: now,
+                  sentAt: now,
+                  receipt,
+                  reporter: me,
+                }
               : x,
           ),
-          events: [ev({ ref: r.id, role: "MOH", actor: "Ministry of Health", text: "Received your monthly report", to: [r.own] }), ...s.events],
+          events: [
+            ev({
+              ref: r.id,
+              role: "MOH",
+              actor: "Ministry of Health",
+              text: "Received your monthly report",
+              to: [r.own],
+            }),
+            ...s.events,
+          ],
         },
       };
     }
@@ -186,7 +310,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const cur = ref.current;
     if (!cur.outbox.length) return;
     let next: DomainState = { ...cur, outbox: [] };
-    for (const it of cur.outbox) next = apply(next, it.type, it.payload, it.role, me.name, Date.now()).next;
+    for (const it of cur.outbox)
+      next = apply(next, it.type, it.payload, it.role, me.name, Date.now()).next;
     commit(next);
   }, [commit, me.name]);
 
@@ -204,7 +329,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (type: ActionType, payload: any, label: string): SendResult => {
       const cur = ref.current;
       if (offline) {
-        const item: OutboxItem = { id: `OB-${Date.now()}`, type, payload, label, role: me.role, at: Date.now() };
+        const item: OutboxItem = {
+          id: `OB-${Date.now()}`,
+          type,
+          payload,
+          label,
+          role: me.role,
+          at: Date.now(),
+        };
         commit({ ...cur, outbox: [...cur.outbox, item] });
         return { queued: true };
       }
@@ -220,7 +352,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const cur = ref.current;
       commit({
         ...cur,
-        reports: cur.reports.map((r) => (r.id === id ? { ...r, values, errors, status: "errors", runs: r.runs + 1, savedAt: Date.now() } : r)),
+        reports: cur.reports.map((r) =>
+          r.id === id
+            ? { ...r, values, errors, status: "errors", runs: r.runs + 1, savedAt: Date.now() }
+            : r,
+        ),
       });
     },
     [commit],
@@ -254,7 +390,10 @@ export function useNotes() {
   const { s } = useStore();
   const me = useMe();
   return useMemo(
-    () => s.events.filter((e) => e.to.includes(me.role) && e.actor !== me.name).sort((a, b) => b.t - a.t),
+    () =>
+      s.events
+        .filter((e) => e.to.includes(me.role) && e.actor !== me.name)
+        .sort((a, b) => b.t - a.t),
     [s.events, me.role, me.name],
   );
 }
@@ -271,5 +410,7 @@ export function useUnread() {
 /** The outbox entry still waiting for this record, if any. */
 export function usePending(id?: string) {
   const { s } = useStore();
-  return id ? s.outbox.find((it) => it.payload?.id === id || it.payload?.hotspotId === id) : undefined;
+  return id
+    ? s.outbox.find((it) => it.payload?.id === id || it.payload?.hotspotId === id)
+    : undefined;
 }
