@@ -19,16 +19,20 @@ The role catalog includes `admin`, `moh`, `nms`, `jms`, `dfcp`, `store incharge`
 
 ## Permission policy
 
-| Permission     | Capability                                    |
-| -------------- | --------------------------------------------- |
-| `users:read`   | List and read account records                 |
-| `users:create` | Create accounts, together with `roles:assign` |
-| `users:update` | Activate or disable accounts                  |
-| `roles:read`   | List roles and available permission codes     |
-| `roles:assign` | Assign user roles, including admin            |
-| `roles:manage` | Replace a non-admin role's permissions        |
+| Permission          | Capability                                           |
+| ------------------- | ---------------------------------------------------- |
+| `users:read`        | List and read account records                        |
+| `users:create`      | Create accounts, together with `roles:assign`        |
+| `users:update`      | Activate or disable accounts                         |
+| `roles:read`        | List roles and available permission codes            |
+| `roles:assign`      | Assign user roles, including admin                   |
+| `roles:manage`      | Replace a non-admin role's permissions               |
+| `orders:read`       | List and view orders involving the assigned store    |
+| `orders:create`     | Request stock for the assigned store                 |
+| `orders:fulfill`    | Record stock issued by the assigned store            |
+| `orders:all_stores` | Apply the account’s orders permissions to all stores |
 
-Admin starts with all six permissions. Other roles initially have no management permissions; every active account can still read its own profile. Role names alone do not grant additional domain access. Inventory, orders, facilities, and organization-scoped policies are not implemented yet.
+The admin role receives all seeded permissions. Administrators grant access to other roles through the permissions endpoint. An active account can read its own profile regardless of its role.
 
 `roles:assign` and `roles:manage` are delegation powers: a holder can grant broad access, including administrator-level access. They are intended for trusted account administrators.
 

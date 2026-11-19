@@ -11,6 +11,7 @@ import (
 	"clims-backend/internal/features/apidocs"
 	"clims-backend/internal/features/auth"
 	"clims-backend/internal/features/health"
+	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
@@ -79,6 +80,7 @@ func main() {
 	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {
