@@ -50,6 +50,17 @@ This example indexes the existing orders table by creation time. Choose SQL appr
 
 An up migration applies the change; its down migration should undo that change without undoing unrelated schema or data. Plan data transformations and rollbacks explicitly. Do not commit empty placeholders. Keep legacy data imports separate from normal schema migrations; `make sql-convert` regenerates the historical backup conversion and is not a migration generator.
 
+## Add permission definitions
+
+Use the migration generator with one `--permission` argument per definition. For example, once an order approval endpoint checks `orders:approve`:
+
+```sh
+python3 scripts/create_migration.py add_order_permissions \
+  --permission orders:approve "Approve orders"
+```
+
+The generated up migration creates UUID-backed permission definitions and grants them to the built-in admin role. Grant permissions to other roles through the existing role management API. A duplicate code fails the whole migration. Rolling back deletes the added definitions and their role grants.
+
 ## Validate against an isolated database
 
 Use a disposable PostgreSQL 16 database with credentials permitted to create tables and indexes. Do not use the application's development/production database for rollback experiments. Stop any API process pointing at the test database so it cannot immediately reapply a rollback. From `backend/`, using the pinned CLI:
