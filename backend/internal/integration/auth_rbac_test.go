@@ -349,6 +349,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatalf("orders leaked to unassigned user: %v", visible)
 	}
 
+	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
+
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
 	for _, userID := range []string{adminID, secondID} {

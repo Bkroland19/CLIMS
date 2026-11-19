@@ -35,12 +35,16 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group := router.Group("/orders", jwt, activeUser)
 	group.Get("/", rbac.RequirePermission("orders:read"), h.list)
 	group.Post("/", rbac.RequirePermission("orders:create"), h.create)
+	group.Post("/stockouts", rbac.RequirePermission("orders:stockout"), h.stockout)
+	group.Get("/notifications", rbac.RequirePermission("orders:read"), h.notifications)
+	group.Get("/:id/events", rbac.RequirePermission("orders:read"), h.events)
+	group.Post("/:id/actions/:action", h.action, h.performAction)
 	group.Get("/:id", rbac.RequirePermission("orders:read"), h.get)
 	group.Patch("/:id/fulfill", rbac.RequirePermission("orders:fulfill"), h.fulfill)
 }
 
 func scopeFor(user *users.User) scope {
-	return scope{storeID: user.StoreID, allStores: user.HasPermission("orders:all_stores")}
+	return scope{storeID: user.StoreID, hotSpotID: user.HotSpotID, userID: user.ID, allStores: user.HasPermission("orders:all_stores")}
 }
 
 func (h *Handler) list(c fiber.Ctx) error {
@@ -49,7 +53,7 @@ func (h *Handler) list(c fiber.Ctx) error {
 	if limitErr != nil || offsetErr != nil || limit < 1 || limit > 100 || offset < 0 {
 		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
 	}
-	orders, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), int32(limit), int32(offset))
+	orders, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), int32(limit), int32(offset), c.Query("status"))
 	if err != nil {
 		return orderError(c, err)
 	}
@@ -136,7 +140,7 @@ func (h *Handler) fulfill(c fiber.Ctx) error {
 		if !access.allStores && (access.storeID == nil || *access.storeID != existing.OrderedFromStoreID) {
 			return response.Error(c, 403, "only the supplying store can fulfill this order", nil)
 		}
-		return response.Error(c, 409, "order has already been fulfilled", nil)
+		return response.Error(c, 409, "order cannot be fulfilled through this endpoint", nil)
 	}
 	if err != nil {
 		return orderError(c, err)

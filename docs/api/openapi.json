@@ -34,6 +34,268 @@
     }
   ],
   "paths": {
+    "/api/v1/orders/stockouts": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "reportOrderStockout",
+        "summary": "Report a hotspot stockout",
+        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. It queues the order and notifies the routed district store.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStockoutRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/notifications": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "listOrderNotifications",
+        "summary": "List order notifications",
+        "description": "Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/events": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "listOrderEvents",
+        "summary": "View order workflow history",
+        "description": "Requires orders:read and access to the order. Returns up to 50 events per page.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/actions/{action}": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "transitionOrder",
+        "summary": "Advance an order workflow",
+        "description": "Review, check-stock and dispatch require orders:process and the supplying store. request-replenishment requires orders:replenish, the district store and warehouse_store_id. Warehouse receive requires orders:receive, the requesting store and quantity_received. A discrepancy requires discrepancy_note. Hotspot dispatch requires rider_id and deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. Review and check-stock accept an empty body.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "review",
+                "check-stock",
+                "dispatch",
+                "request-replenishment",
+                "receive",
+                "deliver"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderActionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders": {
       "get": {
         "tags": [
@@ -41,7 +303,7 @@
         ],
         "operationId": "listOrders",
         "summary": "List orders",
-        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store. Add orders:all_stores for cross-store access.",
+        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access.",
         "responses": {
           "200": {
             "description": "Success",
@@ -67,6 +329,11 @@
           }
         },
         "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
           {
             "name": "limit",
             "in": "query",
@@ -888,6 +1155,130 @@
       }
     },
     "schemas": {
+      "OrderStockoutRequest": {
+        "type": "object",
+        "properties": {
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_needed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "hot_spot_id",
+          "condom_id",
+          "unit_of_measure_id",
+          "quantity_needed"
+        ],
+        "additionalProperties": false
+      },
+      "OrderActionRequest": {
+        "type": "object",
+        "properties": {
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rider_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_received": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "discrepancy_note": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "delivery_note": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "fulfilled",
+              "queued",
+              "reviewed",
+              "on_hold",
+              "confirmed",
+              "dispatched",
+              "received",
+              "delivered"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "actor_id",
+          "action",
+          "status",
+          "created_at"
+        ]
+      },
+      "OrderEventListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderEvent"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
       "CreateOrderRequest": {
         "type": "object",
         "required": [
@@ -960,7 +1351,13 @@
           "quantity_issued",
           "order_status",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "hot_spot_id",
+          "parent_order_id",
+          "rider_id",
+          "quantity_received",
+          "discrepancy_note",
+          "delivery_note"
         ],
         "properties": {
           "id": {
@@ -1015,7 +1412,14 @@
             "type": "string",
             "enum": [
               "pending",
-              "fulfilled"
+              "fulfilled",
+              "queued",
+              "reviewed",
+              "on_hold",
+              "confirmed",
+              "dispatched",
+              "received",
+              "delivered"
             ]
           },
           "created_at": {
@@ -1025,6 +1429,37 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "parent_order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "rider_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "quantity_received": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "nullable": true
+          },
+          "discrepancy_note": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          },
+          "delivery_note": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
           }
         }
       },

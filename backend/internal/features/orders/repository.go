@@ -9,6 +9,12 @@ import (
 )
 
 type Order struct {
+	HotSpotID          *string   `json:"hot_spot_id"`
+	ParentOrderID      *string   `json:"parent_order_id"`
+	RiderID            *string   `json:"rider_id"`
+	QuantityReceived   *int32    `json:"quantity_received"`
+	DiscrepancyNote    *string   `json:"discrepancy_note"`
+	DeliveryNote       *string   `json:"delivery_note"`
 	ID                 string    `json:"id"`
 	CondomID           string    `json:"condom_id"`
 	QuantityNeeded     int32     `json:"quantity_needed"`
@@ -27,6 +33,8 @@ type Order struct {
 
 type scope struct {
 	storeID   *string
+	hotSpotID *string
+	userID    string
 	allStores bool
 }
 
@@ -40,22 +48,25 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 const columns = `id, condom_id, quantity_needed, quantity_issued, order_status,
 to_char(order_date, 'YYYY-MM-DD'), ordered_by_id, handled_by_id, ordered_for_store_id,
-ordered_from_store_id, unit_of_measure_id, comment, created_at, updated_at`
+ordered_from_store_id, unit_of_measure_id, comment, created_at, updated_at,
+hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note`
 
 func scanOrder(row pgx.Row) (Order, error) {
 	var order Order
 	err := row.Scan(&order.ID, &order.CondomID, &order.QuantityNeeded, &order.QuantityIssued,
 		&order.Status, &order.Date, &order.OrderedByID, &order.HandledByID,
 		&order.OrderedForStoreID, &order.OrderedFromStoreID, &order.UnitOfMeasureID,
-		&order.Comment, &order.CreatedAt, &order.UpdatedAt)
+		&order.Comment, &order.CreatedAt, &order.UpdatedAt, &order.HotSpotID,
+		&order.ParentOrderID, &order.RiderID, &order.QuantityReceived, &order.DiscrepancyNote, &order.DeliveryNote)
 	return order, err
 }
 
-const visibleOrders = `($1::boolean OR $2::uuid IN (ordered_for_store_id, ordered_from_store_id))`
+const visibleOrders = `($1::boolean OR $2::uuid IN (ordered_for_store_id, ordered_from_store_id) OR hot_spot_id = $3::uuid OR rider_id = $4::uuid)`
 
-func (r *Repository) list(ctx context.Context, access scope, limit, offset int32) ([]Order, error) {
+func (r *Repository) list(ctx context.Context, access scope, limit, offset int32, status string) ([]Order, error) {
 	rows, err := r.db.Query(ctx, `SELECT `+columns+` FROM orders WHERE `+visibleOrders+
-		` ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4`, access.allStores, access.storeID, limit, offset)
+		` AND ($7 = '' OR order_status = $7) ORDER BY created_at DESC, id DESC LIMIT $5 OFFSET $6`,
+		access.allStores, access.storeID, access.hotSpotID, access.userID, limit, offset, status)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +77,7 @@ func (r *Repository) list(ctx context.Context, access scope, limit, offset int32
 
 func (r *Repository) get(ctx context.Context, access scope, id string) (Order, error) {
 	return scanOrder(r.db.QueryRow(ctx, `SELECT `+columns+` FROM orders WHERE `+visibleOrders+
-		` AND id = $3`, access.allStores, access.storeID, id))
+		` AND id = $5`, access.allStores, access.storeID, access.hotSpotID, access.userID, id))
 }
 
 func (r *Repository) create(ctx context.Context, actorID string, input createRequest) (Order, error) {
