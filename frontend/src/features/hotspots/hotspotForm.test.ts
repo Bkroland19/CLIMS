@@ -1,116 +1,80 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Hotspot } from './api';
-import {
-  hotspotFormDefaults,
-  hotspotLabel,
-  hotspotSchema,
-  statusOptions,
-  type HotspotFormInput,
-} from './hotspotForm';
+import { dispenserSummary, EMPTY_SUBMISSION, submissionSchema } from './hotspotForm';
 
-const valid: HotspotFormInput = {
-  hotspot_name: 'Lugogo',
-  contact_person_name: 'Okello James',
-  contact_person_telephone: '+256 700 000002',
-  latitude: '0.3295',
-  longitude: '32.6016',
-  organization_unit_id: '4',
-  hotspot_status: 'active',
-};
+const district = '7f2c3c5e-1d4b-4c1a-9a51-2a8f6f0b9e11';
+const minimal = { ...EMPTY_SUBMISSION, name: ' Lake view bar ', district_id: district };
 
-const hotspot: Hotspot = {
-  id: 3,
-  hotspot_name: 'Lugogo',
-  contact_person_name: 'Okello James',
-  contact_person_telephone: '0772000000',
-  latitude: 0.3295,
-  longitude: 32.6016,
-  organization_unit_id: 4,
-  hotspot_status: 'Active',
-};
+function issues(input: typeof EMPTY_SUBMISSION) {
+  const result = submissionSchema.safeParse(input);
+  return result.success
+    ? {}
+    : Object.fromEntries(result.error.issues.map((i) => [i.path.join('.'), i.message]));
+}
 
-describe('hotspotSchema', () => {
-  it('converts coordinates to numbers', () => {
-    expect(hotspotSchema.parse(valid)).toMatchObject({ latitude: 0.3295, longitude: 32.6016 });
+describe('submissionSchema', () => {
+  it('turns blanks into nulls and trims text', () => {
+    expect(submissionSchema.parse(minimal)).toEqual({
+      name: 'Lake view bar',
+      district_id: district,
+      type: null,
+      village: null,
+      contact_person_name: null,
+      contact_person_telephone: null,
+      has_condom_dispenser: null,
+      dispenser_condition: null,
+      latitude: null,
+      longitude: null,
+      comment: null,
+    });
   });
 
-  it('accepts coordinates on the equator and the prime meridian', () => {
-    expect(hotspotSchema.safeParse({ ...valid, latitude: '0', longitude: '0' }).success).toBe(true);
+  it('sends the dispenser answer and drops a condition without a dispenser', () => {
+    const withDispenser = {
+      ...minimal,
+      has_condom_dispenser: 'yes',
+      dispenser_condition: 'Good',
+    } as const;
+    expect(submissionSchema.parse(withDispenser)).toMatchObject({
+      has_condom_dispenser: true,
+      dispenser_condition: 'Good',
+    });
+    expect(submissionSchema.parse({ ...withDispenser, has_condom_dispenser: 'no' })).toMatchObject({
+      has_condom_dispenser: false,
+      dispenser_condition: null,
+    });
   });
 
   it.each([
-    { field: 'hotspot_name', value: '  ' },
-    { field: 'contact_person_name', value: '' },
-    { field: 'contact_person_telephone', value: 'none' },
-    { field: 'latitude', value: '' },
-    { field: 'latitude', value: '90.1' },
-    { field: 'latitude', value: '0° 19′ N' },
-    { field: 'longitude', value: '-180.5' },
-    { field: 'longitude', value: '32,6016' },
-    { field: 'organization_unit_id', value: '' },
-    { field: 'hotspot_status', value: '' },
-  ])('rejects $field = "$value"', ({ field, value }) => {
-    const result = hotspotSchema.safeParse({ ...valid, [field]: value });
-    expect(result.error?.issues[0]?.path[0]).toBe(field);
-  });
-});
-
-describe('statusOptions', () => {
-  it('offers the standard statuses for a new hotspot', () => {
-    expect(statusOptions(null).map((option) => option.value)).toEqual([
-      'active',
-      'pending',
-      'inactive',
-    ]);
+    [{ name: '' }, 'name'],
+    [{ name: 'x'.repeat(41) }, 'name'],
+    [{ district_id: '' }, 'district_id'],
+    [{ village: 'x'.repeat(21) }, 'village'],
+    [{ contact_person_telephone: 'call me' }, 'contact_person_telephone'],
+    [{ has_condom_dispenser: 'yes' as const }, 'dispenser_condition'],
+    [{ latitude: '0.31' }, 'longitude'],
+    [{ latitude: '91', longitude: '32' }, 'latitude'],
+    [{ latitude: 'north', longitude: '32' }, 'latitude'],
+  ])('rejects %o on %s', (change, field) => {
+    expect(issues({ ...minimal, ...change })).toHaveProperty(field);
   });
 
-  it('does not duplicate a standard status stored in another case', () => {
-    expect(statusOptions('ACTIVE')).toHaveLength(3);
-  });
-
-  it('keeps a non-standard stored status as a choice', () => {
-    expect(statusOptions('under review').at(-1)).toEqual({
-      value: 'under review',
-      label: 'Under review',
+  it('accepts a coordinate pair', () => {
+    expect(
+      submissionSchema.parse({ ...minimal, latitude: '0.31', longitude: '32.63' }),
+    ).toMatchObject({
+      latitude: 0.31,
+      longitude: 32.63,
     });
   });
-
-  it.each(['', '   '])('ignores a blank stored status %j', (status) => {
-    expect(statusOptions(status)).toHaveLength(3);
-  });
 });
 
-describe('hotspotFormDefaults', () => {
-  it('is blank for a new hotspot', () => {
-    expect(Object.values(hotspotFormDefaults(null)).every((value) => value === '')).toBe(true);
-  });
-
-  it('fills the form from the record, normalising a standard status', () => {
-    expect(hotspotFormDefaults(hotspot)).toEqual({
-      ...valid,
-      contact_person_telephone: '0772000000',
-    });
-  });
-
-  it('keeps zero coordinates as "0", not blank', () => {
-    const onEquator = hotspotFormDefaults({ ...hotspot, latitude: 0 });
-    expect(onEquator.latitude).toBe('0');
-  });
-
-  it('leaves missing coordinates blank', () => {
-    const unplaced = hotspotFormDefaults({ ...hotspot, latitude: null, longitude: null });
-    expect(unplaced).toMatchObject({ latitude: '', longitude: '' });
-  });
-
-  it('round-trips an edited record through validation', () => {
-    expect(hotspotSchema.safeParse(hotspotFormDefaults(hotspot)).success).toBe(true);
-  });
-});
-
-describe('hotspotLabel', () => {
-  it('uses the name, or the id when unnamed', () => {
-    expect(hotspotLabel(hotspot)).toBe('Lugogo');
-    expect(hotspotLabel({ id: 8, hotspot_name: null })).toBe('Hotspot #8');
+describe('dispenserSummary', () => {
+  it('describes the dispenser answers', () => {
+    expect(dispenserSummary({ has_condom_dispenser: null, dispenser_condition: null })).toBeNull();
+    expect(dispenserSummary({ has_condom_dispenser: false, dispenser_condition: null })).toBe('No');
+    expect(dispenserSummary({ has_condom_dispenser: true, dispenser_condition: 'Poor' })).toBe(
+      'Yes, poor',
+    );
   });
 });

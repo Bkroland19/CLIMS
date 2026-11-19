@@ -1,98 +1,73 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createHttpClient } from '@/lib/api';
-import { createFakeAdapter } from '@/test/fakeAdapter';
+import type { HttpClient } from '@/lib/api';
 
-import {
-  createHotspot,
-  listHotspots,
-  mappableHotspots,
-  updateHotspot,
-  type Hotspot,
-  type HotspotInput,
-} from './api';
+import { actOnHotspot, listHotspots, mappableHotspots, type Hotspot } from './api';
 
-function setup(...script: Parameters<typeof createFakeAdapter>) {
-  const { adapter, requests } = createFakeAdapter(...script);
-  const http = createHttpClient({
-    baseUrl: '/api',
-    getToken: () => 'tok',
-    onUnauthorized: vi.fn(),
-    adapter,
-  });
-  return { http, requests };
+function fakeHttp(body: unknown = {}) {
+  return {
+    get: vi.fn().mockResolvedValue(body),
+    post: vi.fn().mockResolvedValue(body),
+    put: vi.fn(),
+    delete: vi.fn(),
+  } as unknown as HttpClient & { get: ReturnType<typeof vi.fn>; post: ReturnType<typeof vi.fn> };
 }
 
-const input: HotspotInput = {
-  hotspot_name: 'Lugogo',
-  contact_person_name: 'Okello James',
-  contact_person_telephone: '+256700000002',
-  latitude: 0.3295,
-  longitude: 32.6016,
-  organization_unit_id: '4',
-  hotspot_status: 'active',
+const wire = {
+  id: '6f1e2c50-9d8a-4f3b-8c1e-2b7a9d0c4e11',
+  name: 'Lake view bar',
+  type: 'Guest house',
+  village: 'Seja',
+  contact_person_name: null,
+  contact_person_telephone: '',
+  has_condom_dispenser: true,
+  dispenser_condition: 'Poor',
+  latitude: 0.31,
+  longitude: 32.63,
+  comment: null,
+  status: 'submitted',
+  rejection_reason: null,
+  district_id: '7f2c3c5e-1d4b-4c1a-9a51-2a8f6f0b9e11',
+  submitted_by_id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f',
+  created_at: '2026-11-19T10:00:00Z',
 };
 
 describe('listHotspots', () => {
-  it('maps the API spelling "longtitude" to longitude', async () => {
-    const { http } = setup({
-      status: 200,
-      body: [{ id: 1, hotspot_name: 'Lugogo', latitude: '0.3295', longtitude: '32.6016' }],
+  it('reads the Go API envelope and normalises blanks to null', async () => {
+    const http = fakeHttp({ success: true, data: [wire] });
+
+    const [hotspot] = await listHotspots(http);
+
+    expect(http.get).toHaveBeenCalledWith('/hotspots?limit=100', { signal: undefined });
+    expect(hotspot).toMatchObject({
+      name: 'Lake view bar',
+      contact_person_telephone: null,
+      has_condom_dispenser: true,
     });
-
-    const [hotspot] = await listHotspots(http);
-
-    expect(hotspot).toMatchObject({ latitude: 0.3295, longitude: 32.6016 });
-    expect(hotspot).not.toHaveProperty('longtitude');
-  });
-
-  it('reads missing coordinates as null, not zero', async () => {
-    const { http } = setup({ status: 200, body: [{ id: 1, latitude: '', longtitude: null }] });
-    const [hotspot] = await listHotspots(http);
-    expect(hotspot).toMatchObject({ latitude: null, longitude: null });
   });
 });
 
-describe('createHotspot / updateHotspot', () => {
-  it('sends longitude under the spelling the API expects', async () => {
-    const { http, requests } = setup({ status: 200, body: {} });
+describe('actOnHotspot', () => {
+  it('sends a reason only when rejecting', async () => {
+    const http = fakeHttp();
 
-    await createHotspot(http, input);
-    await updateHotspot(http, 9, input);
+    await actOnHotspot(http, wire.id, 'verify');
+    await actOnHotspot(http, wire.id, 'reject', 'Duplicate');
 
-    for (const request of requests) {
-      expect(request.body).toHaveProperty('longtitude', 32.6016);
-      expect(request.body).not.toHaveProperty('longitude');
-    }
-    expect(requests[0]).toMatchObject({ method: 'POST', url: '/hotSpots' });
-    expect(requests[1]).toMatchObject({ method: 'PUT', url: '/hotSpots/9' });
+    expect(http.post).toHaveBeenNthCalledWith(1, `/hotspots/${wire.id}/actions/verify`, undefined);
+    expect(http.post).toHaveBeenNthCalledWith(2, `/hotspots/${wire.id}/actions/reject`, {
+      reason: 'Duplicate',
+    });
   });
 });
 
 describe('mappableHotspots', () => {
-  const at = (id: number, latitude: number | null, longitude: number | null): Hotspot => ({
-    id,
-    hotspot_name: `Hotspot ${id}`,
-    contact_person_name: null,
-    contact_person_telephone: null,
-    latitude,
-    longitude,
-    organization_unit_id: null,
-    hotspot_status: null,
-  });
+  const at = (latitude: number | null, longitude: number | null) =>
+    ({ ...wire, latitude, longitude }) as unknown as Hotspot;
 
-  it('keeps hotspots with valid coordinates, including on the equator', () => {
-    const kept = mappableHotspots([at(1, 0.3136, 32.5811), at(2, 0, 32.5), at(3, -1.35, 29.7)]);
-    expect(kept.map((hotspot) => hotspot.id)).toEqual([1, 2, 3]);
-  });
+  it('keeps hotspots with usable coordinates only', () => {
+    const hotspots = [at(0.31, 32.63), at(null, 32), at(0, 0), at(91, 32), at(0.3, 181)];
 
-  it.each([
-    { name: 'a missing latitude', hotspot: at(1, null, 32.5) },
-    { name: 'a missing longitude', hotspot: at(1, 0.3, null) },
-    { name: 'the (0, 0) placeholder', hotspot: at(1, 0, 0) },
-    { name: 'a latitude beyond the poles', hotspot: at(1, 91, 32.5) },
-    { name: 'a longitude beyond the antimeridian', hotspot: at(1, 0.3, -181) },
-  ])('drops $name', ({ hotspot }) => {
-    expect(mappableHotspots([hotspot])).toEqual([]);
+    expect(mappableHotspots(hotspots)).toHaveLength(1);
   });
 });

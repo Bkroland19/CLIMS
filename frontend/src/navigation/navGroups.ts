@@ -6,6 +6,7 @@ import {
   PackageSearch,
   Store,
   Truck,
+  UsersRound,
   Warehouse,
 } from 'lucide-react';
 
@@ -174,6 +175,12 @@ export const navGroups: readonly NavGroup[] = [
         title: 'Evidence',
       },
     ],
+  },
+  {
+    id: 'vht',
+    label: 'Village health team',
+    icon: UsersRound,
+    items: [{ label: 'My hotspots', path: '/vht', title: 'My hotspots' }],
   },
   {
     id: 'delivery',
