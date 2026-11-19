@@ -208,7 +208,7 @@
         "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance an order workflow",
-        "description": "Review, check-stock and dispatch require orders:process and the supplying store. request-replenishment requires orders:replenish, the district store and warehouse_store_id. Warehouse receive requires orders:receive, the requesting store and quantity_received. A discrepancy requires discrepancy_note. Hotspot dispatch requires rider_id and deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. Review and check-stock accept an empty body.",
+        "description": "Review, check-stock and dispatch require orders:process and the supplying store. Hotspot orders need no review: check-stock works on queued, reviewed and on_hold hotspot orders, and on reviewed and on_hold warehouse requests. request-replenishment requires orders:replenish, the district store and warehouse_store_id. Warehouse receive requires orders:receive, the requesting store and quantity_received; it also reserves the received stock for the held hotspot order and confirms it when enough is on hand. A discrepancy requires discrepancy_note. Dispatch accepts an optional quantity_issued for a partial dispatch. Hotspot dispatch requires rider_id and deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. Review and check-stock accept an empty body.",
         "responses": {
           "200": {
             "description": "Success",
@@ -507,7 +507,7 @@
         "tags": ["Auth"],
         "operationId": "register",
         "summary": "Register an unassigned account",
-        "description": "Creates an active account with no assigned role. Role and status fields are rejected. Limited to 10 requests per IP per minute.",
+        "description": "Creates an active account with no assigned role. Role and status fields are rejected. Limited to 10 requests per IP per minute. Email addresses, usernames and phone numbers must each be unused: a taken value returns 409 naming the field. Emails and usernames are compared case-insensitively and phone numbers by their digits, so 0772 123456 and +256772123456 conflict.",
         "responses": {
           "201": {
             "description": "Success",
@@ -553,7 +553,7 @@
         "tags": ["Auth"],
         "operationId": "login",
         "summary": "Log in",
-        "description": "Returns a 24-hour HS256 JWT and the current account profile. Limited to 10 failed attempts per IP per minute. Successful requests do not consume the limit.",
+        "description": "Sign in with an email address, username or phone number in `login`, and the password. Each identifier belongs to one account. Email addresses are tried first; if one account's username equals another's phone number and the password opens both, the response is 409 and the user signs in with their email address. Wrong credentials return 401 without saying which part was wrong. Returns a 24-hour HS256 JWT and the current account profile. Limited to 10 failed attempts per IP per minute. Successful requests do not consume the limit.",
         "responses": {
           "200": {
             "description": "Success",
@@ -573,6 +573,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
@@ -683,7 +686,7 @@
         "tags": ["Users"],
         "operationId": "createUser",
         "summary": "Create a user with roles",
-        "description": "Creates an account with one or more existing roles. Requires users:create and roles:assign.",
+        "description": "Creates an account with one or more existing roles. Requires users:create and roles:assign. Email addresses, usernames and phone numbers must each be unused: a taken value returns 409 naming the field. Emails and usernames are compared case-insensitively and phone numbers by their digits, so 0772 123456 and +256772123456 conflict.",
         "responses": {
           "201": {
             "description": "Success",
@@ -1416,6 +1419,246 @@
           }
         }
       }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "logout",
+        "summary": "Sign out",
+        "description": "Ends the session that issued this token. The token is rejected from then on.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "listOwnSessions",
+        "summary": "List your sessions",
+        "description": "Lists your unexpired sessions, newest first, including revoked ones. `current` marks the session of this token.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{id}": {
+      "delete": {
+        "tags": ["Auth"],
+        "operationId": "revokeOwnSession",
+        "summary": "Sign out one of your sessions",
+        "description": "Revokes one of your live sessions, for example a lost device. Returns 404 for another user's session or one that has already ended.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}/sessions": {
+      "get": {
+        "tags": ["Users"],
+        "operationId": "listUserSessions",
+        "summary": "List a user's sessions",
+        "description": "Requires users:read. Lists the user's unexpired sessions, including revoked ones.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "operationId": "revokeUserSessions",
+        "summary": "Sign a user out everywhere",
+        "description": "Requires users:update. Revokes every live session of the user. Disabling an account does this too.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokedSessionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "refreshSession",
+        "summary": "Refresh the access token",
+        "description": "Public; send the refresh token from login or the previous refresh. Returns a new access token and a new refresh token for the same session; the old refresh token stops working. Reusing an old refresh token more than 30 seconds after it was replaced is treated as theft and signs the session out. Returns 401 when the token is unknown, used, revoked or expired, and 403 when the account is disabled.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1424,7 +1667,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Paste the token returned by POST /api/v1/auth/login. Role and permission changes take effect on the next protected request."
+        "description": "Paste the access token returned by POST /api/v1/auth/login (Swagger UI does this for you). Access tokens last 15 minutes; renew them with POST /api/v1/auth/refresh. Each token belongs to a login session; signing out or revoking the session rejects it at once. Role and permission changes take effect on the next protected request."
       }
     },
     "schemas": {
@@ -1479,6 +1722,12 @@
           "delivery_note": {
             "type": "string",
             "maxLength": 4000
+          },
+          "quantity_issued": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "description": "dispatch only. Issues less than quantity_needed and releases the rest of the reservation. Defaults to quantity_needed."
           }
         },
         "additionalProperties": false
@@ -1898,14 +2147,20 @@
       "LoginRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["email", "password"],
+        "required": ["password"],
         "properties": {
-          "email": {
+          "login": {
             "type": "string",
-            "format": "email",
+            "minLength": 1,
             "maxLength": 255,
             "example": "user@example.test",
-            "description": "Trimmed, lowercased, and unique without regard to case."
+            "description": "Email address, username or phone number, each unique to one account. Emails and usernames are case-insensitive; phone numbers match in any format, e.g. 0772 123456 or +256772123456."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "deprecated": true,
+            "description": "Older name for `login`, still accepted. Send one of the two."
           },
           "password": {
             "type": "string",
@@ -2085,6 +2340,21 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "last_login_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "login_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Successful logins since login counting began."
+          },
+          "active_sessions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Devices currently signed in: live, unrevoked sessions."
           }
         }
       },
@@ -2219,10 +2489,19 @@
           },
           "data": {
             "type": "object",
-            "required": ["token", "token_type", "expires_in", "user"],
+            "required": [
+              "token",
+              "token_type",
+              "expires_in",
+              "refresh_token",
+              "refresh_expires_in",
+              "session_id",
+              "user"
+            ],
             "properties": {
               "token": {
-                "type": "string"
+                "type": "string",
+                "description": "Access token. Send as `Authorization: Bearer <token>`."
               },
               "token_type": {
                 "type": "string",
@@ -2230,7 +2509,22 @@
               },
               "expires_in": {
                 "type": "integer",
-                "enum": [86400]
+                "minimum": 0,
+                "maximum": 900,
+                "description": "Seconds until the access token expires (15 minutes, or sooner when the session ends first)."
+              },
+              "refresh_token": {
+                "type": "string",
+                "description": "Single use. Exchange it at POST /api/v1/auth/refresh before the session expires; store it securely."
+              },
+              "refresh_expires_in": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Seconds until the session ends and a new login is required (30 days after login)."
+              },
+              "session_id": {
+                "type": "string",
+                "format": "uuid"
               },
               "user": {
                 "$ref": "#/components/schemas/User"
@@ -2662,6 +2956,162 @@
             "items": {
               "$ref": "#/components/schemas/District"
             }
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "required": ["id", "created_at", "last_seen_at", "expires_at", "current"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_agent": {
+            "type": "string",
+            "nullable": true
+          },
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated at most once a minute."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session ends and refreshing stops (30 days after login)."
+          },
+          "revoked_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "refreshed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "refresh_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SessionListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            }
+          }
+        }
+      },
+      "RevokedSessionsResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": ["revoked"],
+            "properties": {
+              "revoked": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "TokenPair": {
+        "type": "object",
+        "required": [
+          "token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "refresh_expires_in",
+          "session_id"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Access token. Send as `Authorization: Bearer <token>`."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": ["Bearer"]
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 900,
+            "description": "Seconds until the access token expires (15 minutes, or sooner when the session ends first)."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Single use. Exchange it at POST /api/v1/auth/refresh before the session expires; store it securely."
+          },
+          "refresh_expires_in": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds until the session ends and a new login is required (30 days after login)."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["refresh_token"],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "RefreshResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TokenPair"
           }
         }
       }

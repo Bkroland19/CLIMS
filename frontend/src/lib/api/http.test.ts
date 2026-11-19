@@ -187,3 +187,55 @@ describe('createHttpClient', () => {
     });
   });
 });
+
+describe('refreshing an expired access token', () => {
+  function withRefresh(script: Parameters<typeof createFakeAdapter>, refreshes: boolean) {
+    const { adapter, requests } = createFakeAdapter(...script);
+    let token = 'expired';
+    const onUnauthorized = vi.fn();
+    const refresh = vi.fn((_rejected: string) => {
+      if (refreshes) token = 'renewed';
+      return Promise.resolve(refreshes);
+    });
+    const http = createHttpClient({
+      baseUrl: '/api',
+      getToken: () => token,
+      onUnauthorized,
+      refresh,
+      adapter,
+    });
+    return { http, requests, onUnauthorized, refresh };
+  }
+
+  it('renews the token and retries the request once', async () => {
+    const { http, requests, onUnauthorized, refresh } = withRefresh(
+      [{ status: 401 }, { status: 200, body: { success: true, data: ['ok'] } }],
+      true,
+    );
+
+    await expect(http.get('/condoms')).resolves.toEqual(['ok']);
+    expect(refresh).toHaveBeenCalledWith('expired');
+    expect(requests.map((request) => request.authorization)).toEqual([
+      'Bearer expired',
+      'Bearer renewed',
+    ]);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('ends the session when the token cannot be renewed', async () => {
+    const { http, requests, onUnauthorized } = withRefresh([{ status: 401 }], false);
+
+    expect((await captureError(http.get('/condoms'))).kind).toBe('unauthorized');
+    expect(requests).toHaveLength(1);
+    expect(onUnauthorized).toHaveBeenCalledOnce();
+  });
+
+  it('does not refresh again when the retry is also rejected', async () => {
+    const { http, requests, onUnauthorized, refresh } = withRefresh([{ status: 401 }], true);
+
+    expect((await captureError(http.get('/condoms'))).kind).toBe('unauthorized');
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(requests).toHaveLength(2);
+    expect(onUnauthorized).toHaveBeenCalledOnce();
+  });
+});

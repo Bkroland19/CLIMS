@@ -30,7 +30,14 @@ func NewJWTMiddleware(secret string) fiber.Handler {
 			if err != nil {
 				return c.SendStatus(fiber.StatusUnauthorized)
 			}
+			// Tokens name their login session; users.ActiveUser checks it is still live.
+			rawSession, _ := claims["sid"].(string)
+			sessionID, err := request.ParseUUID(rawSession)
+			if err != nil {
+				return c.SendStatus(fiber.StatusUnauthorized)
+			}
 			c.Locals("user_id", userID)
+			c.Locals("session_id", sessionID)
 			return c.Next()
 		},
 		ErrorHandler: func(c fiber.Ctx, err error) error {

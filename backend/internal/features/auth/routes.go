@@ -13,7 +13,11 @@ func RegisterRoutes(router fiber.Router, handler *Handler, jwtMiddleware, active
 	auth := router.Group("/auth")
 	auth.Post("/register", authRateLimit(false), handler.Register)
 	auth.Post("/login", authRateLimit(true), handler.Login)
+	auth.Post("/refresh", authRateLimit(true), handler.Refresh)
 	auth.Get("/me", jwtMiddleware, activeUser, handler.Me)
+	auth.Post("/logout", jwtMiddleware, activeUser, handler.Sessions.Logout)
+	auth.Get("/sessions", jwtMiddleware, activeUser, handler.Sessions.MySessions)
+	auth.Delete("/sessions/:id", jwtMiddleware, activeUser, handler.Sessions.RevokeMySession)
 }
 
 // Per-process limits; forwarded headers are not trusted as client identity.

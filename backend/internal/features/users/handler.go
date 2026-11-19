@@ -31,13 +31,14 @@ func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleIDs []string) er
 		return response.Error(c, 500, "failed to hash password", nil)
 	}
 	if err != nil {
+		if message, ok := DuplicateIdentifier(err); ok {
+			return response.Error(c, 409, message, nil)
+		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			switch pgErr.ConstraintName {
 			case "users_organisation_unit_id_fkey", "users_hot_spot_id_fkey":
 				return response.Error(c, 422, "unknown organisation unit or hot spot", nil)
-			case "users_email_unique", "users_email_normalized_unique":
-				return response.Error(c, 409, "email already exists", nil)
 			}
 		}
 		return response.Error(c, 500, "failed to create user", nil)

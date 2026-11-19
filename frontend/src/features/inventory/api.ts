@@ -50,7 +50,7 @@ export async function listInventory(
 export async function createInventory(
   http: HttpClient,
   input: InventoryInput,
-  userId: number,
+  userId: number | string,
 ): Promise<void> {
   await http.post('/condomInventories', { ...input, user_id: userId });
 }

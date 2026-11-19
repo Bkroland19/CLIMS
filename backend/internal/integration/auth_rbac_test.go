@@ -98,6 +98,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if roleCount != 11 || userCount != 455 {
 		t.Fatalf("legacy import: roles=%d users=%d", roleCount, userCount)
 	}
+	// Importing after migrations resolves the backup's shared usernames and phone numbers.
+	assertUniqueIdentifiers(t, pool)
 	repo := users.NewRepository(pool)
 	var legacyAdminID string
 	if err = pool.QueryRow(ctx, `SELECT ru.user_id FROM role_user ru JOIN roles r ON r.id=ru.role_id WHERE r.name='admin' LIMIT 1`).Scan(&legacyAdminID); err != nil {
@@ -281,7 +283,13 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("GET", "/auth/me", nil, userToken, 403)
 	login("newuser@example.test", "test-password-123", 403)
 	request("PATCH", fmt.Sprintf("/users/%s/status", id), map[string]any{"status": "active"}, adminToken, 200)
+	// Disabling revoked the user's sessions, so re-enabling does not revive the old token.
+	request("GET", "/auth/me", nil, userToken, 401)
+	userToken = login("newuser@example.test", "test-password-123", 200)
 	request("GET", "/auth/me", nil, userToken, 200)
+	testSessions(t, pool, request, login, adminToken, id, "newuser@example.test")
+	testLoginIdentifiers(t, request, adminToken, mohRole)
+	userToken = login("newuser@example.test", "test-password-123", 200)
 	request("GET", "/users?limit=101", nil, adminToken, 400)
 	request("GET", "/users?offset=-1", nil, adminToken, 400)
 	request("GET", "/users/not-a-number", nil, adminToken, 400)
@@ -438,6 +446,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if userCount != 455 || roleCount != 1 {
 		t.Fatal("upgrade changed user count or lost custom permission grants")
 	}
+	// Upgrading a database that already holds the backup resolves the same duplicates.
+	assertUniqueIdentifiers(t, upgrade)
 	var sameAssignment bool
 	if err = upgrade.QueryRow(ctx, `SELECT EXISTS (
 		SELECT 1 FROM role_user WHERE user_id=$1 AND role_id=$2

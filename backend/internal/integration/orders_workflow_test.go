@@ -75,7 +75,7 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	act(parentPath, "review", warehouseToken, nil, 404, "")
 	act(parentPath, "review", hotspotToken, nil, 403, "")
 	act(parentPath, "dispatch", districtToken, map[string]any{"rider_id": riderID}, 409, "")
-	act(parentPath, "review", districtToken, nil, 200, "reviewed")
+	// The district review is automatic: the DCFP checks stock on the queued order directly.
 	act(parentPath, "check-stock", districtToken, nil, 200, "on_hold")
 	replenish := map[string]any{"warehouse_store_id": warehouse}
 	child := act(parentPath, "request-replenishment", districtToken, replenish, 201, "queued")
@@ -85,30 +85,46 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	childPath := "/orders/" + child["id"].(string)
 	act(parentPath, "request-replenishment", districtToken, replenish, 409, "")
 	notifications(warehouseToken, "replenishment_requested")
+	// The warehouse reviews a request before checking stock, and rechecks a held request directly.
+	act(childPath, "check-stock", warehouseToken, nil, 409, "")
 	act(childPath, "review", warehouseToken, nil, 200, "reviewed")
 	act(childPath, "check-stock", warehouseToken, nil, 200, "on_hold")
 	exec(`INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand) VALUES ($1, $2, $3, 100)`, warehouse, product, unit)
-	act(childPath, "review", warehouseToken, nil, 200, "reviewed")
 	act(childPath, "check-stock", warehouseToken, nil, 200, "confirmed")
+	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 51}, 422, "")
+	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 0}, 422, "")
 	act(childPath, "dispatch", warehouseToken, nil, 200, "dispatched")
 	act(childPath, "receive", districtToken, map[string]any{"quantity_received": 55}, 422, "")
+	act(childPath, "receive", districtToken, map[string]any{"quantity_received": 55, "quantity_issued": 5}, 422, "")
 	receipt := map[string]any{"quantity_received": 55, "discrepancy_note": "Five additional units counted"}
 	act(childPath, "receive", districtToken, receipt, 200, "received")
 	act(childPath, "receive", districtToken, receipt, 409, "")
-	act(parentPath, "review", districtToken, nil, 200, "reviewed")
-	act(parentPath, "check-stock", districtToken, nil, 200, "confirmed")
+	// Receipt reserves the stock for the held order at once and confirms it to the hotspot manager.
+	if held := request("GET", parentPath, nil, districtToken, 200)["data"].(map[string]any); held["order_status"] != "confirmed" {
+		t.Fatalf("held order not confirmed by receipt: %v", held)
+	}
 	notifications(hotspotToken, "check-stock")
-	act(parentPath, "dispatch", districtToken, map[string]any{"rider_id": riderID}, 200, "dispatched")
+	act(parentPath, "review", districtToken, nil, 409, "")
+	partial := map[string]any{"rider_id": riderID, "quantity_issued": 45}
+	dispatched := act(parentPath, "dispatch", districtToken, partial, 200, "dispatched")
+	if dispatched["quantity_issued"] != float64(45) {
+		t.Fatalf("partial dispatch not recorded: %v", dispatched)
+	}
 	notifications(riderToken, "dispatch")
 	act(parentPath, "deliver", riderToken, map[string]any{"delivery_note": "Received by hotspot manager"}, 200, "delivered")
 	notifications(hotspotToken, "deliver")
 	request("GET", parentPath+"/events", nil, hotspotToken, 200)
-	var onHand, reserved int
-	if err := pool.QueryRow(ctx, `SELECT on_hand, reserved FROM order_store_stock
-		WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3`, district, product, unit).Scan(&onHand, &reserved); err != nil {
-		t.Fatal(err)
+	balance := func(store string, wantOnHand int) {
+		t.Helper()
+		var onHand, reserved int
+		if err := pool.QueryRow(ctx, `SELECT on_hand, reserved FROM order_store_stock
+			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3`, store, product, unit).Scan(&onHand, &reserved); err != nil {
+			t.Fatal(err)
+		}
+		if onHand != wantOnHand || reserved != 0 {
+			t.Fatalf("store %s balance on hand=%d reserved=%d, want %d and 0", store, onHand, reserved, wantOnHand)
+		}
 	}
-	if onHand != 5 || reserved != 0 {
-		t.Fatalf("district balance on hand=%d reserved=%d", onHand, reserved)
-	}
+	balance(district, 10) // 55 received, 45 issued
+	balance(warehouse, 50)
 }
