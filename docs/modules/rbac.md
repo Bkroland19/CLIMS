@@ -19,17 +19,17 @@ The role catalog includes `admin`, `moh`, `nms`, `jms`, `dfcp`, `store incharge`
 
 ## Permission policy
 
-| Permission     | Capability                                    |
-| -------------- | --------------------------------------------- |
-| `users:read`   | List and read account records                 |
-| `users:create` | Create accounts, together with `roles:assign` |
-| `users:update` | Activate or disable accounts                  |
-| `roles:read`   | List roles and available permission codes     |
-| `roles:assign` | Assign user roles, including admin            |
-| `roles:manage` | Replace a non-admin role's permissions        |
-| `orders:read` | List and view orders involving the assigned store |
-| `orders:create` | Request stock for the assigned store |
-| `orders:fulfill` | Record stock issued by the assigned store |
+| Permission          | Capability                                           |
+| ------------------- | ---------------------------------------------------- |
+| `users:read`        | List and read account records                        |
+| `users:create`      | Create accounts, together with `roles:assign`        |
+| `users:update`      | Activate or disable accounts                         |
+| `roles:read`        | List roles and available permission codes            |
+| `roles:assign`      | Assign user roles, including admin                   |
+| `roles:manage`      | Replace a non-admin role's permissions               |
+| `orders:read`       | List and view orders involving the assigned store    |
+| `orders:create`     | Request stock for the assigned store                 |
+| `orders:fulfill`    | Record stock issued by the assigned store            |
 | `orders:all_stores` | Apply the account’s orders permissions to all stores |
 
 The admin role receives all seeded permissions. Administrators grant access to other roles through the permissions endpoint. An active account can read its own profile regardless of its role.

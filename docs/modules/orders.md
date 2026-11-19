@@ -2,12 +2,12 @@
 
 CLIMS records stock requests between two distinct stores. Orders use UUIDs for the product, unit of measure, stores and users. The request records the authenticated account as `ordered_by_id` and starts with status `pending`.
 
-| Method | Route | Permission |
-| --- | --- | --- |
-| GET | `/api/v1/orders` | `orders:read` |
-| GET | `/api/v1/orders/{id}` | `orders:read` |
-| POST | `/api/v1/orders` | `orders:create` |
-| PATCH | `/api/v1/orders/{id}/fulfill` | `orders:fulfill` |
+| Method | Route                         | Permission       |
+| ------ | ----------------------------- | ---------------- |
+| GET    | `/api/v1/orders`              | `orders:read`    |
+| GET    | `/api/v1/orders/{id}`         | `orders:read`    |
+| POST   | `/api/v1/orders`              | `orders:create`  |
+| PATCH  | `/api/v1/orders/{id}/fulfill` | `orders:fulfill` |
 
 Either store can view the order. The receiving store creates it and the supplying store fulfills it. `orders:all_stores` extends the assigned operation permissions across stores. Lists use `limit` (default 50, maximum 100) and `offset` (default 0).
 

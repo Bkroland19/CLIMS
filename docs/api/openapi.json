@@ -36,9 +36,7 @@
   "paths": {
     "/api/v1/orders/stockouts": {
       "post": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Report a hotspot stockout",
         "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. It queues the order and notifies the routed district store.",
@@ -89,9 +87,7 @@
     },
     "/api/v1/orders/notifications": {
       "get": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "listOrderNotifications",
         "summary": "List order notifications",
         "description": "Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
@@ -144,9 +140,7 @@
     },
     "/api/v1/orders/{id}/events": {
       "get": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "listOrderEvents",
         "summary": "View order workflow history",
         "description": "Requires orders:read and access to the order. Returns up to 50 events per page.",
@@ -208,9 +202,7 @@
     },
     "/api/v1/orders/{id}/actions/{action}": {
       "post": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance an order workflow",
         "description": "Review, check-stock and dispatch require orders:process and the supplying store. request-replenishment requires orders:replenish, the district store and warehouse_store_id. Warehouse receive requires orders:receive, the requesting store and quantity_received. A discrepancy requires discrepancy_note. Hotspot dispatch requires rider_id and deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. Review and check-stock accept an empty body.",
@@ -298,9 +290,7 @@
     },
     "/api/v1/orders": {
       "get": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "listOrders",
         "summary": "List orders",
         "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access.",
@@ -358,9 +348,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "createOrder",
         "summary": "Request stock",
         "description": "Requires orders:create. The requesting store must match the current user\u2019s store unless they have orders:all_stores. The date defaults to the database current date.",
@@ -405,9 +393,7 @@
     },
     "/api/v1/orders/{id}": {
       "get": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "getOrder",
         "summary": "Get an order",
         "description": "Requires orders:read. An order is visible to either store or users with orders:all_stores.",
@@ -453,9 +439,7 @@
     },
     "/api/v1/orders/{id}/fulfill": {
       "patch": {
-        "tags": [
-          "Orders"
-        ],
+        "tags": ["Orders"],
         "operationId": "fulfillOrder",
         "summary": "Record quantities issued",
         "description": "Requires orders:fulfill and the supplying store, or orders:all_stores in addition to orders:fulfill. Fulfillment records a single issuance up to the quantity requested.",
@@ -1180,12 +1164,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "hot_spot_id",
-          "condom_id",
-          "unit_of_measure_id",
-          "quantity_needed"
-        ],
+        "required": ["hot_spot_id", "condom_id", "unit_of_measure_id", "quantity_needed"],
         "additionalProperties": false
       },
       "OrderActionRequest": {
@@ -1252,14 +1231,7 @@
             "format": "date-time"
           }
         },
-        "required": [
-          "id",
-          "order_id",
-          "actor_id",
-          "action",
-          "status",
-          "created_at"
-        ]
+        "required": ["id", "order_id", "actor_id", "action", "status", "created_at"]
       },
       "OrderEventListResponse": {
         "type": "object",
@@ -1274,10 +1246,7 @@
             }
           }
         },
-        "required": [
-          "success",
-          "data"
-        ]
+        "required": ["success", "data"]
       },
       "CreateOrderRequest": {
         "type": "object",
@@ -1323,9 +1292,7 @@
       },
       "FulfillOrderRequest": {
         "type": "object",
-        "required": [
-          "quantity_issued"
-        ],
+        "required": ["quantity_issued"],
         "properties": {
           "quantity_issued": {
             "type": "integer",
@@ -1465,10 +1432,7 @@
       },
       "OrderResponse": {
         "type": "object",
-        "required": [
-          "success",
-          "data"
-        ],
+        "required": ["success", "data"],
         "properties": {
           "success": {
             "type": "boolean"
@@ -1483,10 +1447,7 @@
       },
       "OrderListResponse": {
         "type": "object",
-        "required": [
-          "success",
-          "data"
-        ],
+        "required": ["success", "data"],
         "properties": {
           "success": {
             "type": "boolean"
