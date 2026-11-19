@@ -30,7 +30,7 @@ func (h *Handler) ListPermissions(c fiber.Ctx) error {
 }
 
 func (h *Handler) SetRolePermissions(c fiber.Ctx) error {
-	id, err := request.PositiveID(c)
+	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}

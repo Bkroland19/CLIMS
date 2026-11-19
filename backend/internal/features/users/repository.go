@@ -3,7 +3,6 @@ package users
 import (
 	"context"
 	"errors"
-	"slices"
 
 	"clims-backend/internal/features/rbac"
 
@@ -18,31 +17,31 @@ var ErrLastAdmin = errors.New("cannot disable or demote the last active admin")
 type Repository struct{ DB *pgxpool.Pool }
 
 func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
-func (r *Repository) CreateUser(ctx context.Context, req AccountInput, passwordHash string, roleID int) (int, error) {
-	var roleIDs []int
-	if roleID > 0 {
-		roleIDs = []int{roleID}
+func (r *Repository) CreateUser(ctx context.Context, req AccountInput, passwordHash string, roleID string) (string, error) {
+	var roleIDs []string
+	if roleID != "" {
+		roleIDs = []string{roleID}
 	}
 	return r.CreateUserWithRoles(ctx, req, passwordHash, roleIDs)
 }
 
-func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, passwordHash string, roleIDs []int) (int, error) {
+func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, passwordHash string, roleIDs []string) (string, error) {
 	tx, err := r.DB.Begin(ctx)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	defer tx.Rollback(ctx)
-	var id int
+	var id string
 	err = tx.QueryRow(ctx, `INSERT INTO users
-		(username,email,password,firstname,lastname,phone_number,role,status,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,'','active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
+		(username,email,password,firstname,lastname,phone_number,status,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
 		req.Username, req.Email, passwordHash, req.Firstname, req.Lastname, req.Phone).Scan(&id)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	if len(roleIDs) > 0 {
 		if err = replaceRoles(ctx, tx, id, roleIDs); err != nil {
-			return 0, err
+			return "", err
 		}
 	}
 	return id, tx.Commit(ctx)
@@ -52,9 +51,9 @@ const userSelect = `SELECT u.id,u.username,COALESCE(u.email,''),u.password,u.fir
 	COALESCE((
 		SELECT jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'permissions', ARRAY(
 			SELECT p.name FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id
-			WHERE rp.role_id = r.rbac_id ORDER BY p.name
+			WHERE rp.role_id = r.id ORDER BY p.name
 		)) ORDER BY r.id)
-		FROM role_user ru JOIN roles r ON r.rbac_id = ru.role_id WHERE ru.user_id = u.rbac_id
+		FROM role_user ru JOIN roles r ON r.id = ru.role_id WHERE ru.user_id = u.id
 	), '[]'::jsonb) FROM users u `
 
 func scanUser(row pgx.Row) (*User, error) {
@@ -73,7 +72,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 	return scanUser(r.DB.QueryRow(ctx, userSelect+`WHERE lower(btrim(u.email))=lower(btrim($1))`, email))
 }
 
-func (r *Repository) GetUserByID(ctx context.Context, id int) (*User, error) {
+func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) {
 	return scanUser(r.DB.QueryRow(ctx, userSelect+`WHERE u.id=$1`, id))
 }
 
@@ -94,20 +93,20 @@ func (r *Repository) ListUsers(ctx context.Context, limit, offset int) ([]User, 
 	return users, rows.Err()
 }
 
-func (r *Repository) UpdateUserAccess(ctx context.Context, id int, roleID *int, status *string) error {
-	var roleIDs []int
+func (r *Repository) UpdateUserAccess(ctx context.Context, id string, roleID *string, status *string) error {
+	var roleIDs []string
 	if roleID != nil {
-		roleIDs = []int{*roleID}
+		roleIDs = []string{*roleID}
 	}
 	return r.updateUserAccess(ctx, id, roleIDs, status)
 }
 
-func (r *Repository) SetUserRoles(ctx context.Context, id int, roleIDs []int) error {
+func (r *Repository) SetUserRoles(ctx context.Context, id string, roleIDs []string) error {
 	return r.updateUserAccess(ctx, id, roleIDs, nil)
 }
 
 // Serialize account changes so concurrent requests cannot remove every active admin.
-func (r *Repository) updateUserAccess(ctx context.Context, id int, roleIDs []int, status *string) error {
+func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []string, status *string) error {
 	tx, err := r.DB.Begin(ctx)
 	if err != nil {
 		return err
@@ -119,9 +118,9 @@ func (r *Repository) updateUserAccess(ctx context.Context, id int, roleIDs []int
 	var currentStatus string
 	var currentAdmin bool
 	if err = tx.QueryRow(ctx, `SELECT u.status, EXISTS (
-		SELECT 1 FROM role_user ru JOIN roles r ON r.rbac_id = ru.role_id
-		WHERE ru.user_id = u.rbac_id AND r.id = $2
-	) FROM users u WHERE u.id=$1 FOR UPDATE`, id, rbac.AdminRoleID).Scan(&currentStatus, &currentAdmin); err != nil {
+		SELECT 1 FROM role_user ru JOIN roles r ON r.id = ru.role_id
+		WHERE ru.user_id = u.id AND r.name = $2
+	) FROM users u WHERE u.id=$1 FOR UPDATE`, id, rbac.AdminRoleName).Scan(&currentStatus, &currentAdmin); err != nil {
 		return err
 	}
 	newStatus := currentStatus
@@ -136,12 +135,12 @@ func (r *Repository) updateUserAccess(ctx context.Context, id int, roleIDs []int
 	if _, err = tx.Exec(ctx, `UPDATE users SET status=$2,updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id, newStatus); err != nil {
 		return err
 	}
-	if currentAdmin && currentStatus == "active" && (newStatus != "active" || (roleIDs != nil && !slices.Contains(roleIDs, rbac.AdminRoleID))) {
+	if currentAdmin && currentStatus == "active" && (newStatus != "active" || roleIDs != nil) {
 		var adminRemaining bool
 		if err = tx.QueryRow(ctx, `SELECT EXISTS (
-			SELECT 1 FROM role_user ru JOIN users u ON u.rbac_id = ru.user_id
-			JOIN roles r ON r.rbac_id = ru.role_id WHERE r.id = $1 AND u.status = 'active'
-		)`, rbac.AdminRoleID).Scan(&adminRemaining); err != nil {
+			SELECT 1 FROM role_user ru JOIN users u ON u.id = ru.user_id
+			JOIN roles r ON r.id = ru.role_id WHERE r.name = $1 AND u.status = 'active'
+		)`, rbac.AdminRoleName).Scan(&adminRemaining); err != nil {
 			return err
 		}
 		if !adminRemaining {
@@ -151,10 +150,10 @@ func (r *Repository) updateUserAccess(ctx context.Context, id int, roleIDs []int
 	return tx.Commit(ctx)
 }
 
-func replaceRoles(ctx context.Context, tx pgx.Tx, userID int, roleIDs []int) error {
+func replaceRoles(ctx context.Context, tx pgx.Tx, userID string, roleIDs []string) error {
 	var unknown bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (
-		SELECT 1 FROM unnest($1::bigint[]) AS requested(id)
+		SELECT 1 FROM unnest($1::text[]::uuid[]) AS requested(id)
 		WHERE NOT EXISTS (SELECT 1 FROM roles r WHERE r.id = requested.id)
 	)`, roleIDs).Scan(&unknown); err != nil {
 		return err
@@ -162,14 +161,14 @@ func replaceRoles(ctx context.Context, tx pgx.Tx, userID int, roleIDs []int) err
 	if unknown {
 		return ErrUnknownRole
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM role_user ru USING users u, roles r
-		WHERE u.id = $1 AND ru.user_id = u.rbac_id AND ru.role_id = r.rbac_id AND NOT (r.id = ANY($2::bigint[]))`,
+	if _, err := tx.Exec(ctx, `DELETE FROM role_user ru
+		WHERE ru.user_id = $1 AND NOT (ru.role_id = ANY($2::text[]::uuid[]))`,
 		userID, roleIDs); err != nil {
 		return err
 	}
 	_, err := tx.Exec(ctx, `INSERT INTO role_user (user_id, role_id)
-		SELECT u.rbac_id, r.rbac_id FROM users u CROSS JOIN roles r
-		WHERE u.id = $1 AND r.id = ANY($2::bigint[]) ON CONFLICT DO NOTHING`,
+		SELECT u.id, r.id FROM users u CROSS JOIN roles r
+		WHERE u.id = $1 AND r.id = ANY($2::text[]::uuid[]) ON CONFLICT DO NOTHING`,
 		userID, roleIDs)
 	return err
 }

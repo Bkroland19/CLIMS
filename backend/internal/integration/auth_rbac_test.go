@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	"clims-backend/internal/middleware"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -68,8 +70,24 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pool.Exec(ctx, string(seed)); err != nil {
+	uuidSeed, err := exec.Command("python3", filepath.Join("..", "..", "..", "scripts", "prepare_legacy_seed.py")).Output()
+	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, string(uuidSeed)); err != nil {
+		t.Fatal(err)
+	}
+	var nonUUIDKeys int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_constraint c
+		JOIN pg_class t ON t.oid=c.conrelid
+		JOIN pg_namespace n ON n.oid=t.relnamespace
+		JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=ANY(c.conkey)
+		WHERE n.nspname='public' AND t.relname <> 'schema_migrations'
+		AND c.contype='p' AND a.atttypid <> 'uuid'::regtype`).Scan(&nonUUIDKeys); err != nil {
+		t.Fatal(err)
+	}
+	if nonUUIDKeys != 0 {
+		t.Fatalf("found %d non-UUID application primary-key columns", nonUUIDKeys)
 	}
 	var roleCount, userCount int
 	if err = pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM roles),(SELECT count(*) FROM users)`).Scan(&roleCount, &userCount); err != nil {
@@ -79,8 +97,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatalf("legacy import: roles=%d users=%d", roleCount, userCount)
 	}
 	repo := users.NewRepository(pool)
-	var legacyAdminID int
-	if err = pool.QueryRow(ctx, `SELECT id FROM users WHERE role='1' LIMIT 1`).Scan(&legacyAdminID); err != nil {
+	var legacyAdminID string
+	if err = pool.QueryRow(ctx, `SELECT ru.user_id FROM role_user ru JOIN roles r ON r.id=ru.role_id WHERE r.name='admin' LIMIT 1`).Scan(&legacyAdminID); err != nil {
 		t.Fatal(err)
 	}
 	legacyAdmin, err := repo.GetUserByID(ctx, legacyAdminID)
@@ -91,14 +109,24 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatal("legacy admin role not resolved")
 	}
 	// Keep the access tests independent of real legacy account credentials.
-	if _, err = pool.Exec(ctx, `DELETE FROM users WHERE role='1'`); err != nil {
+	if _, err = pool.Exec(ctx, `DELETE FROM users USING role_user ru, roles r WHERE users.id=ru.user_id AND r.id=ru.role_id AND r.name='admin'`); err != nil {
 		t.Fatal(err)
 	}
+	roleIDs := map[string]string{}
+	for _, name := range []string{"admin", "moh", "hotspot manager"} {
+		var roleID string
+		if err := pool.QueryRow(ctx, `SELECT id FROM roles WHERE name=$1`, name).Scan(&roleID); err != nil {
+			t.Fatal(err)
+		}
+		roleIDs[name] = roleID
+	}
+	adminRole, mohRole, hotspotRole := roleIDs["admin"], roleIDs["moh"], roleIDs["hotspot manager"]
+	unknownID := uuid.NewString()
 	hash, err := bcrypt.GenerateFromPassword([]byte("test-password-123"), bcrypt.MinCost)
 	if err != nil {
 		t.Fatal(err)
 	}
-	adminID, err := repo.CreateUser(ctx, users.AccountInput{Username: "test-admin", Email: "admin@example.test"}, string(hash), 1)
+	adminID, err := repo.CreateUser(ctx, users.AccountInput{Username: "test-admin", Email: "admin@example.test"}, string(hash), adminRole)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,9 +193,9 @@ func TestAuthRBACIntegration(t *testing.T) {
 		bad := map[string]any{"username": "bad", "email": "bad@example.test", "password": "test-password-123", field: 1}
 		request("POST", "/auth/register", bad, "", 400)
 	}
-	id := int(request("POST", "/auth/register", registration, "", 201)["data"].(map[string]any)["user_id"].(float64))
-	if id < 1465 {
-		t.Fatal("seeded user sequence did not advance")
+	id := request("POST", "/auth/register", registration, "", 201)["data"].(map[string]any)["user_id"].(string)
+	if _, err := uuid.Parse(id); err != nil {
+		t.Fatal("registration did not return a UUID")
 	}
 	request("POST", "/auth/register", registration, "", 409)
 	request("POST", "/auth/register", map[string]any{"username": "longpass", "email": "long@example.test", "password": strings.Repeat("é", 40)}, "", 422)
@@ -182,60 +210,62 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatal("public registration assigned a role")
 	}
 	request("GET", "/users", nil, userToken, 403)
-	request("PATCH", fmt.Sprintf("/users/%d/role", id), map[string]any{"role_id": 1}, userToken, 403)
-	request("PATCH", fmt.Sprintf("/users/%d/role", id), map[string]any{"role_id": 9999}, adminToken, 404)
-	request("PATCH", fmt.Sprintf("/users/%d/role", id), map[string]any{"role_id": 7}, adminToken, 200)
+	request("PATCH", fmt.Sprintf("/users/%s/role", id), map[string]any{"role_id": adminRole}, userToken, 403)
+	request("PATCH", fmt.Sprintf("/users/%s/role", id), map[string]any{"role_id": unknownID}, adminToken, 404)
+	request("PATCH", fmt.Sprintf("/users/%s/role", id), map[string]any{"role_id": hotspotRole}, adminToken, 200)
 	me = request("GET", "/auth/me", nil, userToken, 200)["data"].(map[string]any)
 	if me["role"].(map[string]any)["name"] != "hotspot manager" {
 		t.Fatal("legacy role name changed")
 	}
-	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{"users:read"}}, adminToken, 200)
+	request("PUT", "/roles/"+hotspotRole+"/permissions", map[string]any{"permissions": []string{"users:read"}}, adminToken, 200)
 	request("GET", "/users?limit=1", nil, userToken, 200)
 	request("POST", "/users", map[string]any{}, userToken, 403)
-	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{"unknown:permission"}}, adminToken, 422)
+	request("PUT", "/roles/"+hotspotRole+"/permissions", map[string]any{"permissions": []string{"unknown:permission"}}, adminToken, 422)
 	request("GET", "/users", nil, userToken, 200) // Invalid update rolled back.
-	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{}}, adminToken, 200)
+	request("PUT", "/roles/"+hotspotRole+"/permissions", map[string]any{"permissions": []string{}}, adminToken, 200)
 	request("GET", "/users", nil, userToken, 403) // Existing JWT loses access immediately.
-	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{"users:create"}}, adminToken, 200)
-	request("POST", "/users", map[string]any{"username": "escalation", "email": "escalation@example.test", "password": "test-password-123", "role_id": 1}, userToken, 403)
-	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{}}, adminToken, 200)
-	rolePath := fmt.Sprintf("/users/%d/roles", id)
-	request("PUT", rolePath, map[string]any{"role_ids": []int{2, 7}}, userToken, 403)
-	request("PUT", rolePath, map[string]any{"role_ids": []int{2, 7, 7}}, adminToken, 200)
-	request("PUT", "/roles/2/permissions", map[string]any{"permissions": []string{"roles:read"}}, adminToken, 200)
-	request("PUT", "/roles/7/permissions", map[string]any{"permissions": []string{"users:read"}}, adminToken, 200)
+	request("PUT", "/roles/"+hotspotRole+"/permissions", map[string]any{"permissions": []string{"users:create"}}, adminToken, 200)
+	request("POST", "/users", map[string]any{"username": "escalation", "email": "escalation@example.test", "password": "test-password-123", "role_id": adminRole}, userToken, 403)
+	request("PUT", "/roles/"+hotspotRole+"/permissions", map[string]any{"permissions": []string{}}, adminToken, 200)
+	rolePath := fmt.Sprintf("/users/%s/roles", id)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{mohRole, hotspotRole}}, userToken, 403)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{mohRole, hotspotRole, hotspotRole}}, adminToken, 200)
+	request("PUT", "/roles/"+mohRole+"/permissions", map[string]any{"permissions": []string{"roles:read"}}, adminToken, 200)
+	request("PUT", "/roles/"+hotspotRole+"/permissions", map[string]any{"permissions": []string{"users:read"}}, adminToken, 200)
 	request("GET", "/roles", nil, userToken, 200)
 	request("GET", "/users?limit=1", nil, userToken, 200)
 	me = request("GET", "/auth/me", nil, userToken, 200)["data"].(map[string]any)
 	if len(me["roles"].([]any)) != 2 {
 		t.Fatal("role assignments were lost or duplicated")
 	}
-	request("PUT", rolePath, map[string]any{"role_ids": []int{2, 9999}}, adminToken, 422)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{mohRole, unknownID}}, adminToken, 422)
 	request("GET", "/users?limit=1", nil, userToken, 200)
 	request("PUT", rolePath, map[string]any{"role_ids": nil}, adminToken, 422)
-	request("PUT", rolePath, map[string]any{"role_ids": []int{}}, adminToken, 200)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{}}, adminToken, 200)
 	request("GET", "/roles", nil, userToken, 403)
 	request("GET", "/users", nil, userToken, 403)
-	request("PUT", fmt.Sprintf("/users/%d/roles", adminID), map[string]any{"role_ids": []int{2, 7}}, adminToken, 409)
-	request("PUT", "/roles/1/permissions", map[string]any{"permissions": []string{}}, adminToken, 409)
-	request("PATCH", fmt.Sprintf("/users/%d/status", id), map[string]any{"status": "disabled"}, adminToken, 200)
+	request("PUT", fmt.Sprintf("/users/%s/roles", adminID), map[string]any{"role_ids": []string{mohRole, hotspotRole}}, adminToken, 409)
+	request("PUT", "/roles/"+adminRole+"/permissions", map[string]any{"permissions": []string{}}, adminToken, 409)
+	request("PATCH", fmt.Sprintf("/users/%s/status", id), map[string]any{"status": "disabled"}, adminToken, 200)
 	request("GET", "/auth/me", nil, userToken, 403)
 	login("newuser@example.test", "test-password-123", 403)
-	request("PATCH", fmt.Sprintf("/users/%d/status", id), map[string]any{"status": "active"}, adminToken, 200)
+	request("PATCH", fmt.Sprintf("/users/%s/status", id), map[string]any{"status": "active"}, adminToken, 200)
 	request("GET", "/auth/me", nil, userToken, 200)
 	request("GET", "/users?limit=101", nil, adminToken, 400)
 	request("GET", "/users?offset=-1", nil, adminToken, 400)
 	request("GET", "/users/not-a-number", nil, adminToken, 400)
-	request("GET", "/users/9999999", nil, adminToken, 404)
-	request("PATCH", fmt.Sprintf("/users/%d/status", adminID), map[string]any{"status": "disabled"}, adminToken, 409)
-	request("PATCH", fmt.Sprintf("/users/%d/role", adminID), map[string]any{"role_id": 2}, adminToken, 409)
-	created := map[string]any{"username": "second-admin", "email": "second-admin@example.test", "password": "test-password-123", "role_ids": []int{1, 7}}
-	secondID := int(request("POST", "/users", created, adminToken, 201)["data"].(map[string]any)["user_id"].(float64))
+	request("GET", "/users/"+unknownID, nil, adminToken, 404)
+	request("GET", "/users/123", nil, adminToken, 400)
+	request("PUT", rolePath, map[string]any{"role_ids": []int{7}}, adminToken, 400)
+	request("PATCH", fmt.Sprintf("/users/%s/status", adminID), map[string]any{"status": "disabled"}, adminToken, 409)
+	request("PATCH", fmt.Sprintf("/users/%s/role", adminID), map[string]any{"role_id": mohRole}, adminToken, 409)
+	created := map[string]any{"username": "second-admin", "email": "second-admin@example.test", "password": "test-password-123", "role_ids": []string{adminRole, hotspotRole}}
+	secondID := request("POST", "/users", created, adminToken, 201)["data"].(map[string]any)["user_id"].(string)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
-	for _, userID := range []int{adminID, secondID} {
-		go func(id int) { status := "disabled"; results <- repo.UpdateUserAccess(ctx, id, nil, &status) }(userID)
+	for _, userID := range []string{adminID, secondID} {
+		go func(id string) { status := "disabled"; results <- repo.UpdateUserAccess(ctx, id, nil, &status) }(userID)
 	}
 	successes, conflicts := 0, 0
 	for range 2 {
@@ -281,13 +311,44 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if _, err = upgrade.Exec(ctx, `CREATE TABLE schema_migrations(version bigint NOT NULL PRIMARY KEY,dirty boolean NOT NULL); INSERT INTO schema_migrations VALUES(1,false)`); err != nil {
 		t.Fatal(err)
 	}
+	// Simulate a database that has already issued RBAC UUIDs and has custom grants.
+	for _, migration := range []string{"000002_auth_rbac.up.sql", "000003_schema_rbac.up.sql"} {
+		sql, err := os.ReadFile(filepath.Join("..", "database", "migrations", migration))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upgrade.Exec(ctx, string(sql)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var existingUserUUID, existingRoleUUID string
+	if err = upgrade.QueryRow(ctx, `SELECT u.rbac_id, r.rbac_id FROM users u
+		JOIN role_user ru ON ru.user_id = u.rbac_id JOIN roles r ON r.rbac_id = ru.role_id
+		WHERE r.name = 'admin' ORDER BY u.id LIMIT 1`).Scan(&existingUserUUID, &existingRoleUUID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = upgrade.Exec(ctx, `UPDATE schema_migrations SET version=3;
+		INSERT INTO role_permission(role_id, permission_id)
+		SELECT r.rbac_id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name='moh' AND p.name='roles:read'`); err != nil {
+		t.Fatal(err)
+	}
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM role_permission rp JOIN roles r ON r.rbac_id = rp.role_id WHERE r.id<>1)`).Scan(&userCount, &roleCount); err != nil {
+	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id WHERE r.name<>'admin')`).Scan(&userCount, &roleCount); err != nil {
 		t.Fatal(err)
 	}
-	if userCount != 455 || roleCount != 0 {
-		t.Fatal("upgrade changed users or granted non-admin permissions")
+	if userCount != 455 || roleCount != 1 {
+		t.Fatal("upgrade changed user count or lost custom permission grants")
 	}
+	var sameAssignment bool
+	if err = upgrade.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM role_user WHERE user_id=$1 AND role_id=$2
+	)`, existingUserUUID, existingRoleUUID).Scan(&sameAssignment); err != nil {
+		t.Fatal(err)
+	}
+	if !sameAssignment {
+		t.Fatal("upgrade changed an existing RBAC UUID or assignment")
+	}
+
 }

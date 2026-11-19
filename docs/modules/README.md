@@ -29,7 +29,7 @@ flowchart LR
 
 ## Protected request flow
 
-1. JWT middleware in `internal/middleware/jwt.go` validates the HS256 signature, expiration, and positive integer subject. It sets `user_id` in Fiber locals.
+1. JWT middleware in `internal/middleware/jwt.go` validates the HS256 signature, expiration, and nonzero UUID subject. It sets `user_id` in Fiber locals.
 2. `users.ActiveUser` loads the user and current permissions from PostgreSQL. Missing accounts return 401, disabled accounts return 403, and database failures return 500.
 3. The account is stored under `rbac.PrincipalKey` (`current_user`).
 4. Management routes run `rbac.RequirePermission` for each required permission. Missing permissions return 403.

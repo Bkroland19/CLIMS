@@ -3,7 +3,7 @@ package users
 import "clims-backend/internal/features/rbac"
 
 type User struct {
-	ID           int         `json:"id"`
+	ID           string      `json:"id"`
 	Username     string      `json:"username"`
 	Email        string      `json:"email"`
 	Firstname    string      `json:"firstname"`

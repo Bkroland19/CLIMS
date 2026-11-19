@@ -27,7 +27,7 @@ All routes require JWT authentication and an active account.
 | PUT    | `/api/v1/users/{id}/roles`  | `roles:assign`                         |
 | PATCH  | `/api/v1/users/{id}/status` | `users:update`                         |
 
-Listing defaults to `limit=50&offset=0`, allows limits from 1 to 100, and orders by user ID. Account responses include names, email, phone, status, and the complete `roles` array with each role’s permissions. The legacy `role` field contains the assigned role with the lowest numeric ID, or null when there are no assignments. `PasswordHash` has `json:"-"` and is never serialized.
+Listing defaults to `limit=50&offset=0`, allows limits from 1 to 100, and orders by user ID. Account responses include names, email, phone, status, and the complete `roles` array with each role’s permissions. The legacy `role` field contains the assigned role with the lowest UUID, or null when there are no assignments. `PasswordHash` has `json:"-"` and is never serialized.
 
 Admin creation accepts signup fields plus either one existing `role_id` or a nonempty `role_ids` array. Unknown roles reject the entire transaction. Supplying only `users:create` does not allow a caller to create an administrator; the route also requires `roles:assign`.
 
@@ -41,10 +41,10 @@ The repository joins roles and permission mappings when looking up users. Postgr
 
 ## Access changes and administrator protection
 
-`UpdateUserAccess` updates role or account status inside a transaction. It takes a PostgreSQL transaction advisory lock before reading and updating the account, serializing account-access changes. A request that would disable or demote the last active account with role `1` returns 409. This guard applies to concurrent API requests; operators with direct database access must preserve the invariant themselves.
+`UpdateUserAccess` updates role or account status inside a transaction. It takes a PostgreSQL transaction advisory lock before reading and updating the account, serializing account-access changes. A request that would disable or demote the last active account with the `admin` role returns 409. This guard applies to concurrent API requests; operators with direct database access must preserve the invariant themselves.
 
-Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing numeric IDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, organization assignment, or organization-scoped access.
+Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, organization assignment, or organization-scoped access.
 
 ## Administrator provisioning
 
-Use imported active role-1 accounts, or set `CLIMS_ADMIN_EMAIL`, `CLIMS_ADMIN_PASSWORD`, and optionally `CLIMS_ADMIN_USERNAME` before running `make create-admin`. The command applies migrations and creates a new administrator without overwriting an existing account. It requires operator database access and Go 1.26+; the HTTP API offers no unauthenticated admin-bootstrap route.
+Use imported active admin accounts, or set `CLIMS_ADMIN_EMAIL`, `CLIMS_ADMIN_PASSWORD`, and optionally `CLIMS_ADMIN_USERNAME` before running `make create-admin`. The command applies migrations and creates a new administrator without overwriting an existing account. It requires operator database access and Go 1.26+; the HTTP API offers no unauthenticated admin-bootstrap route.

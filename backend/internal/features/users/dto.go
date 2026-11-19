@@ -13,8 +13,8 @@ type AccountInput struct {
 
 type CreateUserRequest struct {
 	AccountInput
-	RoleID  int    `json:"role_id" validate:"omitempty,gt=0"`
-	RoleIDs *[]int `json:"role_ids" validate:"omitempty,min=1,max=100,dive,gt=0"`
+	RoleID  string    `json:"role_id" validate:"omitempty,uuid_rfc4122"`
+	RoleIDs *[]string `json:"role_ids" validate:"omitempty,min=1,max=100,dive,uuid_rfc4122"`
 }
 
 func (input *AccountInput) Normalize() {
@@ -23,7 +23,7 @@ func (input *AccountInput) Normalize() {
 }
 
 type AssignRoleRequest struct {
-	RoleID int `json:"role_id" validate:"required,gt=0"`
+	RoleID string `json:"role_id" validate:"required,uuid_rfc4122"`
 }
 
 type UpdateStatusRequest struct {
@@ -31,5 +31,5 @@ type UpdateStatusRequest struct {
 }
 
 type SetRolesRequest struct {
-	RoleIDs *[]int `json:"role_ids" validate:"required,max=100,dive,gt=0"`
+	RoleIDs *[]string `json:"role_ids" validate:"required,max=100,dive,uuid_rfc4122"`
 }

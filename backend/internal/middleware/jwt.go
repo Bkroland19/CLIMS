@@ -1,8 +1,8 @@
 package middleware
 
 import (
+	"clims-backend/internal/pkg/request"
 	"log"
-	"strconv"
 
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
@@ -26,8 +26,8 @@ func NewJWTMiddleware(secret string) fiber.Handler {
 			if err != nil {
 				return c.SendStatus(fiber.StatusUnauthorized)
 			}
-			userID, err := strconv.Atoi(subject)
-			if err != nil || userID <= 0 {
+			userID, err := request.ParseUUID(subject)
+			if err != nil {
 				return c.SendStatus(fiber.StatusUnauthorized)
 			}
 			c.Locals("user_id", userID)

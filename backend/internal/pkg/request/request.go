@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"strconv"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 func DecodeJSON(c fiber.Ctx, dst any) error {
@@ -22,10 +22,14 @@ func DecodeJSON(c fiber.Ctx, dst any) error {
 	return nil
 }
 
-func PositiveID(c fiber.Ctx) (int, error) {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil || id <= 0 {
-		return 0, errors.New("id must be a positive integer")
+func UUIDParam(c fiber.Ctx) (string, error) {
+	return ParseUUID(c.Params("id"))
+}
+
+func ParseUUID(value string) (string, error) {
+	id, err := uuid.Parse(value)
+	if err != nil || id == uuid.Nil || len(value) != 36 {
+		return "", errors.New("id must be a nonzero UUID")
 	}
-	return id, nil
+	return id.String(), nil
 }

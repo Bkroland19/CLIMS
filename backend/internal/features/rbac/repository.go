@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,7 +17,7 @@ func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
 func (r *Repository) ListRoles(ctx context.Context) ([]Role, error) {
 	rows, err := r.DB.Query(ctx, `SELECT r.id, r.name, ARRAY(
 SELECT p.name FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id
-WHERE rp.role_id = r.rbac_id ORDER BY p.name) FROM roles r ORDER BY r.id`)
+WHERE rp.role_id = r.id ORDER BY p.name) FROM roles r ORDER BY r.name`)
 	if err != nil {
 		return nil, err
 	}
@@ -51,18 +50,18 @@ func (r *Repository) ListPermissions(ctx context.Context) ([]string, error) {
 	return codes, rows.Err()
 }
 
-func (r *Repository) SetRolePermissions(ctx context.Context, id int, codes []string) error {
-	if id == AdminRoleID {
-		return ErrAdminRole
-	}
+func (r *Repository) SetRolePermissions(ctx context.Context, id string, codes []string) error {
 	tx, err := r.DB.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var roleID pgtype.UUID
-	if err = tx.QueryRow(ctx, `SELECT rbac_id FROM roles WHERE id=$1 FOR UPDATE`, id).Scan(&roleID); err != nil {
+	var name string
+	if err = tx.QueryRow(ctx, `SELECT name FROM roles WHERE id=$1 FOR UPDATE`, id).Scan(&name); err != nil {
 		return err
+	}
+	if name == AdminRoleName {
+		return ErrAdminRole
 	}
 	var unknown bool
 	if err = tx.QueryRow(ctx, `SELECT EXISTS (
@@ -74,11 +73,11 @@ func (r *Repository) SetRolePermissions(ctx context.Context, id int, codes []str
 	if unknown {
 		return ErrUnknownPermission
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM role_permission WHERE role_id=$1 AND permission_id NOT IN (SELECT id FROM permissions WHERE name = ANY($2::text[]))`, roleID, codes); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM role_permission WHERE role_id=$1 AND permission_id NOT IN (SELECT id FROM permissions WHERE name = ANY($2::text[]))`, id, codes); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO role_permission (role_id, permission_id)
-		SELECT $1, id FROM permissions WHERE name = ANY($2) ON CONFLICT DO NOTHING`, roleID, codes); err != nil {
+		SELECT $1, id FROM permissions WHERE name = ANY($2) ON CONFLICT DO NOTHING`, id, codes); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

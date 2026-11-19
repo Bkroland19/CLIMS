@@ -111,7 +111,9 @@ db-up:
 	$(COMPOSE) up -d --wait postgres
 
 db-seed:
-	$(COMPOSE) exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -v ON_ERROR_STOP=1' < infra/database/clims_postgres_seed.sql
+	@seed_file=$$(mktemp) && trap 'rm -f "$$seed_file"' EXIT && \
+		python3 scripts/prepare_legacy_seed.py > "$$seed_file" && \
+		$(COMPOSE) exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$$seed_file"
 
 sql-convert:
 	python3 scripts/convert_mysql_dump.py

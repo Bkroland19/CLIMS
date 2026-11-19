@@ -22,7 +22,7 @@ func NewHandler(repo *Repository, service *Service) *Handler {
 	return &Handler{Repo: repo, Service: service}
 }
 
-func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleIDs []int) error {
+func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleIDs []string) error {
 	id, err := h.Service.CreateWithRoles(c.Context(), req, roleIDs)
 	if errors.Is(err, ErrUnknownRole) {
 		return response.Error(c, 422, "unknown role_id", nil)
@@ -63,7 +63,7 @@ func (h *Handler) ListUsers(c fiber.Ctx) error {
 }
 
 func (h *Handler) GetUser(c fiber.Ctx) error {
-	id, err := request.PositiveID(c)
+	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -86,17 +86,17 @@ func (h *Handler) CreateUser(c fiber.Ctx) error {
 	if len(req.Password) > 72 {
 		return response.Error(c, 422, "password must not exceed 72 bytes", nil)
 	}
-	if (req.RoleID == 0) == (req.RoleIDs == nil) {
+	if (req.RoleID == "") == (req.RoleIDs == nil) {
 		return response.Error(c, 422, "provide either role_id or role_ids", nil)
 	}
 	if req.RoleIDs != nil {
 		return h.createUser(c, req.AccountInput, *req.RoleIDs)
 	}
-	return h.createUser(c, req.AccountInput, []int{req.RoleID})
+	return h.createUser(c, req.AccountInput, []string{req.RoleID})
 }
 
 func (h *Handler) AssignRole(c fiber.Ctx) error {
-	id, err := request.PositiveID(c)
+	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -114,7 +114,7 @@ func (h *Handler) AssignRole(c fiber.Ctx) error {
 }
 
 func (h *Handler) SetRoles(c fiber.Ctx) error {
-	id, err := request.PositiveID(c)
+	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -135,7 +135,7 @@ func (h *Handler) SetRoles(c fiber.Ctx) error {
 }
 
 func (h *Handler) SetStatus(c fiber.Ctx) error {
-	id, err := request.PositiveID(c)
+	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}

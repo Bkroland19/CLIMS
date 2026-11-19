@@ -15,23 +15,7 @@ Source: `backend/internal/features/rbac/`.
 
 ## Role catalog
 
-Migration 2 preserves the original CLIMS IDs and names:
-
-| ID  | Role             |
-| --- | ---------------- |
-| 1   | admin            |
-| 2   | moh              |
-| 3   | nms              |
-| 4   | jms              |
-| 5   | dfcp             |
-| 6   | store incharge   |
-| 7   | hotspot manager  |
-| 8   | delivery agent   |
-| 9   | other supplier   |
-| 10  | healthy facility |
-| 11  | vht              |
-
-`healthy facility` is the source backup's spelling. The API manages permissions for these roles; it does not expose role creation, renaming, or deletion.
+The role catalog includes `admin`, `moh`, `nms`, `jms`, `dfcp`, `store incharge`, `hotspot manager`, `delivery agent`, `other supplier`, `healthy facility`, and `vht`. The API returns UUIDs for these roles. It supports permission updates for existing roles.
 
 ## Permission policy
 
@@ -60,10 +44,10 @@ All routes require a valid JWT and an active account. `RequirePermission` reads 
 
 Permission replacement takes a role-row lock, removes mappings absent from the request and inserts new mappings, and commits as one transaction. Invalid codes roll back the entire update with 422. Duplicates are ignored. An empty array revokes all management permissions. Missing or null `permissions` is rejected, and requests are limited to 100 entries.
 
-Role 1's permissions are immutable through this API; attempts to change them return 409. The users module separately protects the last active administrator from demotion or disabling. Protected requests reload account permissions from PostgreSQL, so a role or permission change affects the next request even with an existing JWT.
+The admin role's permissions are immutable through this API; attempts to change them return 409. The users module separately protects the last active administrator from demotion or disabling. Protected requests reload account permissions from PostgreSQL, so a role or permission change affects the next request even with an existing JWT.
 
 ## Schema migration
 
-Migration 3 creates the `role_user` and `role_permission` tables and backfills known legacy user assignments and all existing permission mappings. Both tables have UUID foreign keys, composite primary keys, and timestamps. Permissions retain their existing codes as unique names and gain UUID primary keys. Users and roles retain their original numeric primary keys for legacy imports, clients, and JWTs, and each gains a unique `rbac_id` UUID used by the joins. Role names are unique and can have descriptions.
+Migration 3 backfills legacy user assignments and existing permission grants into `role_user` and `role_permission`. Migration 4 promotes the existing user and role UUIDs to primary keys and points both joins to those keys. Permissions have UUID primary keys and unique names. The joins have composite UUID primary keys and timestamps.
 
-Authorization uses the union of all assigned roles’ permissions. A legacy import after migration also populates `role_user` from recognized values in `users.role`. Subsequent access changes use `role_user`. Rolling back migration 3 requires first reducing every account’s assignments to one role or fewer.
+Authorization uses the union of all assigned roles’ permissions. The legacy import copies recognized role assignments into `role_user`. The admin role is identified by its unique name for provisioning and protection.
