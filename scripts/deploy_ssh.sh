@@ -25,7 +25,7 @@ target="$DEPLOY_USER@$DEPLOY_HOST"
 destination="$DEPLOY_PATH/releases/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 
 # Include only tracked runtime configuration from this release, never local env files.
-git archive HEAD infra/compose/docker-compose.yml infra/compose/docker-compose.prod.yml \
+git archive "${DEPLOY_REF:-HEAD}" infra/compose/docker-compose.yml infra/compose/docker-compose.prod.yml \
   infra/docker/nginx/Dockerfile.prod infra/docker/postgres/Dockerfile.prod \
   infra/nginx/nginx.conf infra/nginx/app.prod.conf scripts/deploy_release.sh |
   tar -x -C "$temporary"
@@ -33,5 +33,12 @@ cp release/images.env "$temporary/images.env"
 tar -czf "$temporary/release.tar.gz" -C "$temporary" infra scripts images.env
 printf -v command 'mkdir -p %q && tar -xzf - -C %q' "$destination" "$destination"
 ssh "${ssh_options[@]}" -p "$DEPLOY_PORT" "$target" "$command" < "$temporary/release.tar.gz"
-printf -v command 'bash %q %q' "$destination/scripts/deploy_release.sh" "$DEPLOY_PATH"
-ssh "${ssh_options[@]}" -p "$DEPLOY_PORT" "$target" "$command"
+if [[ -n ${GHCR_TOKEN:-} ]]; then
+  : "${GHCR_USER:?Set GHCR_USER when supplying GHCR_TOKEN}"
+  printf -v command 'set -eu; umask 077; export DOCKER_CONFIG=%q; mkdir -p "$DOCKER_CONFIG"; trap '\''rm -rf "$DOCKER_CONFIG"'\'' EXIT; docker login ghcr.io --username %q --password-stdin; bash %q %q' \
+    "$destination/.docker" "$GHCR_USER" "$destination/scripts/deploy_release.sh" "$DEPLOY_PATH"
+  printf '%s\n' "$GHCR_TOKEN" | ssh "${ssh_options[@]}" -p "$DEPLOY_PORT" "$target" "$command"
+else
+  printf -v command 'bash %q %q' "$destination/scripts/deploy_release.sh" "$DEPLOY_PATH"
+  ssh "${ssh_options[@]}" -p "$DEPLOY_PORT" "$target" "$command"
+fi

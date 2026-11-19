@@ -28,6 +28,8 @@ class DeploymentTest(unittest.TestCase):
         docker = binaries / "docker"
         docker.write_text(
             '#!/bin/bash\nprintf "%s\\n" "$*" >> "$DEPLOY_TEST_LOG"\n'
+            "if [[ $1 == login ]]; then cat > /dev/null; "
+            'touch "$DOCKER_CONFIG/config.json"; fi\n'
             'if [[ " $* " == *" up "* && ${FAIL_HEALTH:-} == 1 ]]; then exit 1; fi\n'
         )
         docker.chmod(0o755)
@@ -85,6 +87,44 @@ class DeploymentTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "current").resolve(), self.old)
         self.assertEqual((self.root / "previous").resolve(), self.release)
+
+    def test_ssh_registry_credentials_are_temporary_on_success_and_failure(self):
+        ssh = self.root / "bin/ssh"
+        ssh.write_text('#!/bin/bash\nbash -c "${!#}"\n')
+        ssh.chmod(0o755)
+        work = self.root / "client"
+        (work / "release").mkdir(parents=True)
+        shutil.copyfile(self.release / "images.env", work / "release/images.env")
+        repository = Path(__file__).resolve().parents[1]
+        # The client bundles tracked release configuration from the selected git ref.
+        (work / ".git").write_text(f"gitdir: {repository / '.git'}\n")
+        for failure in ("", "1"):
+            with self.subTest(failure=failure):
+                attempt = "2" if failure else "1"
+                result = subprocess.run(
+                    ["bash", str(repository / "scripts/deploy_ssh.sh")],
+                    cwd=work,
+                    env={
+                        **self.environment,
+                        "DEPLOY_HOST": "example.org",
+                        "DEPLOY_USER": "deploy",
+                        "DEPLOY_PORT": "22",
+                        "DEPLOY_PATH": str(self.root),
+                        "DEPLOY_SSH_KEY": "test-key",
+                        "DEPLOY_KNOWN_HOSTS": "test-host-key",
+                        "GHCR_USER": "test-user",
+                        "GHCR_TOKEN": "test-token-must-not-be-logged",
+                        "GITHUB_RUN_ID": "123",
+                        "GITHUB_RUN_ATTEMPT": attempt,
+                        "FAIL_HEALTH": failure,
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode == 0, not failure, result.stderr)
+                self.assertFalse((self.root / f"releases/123-{attempt}/.docker").exists())
+                self.assertNotIn("test-token-must-not-be-logged", result.stdout + result.stderr)
+        self.assertIn("login ghcr.io --username test-user --password-stdin", self.log.read_text())
 
 
 if __name__ == "__main__":
