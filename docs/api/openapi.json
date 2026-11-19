@@ -709,6 +709,19 @@
           "phone_number": {
             "type": "string",
             "maxLength": 15
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 15
           }
         }
       },
@@ -767,6 +780,29 @@
               "7f5046a1-34b9-476b-bffc-e1cca9455e07",
               "f8391ab1-3212-423e-a7d3-5141d8b6dbf8"
             ]
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 15
+          },
+          "organisation_unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         },
         "oneOf": [
@@ -884,7 +920,16 @@
           "phone_number",
           "status",
           "role",
-          "roles"
+          "roles",
+          "organisation_unit_id",
+          "hot_spot_id",
+          "subcounty_id",
+          "store_id",
+          "first_name",
+          "last_name",
+          "location",
+          "created_at",
+          "updated_at"
         ],
         "properties": {
           "id": {
@@ -919,6 +964,46 @@
             "items": {
               "$ref": "#/components/schemas/Role"
             }
+          },
+          "organisation_unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },

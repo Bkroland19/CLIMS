@@ -33,9 +33,10 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 	defer tx.Rollback(ctx)
 	var id string
 	err = tx.QueryRow(ctx, `INSERT INTO users
-		(username,email,password,firstname,lastname,phone_number,status,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
-		req.Username, req.Email, passwordHash, req.Firstname, req.Lastname, req.Phone).Scan(&id)
+		(username,email,password,firstname,lastname,phone_number,location,organisation_unit_id,hot_spot_id,status,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
+		req.Username, req.Email, passwordHash, req.FirstName, req.LastName, req.Phone,
+		req.Location, req.Assignment.OrganisationUnitID, req.Assignment.HotSpotID).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -48,6 +49,7 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 }
 
 const userSelect = `SELECT u.id,u.username,COALESCE(u.email,''),u.password,u.firstname,u.lastname,u.phone_number,u.status,
+	u.location,u.organisation_unit_id,u.hot_spot_id,u.subcounty_id,u.store_id,u.created_at,u.updated_at,
 	COALESCE((
 		SELECT jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'permissions', ARRAY(
 			SELECT p.name FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id
@@ -58,10 +60,13 @@ const userSelect = `SELECT u.id,u.username,COALESCE(u.email,''),u.password,u.fir
 
 func scanUser(row pgx.Row) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Firstname, &u.Lastname, &u.Phone, &u.Status, &u.Roles)
+	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Phone, &u.Status,
+		&u.Location, &u.OrganisationUnitID, &u.HotSpotID, &u.SubcountyID, &u.StoreID,
+		&u.CreatedAt, &u.UpdatedAt, &u.Roles)
 	if err != nil {
 		return nil, err
 	}
+	u.Firstname, u.Lastname = u.FirstName, u.LastName
 	if len(u.Roles) > 0 {
 		u.Role = &u.Roles[0]
 	}
