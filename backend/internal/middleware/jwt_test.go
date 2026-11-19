@@ -9,13 +9,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const testUserID = "c0784d50-241e-4164-97db-9314f5f17c33"
+
 func TestJWTSubject(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		subject any
 		want    int
 	}{
-		{"valid", "1465", 200},
+		{"valid", testUserID, 200},
+		{"legacy numeric string", "1465", 401},
+		{"zero UUID", "00000000-0000-0000-0000-000000000000", 401},
 		{"missing", nil, 401},
 		{"invalid", "abc", 401},
 		{"negative", "-1", 401},
@@ -25,7 +29,7 @@ func TestJWTSubject(t *testing.T) {
 			app := fiber.New()
 			app.Use(NewJWTMiddleware("test-secret"))
 			app.Get("/", func(c fiber.Ctx) error {
-				if c.Locals("user_id") != 1465 {
+				if c.Locals("user_id") != testUserID {
 					t.Fatal("incorrect user ID")
 				}
 				return c.SendStatus(200)
@@ -66,7 +70,7 @@ func TestJWTRejectsInvalidTokens(t *testing.T) {
 			app := fiber.New()
 			app.Use(NewJWTMiddleware("test-secret"))
 			app.Get("/", func(c fiber.Ctx) error { return c.SendStatus(200) })
-			claims := jwt.MapClaims{"sub": "1"}
+			claims := jwt.MapClaims{"sub": testUserID}
 			if tc.expires != nil {
 				claims["exp"] = tc.expires
 			}

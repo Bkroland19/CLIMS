@@ -1,7 +1,9 @@
 package rbac
 
+const AdminRoleName = "admin"
+
 type Role struct {
-	ID          int      `json:"id"`
+	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Permissions []string `json:"permissions"`
 }

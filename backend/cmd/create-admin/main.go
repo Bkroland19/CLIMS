@@ -9,6 +9,7 @@ import (
 
 	"clims-backend/internal/config"
 	"clims-backend/internal/database"
+	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/validator"
 
@@ -44,9 +45,13 @@ func main() {
 	}
 	defer pool.Close()
 	repo := users.NewRepository(pool)
-	id, err := users.NewService(repo).Create(ctx, req, 1)
+	var roleID string
+	if err := pool.QueryRow(ctx, `SELECT id FROM roles WHERE name = $1`, rbac.AdminRoleName).Scan(&roleID); err != nil {
+		log.Fatal("failed to resolve admin role")
+	}
+	id, err := users.NewService(repo).Create(ctx, req, roleID)
 	if err != nil {
 		log.Fatal("failed to create admin; ensure its email is unused")
 	}
-	log.Printf("Admin account created with user ID %d", id)
+	log.Printf("Admin account created with user ID %s", id)
 }
