@@ -9,6 +9,14 @@ services:
     ports:
       - "127.0.0.1:${DB_PORT:-5432}:5432"
 
+  seaweedfs:
+    image: clims-seaweedfs:dev
+    build:
+      context: ../..
+      dockerfile: infra/docker/seaweedfs/Dockerfile.dev
+    ports:
+      - "127.0.0.1:${S3_PORT:-8333}:8333"
+
   backend:
     image: clims-backend:dev
     build:
