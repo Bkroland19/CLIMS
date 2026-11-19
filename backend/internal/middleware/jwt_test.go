@@ -9,7 +9,53 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const testUserID = "c0784d50-241e-4164-97db-9314f5f17c33"
+const (
+	testUserID    = "c0784d50-241e-4164-97db-9314f5f17c33"
+	testSessionID = "5d1f0b0e-8c3a-4b7e-9f2d-6a4c1e8b3d27"
+)
+
+func TestJWTSession(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		session any
+		want    int
+	}{
+		{"valid", testSessionID, 200},
+		{"missing", nil, 401},
+		{"invalid", "session-1", 401},
+		{"zero UUID", "00000000-0000-0000-0000-000000000000", 401},
+		{"numeric", 7, 401},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := fiber.New()
+			app.Use(NewJWTMiddleware("test-secret"))
+			app.Get("/", func(c fiber.Ctx) error {
+				if c.Locals("session_id") != testSessionID {
+					t.Fatal("incorrect session ID")
+				}
+				return c.SendStatus(200)
+			})
+			claims := jwt.MapClaims{"sub": testUserID, "exp": time.Now().Add(time.Hour).Unix()}
+			if tc.session != nil {
+				claims["sid"] = tc.session
+			}
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("test-secret"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			res, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			if res.StatusCode != tc.want {
+				t.Fatalf("got %d, want %d", res.StatusCode, tc.want)
+			}
+		})
+	}
+}
 
 func TestJWTSubject(t *testing.T) {
 	for _, tc := range []struct {
@@ -35,7 +81,7 @@ func TestJWTSubject(t *testing.T) {
 				return c.SendStatus(200)
 			})
 			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-				"sub": tc.subject, "exp": time.Now().Add(time.Hour).Unix(),
+				"sub": tc.subject, "sid": testSessionID, "exp": time.Now().Add(time.Hour).Unix(),
 			}).SignedString([]byte("test-secret"))
 			if err != nil {
 				t.Fatal(err)

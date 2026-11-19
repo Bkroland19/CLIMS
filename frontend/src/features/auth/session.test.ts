@@ -17,9 +17,19 @@ const session: Session = {
 };
 
 describe('sessionSchema', () => {
-  it('normalises a numeric role id and a string id', () => {
-    const parsed = sessionSchema.parse({ token: 't', user: { id: '12', username: 'u', role: 3 } });
-    expect(parsed.user).toMatchObject({ id: 12, role: '3', firstname: null, email: null });
+  it('normalises a numeric role id and keeps a UUID user id', () => {
+    const id = 'c0784d50-241e-4164-97db-9314f5f17c33';
+    const parsed = sessionSchema.parse({ token: 't', user: { id, username: 'u', role: 3 } });
+    expect(parsed.user).toMatchObject({ id, role: '3', firstname: null, email: null });
+  });
+
+  it('keeps the refresh token when the API issues one', () => {
+    const parsed = sessionSchema.parse({
+      token: 't',
+      refresh_token: 'r',
+      user: { id: 1, username: 'u' },
+    });
+    expect(parsed.refresh_token).toBe('r');
   });
 
   it('reads the role name from the Go API role object', () => {
@@ -41,7 +51,7 @@ describe('sessionSchema', () => {
     { name: 'an empty token', value: { token: '', user: { id: 1, username: 'u' } } },
     { name: 'a missing user', value: { token: 't' } },
     { name: 'a user without an id', value: { token: 't', user: { username: 'u' } } },
-    { name: 'a non-numeric id', value: { token: 't', user: { id: 'abc', username: 'u' } } },
+    { name: 'an empty id', value: { token: 't', user: { id: '', username: 'u' } } },
     { name: 'an empty username', value: { token: 't', user: { id: 1, username: '' } } },
   ])('rejects $name', ({ value }) => {
     expect(sessionSchema.safeParse(value).success).toBe(false);

@@ -23,7 +23,7 @@ interface LookupOptions {
 
 interface DeliveryFormDialogProps {
   /** The signed-in user, recorded as having received the delivery. */
-  userId: number;
+  userId: number | string;
   condoms: LookupOptions;
   units: LookupOptions;
   organizationUnits: LookupOptions;

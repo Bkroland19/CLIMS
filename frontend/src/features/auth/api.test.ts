@@ -39,14 +39,14 @@ describe('signIn', () => {
       },
     });
 
-    const session = await signIn(http, { email: 'okello@example.org', password: 'secret' });
+    const session = await signIn(http, { login: 'okello@example.org', password: 'secret' });
 
     expect(session.token).toBe('tok_9');
     expect(session.user).toMatchObject({ id: 2, username: 'okello', role: 'dfcp' });
     expect(requests[0]).toMatchObject({
       method: 'POST',
       url: '/auth/login',
-      body: { email: 'okello@example.org', password: 'secret' },
+      body: { login: 'okello@example.org', password: 'secret' },
     });
   });
 
@@ -55,7 +55,7 @@ describe('signIn', () => {
       status: 200,
       body: { token: 't', user: { id: 1, username: 'u' } },
     });
-    await signIn(http, { email: 'u@example.org', password: 'p' });
+    await signIn(http, { login: 'u@example.org', password: 'p' });
     expect(requests[0]?.authorization).toBeNull();
   });
 
@@ -65,7 +65,7 @@ describe('signIn', () => {
       body: { code: '401', message: 'Invalid username or password' },
     });
 
-    await expect(signIn(http, { email: 'u@example.org', password: 'wrong' })).rejects.toMatchObject(
+    await expect(signIn(http, { login: 'u@example.org', password: 'wrong' })).rejects.toMatchObject(
       {
         kind: 'unauthorized',
         message: 'Invalid username or password',
@@ -76,7 +76,7 @@ describe('signIn', () => {
 
   it('rejects a success response that carries no token', async () => {
     const { http } = setup({ status: 200, body: { code: '200', user: { id: 1, username: 'u' } } });
-    const failure = signIn(http, { email: 'u@example.org', password: 'p' });
+    const failure = signIn(http, { login: 'u@example.org', password: 'p' });
     await expect(failure).rejects.toBeInstanceOf(ApiError);
     await expect(failure).rejects.toMatchObject({ kind: 'unexpected_response' });
   });
@@ -88,7 +88,7 @@ describe('signIn against the Go API', () => {
       status: 401,
       body: { success: false, message: 'invalid credentials' },
     });
-    await expect(signIn(http, { email: 'u@example.org', password: 'wrong' })).rejects.toMatchObject(
+    await expect(signIn(http, { login: 'u@example.org', password: 'wrong' })).rejects.toMatchObject(
       { kind: 'unauthorized', message: 'invalid credentials' },
     );
     expect(onUnauthorized).not.toHaveBeenCalled();

@@ -8,6 +8,7 @@ import { PageLoader } from '@/components/states/PageLoader';
 import { applyTheme, loadTheme } from '@/components/theme/theme';
 import { ConfigError, parseConfig, type AppConfig } from '@/config/env';
 import { selectSession, selectToken, sessionEnded } from '@/features/auth/authSlice';
+import { createSessionRefresher } from '@/features/auth/refresh';
 import { createSessionStore } from '@/features/auth/session';
 import { createHttpClient, type HttpClient } from '@/lib/api';
 import { createQueryClient } from '@/lib/query/queryClient';
@@ -53,9 +54,11 @@ function createApp(): App {
     },
   });
 
-  const http = createHttpClient({
+  const http: HttpClient = createHttpClient({
     baseUrl: config.apiBaseUrl,
     getToken: () => selectToken(store.getState()),
+    // Access tokens last minutes; an expired one is renewed quietly before giving up.
+    refresh: createSessionRefresher(store, () => http),
     onUnauthorized: () => {
       // Several requests can be rejected together; only the first ends the session.
       if (!selectSession(store.getState())) return;
