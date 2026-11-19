@@ -39,11 +39,15 @@ Public signup starts with `roles: []` and `role: null`. Legacy imports map recog
 
 The repository joins roles and permission mappings when looking up users. PostgreSQL's normalized email index prevents concurrent duplicate email registrations. Other database failures return a server error rather than being reported as duplicate emails.
 
+## Work context
+
+Administrator creation accepts existing `organisation_unit_id` and `hot_spot_id` UUIDs. Migration 5 resolves unambiguous legacy references to these UUIDs, and the legacy import uses the same lookup. User profiles include nullable `store_id` and `subcounty_id` fields. Those assignments await the corresponding reference tables and are currently read-only.
+
 ## Access changes and administrator protection
 
 `UpdateUserAccess` updates role or account status inside a transaction. It takes a PostgreSQL transaction advisory lock before reading and updating the account, serializing account-access changes. A request that would disable or demote the last active account with the `admin` role returns 409. This guard applies to concurrent API requests; operators with direct database access must preserve the invariant themselves.
 
-Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, organization assignment, or organization-scoped access.
+Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, changes to an existing account’s work context, or organization-scoped access.
 
 ## Administrator provisioning
 
