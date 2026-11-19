@@ -24,7 +24,7 @@ The mobile image is an export job containing iOS and Android JavaScript bundles 
 
 ## Shared application version
 
-The root `VERSION` file is authoritative, currently `2.0.0`. Backend, frontend, and mobile use one application version. Package manifests and lockfiles (including root tooling), the backend default version, Expo release metadata, and OpenAPI `info.version` must agree. CI checks this on every pull request and main push; the release preflight also requires the Git tag to be exactly `v` plus `VERSION`.
+The root `VERSION` file is authoritative, currently `2.0.1`. Backend, frontend, and mobile use one application version. Package manifests and lockfiles (including root tooling), the backend default version, Expo release metadata, and OpenAPI `info.version` must agree. CI checks this on every pull request and main push; the release preflight also requires the Git tag to be exactly `v` plus `VERSION`.
 
 ```sh
 make version-set VERSION=2.1.0
@@ -97,7 +97,7 @@ Without image overrides, production Compose retains the local `clims-<service>:p
 
 ## Deploy automatically after a release
 
-After a stable release is published successfully, the same workflow deploys its digest-pinned backend and frontend images over SSH. Pull requests and prereleases do not deploy. The job uses the GitHub `production` environment and serializes deployments. Configure that environment in the publishing repository before the next stable release.
+After a stable release is published successfully, the same workflow deploys its digest-pinned backend and frontend images over SSH. Pull requests and prereleases do not deploy. The job uses the GitHub `prod` environment and serializes deployments. Configure that environment in the publishing repository before the next stable release.
 
 | Setting              | Kind                 | Value                                                                                                             |
 | -------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -107,6 +107,8 @@ After a stable release is published successfully, the same workflow deploys its 
 | `DEPLOY_KNOWN_HOSTS` | Environment secret   | Verified server public host-key entry in OpenSSH known_hosts format; include `[host]:port` for a nonstandard port |
 | `DEPLOY_PORT`        | Environment variable | SSH port, defaults to `22`                                                                                        |
 | `DEPLOY_PATH`        | Environment variable | Absolute directory without spaces, defaults to `/opt/clims`                                                       |
+
+The port and path may also be stored as environment secrets; variables take precedence.
 
 Provision an amd64 Linux server with Bash, OpenSSH, Docker Engine, Docker Compose v2 with `--wait` support, and `flock` (util-linux). The SSH user's login shell must support Bash quoting. Create `/opt/clims/shared/prod.env` (or the equivalent under `DEPLOY_PATH`) using [the production environment example](../infra/env/prod.env.example), fill in the database and JWT secrets, and restrict its permissions to the deployment user. The workflow never uploads or replaces this file. Configure the host's HTTPS reverse proxy to forward to the configured production Nginx port.
 
