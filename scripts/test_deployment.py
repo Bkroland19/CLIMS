@@ -68,6 +68,16 @@ class DeploymentTest(unittest.TestCase):
         self.assertEqual((self.root / "current").resolve(), self.old)
         self.assertFalse((self.root / "previous").exists())
 
+    def test_object_storage_is_built_and_started_for_new_releases(self):
+        storage = self.release / "infra/docker/seaweedfs/Dockerfile.prod"
+        storage.parent.mkdir(parents=True)
+        storage.write_text("FROM chrislusf/seaweedfs:3.80\n")
+        result = self.run_deployment()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = self.log.read_text().splitlines()
+        self.assertTrue(commands[-2].endswith("build postgres nginx seaweedfs"))
+        self.assertTrue(commands[-1].endswith("postgres backend frontend nginx seaweedfs"))
+
     def test_missing_server_secrets_fails_before_docker(self):
         (self.root / "shared/prod.env").unlink()
         self.assertNotEqual(self.run_deployment().returncode, 0)
@@ -124,6 +134,11 @@ class DeploymentTest(unittest.TestCase):
                 self.assertEqual(result.returncode == 0, not failure, result.stderr)
                 self.assertFalse((self.root / f"releases/123-{attempt}/.docker").exists())
                 self.assertNotIn("test-token-must-not-be-logged", result.stdout + result.stderr)
+                self.assertTrue(
+                    (
+                        self.root / f"releases/123-{attempt}/infra/docker/seaweedfs/Dockerfile.prod"
+                    ).is_file()
+                )
         self.assertIn("login ghcr.io --username test-user --password-stdin", self.log.read_text())
 
 
