@@ -2,7 +2,7 @@
 
 [Documentation index](README.md)
 
-See the [2.1.0 release notes](releases/2.1.0.md) for the latest release and the [2.0.0 release notes](releases/2.0.0.md) for the platform revamp.
+See the [2.2.0 release notes](releases/2.2.0.md) for the latest release, the [2.1.0 release notes](releases/2.1.0.md) for orders and hotspot activation, and the [2.0.0 release notes](releases/2.0.0.md) for the platform revamp.
 
 `.github/workflows/images.yml` builds the three application production Dockerfiles on pull requests without publishing. Pushing a version tag runs the complete [CI workflow](ci.md), publishes images to GitHub Container Registry (GHCR), and creates a GitHub Release after all three application images succeed. Normal pushes to `main` run CI; they do not publish images.
 
@@ -24,15 +24,15 @@ The mobile image is an export job containing iOS and Android JavaScript bundles 
 
 ## Shared application version
 
-The root `VERSION` file is authoritative, currently `2.1.0`. Backend, frontend, and mobile use one application version. Package manifests and lockfiles (including root tooling), the backend default version, Expo release metadata, and OpenAPI `info.version` must agree. CI checks this on every pull request and main push; the release preflight also requires the Git tag to be exactly `v` plus `VERSION`.
+The root `VERSION` file is authoritative, currently `2.2.0`. Backend, frontend, and mobile use one application version. Package manifests and lockfiles (including root tooling), the backend default version, Expo release metadata, and OpenAPI `info.version` must agree. CI checks this on every pull request and main push; the release preflight also requires the Git tag to be exactly `v` plus `VERSION`.
 
 ```sh
-make version-set VERSION=2.1.0
+make version-set VERSION=2.2.0
 make version-check
 npm run format:check
 ```
 
-Commit the version update with the release changes and merge it into `main` before creating `v2.1.0`. `make version-set VERSION=2.1.0-rc.1` supports prereleases too. Expo's native `version` keeps the numeric base (`2.1.0`), while `expo.extra.releaseVersion` and the mobile package version retain `2.1.0-rc.1`. This respects the [Expo/iOS version format](https://docs.expo.dev/versions/v58.0.0/config/app/#version). Native build numbers and signing remain separate workflows.
+Commit the version update with the release changes and merge it into `main` before creating `v2.2.0`. `make version-set VERSION=2.2.0-rc.1` supports prereleases too. Expo's native `version` keeps the numeric base (`2.2.0`), while `expo.extra.releaseVersion` and the mobile package version retain `2.2.0-rc.1`. This respects the [Expo/iOS version format](https://docs.expo.dev/versions/v58.0.0/config/app/#version). Native build numbers and signing remain separate workflows.
 
 Image tags and OCI labels include the `v` prefix; application versions omit it. PR image tags use `pr-<number>` while the embedded application version remains the value in `VERSION`. Production Dockerfiles reject mismatching version build arguments; the backend defaults to the copied `VERSION` file and client images default to their checked package metadata. The Makefile reads `VERSION` for local builds too.
 
