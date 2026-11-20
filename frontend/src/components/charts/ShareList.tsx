@@ -37,7 +37,7 @@ export function ShareList({
   const total = shares.reduce((sum, share) => sum + share.value, 0);
 
   return (
-    <section className={cn('bg-card flex min-w-0 flex-col rounded-xl border p-5', className)}>
+    <section className={cn('bg-card rounded-card flex min-w-0 flex-col border p-5', className)}>
       <div className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold">{title}</h2>

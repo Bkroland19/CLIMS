@@ -38,8 +38,12 @@ export function ExportButton<Row>({ name, columns, rows }: ExportButtonProps<Row
       title={hasRows ? undefined : 'There is nothing to export yet'}
       onClick={handleExport}
     >
-      {isExporting ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
-      Export Excel
+      {isExporting ? (
+        <Spinner data-icon="inline-start" aria-hidden="true" />
+      ) : (
+        <Download data-icon="inline-start" />
+      )}
+      {isExporting ? 'Exporting…' : 'Export Excel'}
     </Button>
   );
 }
