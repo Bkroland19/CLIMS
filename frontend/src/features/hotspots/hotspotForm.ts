@@ -1,19 +1,15 @@
 import { z } from 'zod';
 
+import { ugandanMobile } from '@/lib/phone';
 import { decimalNumber } from '@/lib/validation';
 
 import type { Hotspot } from './api';
 
-const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/;
-
 export const hotspotSchema = z.object({
   hotspot_name: z.string().trim().min(1, 'Enter the hotspot name.').max(150),
   contact_person_name: z.string().trim().min(1, 'Enter the contact person.').max(150),
-  contact_person_telephone: z
-    .string()
-    .trim()
-    .min(1, 'Enter a contact phone number.')
-    .regex(PHONE_PATTERN, 'Enter a phone number, e.g. +256 700 000000.'),
+  // Sent as `+256XXXXXXXXX` (13 characters): the column holds at most 15.
+  contact_person_telephone: ugandanMobile('a contact phone number'),
   latitude: decimalNumber('a latitude', { min: -90, max: 90 }),
   longitude: decimalNumber('a longitude', { min: -180, max: 180 }),
   organization_unit_id: z.string().min(1, 'Choose an organisation unit.'),
