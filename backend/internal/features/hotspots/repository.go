@@ -192,10 +192,11 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 		}
 		// Keep earlier contacts as history; add a row only when the contact changed.
 		if _, err := tx.Exec(ctx, `INSERT INTO contact_persons (name, phone_number, hot_spot_id)
-			SELECT $2, $3, $1 WHERE NOT EXISTS (
-				SELECT 1 FROM (SELECT name, phone_number FROM contact_persons WHERE hot_spot_id = $1
+			SELECT $2::varchar, $3::varchar, $1::uuid WHERE NOT EXISTS (
+				SELECT 1 FROM (SELECT name, phone_number FROM contact_persons WHERE hot_spot_id = $1::uuid
 					ORDER BY created_at DESC, id DESC LIMIT 1) latest
-				WHERE latest.name IS NOT DISTINCT FROM $2 AND latest.phone_number IS NOT DISTINCT FROM $3)`,
+				WHERE latest.name IS NOT DISTINCT FROM $2::varchar
+					AND latest.phone_number IS NOT DISTINCT FROM $3::varchar)`,
 			id, d.ContactPersonName, d.ContactPersonPhone); err != nil {
 			return err
 		}
