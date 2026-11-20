@@ -3,6 +3,7 @@ package hotspots
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
 
 	"clims-backend/internal/features/users"
@@ -43,11 +44,23 @@ func (h *Handler) list(c fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
 	}
-	status := c.Query("status")
-	if status != "" && status != StatusActive && status != StatusInactive {
+	filter := Filter{Status: c.Query("status"), ReviewStatus: c.Query("review_status")}
+	if !slices.Contains([]string{"", StatusActive, StatusInactive}, filter.Status) {
 		return response.Error(c, 400, "status must be active or inactive", nil)
 	}
-	hotSpots, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), status, limit, offset)
+	if !slices.Contains([]string{"", ReviewSubmitted, ReviewRejected, ReviewActive, ReviewDeactivated}, filter.ReviewStatus) {
+		return response.Error(c, 400, "review_status must be submitted, rejected, active or deactivated", nil)
+	}
+	for name, target := range map[string]**string{"submitted_by_id": &filter.SubmittedByID, "district_id": &filter.DistrictID} {
+		if raw := c.Query(name); raw != "" {
+			id, err := request.ParseUUID(raw)
+			if err != nil {
+				return response.Error(c, 400, name+" must be a nonzero UUID", nil)
+			}
+			*target = &id
+		}
+	}
+	hotSpots, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), filter, limit, offset)
 	if err != nil {
 		return hotSpotError(c, err)
 	}

@@ -102,12 +102,21 @@ func scanHotSpot(row pgx.Row) (HotSpot, error) {
 	return h, nil
 }
 
+// Filter narrows a list within what the user can already see. Empty fields match everything.
+type Filter struct {
+	Status        string
+	ReviewStatus  string
+	SubmittedByID *string
+	DistrictID    *string
+}
+
 // list returns visible hotspots, most recently updated first.
-func (r *Repository) list(ctx context.Context, access scope, status string, limit, offset int32) ([]HotSpot, error) {
+func (r *Repository) list(ctx context.Context, access scope, f Filter, limit, offset int32) ([]HotSpot, error) {
 	rows, err := r.db.Query(ctx, `SELECT `+hotSpotColumns+hotSpotTables+
-		` WHERE `+visibleHotSpots+` AND ($5 = '' OR h.status = $5)
-		ORDER BY h.updated_at DESC, h.id DESC LIMIT $6 OFFSET $7`,
-		visibleArgs(access, status, limit, offset)...)
+		` WHERE `+visibleHotSpots+` AND ($5 = '' OR h.status = $5) AND ($6 = '' OR h.review_status = $6)
+			AND ($7::uuid IS NULL OR h.submitted_by_id = $7) AND ($8::uuid IS NULL OR h.district_id = $8)
+		ORDER BY h.updated_at DESC, h.id DESC LIMIT $9 OFFSET $10`,
+		visibleArgs(access, f.Status, f.ReviewStatus, f.SubmittedByID, f.DistrictID, limit, offset)...)
 	if err != nil {
 		return nil, err
 	}

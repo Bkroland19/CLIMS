@@ -1773,7 +1773,7 @@
         "tags": ["Hotspots"],
         "operationId": "listHotspots",
         "summary": "List hotspots",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
         "responses": {
           "200": {
             "description": "Success",
@@ -1798,6 +1798,32 @@
               "type": "string",
               "enum": ["active", "inactive"]
             }
+          },
+          {
+            "name": "review_status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["submitted", "rejected", "active", "deactivated"]
+            }
+          },
+          {
+            "name": "submitted_by_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Only hotspots this VHT submitted."
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Only hotspots in this district."
           },
           {
             "name": "limit",

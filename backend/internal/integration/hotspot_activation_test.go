@@ -67,6 +67,7 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	grant("vht", "hotspots:read", "hotspots:submit")
 	grant("dfcp", "hotspots:read", "hotspots:activate")
 	grant("store incharge", "hotspots:read")
+	grant("moh", "hotspots:read", "hotspots:all_districts")
 	account := func(role, name string, storeID *string) (string, string) {
 		t.Helper()
 		email := name + "@example.test"
@@ -79,11 +80,12 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 		return id, login(email, "test-password-123", 200)
 	}
 	vhtID, vht := account("vht", "hotspot-vht", nil)
-	_, otherVHT := account("vht", "hotspot-other-vht", nil)
+	otherVHTID, otherVHT := account("vht", "hotspot-other-vht", nil)
 	_, dcfp := account("dfcp", "hotspot-dcfp", &store)
 	_, otherDCFP := account("dfcp", "hotspot-other-dcfp", &otherStore)
 	// Read access with a store assignment alone must not reveal the district.
 	_, storekeeper := account("store incharge", "hotspot-storekeeper", &store)
+	_, national := account("moh", "hotspot-national", nil)
 
 	submission := func(name string) map[string]any {
 		return map[string]any{
@@ -254,6 +256,23 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	if !notified(dcfp, id, "commented") {
 		t.Fatal("submitter comment did not notify the district")
 	}
+
+	// Filters narrow what the caller can already see; all_districts sees every district.
+	if !listed(dcfp, "?review_status=submitted", second) || listed(dcfp, "?review_status=submitted", id) ||
+		!listed(dcfp, "?review_status=active", id) {
+		t.Fatal("review_status filter is wrong")
+	}
+	if !listed(national, "?district_id="+district, id) || listed(national, "?district_id="+otherDistrict, id) ||
+		!listed(national, "?submitted_by_id="+vhtID, id) || listed(national, "?submitted_by_id="+otherVHTID, id) {
+		t.Fatal("district or submitter filter is wrong for a national user")
+	}
+	if len(request("GET", "/hotspots?submitted_by_id="+vhtID, nil, otherVHT, 200)["data"].([]any)) != 0 {
+		t.Fatal("a filter widened a VHT's view to another submitter")
+	}
+	request("GET", path, nil, national, 200)
+	request("POST", path+"/deactivate", reason, national, 403)
+	request("GET", "/hotspots?review_status=verified", nil, dcfp, 400)
+	request("GET", "/hotspots?district_id=kampala", nil, national, 400)
 
 	// Location lookups chain region, district and subcounty for the submission form.
 	includes := func(path, id string) bool {
