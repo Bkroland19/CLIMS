@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:14px">
+
+<sc-if value="{{ pg.missing }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:32px 16px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center">
+    <div style="font-size:14px;font-weight:600">That record isn't available</div>
+    <div style="font-size:14px;color:#62666d">It may have been reset. Go back to the dashboard to pick up where the flow is.</div>
+    <button onClick="{{ toDash }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;font-size:14px;font-weight:500;cursor:pointer">Back to dashboard</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.dashboard }}" hint-placeholder-val="{{ true }}">
+  <div style="display:grid;grid-template-columns:repeat({{ kpiCols }},minmax(0,1fr));gap:12px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+      <button onClick="{{ k.onClick }}" style="text-align:left;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;cursor:{{ k.cursor }};display:flex;flex-direction:column;gap:10px;color:#0c0d0f;min-width:0" style-hover="background:rgba(69,186,80,.06)">
+        <span style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;width:100%"><span style="font-size:10.5px;color:#4a4e55;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.label }}</span><span style="width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.8);box-shadow:inset 0 0 0 1px rgba(15,40,25,.09),0 1px 2px rgba(15,40,25,.06)"><span style="width:15px;height:15px;background:{{ k.icc }};-webkit-mask:{{ k.mask }};mask:{{ k.mask }}"></span></span></span>
+        <span style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;width:100%">
+          <span style="min-width:0;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.01em;white-space:nowrap">{{ k.value }}</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#62666d;white-space:nowrap"><span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;font-weight:600;background:{{ k.dbg }};color:{{ k.dfg }}">{{ k.delta }}</span>{{ k.sub }}</span>
+          </span>
+          <svg width="84" height="32" viewBox="0 0 84 32" aria-hidden="true" style="flex:none;overflow:visible"><path d="{{ k.area }}" fill="{{ k.fill }}"></path><path d="{{ k.line }}" fill="none" stroke="{{ k.icc }}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="{{ k.ex }}" cy="{{ k.ey }}" r="2.5" fill="#fff" stroke="{{ k.icc }}" stroke-width="1.5"></circle></svg>
+        </span>
+      </button>
+    </sc-for>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 480px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div style="font-size:14px;font-weight:600">Needs your action</div>
+        <span style="font-size:13px;color:#62666d">{{ taskCount }}</span>
+      </div>
+      <sc-for list="{{ tasks }}" as="tk" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:10px 16px;padding:10px 16px;border-bottom:1px solid rgba(15,40,25,.06);flex-wrap:wrap">
+          <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ tk.chip.bg }};color:{{ tk.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ tk.chip.label }}</span>
+          <div style="flex:1 1 220px;min-width:0">
+            <div style="font-weight:500;font-size:14px">{{ tk.title }}</div>
+            <div style="font-size:13px;color:#62666d;margin-top:2px">{{ tk.sub }}</div>
+          </div>
+          <button onClick="{{ tk.onClick }}" style="height:32px;padding:0 14px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:13px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);white-space:nowrap" style-hover="background:#f2f3f5">{{ tk.cta }}</button>
+        </div>
+      </sc-for>
+      <sc-if value="{{ noTasks }}"><div style="padding:28px 16px;text-align:center;color:#62666d;font-size:14px">Nothing needs you right now. New stockout notifications will appear here.</div></sc-if>
+    </div>
+    <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:14px;font-weight:600">District store</div><button onClick="{{ toStock }}" style="background:none;border:none;color:#177534;font-size:13px;font-weight:500;cursor:pointer;padding:0">View stock</button></div>
+        <sc-for list="{{ stockRows }}" as="r" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+              <span style="font-size:14px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }} <span style="color:#62666d">· {{ r.brand }}</span></span>
+              <span style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums">{{ r.value }}</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:#f2f3f5;overflow:hidden"><div style="height:100%;width:{{ r.pct }};background:{{ r.bar }};border-radius:4px"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#62666d"><span>Minimum {{ r.min }} pieces</span><span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-weight:500;background:{{ r.chip.bg }};color:{{ r.chip.fg }}">{{ r.chip.label }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <details style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><summary style="padding:12px 12px 12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">Recent activity</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">Latest updates on Wakiso orders and stock</span></span><span style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(15,40,25,.09);display:flex;align-items:center;justify-content:center;flex:none;color:#62666d"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div style="padding:10px 14px 8px;border-top:1px solid rgba(15,40,25,.06)">
+        <sc-for list="{{ activity }}" as="e" hint-placeholder-count="4">
+          <div style="display:flex;gap:10px;padding-bottom:14px">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ e.dot }};margin-top:6px;flex:none"></span>
+            <div style="min-width:0"><div style="font-size:13px;line-height:1.4">{{ e.text }}</div><div style="font-size:12px;color:#62666d;margin-top:2px">{{ e.ref }} · {{ e.actor }} · {{ e.time }}</div></div>
+          </div>
+        </sc-for>
+      </div></details>
+    </div>
+  </div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px;align-items:stretch">
+    <sc-for list="{{ lineCharts }}" as="c" hint-placeholder-count="1">
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;min-width:0;display:flex;flex-direction:column">
+      <div style="padding:10px 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px 16px;flex-wrap:wrap">
+        <div style="min-width:0"><div style="font-size:14px;font-weight:600">{{ c.title }}</div><div style="font-size:12.5px;color:#62666d;margin-top:2px">{{ c.sub }}</div></div>
+        <sc-if value="{{ c.hasLegend }}"><div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#4a4e55;padding-top:2px"><sc-for list="{{ c.legend }}" as="lg" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:10px;height:{{ lg.h }};border-radius:2px;background:{{ lg.color }}"></span>{{ lg.label }}</span></sc-for></div></sc-if>
+      </div>
+      <div style="padding:12px 14px 12px 4px;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:10px;margin-top:auto">
+        <div style="position:relative;height:{{ c.hpx }}"><sc-for list="{{ c.grid }}" as="g" hint-placeholder-count="5"><span style="position:absolute;right:0;top:{{ g.top }};transform:translateY(-50%);font-size:11px;color:#8b9097;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1">{{ g.label }}</span></sc-for></div>
+        <div style="position:relative;height:{{ c.hpx }}">
+          <sc-for list="{{ c.grid }}" as="g" hint-placeholder-count="5"><div style="position:absolute;left:0;right:0;top:{{ g.top }};border-top:1px solid {{ g.col }}"></div></sc-for>
+          <svg viewBox="{{ c.vb }}" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"><path d="{{ c.l1.area }}" fill="{{ c.l1.fill }}"></path><path d="{{ c.l2.area }}" fill="{{ c.l2.fill }}"></path><path d="{{ c.ref.d }}" fill="none" stroke="#e0a03a" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"></path><path d="{{ c.l2.d }}" fill="none" stroke="{{ c.l2.color }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path><path d="{{ c.l1.d }}" fill="none" stroke="{{ c.l1.color }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path></svg>
+          <sc-if value="{{ c.hasRef }}"><span style="position:absolute;left:6px;top:{{ c.ref.top }};transform:translateY(-130%);font-size:11px;font-weight:600;color:#a84c06;white-space:nowrap">{{ c.ref.label }}</span></sc-if>
+          <span style="position:absolute;left:100%;top:{{ c.end.top }};width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#fff;border:2px solid {{ c.end.color }}"></span>
+        </div>
+        <div></div>
+        <div style="position:relative;height:22px;font-size:11px;color:#8b9097;white-space:nowrap"><sc-for list="{{ c.xl }}" as="x" hint-placeholder-count="5"><span style="position:absolute;top:8px;left:{{ x.left }};transform:{{ x.tx }}">{{ x.label }}</span></sc-for></div>
+      </div>
+    </div>
+    </sc-for>
+    <sc-for list="{{ barCharts }}" as="c" hint-placeholder-count="1">
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;min-width:0;display:flex;flex-direction:column">
+      <div style="padding:10px 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px 16px;flex-wrap:wrap">
+        <div style="min-width:0"><div style="font-size:14px;font-weight:600">{{ c.title }}</div><div style="font-size:12.5px;color:#62666d;margin-top:2px">{{ c.sub }}</div></div>
+        <sc-if value="{{ c.hasLegend }}"><div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#4a4e55;padding-top:2px"><sc-for list="{{ c.legend }}" as="lg" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:10px;height:{{ lg.h }};border-radius:2px;background:{{ lg.color }}"></span>{{ lg.label }}</span></sc-for></div></sc-if>
+      </div>
+      <div style="padding:12px 14px 12px 4px;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:10px;margin-top:auto">
+        <div style="position:relative;height:{{ c.hpx }}"><sc-for list="{{ c.grid }}" as="g" hint-placeholder-count="5"><span style="position:absolute;right:0;top:{{ g.top }};transform:translateY(-50%);font-size:11px;color:#8b9097;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1">{{ g.label }}</span></sc-for></div>
+        <div style="position:relative;height:{{ c.hpx }}">
+          <sc-for list="{{ c.grid }}" as="g" hint-placeholder-count="5"><div style="position:absolute;left:0;right:0;top:{{ g.top }};border-top:1px solid {{ g.col }}"></div></sc-for>
+          <div style="position:absolute;inset:0;display:flex;align-items:flex-end;gap:6px;padding:0 2px">
+            <sc-for list="{{ c.bars }}" as="b" hint-placeholder-count="8"><div title="{{ b.tip }}" style="flex:1;min-width:0;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:2px"><div style="flex:1;max-width:12px;height:{{ b.h1 }};background:{{ c.c1 }};border-radius:3px 3px 0 0"></div><div style="flex:1;max-width:12px;height:{{ b.h2 }};background:{{ c.c2 }};border-radius:3px 3px 0 0"></div></div></sc-for>
+          </div>
+        </div>
+        <div></div>
+        <div style="display:flex;gap:6px;padding:8px 2px 0;font-size:11px;color:#8b9097"><sc-for list="{{ c.bars }}" as="b" hint-placeholder-count="8"><span style="flex:1;min-width:0;text-align:center;white-space:nowrap;overflow:hidden">{{ b.label }}</span></sc-for></div>
+      </div>
+    </div>
+    </sc-for>
+    <sc-for list="{{ hbarCharts }}" as="c" hint-placeholder-count="1">
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;min-width:0;display:flex;flex-direction:column">
+      <div style="padding:10px 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px 16px;flex-wrap:wrap">
+        <div style="min-width:0"><div style="font-size:14px;font-weight:600">{{ c.title }}</div><div style="font-size:12.5px;color:#62666d;margin-top:2px">{{ c.sub }}</div></div>
+        <sc-if value="{{ c.hasLegend }}"><div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#4a4e55;padding-top:2px"><sc-for list="{{ c.legend }}" as="lg" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:10px;height:{{ lg.h }};border-radius:2px;background:{{ lg.color }}"></span>{{ lg.label }}</span></sc-for></div></sc-if>
+      </div>
+      <div style="padding:12px 14px 16px;display:flex;flex-direction:column;gap:13px;margin-top:auto">
+        <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:minmax(0,104px) minmax(0,1fr) 32px;gap:10px;align-items:center;font-size:13px"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:{{ r.fw }}">{{ r.label }}</span><div style="height:10px;border-radius:5px;background:#f2f3f5;overflow:hidden"><div style="height:100%;width:{{ r.pct }};background:{{ r.color }};border-radius:5px"></div></div><span style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">{{ r.value }}</span></div></sc-for>
+      </div>
+    </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+<sc-if value="{{ pg.orders }}">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+    <div role="tablist" style="display:flex;gap:2px;padding:4px;background:#f2f3f5;border-radius:8px;flex-wrap:wrap">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="6">
+        <button role="tab" onClick="{{ f.onClick }}" style="height:32px;padding:0 12px;border:none;border-radius:8px;background:{{ f.bg }};box-shadow:{{ f.sh }};color:{{ f.fg }};font-size:14px;font-weight:500;cursor:pointer;display:flex;gap:6px;align-items:center">{{ f.label }}<span style="font-size:12px;color:#62666d;font-variant-numeric:tabular-nums">{{ f.count }}</span></button>
+      </sc-for>
+    </div>
+    
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Order</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Hotspot</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Requested by</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Pieces</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Received</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+        <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+          <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-weight:600;white-space:nowrap">{{ r.id }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ r.hotspot }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.loc }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ r.by }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.byRole }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap">{{ r.items }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap">{{ r.time }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+            <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+    <sc-if value="{{ noRows }}"><div style="padding:28px 16px;text-align:center;color:#62666d;font-size:14px">No orders in this view.</div></sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.order }}">
+  <button onClick="{{ back }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#62666d;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Order queue</button>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><div style="padding:12px 14px 12px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center">
+    <h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">{{ o.id }}</h2>
+    <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ o.chip.bg }};color:{{ o.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ o.chip.label }}</span>
+    <span style="color:#62666d;font-size:14px;flex-basis:100%">{{ o.hotspot }} · {{ o.reason }} · received {{ o.time }}</span>
+  </div>
+  <div style="padding:10px 14px 16px;border-top:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.5);display:flex;flex-wrap:wrap;gap:12px 12px">
+    <sc-for list="{{ steps }}" as="st" hint-placeholder-count="6">
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 104px;min-width:0">
+        <span style="height:4px;border-radius:2px;background:{{ st.bar }}"></span><span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ st.kc }};margin-top:4px">{{ st.kicker }}</span>
+        <div style="min-width:0"><div style="font-size:14px;font-weight:{{ st.fw }};color:{{ st.tc }}">{{ st.label }}</div><div style="font-size:12px;color:#62666d;margin-top:1px">{{ st.sub }}</div></div>
+      </div>
+    </sc-for>
+  </div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 520px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="border-radius:12px 14px 0 0;padding:10px 14px;background:linear-gradient({{ ob.bg }},{{ ob.bg }}),#fff;border:1px solid rgba(15,40,25,.09);border-bottom:none;margin-bottom:-12px;display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:14px;font-weight:600;color:{{ ob.fg }}">{{ ob.title }}</div>
+        <div style="font-size:14px;color:#0c0d0f;text-wrap:pretty">{{ ob.body }}</div>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(15,40,25,.09);border-radius:0 0 14px 14px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.03);overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)">
+          <div style="font-size:14px;font-weight:600">Quantities</div>
+          <div style="font-size:13px;color:#62666d;margin-top:2px">In pieces. You can approve less than was requested.</div>
+        </div>
+        <div style="overflow-x:auto;overflow-y:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Product</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Requested</th>
+              <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Approve</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">In store</th>
+              
+            <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+            <tbody>
+              <sc-for list="{{ qrows }}" as="q" hint-placeholder-count="2">
+                <tr>
+                  <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ q.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ q.brand }}</div></td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ q.req }}</td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">
+                    <sc-if value="{{ q.editable }}"><input type="number" min="0" step="100" value="{{ q.appr }}" onChange="{{ q.onAppr }}" aria-label="Approved quantity" style="height:32px;width:92px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-variant-numeric:tabular-nums"></sc-if>
+                    <sc-if value="{{ q.fixed }}"><span style="font-variant-numeric:tabular-nums;font-weight:500">{{ q.apprTxt }}</span></sc-if>
+                  </td>
+                  <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;white-space:nowrap;line-height:1.35"><div style="font-variant-numeric:tabular-nums;font-weight:500">{{ q.avail }}</div><div style="margin-top:6px;display:flex;justify-content:flex-end">
+                    <sc-if value="{{ q.resOk }}"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:rgba(23,117,52,.1);color:#177534"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>Available</span></sc-if>
+                    <sc-if value="{{ q.resShort }}"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:rgba(168,76,6,.1);color:#a84c06"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ q.shortTxt }}</span></sc-if>
+                    
+                  </div></td>
+                <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ q.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;background:rgba(246,248,247,.6)">
+          <sc-if value="{{ oa.checkPrimary }}"><button onClick="{{ doCheck }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Check stock availability</button></sc-if>
+          <sc-if value="{{ oa.checkSecondary }}"><button onClick="{{ doCheck }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Check again</button></sc-if>
+          <sc-if value="{{ oa.confirm }}">
+            <button onClick="{{ doHold }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Put on hold</button>
+            <button onClick="{{ doConfirm }}" disabled="{{ pk.cant }}" style="opacity:{{ pk.op }};height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Confirm order and notify hotspot</button>
+          </sc-if>
+          <sc-if value="{{ oa.short }}">
+            <button onClick="{{ doHold }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Put on hold only</button>
+            <button onClick="{{ doHoldReq }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Put on hold and request from warehouse</button>
+          </sc-if>
+          <sc-if value="{{ oa.reqwr }}"><button onClick="{{ doReqWr }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Request stock from warehouse</button></sc-if>
+          <sc-if value="{{ oa.viewwr }}"><button onClick="{{ doViewWr }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">View {{ o.wrId }}</button></sc-if>
+          <sc-if value="{{ oa.release }}"><button onClick="{{ doRelease }}" disabled="{{ pk.cant }}" style="opacity:{{ pk.op }};height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Release from hold and confirm</button></sc-if>
+          <sc-if value="{{ oa.dispatch }}"><button onClick="{{ doDispatch }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Prepare dispatch</button></sc-if>
+        </div>
+      </div>
+      <sc-if value="{{ al.has }}">
+        <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">{{ al.title }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ al.sub }}</div></div>
+          <div style="overflow-x:auto;overflow-y:hidden"><table style="width:100%;border-collapse:collapse;min-width:560px">
+            <thead><tr><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Product</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Batch</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Expires</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Pieces</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Status</th></tr></thead>
+            <tbody><sc-for list="{{ al.rows }}" as="b" hint-placeholder-count="2"><tr><td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ b.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ b.brand }}</div></td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;font-weight:500;font-variant-numeric:tabular-nums">{{ b.batch }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ b.exp }}</div><div style="font-size:12.5px;color:{{ b.expFg }}">{{ b.left }}</div></td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums">{{ b.qty }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ b.chip.bg }};color:{{ b.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ b.chip.label }}</span></td></tr></sc-for></tbody>
+          </table></div>
+          <sc-if value="{{ al.near }}"><div style="padding:8px 14px;font-size:13px;color:#a84c06;background:rgba(168,76,6,.06);border-top:1px solid rgba(15,40,25,.06);text-wrap:pretty">{{ al.nearTxt }}</div></sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{ pk.has }}">
+        <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">Select batches</div><div style="font-size:13px;color:#62666d;margin-top:2px;text-wrap:pretty">{{ pk.sub }}</div></div>
+          <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+              <sc-for list="{{ pk.prods }}" as="g" hint-placeholder-count="2">
+                <div style="border:1px solid rgba(15,40,25,.09);border-radius:8px;overflow:hidden">
+                  <div style="padding:8px 12px;display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:space-between;align-items:center;background:rgba(246,248,247,.6);border-bottom:1px solid rgba(15,40,25,.06)">
+                    <div style="font-size:14px;font-weight:600">{{ g.name }} <span style="font-weight:400;color:#62666d">· {{ g.brand }}</span></div>
+                    <div style="font-size:13px;font-weight:500;color:{{ g.sumFg }};font-variant-numeric:tabular-nums">{{ g.sumTxt }}</div>
+                  </div>
+                  <div style="max-height:{{ g.maxH }};overflow-y:auto;overflow-x:hidden"><table style="width:100%;border-collapse:collapse;table-layout:fixed">
+                    <colgroup><col style="width:38%"><col style="width:25%"><col style="width:17%"><col style="width:20%"></colgroup>
+                    <thead><tr><th style="position:sticky;top:0;z-index:1;text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:#eef6ef;padding:7px 10px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Batch</th><th style="position:sticky;top:0;z-index:1;text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:#eef6ef;padding:7px 10px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Expires</th><th style="position:sticky;top:0;z-index:1;text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:#eef6ef;padding:7px 10px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">In store</th><th style="position:sticky;top:0;z-index:1;text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:#eef6ef;padding:7px 10px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Pick</th></tr></thead>
+                    <tbody><sc-for list="{{ g.lots }}" as="l" hint-placeholder-count="3"><tr style="background:{{ l.rowBg }}">
+                      <td style="padding:8px 10px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;line-height:1.35;vertical-align:top;padding-left:14px"><div style="font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.batch }}</div><div style="font-size:12px;color:#62666d">Made {{ l.mfg }}</div><sc-if value="{{ l.fefo }}"><div style="font-size:12px;font-weight:600;color:#177534">Expires first · pick first</div></sc-if><sc-if value="{{ l.showChip }}"><div style="margin-top:5px"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ l.chip.bg }};color:{{ l.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ l.chip.label }}</span></div></sc-if></td>
+                      <td style="padding:8px 10px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;line-height:1.35;vertical-align:top"><div style="white-space:nowrap">{{ l.exp }}</div><div style="font-size:12.5px;color:{{ l.expFg }}">{{ l.left }}</div></td>
+                      <td style="padding:8px 10px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;line-height:1.35;vertical-align:top;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">{{ l.avail }}</td>
+                      <td style="padding:8px 10px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;line-height:1.35;vertical-align:top"><sc-if value="{{ l.can }}"><input type="number" min="0" step="100" value="{{ l.val }}" onChange="{{ l.on }}" aria-label="{{ l.aria }}" style="height:32px;width:100%;min-width:0;padding:0 8px;border-radius:8px;border:1px solid {{ l.bd }};font-size:14px;font-variant-numeric:tabular-nums;background:#fff"><sc-if value="{{ l.over }}"><div style="font-size:12px;color:#c62828;margin-top:3px">More than available</div></sc-if><sc-if value="{{ l.warnPick }}"><div style="font-size:12px;color:#a84c06;margin-top:3px;text-wrap:pretty">{{ l.warnTxt }}</div></sc-if></sc-if><sc-if value="{{ l.blocked }}"><div style="font-size:12.5px;font-weight:600;color:#c62828;padding-top:7px">Expired — can't issue</div></sc-if></td>
+                    </tr></sc-for></tbody>
+                  </table></div>
+                </div>
+              </sc-for>
+            <div style="font-size:13px;color:#62666d;text-wrap:pretty">Batches expiring within 3 months are flagged but can still be issued — tell the hotspot to use them first. Expired batches can't be issued.</div>
+            <sc-if value="{{ pk.mismatch }}"><div style="font-size:13px;color:#c62828;text-wrap:pretty">{{ pk.misTxt }}</div></sc-if>
+          </div>
+        </div>
+      </sc-if>
+      
+    </div>
+    <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11.5px;color:#62666d;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Request</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px"><div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Requested by</span><span style="text-align:right">{{ o.by }}<span style="display:block;font-size:13px;color:#62666d">{{ o.byRole }}</span></span></div><div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Reason</span><span style="text-align:right">{{ o.reason }}</span></div><div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Stock left when reported</span><span style="text-align:right">{{ o.found }}</span></div><div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Note</span><span style="text-align:right">{{ o.note }}</span></div></div>
+        <div style="height:1px;background:#f0f1f3;margin:6px 0"></div>
+        <div style="font-size:11.5px;color:#62666d;text-transform:uppercase;letter-spacing:.06em;font-weight:600">Hotspot</div>
+        <div><div style="font-size:14px;font-weight:600">{{ h.name }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ h.kind }} · {{ h.village }}, {{ h.subcounty }}</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;border-top:1px solid rgba(15,40,25,.06);padding-top:12px">
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Contact person</span><span>{{ h.contact }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d">Phone</span><span style="font-variant-numeric:tabular-nums">{{ h.phone }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d">Dispenser</span><span>{{ h.disp }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d">Covering VHT</span><span>{{ h.vht }}</span></div>
+        </div>
+      </div>
+      <details style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><summary style="padding:12px 12px 12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">Activity</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">Full history, oldest first</span></span><span style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(15,40,25,.09);display:flex;align-items:center;justify-content:center;flex:none;color:#62666d"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div style="padding:10px 14px 8px;border-top:1px solid rgba(15,40,25,.06)">
+        <sc-for list="{{ tl }}" as="e" hint-placeholder-count="3">
+          <div style="display:flex;gap:12px">
+            <div style="display:flex;flex-direction:column;align-items:center"><span style="width:10px;height:10px;border-radius:50%;background:{{ e.dot }};margin-top:5px;flex:none"></span><span style="flex:1;width:1px;background:#e4e6e9;margin:4px 0"></span></div>
+            <div style="min-width:0;padding-bottom:14px"><div style="font-size:14px;line-height:1.4">{{ e.text }}</div><div style="font-size:12px;color:#62666d;margin-top:2px">{{ e.actor }} · {{ e.role }} · {{ e.time }}</div></div>
+          </div>
+        </sc-for>
+      </div></details>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.pending }}">
+  
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between">
+    <div style="font-size:14px;color:#62666d">Release an order once the store can cover it.</div>
+    <div style="background:#fff;border:1px solid rgba(15,40,25,.09);border-radius:8px;padding:10px 14px;font-size:14px;white-space:nowrap"><span style="color:#62666d">In district store:</span> <span style="font-weight:600;font-variant-numeric:tabular-nums">{{ pStock }}</span></div>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <sc-for list="{{ pend }}" as="p" hint-placeholder-count="2">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.06)">
+        <div style="flex:1 1 240px;min-width:0">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button onClick="{{ p.open }}" style="background:none;border:none;padding:0;font-size:14px;font-weight:600;cursor:pointer;color:#0c0d0f">{{ p.id }}</button><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ p.chip.bg }};color:{{ p.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ p.chip.label }}</span></div>
+          <div style="font-size:14px;margin-top:4px">{{ p.hotspot }}</div>
+          <div style="font-size:13px;color:#62666d;margin-top:2px">On hold since {{ p.since }} · {{ p.wr }}</div>
+        </div>
+        <div style="font-size:14px;font-variant-numeric:tabular-nums;min-width:160px">{{ p.items }}</div>
+        <sc-if value="{{ p.ok }}"><button onClick="{{ p.release }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Release and confirm</button></sc-if>
+        <sc-if value="{{ p.notOk }}"><button disabled="{{ true }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500">Not enough stock</button></sc-if>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noPend }}">
+      <div style="padding:28px 16px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center">
+        <div style="font-size:14px;font-weight:600">No orders on hold</div>
+        <div style="font-size:14px;color:#62666d">{{ readyTxt }}</div>
+        <button onClick="{{ toDispatch }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Go to dispatch</button>
+      </div>
+    </sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.stock }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+    <sc-for list="{{ stockCards }}" as="c" hint-placeholder-count="2">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div><div style="font-size:14px;color:#62666d;font-weight:500">{{ c.name }} · {{ c.brand }}</div><div style="font-size:12px;color:#62666d;margin-top:2px">{{ c.batches }}</div></div>
+          <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ c.chip.bg }};color:{{ c.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ c.chip.label }}</span>
+        </div>
+        <div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.01em">{{ c.value }} <span style="font-size:14px;font-weight:400;color:#62666d">pieces</span></div>
+        <div style="height:8px;border-radius:4px;background:#f2f3f5;overflow:hidden"><div style="height:100%;width:{{ c.pct }};background:{{ c.bar }}"></div></div>
+        <div style="font-size:13px;color:#62666d">Minimum level {{ c.min }} · {{ c.waiting }} needed by held orders</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">Batches in store</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ lastIn }}</div></div>
+    <div style="overflow-x:auto;overflow-y:hidden"><table style="width:100%;border-collapse:collapse;min-width:680px">
+            <thead><tr><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Product</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Batch</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Manufactured</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Expires</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Pieces</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Status</th></tr></thead>
+            <tbody><sc-for list="{{ lots }}" as="b" hint-placeholder-count="3"><tr><td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ b.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ b.brand }}</div></td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;font-weight:500;font-variant-numeric:tabular-nums">{{ b.batch }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;color:#62666d">{{ b.mfg }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ b.exp }}</div><div style="font-size:12.5px;color:{{ b.expFg }}">{{ b.left }}</div></td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums">{{ b.qty }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ b.chip.bg }};color:{{ b.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ b.chip.label }}</span></td></tr></sc-for></tbody>
+          </table></div>
+    <sc-if value="{{ noLots }}"><div style="padding:20px 16px;text-align:center;font-size:14px;color:#62666d">No stock in the district store.</div></sc-if>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><div style="font-size:14px;font-weight:600">Stock movements</div><div style="font-size:13px;color:#62666d;margin-top:2px">Additions from warehouses and allocations to hotspots.</div></div>
+      <button onClick="{{ toNewWr }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Request stock</button>
+    </div>
+    <div style="overflow-x:auto;overflow-y:hidden">
+      <table style="width:100%;border-collapse:collapse;min-width:680px">
+        <thead><tr>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Date</th>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Reference</th>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Movement</th>
+          <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Male</th>
+          <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Female</th>
+          <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Balance (M / F)</th>
+        <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+        <tbody>
+          <sc-for list="{{ ledger }}" as="l" hint-placeholder-count="3">
+            <tr>
+              <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap">{{ l.time }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-weight:500;white-space:nowrap">{{ l.ref }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px">{{ l.text }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;color:{{ l.mfg }};white-space:nowrap;line-height:1.35">{{ l.male }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;color:{{ l.ffg }};white-space:nowrap;line-height:1.35">{{ l.female }}</td>
+              <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ l.bal }}</td>
+            <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ l.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.warehouse }}">
+  <div style="display:flex;justify-content:flex-end"><button onClick="{{ toNewWr }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">New request</button></div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Request</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Ordered from</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Quantity needed</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Held orders</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Sent</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+        <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ wrRows }}" as="r" hint-placeholder-count="2">
+          <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-weight:600;white-space:nowrap">{{ r.id }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ r.wh }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.whName }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap">{{ r.items }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px">{{ r.linked }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap">{{ r.time }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+            <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.newwr }}">
+  <button onClick="{{ nw.back }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#62666d;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Warehouse requests</button>
+  <div><h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">Request stock from a warehouse</h2><div style="font-size:14px;color:#62666d;margin-top:4px">Order for the Wakiso district store. The warehouse reviews it, checks its stock, then dispatches or holds.</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 520px;min-width:0;display:flex;flex-direction:column;gap:1px;background:rgba(15,40,25,.08);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="background:rgba(255,255,255,.95);border:none;border-radius:0;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">1</span>Order from</div>
+        <div role="radiogroup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          <sc-for list="{{ nw.whs }}" as="x" hint-placeholder-count="2">
+            <button role="radio" aria-checked="{{ x.on }}" onClick="{{ x.pick }}" style="text-align:left;padding:12px 14px;border-radius:8px;border:{{ x.bd }};background:{{ x.bg }};cursor:pointer;display:flex;gap:12px;align-items:flex-start;color:#0c0d0f">
+              <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ x.ring }};flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center"><sc-if value="{{ x.on }}"><span style="width:8px;height:8px;border-radius:50%;background:#45ba50"></span></sc-if></span>
+              <span><span style="display:block;font-size:14px;font-weight:600">{{ x.code }} · {{ x.name }}</span><span style="display:block;font-size:13px;color:#62666d;margin-top:3px">{{ x.desc }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.95);border:none;border-radius:0;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">2</span>Quantity needed</div><div style="font-size:13px;color:#62666d;margin-top:4px;padding-left:34px">Pre-filled to cover the held orders below and bring the store back to its minimum level.</div></div>
+        <div style="overflow-x:auto;overflow-y:hidden">
+          <table style="width:100%;border-collapse:collapse;min-width:600px">
+            <thead><tr>
+              <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Product</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">In store</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Held orders</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Minimum</th>
+              <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Request (pieces)</th>
+            <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+            <tbody>
+              <sc-for list="{{ nw.rows }}" as="r" hint-placeholder-count="2">
+                <tr>
+                  <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ r.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.brand }}</div></td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.store }}</td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.demand }}</td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.min }}</td>
+                  <td style="padding:6px 16px 6px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><input type="number" min="0" step="100" value="{{ r.val }}" onChange="{{ r.on }}" aria-label="Quantity to request" style="height:32px;width:130px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-variant-numeric:tabular-nums"></td>
+                <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.95);border:none;border-radius:0;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">3</span>Orders waiting on this stock</div><div style="font-size:13px;color:#62666d;margin-top:4px;padding-left:34px">Linked orders are flagged for release when the stock arrives.</div></div>
+        <sc-for list="{{ nw.held }}" as="h" hint-placeholder-count="2">
+          <label style="display:flex;gap:14px;align-items:center;padding:9px 16px;border-bottom:1px solid rgba(15,40,25,.06);cursor:pointer">
+            <input type="checkbox" checked="{{ h.checked }}" onChange="{{ h.toggle }}">
+            <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:500">{{ h.id }} · {{ h.hotspot }}</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">On hold · received {{ h.time }}</span></span>
+            <span style="font-size:14px;font-variant-numeric:tabular-nums">{{ h.items }}</span>
+          </label>
+        </sc-for>
+        <sc-if value="{{ nw.noHeld }}"><div style="padding:12px 14px;font-size:14px;color:#62666d">No orders are on hold. This request will top up the district store.</div></sc-if>
+      </div>
+      <details style="background:rgba(255,255,255,.95)"><summary style="padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;color:#177534"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add a comment for the warehouse<span style="color:#62666d;font-weight:400">· optional</span></summary><div style="padding:0 24px 20px"><textarea id="wrnote" rows="3" value="{{ nw.note }}" onChange="{{ nw.onNote }}" placeholder="e.g. Two hotspots in Katabi are out of stock" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #8b9097;font-size:14px;resize:vertical"></textarea></div></details>
+    </div>
+    <div style="flex:1 1 280px;min-width:0;position:sticky;top:80px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:14px;font-weight:600">Summary</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px">
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Ordered from</span><span style="font-weight:500">{{ nw.wh }}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Ordered for</span><span>Wakiso district store</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Quantity</span><span style="font-variant-numeric:tabular-nums;text-align:right">{{ nw.sumItems }}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Held orders linked</span><span>{{ nw.linkedCount }}</span></div>
+      </div>
+      <button onClick="{{ nw.send }}" disabled="{{ nw.cantSend }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Send request to {{ nw.wh }}</button>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.wr }}">
+  <button onClick="{{ backWh }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#62666d;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Warehouse requests</button>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><div style="padding:12px 14px 12px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center">
+    <h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">{{ w.id }}</h2>
+    <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ w.chip.bg }};color:{{ w.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ w.chip.label }}</span>
+    <span style="color:#62666d;font-size:14px;flex-basis:100%">To {{ w.whName }} ({{ w.wh }}) · sent {{ w.time }}</span>
+  </div>
+  <div style="padding:10px 14px 16px;border-top:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.5);display:flex;flex-wrap:wrap;gap:12px 12px">
+    <sc-for list="{{ wsteps }}" as="st" hint-placeholder-count="5">
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 104px;min-width:0">
+        <span style="height:4px;border-radius:2px;background:{{ st.bar }}"></span><span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ st.kc }};margin-top:4px">{{ st.kicker }}</span>
+        <div style="min-width:0"><div style="font-size:14px;font-weight:{{ st.fw }};color:{{ st.tc }}">{{ st.label }}</div><div style="font-size:12px;color:#62666d;margin-top:1px">{{ st.sub }}</div></div>
+      </div>
+    </sc-for>
+  </div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 560px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <sc-if value="{{ wwait }}">
+        <div style="border-radius:12px;padding:10px 14px;background:{{ wb.bg }};display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:14px;font-weight:600;color:{{ wb.fg }}">{{ wb.title }}</div>
+          <div style="font-size:14px;color:#0c0d0f;text-wrap:pretty">{{ wb.body }}</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ rcv }}">
+        <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)">
+            <div style="font-size:14px;font-weight:600">Receive and verify stock</div>
+            <div style="font-size:13px;color:#62666d;margin-top:2px">Count each batch against the waybill, check batch numbers and expiry dates, and note its condition.</div>
+          </div>
+          <div style="padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 20px;border-bottom:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.6)">
+            <div><div style="font-size:12px;color:#62666d">Waybill</div><div style="font-size:14px;font-weight:500;margin-top:2px">{{ rc.waybill }}</div></div>
+            <div><div style="font-size:12px;color:#62666d">Vehicle</div><div style="font-size:14px;font-weight:500;margin-top:2px">{{ rc.vehicle }}</div></div>
+            <div><div style="font-size:12px;color:#62666d">Driver</div><div style="font-size:14px;font-weight:500;margin-top:2px">{{ rc.driver }}</div></div>
+            <div><div style="font-size:12px;color:#62666d">Dispatched</div><div style="font-size:14px;font-weight:500;margin-top:2px">{{ rc.at }}</div></div>
+          </div>
+          <div style="overflow-x:auto;overflow-y:hidden">
+            <table style="width:100%;border-collapse:collapse;min-width:900px">
+              <thead><tr><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Batch</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Expires</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">On waybill</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Counted</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Condition</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Damaged</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Accepted</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Difference</th></tr></thead>
+              <tbody>
+                <sc-for list="{{ rc.rows }}" as="r" hint-placeholder-count="2">
+                  <tr>
+                    <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ r.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">Batch {{ r.batch }} · made {{ r.mfg }}</div></td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ r.exp }}</div><div style="font-size:12.5px;color:{{ r.expFg }}">{{ r.left }}</div></td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums">{{ r.disp }}</td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><input type="number" min="0" value="{{ r.counted }}" onChange="{{ r.onC }}" aria-label="Counted, batch {{ r.batch }}" style="height:32px;width:96px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-variant-numeric:tabular-nums;background:#fff"></td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><select value="{{ r.cond }}" onChange="{{ r.onK }}" aria-label="Condition of batch {{ r.batch }}" style="height:32px;padding:0 8px;border-radius:8px;border:1px solid #8b9097;background:#fff;font-size:14px"><option value="Intact">Intact</option><option value="Damaged">Damaged</option><option value="Batch or expiry differs">Batch or expiry differs</option></select></td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><sc-if value="{{ r.isDmg }}"><input type="number" min="0" value="{{ r.dmg }}" onChange="{{ r.onD }}" aria-label="Damaged pieces, batch {{ r.batch }}" style="height:32px;width:86px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-variant-numeric:tabular-nums;background:#fff"></sc-if><sc-if value="{{ r.noDmg }}"><span style="color:#62666d">—</span></sc-if></td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">{{ r.accepted }}</td>
+                    <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums;color:{{ r.diffFg }}">{{ r.diffTxt }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+            <sc-if value="{{ rc.hasShort }}"><div style="border-radius:8px;padding:10px 14px;background:rgba(10,106,155,.08);font-size:14px;text-wrap:pretty"><span style="font-weight:600;color:#0a6a9b">Short shelf life.</span> {{ rc.shortTxt }}</div></sc-if>
+            <sc-if value="{{ rc.noDisc }}">
+              <div style="border-radius:8px;padding:10px 14px;background:rgba(23,117,52,.1);font-size:14px"><span style="font-weight:600;color:#177534">No discrepancy.</span> Counted quantities, batches and expiry dates match the waybill.</div>
+            </sc-if>
+            <sc-if value="{{ rc.hasDisc }}">
+              <div style="border:1px solid rgba(168,76,6,.35);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px;background:rgba(168,76,6,.04)">
+                <div><div style="font-size:14px;font-weight:600;color:#a84c06">Document discrepancy</div><div style="font-size:13px;color:#0c0d0f;margin-top:2px">{{ rc.discSummary }}. This is shared with {{ rc.warehouse }} and kept on the audit trail.</div></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+                  <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Type
+                    <select value="{{ rc.dtype }}" onChange="{{ rc.onType }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;background:#fff;font-size:14px;font-weight:400">
+                      <option value="Short delivery">Short delivery</option>
+                      <option value="Excess delivery">Excess delivery</option>
+                      <option value="Damaged or expired">Damaged or expired</option>
+                      <option value="Wrong product">Wrong product</option>
+                      <option value="Wrong batch or expiry">Wrong batch or expiry</option>
+                    </select>
+                  </label>
+                  <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">What happened
+                    <input value="{{ rc.dnote }}" onChange="{{ rc.onNote }}" placeholder="e.g. One carton torn, 200 pieces wet" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400">
+                  </label>
+                </div>
+              </div>
+            </sc-if>
+            <div style="display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center">
+              <label style="display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" checked="{{ rc.checked }}" onChange="{{ rc.onChecked }}">I checked batch numbers and expiry dates on the cartons</label>
+              <label style="display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" checked="{{ rc.signed }}" onChange="{{ rc.onSigned }}">I signed waybill {{ rc.waybill }} and kept a copy</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:14px;color:#62666d;cursor:pointer">
+                <span style="height:32px;padding:0 12px;border-radius:8px;border:1px dashed #8b9097;display:inline-flex;align-items:center;color:#0c0d0f">Attach delivery note</span>
+                <span>{{ rc.file }}</span>
+                <input type="file" accept="image/*,.pdf" onChange="{{ rc.onFile }}" style="display:none">
+              </label>
+            </div>
+          </div>
+          <div style="padding:10px 14px;display:flex;justify-content:flex-end;background:rgba(246,248,247,.6);border-top:1px solid rgba(15,40,25,.06)">
+            <button onClick="{{ rc.confirm }}" disabled="{{ rc.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Confirm receipt and issue GRN</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ rcvd }}">
+        <div style="border-radius:12px;padding:10px 14px;background:rgba(23,117,52,.1);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+          <div><div style="font-size:14px;font-weight:600;color:#177534">Received {{ rs.at }} — district stock updated</div><div style="font-size:14px;margin-top:2px">{{ rs.pendTxt }}</div></div>
+          <sc-if value="{{ rs.hasPend }}"><button onClick="{{ rs.toPending }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Review pending orders</button></sc-if>
+        </div>
+        <sc-if value="{{ rs.hasGrn }}">
+          <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+            <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center"><div style="min-width:0"><div style="font-size:14px;font-weight:600">Goods received note {{ rs.grn }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ rs.grnSub }}</div></div><button onClick="{{ rs.print }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Print GRN</button></div>
+            <div style="overflow-x:auto;overflow-y:hidden"><table style="width:100%;border-collapse:collapse;min-width:620px">
+              <thead><tr><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Batch</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Expires</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">On waybill</th><th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Accepted</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Condition</th></tr></thead>
+              <tbody><sc-for list="{{ rs.lines }}" as="g" hint-placeholder-count="2"><tr><td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ g.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">Batch {{ g.batch }} · made {{ g.mfg }}</div></td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ g.exp }}</div><div style="font-size:12.5px;color:{{ g.expFg }}">{{ g.left }}</div></td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums">{{ g.onWaybill }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">{{ g.accepted }}</td><td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ g.cchip.bg }};color:{{ g.cchip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ g.cchip.label }}</span></td></tr></sc-for></tbody>
+            </table></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ rs.disc }}">
+          <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:10px 14px"><div style="font-size:12px;color:#a84c06;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Discrepancy · {{ rs.discType }}</div><div style="font-size:14px;margin-top:4px">{{ rs.discNote }}</div></div>
+        </sc-if>
+      </sc-if>
+
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);font-size:14px;font-weight:600">Quantities</div>
+        <div style="overflow-x:auto;overflow-y:hidden">
+          <table style="width:100%;border-collapse:collapse;min-width:560px">
+            <thead><tr>
+              <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Product</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Needed</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Issued</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Accepted</th>
+              <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Store after</th>
+            <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+            <tbody>
+              <sc-for list="{{ wItems }}" as="r" hint-placeholder-count="2">
+                <tr>
+                  <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-weight:500;white-space:nowrap;line-height:1.35">{{ r.name }}</td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.need }}</td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.issued }}</td>
+                  <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.accepted }}</td>
+                  <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.after }}</td>
+                <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <details style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><summary style="padding:12px 12px 12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">Held orders linked</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">Hotspot orders waiting on this stock</span></span><span style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(15,40,25,.09);display:flex;align-items:center;justify-content:center;flex:none;color:#62666d"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div style="padding:10px 14px 8px;border-top:1px solid rgba(15,40,25,.06)">
+        <sc-for list="{{ wLinked }}" as="l" hint-placeholder-count="2">
+          <button onClick="{{ l.open }}" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border:none;border-bottom:1px solid rgba(15,40,25,.06);background:none;cursor:pointer;color:#0c0d0f">
+            <span><span style="display:block;font-size:14px;font-weight:500">{{ l.id }}</span><span style="display:block;font-size:13px;color:#62666d">{{ l.hotspot }}</span></span>
+            <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ l.chip.bg }};color:{{ l.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ l.chip.label }}</span>
+          </button>
+        </sc-for>
+        <sc-if value="{{ noLinked }}"><div style="font-size:14px;color:#62666d">None — a top-up request.</div></sc-if>
+      </div></details>
+      <details style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><summary style="padding:12px 12px 12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">Activity</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">Full history, oldest first</span></span><span style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(15,40,25,.09);display:flex;align-items:center;justify-content:center;flex:none;color:#62666d"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div style="padding:10px 14px 8px;border-top:1px solid rgba(15,40,25,.06)">
+        <sc-for list="{{ wtl }}" as="e" hint-placeholder-count="3">
+          <div style="display:flex;gap:12px">
+            <div style="display:flex;flex-direction:column;align-items:center"><span style="width:10px;height:10px;border-radius:50%;background:{{ e.dot }};margin-top:5px;flex:none"></span><span style="flex:1;width:1px;background:#e4e6e9;margin:4px 0"></span></div>
+            <div style="min-width:0;padding-bottom:14px"><div style="font-size:14px;line-height:1.4">{{ e.text }}</div><div style="font-size:12px;color:#62666d;margin-top:2px">{{ e.actor }} · {{ e.role }} · {{ e.time }}</div></div>
+          </div>
+        </sc-for>
+      </div></details>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.dispatch }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">Ready to dispatch</div><div style="font-size:13px;color:#62666d;margin-top:2px">Confirmed orders with stock allocated. Assign a rider and print the delivery note.</div></div>
+    <sc-for list="{{ ready }}" as="r" hint-placeholder-count="1">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.06)">
+        <div style="flex:1 1 240px;min-width:0"><div style="font-size:14px;font-weight:600">{{ r.id }} · {{ r.hotspot }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ r.loc }} · confirmed {{ r.time }}</div></div>
+        <div style="font-size:14px;font-variant-numeric:tabular-nums">{{ r.items }}</div>
+        <button onClick="{{ r.open }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Prepare dispatch</button>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noReady }}"><div style="padding:24px 16px;text-align:center;font-size:14px;color:#62666d">No confirmed orders waiting. Confirm orders from the queue to dispatch them.</div></sc-if>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 520px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);font-size:14px;font-weight:600">In delivery</div>
+      <div style="overflow-x:auto;overflow-y:hidden">
+        <table style="width:100%;border-collapse:collapse;min-width:560px">
+          <thead><tr>
+            <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Order</th>
+            <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Rider</th>
+            <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Delivery note</th>
+            <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+          <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+          <tbody>
+            <sc-for list="{{ inDel }}" as="r" hint-placeholder-count="1">
+              <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+                <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:600">{{ r.id }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.hotspot }}</div></td>
+                <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.rider }}</td>
+                <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.dn }}</td>
+                <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span><div style="font-size:12px;color:#62666d;margin-top:4px">{{ r.since }}</div></td>
+              <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <sc-if value="{{ noInDel }}"><div style="padding:20px 16px;text-align:center;font-size:14px;color:#62666d">No deliveries in progress.</div></sc-if>
+      </div>
+    </div>
+    <div style="flex:1 1 280px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:8px">Riders</div>
+      <sc-for list="{{ riders }}" as="r" hint-placeholder-count="3">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid rgba(15,40,25,.06)">
+          <div><div style="font-size:14px;font-weight:500">{{ r.name }}</div><div style="font-size:13px;color:#62666d">{{ r.plate }} · {{ r.phone }}</div></div>
+          <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.dorder }}">
+  <button onClick="{{ dp.back }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#62666d;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Dispatch</button>
+  <div><h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">Dispatch {{ dp.orderId }} to {{ dp.hotspot }}</h2><div style="font-size:14px;color:#62666d;margin-top:4px">The rider carries the condoms and the delivery note. The hotspot signs the note on arrival.</div></div>
+  <sc-if value="{{ dp.already }}">
+    <div style="border-radius:12px;padding:10px 14px;background:rgba(10,106,155,.1);font-size:14px"><span style="font-weight:600;color:#0a6a9b">Already dispatched.</span> {{ dp.orderId }} is with {{ dp.riderName }} on {{ dp.dn }}.</div>
+  </sc-if>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:14px;font-weight:600">Assign a rider</div>
+        <div role="radiogroup" style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ dp.riders }}" as="r" hint-placeholder-count="3">
+            <button role="radio" aria-checked="{{ r.on }}" onClick="{{ r.pick }}" disabled="{{ r.disabled }}" style="text-align:left;padding:12px 14px;border-radius:8px;border:{{ r.bd }};background:{{ r.bg }};cursor:pointer;display:flex;gap:12px;align-items:center;color:#0c0d0f">
+              <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ r.ring }};flex:none;display:flex;align-items:center;justify-content:center"><sc-if value="{{ r.on }}"><span style="width:8px;height:8px;border-radius:50%;background:#45ba50"></span></sc-if></span>
+              <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ r.name }}</span><span style="display:block;font-size:13px;color:#62666d">{{ r.plate }} · {{ r.phone }}</span></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:14px;font-weight:600">Hand over</div>
+        <div style="font-size:14px;color:#62666d;text-wrap:pretty">Print two copies: one travels with the rider for the hotspot to sign, one stays at the store.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">
+          <button onClick="{{ dp.print }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">{{ dp.printLabel }}</button>
+          <button onClick="{{ dp.handover }}" disabled="{{ dp.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Hand over to {{ dp.riderFirst }}</button>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1.4 1 420px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:28px;box-shadow:0 1px 2px rgba(12,13,15,.04)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:2px solid #0c0d0f;padding-bottom:14px">
+        <div><div style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#62666d">Ministry of Health · Wakiso district store</div><div style="font-size:22px;font-weight:700;margin-top:4px;letter-spacing:.02em">DELIVERY NOTE</div></div>
+        <div style="text-align:right"><div style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums">{{ dp.dn }}</div><div style="font-size:13px;color:#62666d">{{ dp.date }}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:16px 0;border-bottom:1px solid rgba(15,40,25,.09);font-size:14px">
+        <div><div style="font-size:12px;color:#62666d">Deliver to</div><div style="font-weight:600;margin-top:2px">{{ dp.hotspot }}</div><div>{{ dp.loc }}</div><div style="color:#62666d">{{ dp.contact }} · {{ dp.phone }}</div></div>
+        <div><div style="font-size:12px;color:#62666d">Order</div><div style="font-weight:600;margin-top:2px">{{ dp.orderId }}</div><div style="font-size:12px;color:#62666d;margin-top:8px">Rider</div><div style="font-weight:600;margin-top:2px">{{ dp.riderName }}</div></div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px">
+        <thead><tr>
+          <th style="text-align:left;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#62666d;padding:10px 0;border-bottom:1px solid rgba(15,40,25,.09)">Item</th>
+          <th style="text-align:left;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#62666d;padding:10px 8px;border-bottom:1px solid rgba(15,40,25,.09)">Batch</th>
+          <th style="text-align:left;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#62666d;padding:10px 8px;border-bottom:1px solid rgba(15,40,25,.09)">Expires</th>
+          <th style="text-align:right;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#62666d;padding:10px 0;border-bottom:1px solid rgba(15,40,25,.09)">Pieces</th>
+        </tr></thead>
+        <tbody>
+          <sc-for list="{{ dp.lines }}" as="l" hint-placeholder-count="2">
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ l.name }} · {{ l.brand }}</td>
+              <td style="padding:6px 8px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap;line-height:1.35">{{ l.batch }}</td>
+              <td style="padding:6px 8px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap;line-height:1.35">{{ l.exp }}</td>
+              <td style="padding:10px 0;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ l.qty }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:20px;margin-top:32px">
+        <div><div style="border-bottom:1px solid #8b9097;height:32px"></div><div style="font-size:12px;color:#62666d;margin-top:6px">Issued by · Sarah Namubiru</div></div>
+        <div><div style="border-bottom:1px solid #8b9097;height:32px"></div><div style="font-size:12px;color:#62666d;margin-top:6px">Delivered by · {{ dp.riderName }}</div></div>
+        <div><div style="border-bottom:1px solid #8b9097;height:32px"></div><div style="font-size:12px;color:#62666d;margin-top:6px">Received by · name, signature, date</div></div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.hotspots }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Hotspot</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Type</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Contact person</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Dispenser</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Stock at hotspot</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Last delivery</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Entered by</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+      <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ hsRows }}" as="h" hint-placeholder-count="5">
+          <tr>
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:500">{{ h.name }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ h.id }} · {{ h.loc }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ h.kind }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ h.contact }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ h.phone }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ h.disp }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-variant-numeric:tabular-nums;color:{{ h.stockFg }};white-space:nowrap;line-height:1.35">{{ h.stock }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;color:#62666d">{{ h.last }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ h.by }}</td>
+            <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ h.chip.bg }};color:{{ h.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ h.chip.label }}</span></td>
+          <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ h.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { d: {}, filter: 'all' };
+  setD = (key, field, val) => this.setState(st => ({ d: { ...st.d, [key]: { ...(st.d[key] || {}), [field]: val } } }));
+
+  componentDidMount() { if (this.props.ready) this.props.ready(); this.autoOpen(); }
+  componentDidUpdate() { this.autoOpen(); }
+  autoOpen() {
+    const { store: s, nav, act } = this.props;
+    if (!s || !nav || nav.page !== 'order') return;
+    const o = s.orders.find(x => x.id === nav.id);
+    if (o && o.status === 'queued' && this._opened !== o.id) { this._opened = o.id; act('openOrder', { id: o.id }); }
+  }
+
+  renderVals() {
+    const v = this._rv();
+    const L = this.props.lib;
+    if (L && L.menu && this.KEBAB) this.KEBAB.forEach(([path, fn]) => {
+      const arr = path.split('.').reduce((a, k) => (a ? a[k] : undefined), v);
+      if (Array.isArray(arr)) arr.forEach(r => { r.menu = e => { e.preventDefault(); e.stopPropagation(); L.menu(e, fn.call(this, r) || []); }; });
+    });
+    return v;
+  }
+  KEBAB = [
+    ['rows', function (r) { const { store: s, go, act, lib: L } = this.props; const o = s.orders.find(x => x.id === r.id); if (!o) return []; const h = s.hotspots.find(x => x.id === o.hotspotId) || {}; const open = o.status === 'queued' || o.status === 'review'; const it = [{ label: open ? 'Review order' : o.status === 'confirmed' ? 'Prepare dispatch' : 'Open order', icon: 'eye', run: () => go(o.status === 'confirmed' ? 'dorder' : 'order', o.id) }]; if (o.status === 'on_hold') it.push({ label: o.wr ? `View ${o.wr}` : 'Request stock from warehouse', icon: 'warehouse', run: () => go(o.wr ? 'wr' : 'newwr', o.wr || o.id) }); it.push({ label: `Call ${h.contact}`, icon: 'phone', run: () => L.call(h.contact, h.phone) }, { label: 'Copy order ID', icon: 'copy', run: () => L.copy(o.id, 'order ID') }); if (open) it.push('sep', { label: 'Put on hold', icon: 'clock', run: () => act('holdOrder', { id: o.id, reason: 'Held for review by DCFP' }) }); return it; }],
+    ['qrows', function (q) { const { store: s, nav, go, lib: L } = this.props; const o = s.orders.find(x => x.id === nav.id); const p = L.P.find(x => x.name === q.name); if (!o || !p) return []; const view = { label: 'View stock movements', icon: 'list', run: () => go('stock') }; if (!(o.status === 'queued' || o.status === 'review')) return [view]; const req = +o.items[p.k] || 0, av = s.districtStock[p.k]; const set = n => this.setD('o:' + o.id, p.k, String(n)); return [{ label: 'Approve full request', icon: 'check', run: () => set(req) }, { label: `Approve what's in store (${L.num(Math.min(req, av))})`, icon: 'package', run: () => set(Math.min(req, av)) }, { label: 'Approve none', icon: 'ban', run: () => set(0) }, 'sep', view]; }],
+    ['ledger', function (l) { const { go, lib: L } = this.props; return [{ label: `Open ${l.ref}`, icon: 'eye', run: () => go(l.ref.startsWith('WR') ? 'wr' : 'order', l.ref) }, { label: 'Copy reference', icon: 'copy', run: () => L.copy(l.ref) }]; }],
+    ['wrRows', function (r) { const { store: s, go, lib: L } = this.props; const w = s.wrs.find(x => x.id === r.id); const rc = w && w.status === 'dispatched'; const it = [{ label: rc ? 'Receive stock' : 'Open request', icon: rc ? 'package' : 'eye', run: () => go('wr', r.id) }]; if (w && w.linked.length) it.push({ label: `View held orders (${w.linked.length})`, icon: 'inbox', run: () => go('pending') }); it.push({ label: 'Copy request ID', icon: 'copy', run: () => L.copy(r.id, 'request ID') }); if (w && w.dispatch) it.push({ label: 'Copy waybill number', icon: 'copy', run: () => L.copy(w.dispatch.waybill, 'waybill') }); return it; }],
+    ['nw.rows', function (r) { const { nav, lib: L } = this.props; const p = L.P.find(x => x.name === r.name); if (!p) return []; const key = 'wr:new:' + (nav.id || ''); return [{ label: 'Use suggested quantity', icon: 'refresh', run: () => this.setD(key, p.k, undefined) }, { label: 'Don’t request this product', icon: 'ban', run: () => this.setD(key, p.k, '0') }]; }],
+    ['rc.rows', function (r) { const { store: s, nav, lib: L } = this.props; const w = s.wrs.find(x => x.id === nav.id); const p = L.P.find(x => x.name === r.name); if (!w || !p || !w.dispatch) return []; const key = 'rcv:' + w.id; const d = String(+w.dispatch.qty[p.k] || 0); const set = (c, dm) => { this.setD(key, 'c_' + p.k, c); this.setD(key, 'd_' + p.k, dm); }; return [{ label: 'Matches the waybill', icon: 'check', run: () => set(d, '0') }, { label: 'All damaged or expired', icon: 'alert', run: () => set(d, d) }, { label: 'Nothing arrived', icon: 'ban', run: () => set('0', '0') }]; }],
+    ['wItems', function () { const { go } = this.props; return [{ label: 'View district store', icon: 'package', run: () => go('stock') }]; }],
+    ['inDel', function (r) { const { store: s, go, lib: L } = this.props; const o = s.orders.find(x => x.id === r.id); if (!o || !o.delivery) return []; return [{ label: 'Open order', icon: 'eye', run: () => go('order', o.id) }, { label: 'Reprint delivery note', icon: 'printer', run: () => go('dorder', o.id) }, { label: `Call ${o.delivery.rider}`, icon: 'phone', run: () => L.call(o.delivery.rider, o.delivery.phone) }, { label: 'Copy delivery note number', icon: 'copy', run: () => L.copy(o.delivery.dn, 'delivery note') }]; }],
+    ['hsRows', function (h) { const { store: s, go, lib: L } = this.props; const x = s.hotspots.find(y => y.id === h.id) || {}; const it = [{ label: 'View orders', icon: 'inbox', run: () => { this.setState({ filter: 'all' }); go('orders'); } }, { label: `Call ${x.contact}`, icon: 'phone', run: () => L.call(x.contact, x.phone) }]; if (x.lat != null) it.push({ label: 'Open in maps', icon: 'pin', run: () => window.open(`https://maps.google.com/?q=${x.lat},${x.lng}`, '_blank', 'noopener') }); it.push({ label: 'Copy hotspot ID', icon: 'copy', run: () => L.copy(x.id, 'hotspot ID') }); return it; }],
+  ];
+  _rv() {
+    const { store: s, act, nav, go, lib: L } = this.props;
+    if (!s || !L || !nav) return { pg: {} };
+    const page = nav.page || 'dashboard';
+    const id = nav.id;
+    const v = { pg: { [page]: true }, toDash: () => go('dashboard') };
+    const H = hid => s.hotspots.find(h => h.id === hid) || {};
+    const num = x => { const n = parseInt(String(x ?? '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; };
+    const orders = s.orders.slice().sort((a, b) => b.createdAt - a.createdAt);
+    const wrs = s.wrs.filter(w => w.district === 'Wakiso').sort((a, b) => b.createdAt - a.createdAt);
+    const fits = o => L.P.every(p => (+o.approved[p.k] || 0) <= s.districtStock[p.k]);
+    const missing = () => ({ pg: { missing: true }, toDash: () => go('dashboard') });
+    const ring = on => (on ? '#45ba50' : '#8b9097');
+
+    if (page === 'dashboard') {
+      const c = st => s.orders.filter(o => st.includes(o.status)).length;
+      v.kpis = [
+        { label: 'Orders in queue', value: c(['queued', 'review']), sub: 'Waiting for your review', onClick: () => { this.setState({ filter: 'queue' }); go('orders'); } },
+        { label: 'On hold', value: c(['on_hold']), sub: 'Waiting for stock', onClick: () => { this.setState({ filter: 'hold' }); go('orders'); } },
+        { label: 'Ready to dispatch', value: c(['confirmed']), sub: 'Confirmed, no rider yet', onClick: () => go('dispatch') },
+        { label: 'Out for delivery', value: c(['dispatched', 'in_transit']), sub: 'With riders now', onClick: () => go('dispatch') },
+      ];
+      [['inbox', '#0a6a9b', 'rgba(10,106,155,.1)'], ['clock', '#a84c06', 'rgba(168,76,6,.1)'], ['package', '#177534', 'rgba(23,117,52,.1)'], ['truck', '#7c5cd6', 'rgba(124,92,214,.12)']].forEach((x, i) => { Object.assign(v.kpis[i], { mask: L.mask(x[0]), icc: x[1], tint: x[2] }); });
+      const tasks = [];
+      orders.filter(o => o.status === 'queued' || o.status === 'review').forEach(o => tasks.push({ chip: L.oChip(o.status), title: `1 · Review ${o.id} from ${o.hotspot}`, sub: `${L.items(o.items)} · ${o.reason} · ${L.t(o.createdAt)}`, cta: 'Review order', onClick: () => go('order', o.id) }));
+      const noWr = orders.filter(o => o.status === 'on_hold' && !o.wr && !fits(o));
+      if (noWr.length) tasks.push({ chip: L.chip('On hold', 'warning'), title: `2 · Request stock for ${noWr.length} held order${noWr.length > 1 ? 's' : ''}`, sub: `${noWr.map(o => o.id).join(', ')} · no warehouse request yet`, cta: 'Request stock', onClick: () => go('newwr', noWr[0].id) });
+      wrs.filter(w => w.status === 'dispatched').forEach(w => tasks.push({ chip: L.wChip('dispatched'), title: `3 · Receive ${w.id} from ${w.warehouse}`, sub: `${L.items(w.dispatch.qty)} · waybill ${w.dispatch.waybill}`, cta: 'Receive stock', onClick: () => go('wr', w.id) }));
+      const rel = orders.filter(o => o.status === 'on_hold' && fits(o));
+      if (rel.length) tasks.push({ chip: L.chip('Stock available', 'success'), title: `4 · Release ${rel.length} held order${rel.length > 1 ? 's' : ''}`, sub: `${rel.map(o => o.id).join(', ')} can now be fulfilled from the district store`, cta: 'Review pending', onClick: () => go('pending') });
+      orders.filter(o => o.status === 'confirmed').forEach(o => tasks.push({ chip: L.oChip('confirmed'), title: `5 · Dispatch ${o.id} to ${o.hotspot}`, sub: `${L.items(o.approved)} · confirmed ${L.t(o.confirmedAt)}`, cta: 'Prepare dispatch', onClick: () => go('dorder', o.id) }));
+      v.tasks = tasks; v.noTasks = !tasks.length; v.taskCount = tasks.length ? `${tasks.length} open` : '';
+      v.stockRows = L.P.map(p => { const q = s.districtStock[p.k], min = L.minLevel[p.k], ok = q >= min; return { name: p.name, brand: p.brand, value: L.num(q), min: L.num(min), pct: Math.min(100, Math.round(q / (min * 2) * 100)) + '%', bar: ok ? '#45ba50' : '#e0a03a', chip: ok ? L.chip('Above minimum', 'success') : L.chip('Below minimum', 'warning') }; });
+      v.activity = L.feed(e => { const o = s.orders.find(x => x.id === e.ref); const w = s.wrs.find(x => x.id === e.ref); return !!o || (!!w && w.district === 'Wakiso'); }, 6);
+      v.toStock = () => go('stock');
+      const HIST = [[3, 5, 4, 6, 4, 5, 2], [1, 0, 2, 1, 1, 0, 1], [2, 1, 3, 2, 2, 1, 2], [3, 4, 2, 5, 3, 4, 3]];
+      const GOOD = [false, false, null, true];
+      v.kpiCols = L.kpiCols;
+      v.kpis = v.kpis.map((k, i) => L.kpi({ ...k, series: [...HIST[i], k.value], goodUp: GOOD[i], sub: 'vs last week' }));
+      const P = s.districtStock.male, peak = Math.max(8600, P + 3000);
+      const NZ = [0, 120, -80, 60, -140, 90, -40, 30, -110, 70, -60, 100, -30, 50, -90, 40, -70, 110, -20, 80, -50, 30, -100, 60, -40, 20, -60, 40, -20, 0];
+      const stockS = [2600, ...NZ.map((z, i) => (i === 29 ? P : Math.max(0, Math.round(peak + (P - peak) * (i / 29) + z * 4))))];
+      const wk = s.clock - 10080;
+      const wkR = s.orders.filter(o => o.createdAt > wk).length, wkD = s.orders.filter(o => o.receipt && o.receipt.at > wk).length;
+      const subOut = sc => s.orders.filter(o => o.reason === 'Out of stock' && (s.hotspots.find(x => x.id === o.hotspotId) || {}).subcounty === sc).length;
+      v.lineCharts = [L.chartLine({ title: 'District store stock', sub: 'Male condoms in the Wakiso store, last 30 days', series: [{ label: 'Male condoms', color: '#45ba50', fill: 'rgba(69,186,80,.12)', vals: stockS }], ref: { value: L.minLevel.male, label: `Minimum ${L.num(L.minLevel.male)}` }, xl: L.days(31, 5) })];
+      v.barCharts = [L.chartBars({ title: 'Orders received vs delivered', sub: 'Hotspot orders per week, last 8 weeks', labels: L.weeks(8), a: { label: 'Received', color: '#0a6a9b', vals: [6, 9, 7, 11, 8, 10, 9, wkR] }, b: { label: 'Delivered', color: '#45ba50', vals: [5, 8, 7, 9, 8, 9, 8, wkD] } })];
+      v.hbarCharts = [L.chartH({ title: 'Stockouts by sub-county', sub: 'Reported in the last 30 days', rows: [['Nansana Municipality', 4], ['Katabi TC', 3], ['Kajjansi TC', 2], ['Kira Municipality', 2], ['Ssisa', 1]].map(([label, b]) => ({ label, value: b + subOut(label), color: '#e0a03a' })).sort((x, y) => y.value - x.value) })];
+    }
+
+    if (page === 'orders') {
+      const F = [['all', 'All', () => true], ['queue', 'In queue', o => o.status === 'queued' || o.status === 'review'], ['hold', 'On hold', o => o.status === 'on_hold'], ['confirmed', 'Confirmed', o => o.status === 'confirmed'], ['delivery', 'In delivery', o => ['dispatched', 'in_transit', 'delivered'].includes(o.status)], ['closed', 'Closed', o => o.status === 'received']];
+      const f = this.state.filter;
+      v.filters = F.map(([k, label, fn]) => ({ label, count: orders.filter(fn).length, onClick: () => this.setState({ filter: k }), bg: f === k ? '#fff' : 'transparent', sh: f === k ? '0 1px 2px rgba(12,13,15,.1)' : 'none', fg: f === k ? '#0c0d0f' : '#62666d' }));
+      const fn = (F.find(x => x[0] === f) || F[0])[2];
+      v.rows = orders.filter(fn).map(o => ({ id: o.id, hotspot: o.hotspot, loc: H(o.hotspotId).subcounty, by: o.by, byRole: o.byRole, items: L.items(o.items), time: L.t(o.createdAt), chip: L.oChip(o.status), cta: (o.status === 'queued' || o.status === 'review') ? 'Review' : o.status === 'confirmed' ? 'Dispatch' : 'Open', open: () => go(o.status === 'confirmed' ? 'dorder' : 'order', o.id) }));
+      v.noRows = !v.rows.length;
+      v.toPending = () => go('pending');
+    }
+
+    if (page === 'order') {
+      const o = s.orders.find(x => x.id === id);
+      if (!o) return missing();
+      const h = H(o.hotspotId);
+      const key = 'o:' + o.id;
+      const d = this.state.d[key] || {};
+      const st = o.status;
+      const editable = st === 'queued' || st === 'review';
+      const appr = {}; L.P.forEach(p => { appr[p.k] = d[p.k] ?? String(o.approved[p.k] ?? 0); });
+      const apprN = { male: num(appr.male), female: num(appr.female) };
+      const checkValid = !!o.check && L.P.every(p => o.check[p.k] && o.check[p.k].req === (editable ? apprN[p.k] : (+o.approved[p.k] || 0)));
+      const c = checkValid ? o.check : null;
+      v.qrows = L.P.map(p => {
+        const ck = c && c[p.k];
+        return { name: p.name, brand: p.brand, req: L.num(o.items[p.k] || 0), appr: appr[p.k], apprTxt: L.num(o.approved[p.k] || 0), editable, fixed: !editable, onAppr: e => this.setD(key, p.k, e.target.value), avail: L.num(s.districtStock[p.k]), resOk: !!ck && ck.ok && ck.req > 0, resShort: !!ck && !ck.ok, resNone: !ck || ck.req === 0, shortTxt: ck ? `Short by ${L.num(ck.req - ck.avail)}` : '' };
+      });
+      const after = ['dispatched', 'in_transit', 'delivered', 'received'];
+      v.steps = [
+        L.step('Queue order', 'done', L.t(o.createdAt), 0),
+        L.step('Review order', editable && !checkValid ? 'cur' : 'done', '', 1),
+        L.step('Check stock', checkValid || !editable ? 'done' : 'todo', c ? (c.ok ? 'Available' : 'Not available') : '', 2),
+        st === 'on_hold' ? L.step('On hold', 'warn', 'Waiting for stock', 3) : !editable ? L.step('Confirmed', 'done', L.t(o.confirmedAt), 3) : L.step('Confirm or hold', checkValid ? 'cur' : 'todo', '', 3),
+        L.step('Dispatch', after.includes(st) ? 'done' : st === 'confirmed' ? 'cur' : 'todo', o.delivery ? o.delivery.dn : '', 4),
+        L.step('Received at hotspot', st === 'received' ? 'done' : after.includes(st) ? 'cur' : 'todo', o.receipt ? L.t(o.receipt.at) : '', 5),
+      ];
+      const w = o.wr && s.wrs.find(x => x.id === o.wr);
+      let b;
+      if (editable && !checkValid) b = { tone: 'info', title: 'Review the quantities, then check stock', body: `You can approve less than ${o.by} asked for. Stock is checked against the Wakiso district store.` };
+      else if (editable && c.ok) b = { tone: 'success', title: 'All items are available in the district store', body: 'Confirming allocates the stock to this order and notifies the hotspot.' };
+      else if (editable) b = { tone: 'warning', title: 'Not enough stock in the district store', body: L.P.filter(p => !c[p.k].ok).map(p => `${p.name}: ${L.num(c[p.k].avail)} in store, ${L.num(c[p.k].req)} needed`).join('. ') + '. Put the order on hold and request stock from a warehouse.' };
+      else if (st === 'on_hold') b = { tone: 'warning', title: `On hold — ${(o.holdReason || '').toLowerCase()}`, body: fits(o) ? 'The district store now has enough stock. Release the order to confirm it.' : w ? `Waiting on ${w.id} from ${w.warehouse} (${L.wChip(w.status).label.toLowerCase()}).` : 'No warehouse request has been raised for this order yet.' };
+      else if (st === 'confirmed') b = { tone: 'success', title: `Confirmed ${L.t(o.confirmedAt)}`, body: `${h.contact} was notified. Assign a rider and print the delivery note.` };
+      else if (st === 'dispatched' || st === 'in_transit') b = { tone: 'info', title: st === 'dispatched' ? `Waiting for ${o.delivery.rider} to collect` : `Out for delivery with ${o.delivery.rider}`, body: `Delivery note ${o.delivery.dn} · ${o.delivery.plate}.` };
+      else if (st === 'delivered') b = { tone: 'success', title: `Delivered ${L.t(o.delivery.deliveredAt)}`, body: `Signed delivery note photographed. Waiting for ${h.contact} to confirm receipt.` };
+      else b = { tone: 'neutral', title: 'Closed', body: `${h.contact} confirmed receipt ${L.t(o.receipt.at)}.` };
+      v.ob = { ...b, fg: L.TONE[b.tone][0], bg: L.TONE[b.tone][1] };
+      v.oa = {
+        checkPrimary: editable && !checkValid, checkSecondary: editable && checkValid,
+        confirm: editable && !!c && c.ok, short: editable && !!c && !c.ok,
+        reqwr: st === 'on_hold' && !w && !fits(o), viewwr: st === 'on_hold' && !!w && !fits(o),
+        release: st === 'on_hold' && fits(o), dispatch: st === 'confirmed',
+      };
+      v.o = { id: o.id, chip: L.oChip(st), hotspot: o.hotspot, time: L.t(o.createdAt), by: o.by, byRole: o.byRole, reason: o.reason, note: o.note || '—', found: o.found ? L.items(o.found) === '—' ? 'None' : L.items(o.found) : '—', wrId: o.wr || '' };
+      v.h = { name: h.name, kind: h.kind, village: h.village, subcounty: h.subcounty, contact: h.contact, phone: h.phone, disp: h.dispenser ? (h.dispCond || 'Yes') : 'None', vht: (h.vhts || []).join(', ') || '—' };
+      v.tl = L.tl([o.id, o.wr].filter(Boolean));
+      v.doCheck = () => act('checkStock', { id: o.id, approved: apprN });
+      const dTag = iso => { const st = L.expTag(iso).st; return st === 'short' ? 'ok' : st; };
+      const alLines = o.alloc && o.alloc.length ? o.alloc : null;
+      const alRows = alLines ? L.lineRows(alLines).map((r, i) => (dTag(alLines[i].exp) === 'ok' ? { ...r, chip: L.chip('OK', 'success'), flag: false } : r)) : [];
+      const nNear = alRows.filter(r => r.flag).length;
+      v.al = { has: alRows.length > 0, title: 'Allocated batches', sub: 'Reserved for this order. These batch lines print on the delivery note.', rows: alRows, near: nNear > 0, nearTxt: `${nNear} batch${nNear > 1 ? 'es expire' : ' expires'} within ${L.nearMonths} months — tell the hotspot to use ${nNear > 1 ? 'them' : 'it'} first.` };
+      const showPick = !alLines && ((editable && c && c.ok) || (st === 'on_hold' && fits(o)));
+      const qFor = editable ? apprN : o.approved;
+      const pkey = 'pick:' + o.id; const pd = this.state.d[pkey] || {};
+      const picks = [], mis = []; let over = false;
+      const prods = !showPick ? [] : L.P.filter(p => (+qFor[p.k] || 0) > 0).map(p => {
+        const need = +qFor[p.k] || 0;
+        const lots = s.districtLots.filter(l => l.k === p.k).slice().sort((x, y) => x.exp.localeCompare(y.exp));
+        const sugg = L.fefo(lots, p.k, need, 0).lines;
+        let total = 0, nb = 0, fq = 0, first = true;
+        const rows = lots.map(l => {
+          const tg = L.expTag(l.exp); const ds = dTag(l.exp); const can = ds !== 'expired'; const flagged = ds === 'near';
+          const def = (sugg.find(x => x.batch === l.batch) || {}).qty || 0;
+          const fk = p.k + '_' + l.batch + '_' + need;
+          const val = can ? (pd[fk] ?? String(def)) : '';
+          const n0 = can ? num(val) : 0; const ov = n0 > l.qty; if (ov) over = true;
+          const take = Math.min(n0, l.qty);
+          if (take > 0) { total += take; nb++; if (flagged) fq += take; picks.push({ k: p.k, batch: l.batch, mfg: l.mfg, exp: l.exp, qty: take }); }
+          const isFirst = def > 0 && first; if (def > 0) first = false;
+          return { batch: l.batch, mfg: L.fdate(l.mfg), exp: L.fdate(l.exp), left: tg.left, expFg: flagged || !can ? tg.fg : '#62666d', avail: L.num(l.qty), can, blocked: !can, showChip: flagged || !can, chip: !can ? L.chip('Expired', 'danger') : L.chip('Near expiry', 'warning'), warnPick: flagged && n0 > 0, warnTxt: `Expires within ${L.nearMonths} months — use first`, val, on: e => this.setD(pkey, fk, e.target.value), over: ov, bd: ov ? '#c62828' : '#8b9097', fefo: isFirst, rowBg: !can ? 'rgba(198,40,40,.04)' : flagged ? 'rgba(168,76,6,.04)' : 'transparent', aria: `Pieces to issue from batch ${l.batch}` };
+        });
+        if (total !== need) mis.push(`${p.name}: picking ${L.num(total)} of ${L.num(need)}`);
+        return { name: p.name, brand: p.brand, lots: rows, maxH: rows.length > 4 ? '292px' : 'none', sumTxt: `Picking ${L.num(total)} of ${L.num(need)}${nb > 1 ? ` · ${nb} batches` : nb === 1 ? ' · 1 batch' : ''}${fq ? ` · ${L.num(fq)} near expiry` : ''}`, sumFg: total !== need ? '#c62828' : fq ? '#a84c06' : '#177534' };
+      });
+      const pkCant = showPick && (over || mis.length > 0);
+      v.pk = { has: prods.length > 0, prods, sub: editable ? 'Suggested first-expiry-first-out from the district store. Change the picks if needed — confirming reserves these batches.' : 'Suggested first-expiry-first-out. Releasing the order reserves these batches.', mismatch: mis.length > 0, misTxt: mis.join(' · ') + '. Picks must add up to the approved quantity.', cant: pkCant, op: pkCant ? '.5' : '1' };
+      v.doConfirm = () => act('confirmOrder', { id: o.id, lines: picks });
+      v.doHold = () => act('holdOrder', { id: o.id });
+      v.doHoldReq = () => act('holdOrder', { id: o.id, go: { page: 'newwr', id: o.id } });
+      v.doReqWr = () => go('newwr', o.id);
+      v.doViewWr = () => go('wr', o.wr);
+      v.doRelease = () => act('releaseOrder', { id: o.id, lines: picks });
+      v.doDispatch = () => go('dorder', o.id);
+      v.back = () => go('orders');
+    }
+
+    if (page === 'pending') {
+      const held = orders.filter(o => o.status === 'on_hold');
+      v.pend = held.map(o => { const ok = fits(o); return { id: o.id, hotspot: o.hotspot, items: L.items(o.approved), since: L.t(o.createdAt), wr: o.wr ? `Linked to ${o.wr}` : 'No warehouse request', ok, notOk: !ok, chip: ok ? L.chip('Can be fulfilled', 'success') : L.chip('Still short', 'warning'), release: () => act('releaseOrder', { id: o.id }), open: () => go('order', o.id) }; });
+      v.noPend = !held.length;
+      v.pStock = L.items(s.districtStock);
+      const rn = s.orders.filter(o => o.status === 'confirmed').length;
+      v.readyTxt = rn ? `${rn} confirmed order${rn > 1 ? 's are' : ' is'} ready to go out with a rider.` : 'Every order has been confirmed or is already out.';
+      v.toDispatch = () => go('dispatch');
+      v.backQueue = () => go('orders');
+    }
+
+    if (page === 'stock') {
+      const heldNeed = { male: 0, female: 0 };
+      s.orders.filter(o => o.status === 'on_hold').forEach(o => L.P.forEach(p => { heldNeed[p.k] += +o.approved[p.k] || 0; }));
+      v.stockCards = L.P.map(p => { const q = s.districtStock[p.k], min = L.minLevel[p.k], ok = q >= min; return { name: p.name, brand: p.brand, batches: (() => { const ls = s.districtLots.filter(l => l.k === p.k).sort((a, b) => a.exp.localeCompare(b.exp)); return ls.length ? `${ls.length} batch${ls.length > 1 ? 'es' : ''} · next expiry ${L.fdate(ls[0].exp)}` : 'No batches in store'; })(), value: L.num(q), min: L.num(min), waiting: L.num(heldNeed[p.k]), pct: Math.min(100, Math.round(q / (min * 2) * 100)) + '%', bar: ok ? '#45ba50' : '#e0a03a', chip: ok ? L.chip('Above minimum', 'success') : L.chip('Below minimum', 'warning') }; });
+      const lotsD = s.districtLots.slice().sort((a, b) => a.exp.localeCompare(b.exp));
+      v.lots = L.lineRows(lotsD).map((r, i) => { const st = L.expTag(lotsD[i].exp).st; return st === 'ok' || st === 'short' ? { ...r, chip: L.chip('OK', 'success') } : r; });
+      v.noLots = !lotsD.length;
+      const lastW = s.wrs.filter(w => w.district === 'Wakiso' && w.receipt).sort((a, b) => b.receipt.at - a.receipt.at)[0];
+      v.lastIn = (lastW ? `Last delivery ${L.t(lastW.receipt.at)} from ${lastW.warehouse}${lastW.receipt.grn ? ` · ${lastW.receipt.grn}` : ''}. ` : '') + 'Issued first-expiry-first-out; near expiry is under 3 months.';
+      const sg = x => (x === 0 ? '—' : (x > 0 ? '+' : '−') + L.num(Math.abs(x)));
+      v.ledger = s.ledger.map(l => ({ time: L.t(l.t), ref: l.ref, text: l.text, male: sg(l.male), female: sg(l.female), mfg: l.male > 0 ? '#177534' : l.male < 0 ? '#0c0d0f' : '#62666d', ffg: l.female > 0 ? '#177534' : l.female < 0 ? '#0c0d0f' : '#62666d', bal: `${L.num(l.bal.male)} / ${L.num(l.bal.female)}` }));
+      v.toNewWr = () => go('newwr');
+    }
+
+    if (page === 'warehouse') {
+      v.wrRows = wrs.map(w => ({ id: w.id, wh: w.warehouse, whName: L.whName(w.warehouse), items: L.items(w.items), linked: w.linked.length ? w.linked.join(', ') : '—', time: L.t(w.createdAt), chip: L.wChip(w.status), cta: w.status === 'dispatched' ? 'Receive' : 'Open', open: () => go('wr', w.id) }));
+      v.toNewWr = () => go('newwr');
+    }
+
+    if (page === 'newwr') {
+      const key = 'wr:new:' + (id || '');
+      const d = this.state.d[key] || {};
+      const held = orders.filter(o => o.status === 'on_hold' && !o.wr);
+      const linked = (d.linked || (id ? [id, ...held.filter(o => o.id !== id).map(o => o.id)] : held.map(o => o.id))).filter(x => held.some(o => o.id === x));
+      const demand = { male: 0, female: 0 };
+      held.filter(o => linked.includes(o.id)).forEach(o => L.P.forEach(p => { demand[p.k] += +o.approved[p.k] || 0; }));
+      const up = (x, step) => Math.ceil(x / step) * step;
+      const sugg = { male: up(Math.max(0, demand.male + L.minLevel.male - s.districtStock.male), 1000), female: up(Math.max(0, demand.female + L.minLevel.female - s.districtStock.female), 100) };
+      const qty = { male: d.male ?? String(sugg.male), female: d.female ?? String(sugg.female) };
+      const items = { male: num(qty.male), female: num(qty.female) };
+      const whSel = d.wh || 'NMS';
+      v.nw = {
+        whs: [['NMS', 'National Medical Stores', 'Entebbe · usual lead time 1–2 days'], ['JMS', 'Joint Medical Store', 'Kampala · usual lead time 1–3 days']].map(([code, name, desc]) => { const on = whSel === code; return { code, name, desc, on, pick: () => this.setD(key, 'wh', code), bd: on ? '2px solid #45ba50' : '1px solid #e4e6e9', bg: on ? 'rgba(69,186,80,.06)' : '#fff', ring: ring(on) }; }),
+        rows: L.P.map(p => ({ name: p.name, brand: p.brand, store: L.num(s.districtStock[p.k]), demand: L.num(demand[p.k]), min: L.num(L.minLevel[p.k]), val: qty[p.k], on: e => this.setD(key, p.k, e.target.value) })),
+        held: held.map(o => ({ id: o.id, hotspot: o.hotspot, items: L.items(o.approved), time: L.t(o.createdAt), checked: linked.includes(o.id), toggle: () => this.setD(key, 'linked', linked.includes(o.id) ? linked.filter(x => x !== o.id) : [...linked, o.id]) })),
+        noHeld: !held.length,
+        note: d.note ?? '', onNote: e => this.setD(key, 'note', e.target.value),
+        wh: whSel, sumItems: L.items(items), linkedCount: linked.length,
+        cantSend: items.male + items.female === 0,
+        send: () => act('createWR', { warehouse: whSel, items, linked, note: d.note || '', go: { page: 'wr', id: '$new' } }),
+        back: () => go('warehouse'),
+      };
+    }
+
+    if (page === 'wr') {
+      const w = s.wrs.find(x => x.id === id);
+      if (!w) return missing();
+      const st = w.status;
+      v.w = { id: w.id, chip: L.wChip(st), wh: w.warehouse, whName: L.whName(w.warehouse), time: L.t(w.createdAt) };
+      v.wsteps = [
+        L.step('Request sent', 'done', L.t(w.createdAt), 0),
+        L.step(`${w.warehouse} review`, st === 'on_hold' ? 'warn' : ['sent', 'review', 'queued'].includes(st) ? 'cur' : 'done', st === 'on_hold' ? 'On hold' : st === 'queued' ? 'Queued for picking' : st === 'review' ? 'Under review' : st === 'sent' ? 'Not opened yet' : '', 1),
+        L.step('Dispatched', st === 'dispatched' || st === 'received' ? 'done' : 'todo', w.dispatch ? L.t(w.dispatch.at) : '', 2),
+        L.step('Receive and verify', st === 'received' ? 'done' : st === 'dispatched' ? 'cur' : 'todo', w.receipt && w.receipt.discrepancy ? 'Discrepancy noted' : '', 3),
+        L.step('Stock updated', st === 'received' ? 'done' : 'todo', w.receipt ? L.t(w.receipt.at) : '', 4),
+      ];
+      v.wwait = ['sent', 'review', 'queued', 'on_hold'].includes(st);
+      if (v.wwait) {
+        const B = { sent: ['info', `Sent to ${w.warehouse}`, `${w.warehouse} has not opened this request yet. You'll be notified when it is reviewed.`], review: ['info', `${w.warehouse} is reviewing this request`, 'They will check their stock next.'], queued: ['info', `Accepted and queued at ${w.warehouse}`, 'The request is waiting to be picked and dispatched.'], on_hold: ['warning', `On hold at ${w.warehouse}`, `${w.hold ? w.hold.reason : ''}. Linked orders stay on hold until this stock arrives.`] }[st];
+        v.wb = { title: B[1], body: B[2], fg: L.TONE[B[0]][0], bg: L.TONE[B[0]][1] };
+      } else v.wb = {};
+      v.rcv = st === 'dispatched';
+      if (v.rcv) {
+        const key = 'rcv:' + w.id;
+        const d = this.state.d[key] || {};
+        const dl = (w.dispatch.lines && w.dispatch.lines.length) ? w.dispatch.lines : L.P.filter(p => +w.dispatch.qty[p.k] > 0).map(p => ({ k: p.k, batch: '—', mfg: null, exp: null, qty: +w.dispatch.qty[p.k] }));
+        const rows = dl.map((l, i) => {
+          const p = L.P.find(x => x.k === l.k) || L.P[0];
+          const tg = l.exp ? L.expTag(l.exp) : { left: '', fg: '#62666d', st: 'ok' };
+          const disp = +l.qty || 0; const fk = i + '_' + l.batch;
+          const counted = d['c_' + fk] ?? String(disp);
+          const cond = d['k_' + fk] ?? 'Intact';
+          const dmg = cond === 'Damaged' ? (d['d_' + fk] ?? '0') : '0';
+          const cn = num(counted), dn = Math.min(num(dmg), cn), diff = cn - disp;
+          return { name: p.name, batch: l.batch, mfg: L.fdate(l.mfg), exp: L.fdate(l.exp), left: tg.left, expFg: tg.fg, disp: L.num(disp), counted, cond, dmg, isDmg: cond === 'Damaged', noDmg: cond !== 'Damaged',
+            onC: e => this.setD(key, 'c_' + fk, e.target.value), onK: e => this.setD(key, 'k_' + fk, e.target.value), onD: e => this.setD(key, 'd_' + fk, e.target.value),
+            accepted: L.num(cn - dn), diffTxt: diff === 0 ? '0' : (diff > 0 ? '+' : '−') + L.num(Math.abs(diff)), diffFg: diff === 0 ? '#62666d' : '#c62828',
+            _diff: diff, _dmg: dn, _cond: cond, _short: tg.st !== 'ok', _line: { k: l.k, batch: l.batch, mfg: l.mfg, exp: l.exp, onWaybill: disp, counted: cn, damaged: dn, condition: cond, accepted: cn - dn } };
+        });
+        const bad = r => r._diff !== 0 || r._dmg > 0 || r._cond !== 'Intact';
+        const hasDisc = rows.some(bad);
+        const defType = rows.some(r => r._cond === 'Batch or expiry differs') ? 'Wrong batch or expiry' : rows.some(r => r._diff < 0) ? 'Short delivery' : rows.some(r => r._diff > 0) ? 'Excess delivery' : 'Damaged or expired';
+        const dtype = d.type ?? defType;
+        const noteOk = !hasDisc || (d.dnote || '').trim().length > 2;
+        const shortRows = rows.filter(r => r._short);
+        v.rc = {
+          rows, hasDisc, noDisc: !hasDisc, dtype, onType: e => this.setD(key, 'type', e.target.value),
+          dnote: d.dnote ?? '', onNote: e => this.setD(key, 'dnote', e.target.value),
+          signed: !!d.signed, onSigned: e => this.setD(key, 'signed', e.target.checked),
+          checked: !!d.checked, onChecked: e => this.setD(key, 'checked', e.target.checked),
+          file: d.file || 'No file attached', onFile: e => { const f = e.target.files && e.target.files[0]; if (f) this.setD(key, 'file', f.name); },
+          waybill: w.dispatch.waybill, vehicle: w.dispatch.vehicle, driver: w.dispatch.driver, at: L.t(w.dispatch.at), warehouse: w.warehouse,
+          hasShort: shortRows.length > 0, shortTxt: `${shortRows.map(r => r.batch).join(', ')} ${shortRows.length > 1 ? 'have' : 'has'} less than ${L.minShelf} months shelf life. Accept only if it can be used before it expires.`,
+          discSummary: rows.filter(bad).map(r => `${r.batch}: ${[r._diff !== 0 ? `${r.diffTxt} against the waybill` : '', r._dmg ? `${L.num(r._dmg)} damaged` : '', r._cond === 'Damaged' && !r._dmg ? 'marked damaged' : '', r._cond === 'Batch or expiry differs' ? 'batch or expiry differs from the waybill' : ''].filter(Boolean).join(', ')}`).join(' · '),
+          cant: !d.signed || !d.checked || !noteOk,
+          confirm: () => act('receiveWR', { id: w.id, lines: rows.map(r => r._line), discrepancy: hasDisc ? { type: dtype, note: (d.dnote || '').trim() } : null, go: { page: 'wr', id: w.id } }),
+        };
+      } else v.rc = {};
+      v.rcvd = st === 'received';
+      if (v.rcvd) {
+        const pend = s.orders.filter(o => o.status === 'on_hold');
+        const pf = pend.filter(fits).length;
+        v.rs = { at: L.t(w.receipt.at), disc: !!w.receipt.discrepancy, discType: w.receipt.discrepancy ? w.receipt.discrepancy.type : '', discNote: w.receipt.discrepancy ? w.receipt.discrepancy.note : '', hasPend: pend.length > 0, pendTxt: pend.length ? `${pend.length} order${pend.length > 1 ? 's are' : ' is'} on hold — ${pf} can now be fulfilled.` : 'No orders are waiting on stock.', toPending: () => go('pending'),
+          hasGrn: !!w.receipt.grn, grn: w.receipt.grn || '', grnSub: `Received ${L.t(w.receipt.at)} from ${w.warehouse} on waybill ${w.dispatch.waybill} · checked by Sarah Namubiru`,
+          lines: (w.receipt.lines || []).map(l => { const p = L.P.find(x => x.k === l.k) || L.P[0]; const tg = L.expTag(l.exp); return { name: p.name, batch: l.batch, mfg: L.fdate(l.mfg), exp: L.fdate(l.exp), left: tg.left, expFg: tg.fg, onWaybill: L.num(l.onWaybill), accepted: L.num(l.accepted), cchip: l.condition === 'Intact' ? L.chip('Intact', 'success') : l.condition === 'Damaged' ? L.chip('Damaged', 'danger') : L.chip('Label differs', 'warning') }; }),
+          print: () => L.toast(`Printing ${w.receipt.grn}…`) };
+      } else v.rs = {};
+      v.wItems = L.P.map(p => ({ name: p.name, need: L.num(w.items[p.k] || 0), issued: w.dispatch ? L.num(w.dispatch.qty[p.k] || 0) : '—', accepted: w.receipt ? L.num(w.receipt.accepted[p.k]) : '—', after: w.receipt && w.receipt.after ? L.num(w.receipt.after[p.k]) : '—' }));
+      v.wLinked = w.linked.map(oid => { const o = s.orders.find(x => x.id === oid); return o ? { id: o.id, hotspot: o.hotspot, chip: L.oChip(o.status), open: () => go('order', o.id) } : null; }).filter(Boolean);
+      v.noLinked = !v.wLinked.length;
+      v.wtl = L.tl([w.id]);
+      v.backWh = () => go('warehouse');
+    }
+
+    if (page === 'dispatch') {
+      const ready = orders.filter(o => o.status === 'confirmed');
+      v.ready = ready.map(o => { const h = H(o.hotspotId); return { id: o.id, hotspot: o.hotspot, loc: `${h.village}, ${h.subcounty}`, items: L.items(o.approved), time: L.t(o.confirmedAt), open: () => go('dorder', o.id) }; });
+      v.noReady = !ready.length;
+      const inDel = orders.filter(o => ['dispatched', 'in_transit', 'delivered'].includes(o.status));
+      v.inDel = inDel.map(o => ({ id: o.id, hotspot: o.hotspot, rider: o.delivery.rider, dn: o.delivery.dn, chip: L.oChip(o.status), since: L.t(o.delivery.deliveredAt || o.delivery.pickedAt || o.delivery.at), open: () => go('order', o.id) }));
+      v.noInDel = !inDel.length;
+      v.riders = s.riders.map(r => ({ name: r.name, plate: r.plate, phone: r.phone, chip: L.chip(r.status, r.status === 'Available' ? 'success' : r.status === 'On delivery' ? 'info' : 'neutral') }));
+    }
+
+    if (page === 'dorder') {
+      const o = s.orders.find(x => x.id === id);
+      if (!o) return missing();
+      const h = H(o.hotspotId);
+      const key = 'dsp:' + o.id;
+      const d = this.state.d[key] || {};
+      const avail = s.riders.filter(r => r.status === 'Available');
+      const rid = o.delivery ? o.delivery.riderId : (d.rider ?? (avail[0] && avail[0].id));
+      const rider = s.riders.find(r => r.id === rid);
+      const can = o.status === 'confirmed';
+      v.dp = {
+        already: !can, orderId: o.id, hotspot: o.hotspot, loc: `${h.village}, ${h.subcounty}, Wakiso`, contact: h.contact, phone: h.phone,
+        riders: s.riders.map(r => { const ok = r.status === 'Available' && can; const on = rid === r.id; return { name: r.name, plate: r.plate, phone: r.phone, chip: L.chip(r.status, r.status === 'Available' ? 'success' : r.status === 'On delivery' ? 'info' : 'neutral'), on, disabled: !ok, pick: () => this.setD(key, 'rider', r.id), bd: on ? '2px solid #45ba50' : '1px solid #e4e6e9', bg: on ? 'rgba(69,186,80,.06)' : '#fff', ring: ring(on) }; }),
+        dn: o.delivery ? o.delivery.dn : L.nextDn, date: L.date(s.clock),
+        lines: L.lineRows((o.delivery && o.delivery.lines) || o.alloc || []),
+        riderName: rider ? rider.name : '—', riderFirst: rider ? rider.name.split(' ')[0] : 'rider',
+        printLabel: d.printed ? 'Printed · 2 copies' : 'Print delivery note',
+        print: () => this.setD(key, 'printed', true),
+        cant: !can || !rid,
+        handover: () => act('dispatchOrder', { id: o.id, riderId: rid, go: { page: 'dispatch' } }),
+        back: () => go('dispatch'),
+      };
+    }
+
+    if (page === 'hotspots') {
+      v.hsRows = s.hotspots.map(h => { const empty = !(h.stock.male || h.stock.female); return { id: h.id, name: h.name, kind: h.kind, loc: `${h.village}, ${h.subcounty}`, contact: h.contact, phone: h.phone, disp: h.dispenser ? (h.dispCond || 'Yes') : 'None', stock: empty ? 'Out of stock' : L.items(h.stock), stockFg: empty ? '#c62828' : '#0c0d0f', by: h.enteredBy, last: h.lastDelivery != null ? L.t(h.lastDelivery) : 'None yet', chip: L.chip(h.status, h.status === 'Active' ? 'success' : 'neutral') }; });
+    }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

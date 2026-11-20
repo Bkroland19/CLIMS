@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:12px">
+
+<sc-if value="{{ pg.users }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <div style="position:relative;flex:1 1 240px;max-width:320px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b9097" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:11px;top:10px"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input value="{{ u.q }}" onChange="{{ u.onQ }}" placeholder="Search name, email or phone" aria-label="Search users" style="height:32px;padding:0 10px 0 34px;border-radius:8px;border:1px solid #8b9097;font-size:14px;width:100%;background:#fff">
+    </div>
+    <select value="{{ u.role }}" onChange="{{ u.onRole }}" aria-label="Filter by role" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;background:#fff">
+      <option value="all">All roles</option>
+      <sc-for list="{{ roleNames }}" as="rn" hint-placeholder-count="8"><option value="{{ rn }}">{{ rn }}</option></sc-for>
+    </select>
+    <div role="tablist" aria-label="Status" style="display:flex;gap:2px;padding:3px;background:#eef0f2;border-radius:8px">
+      <sc-for list="{{ u.statuses }}" as="f" hint-placeholder-count="4">
+        <button role="tab" aria-selected="{{ f.on }}" onClick="{{ f.pick }}" style="height:30px;padding:0 10px;border:none;border-radius:6px;background:{{ f.bg }};box-shadow:{{ f.sh }};color:{{ f.fg }};font-size:13px;font-weight:500;cursor:pointer;display:flex;gap:6px;align-items:center">{{ f.label }}<span style="font-size:12px;color:#62666d">{{ f.n }}</span></button>
+      </sc-for>
+    </div>
+    <div style="flex:1"></div>
+    <button onClick="{{ u.invite }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Invite user</button>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">User</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Roles</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Working area</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Last active</th>
+        <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ u.rows }}" as="r" hint-placeholder-count="6">
+          <tr onClick="{{ r.edit }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+            <td style="padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap">
+              <div style="display:flex;align-items:center;gap:10px"><span style="width:30px;height:30px;border-radius:50%;background:#eef0f2;color:#0c0d0f;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none">{{ r.initials }}</span><div style="line-height:1.3"><div style="font-weight:500">{{ r.name }}</div><div style="font-size:12.5px;color:#62666d">{{ r.contact }}</div></div></div>
+            </td>
+            <td style="padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px"><div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ r.roles }}" as="x" hint-placeholder-count="1"><span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:#f2f3f5;font-size:12px;font-weight:500;white-space:nowrap">{{ x }}</span></sc-for></div></td>
+            <td style="padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.3"><div>{{ r.area }}</div><div style="font-size:12.5px;color:#62666d">{{ r.areaSub }}</div></td>
+            <td style="padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.06)"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ r.chip.label }}</span></td>
+            <td style="padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap">{{ r.last }}</td>
+            <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+    <sc-if value="{{ u.none }}"><div style="padding:28px 16px;text-align:center;font-size:14px;color:#62666d">No users match these filters.</div></sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.roles }}">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:1 1 260px;max-width:340px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:8px">
+      <sc-for list="{{ rl.list }}" as="x" hint-placeholder-count="8">
+        <button onClick="{{ x.pick }}" aria-pressed="{{ x.on }}" style="width:100%;text-align:left;padding:10px 12px;border:none;border-radius:8px;background:{{ x.bg }};cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;color:#0c0d0f" style-hover="background:#f2f3f5">
+          <span style="min-width:0"><span style="display:block;font-size:14px;font-weight:{{ x.fw }}">{{ x.name }}</span><span style="display:block;font-size:12.5px;color:#62666d">{{ x.sub }}</span></span>
+          <span style="font-size:12px;color:#62666d;flex:none">{{ x.users }}</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="flex:2 1 460px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between">
+        <div><div style="font-size:14px;font-weight:600">{{ rl.name }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ rl.desc }}</div></div>
+        <span style="font-size:13px;color:#62666d">{{ rl.count }}</span>
+      </div>
+      <sc-for list="{{ rl.groups }}" as="g" hint-placeholder-count="4">
+        <div style="padding:10px 16px 4px;border-bottom:1px solid rgba(15,40,25,.06)">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b9097;padding-bottom:4px">{{ g.label }}</div>
+          <sc-for list="{{ g.perms }}" as="p" hint-placeholder-count="3">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0">
+              <span style="font-size:14px">{{ p.label }}</span>
+              <button role="switch" aria-checked="{{ p.on }}" aria-label="{{ p.label }}" onClick="{{ p.toggle }}" disabled="{{ p.locked }}" style="width:36px;height:20px;border-radius:999px;border:none;padding:2px;background:{{ p.track }};cursor:pointer;display:flex;justify-content:{{ p.jc }};flex:none;transition:background .15s"><span style="width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span></button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+      <div style="padding:10px 16px;font-size:13px;color:#62666d;background:rgba(246,248,247,.6)">Changes apply immediately and are recorded in the audit log.</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.products }}">
+  <div style="display:flex;justify-content:flex-end"><button onClick="{{ pr.add }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add product</button></div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:600px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Product</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Category</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Unit</th>
+        <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Condoms per unit</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+      <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ pr.rows }}" as="r" hint-placeholder-count="5">
+          <tr>
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.3"><div style="font-weight:500">{{ r.brand }} · {{ r.type }}</div><div style="font-size:12.5px;color:#62666d">{{ r.id }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px">{{ r.category }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px">{{ r.unit }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums">{{ r.per }}</td>
+            <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06)"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ r.chip.label }}</span></td>
+          <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.units }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden;max-width:760px">
+    <div style="padding:12px 12px 12px 16px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(246,248,247,.6)">
+      <input value="{{ un.val }}" onChange="{{ un.on }}" placeholder="New unit, e.g. Dispenser pack" aria-label="New unit name" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;flex:1 1 220px;background:#fff">
+      <button onClick="{{ un.add }}" disabled="{{ un.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer">Add unit</button>
+    </div>
+    <sc-for list="{{ un.rows }}" as="r" hint-placeholder-count="3">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid rgba(15,40,25,.06)">
+        <div style="line-height:1.3"><div style="font-size:14px;font-weight:500">{{ r.name }}</div><div style="font-size:12.5px;color:#62666d">{{ r.note }}</div></div>
+        <span style="font-size:13px;color:#62666d;white-space:nowrap">{{ r.used }}</span>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.stores }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Store</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Type</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Code</th>
+        <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Users</th>
+        <th style="text-align:right;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">On hand (M / F)</th>
+      <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ st.rows }}" as="r" hint-placeholder-count="5">
+          <tr>
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.3"><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:500">{{ r.name }}</span><sc-if value="{{ r.flag }}"><span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:rgba(168,76,6,.1);color:#a84c06;font-size:11px;font-weight:600">Confirm with data team</span></sc-if></div><div style="font-size:12.5px;color:#62666d">{{ r.sub }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px">{{ r.type }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:13px;font-family:ui-monospace,Menlo,monospace;color:#4a4e55">{{ r.code }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums">{{ r.users }}</td>
+            <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">{{ r.stock }}</td>
+          <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.geo }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 12px 12px 16px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center">
+    <div style="flex:1 1 280px;min-width:0"><div style="font-size:14px;font-weight:600">DHIS2 sync</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ geo.status }}</div></div>
+    <div style="display:flex;gap:24px;font-size:13px;color:#62666d;flex-wrap:wrap">
+      <sc-for list="{{ geo.counts }}" as="c" hint-placeholder-count="4"><div><div style="font-size:14px;font-weight:600;color:#0c0d0f;font-variant-numeric:tabular-nums">{{ c.n }}</div>{{ c.label }}</div></sc-for>
+    </div>
+    <button onClick="{{ geo.sync }}" disabled="{{ geo.busy }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer">{{ geo.btn }}</button>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <sc-for list="{{ geo.regions }}" as="rg" hint-placeholder-count="4">
+      <details open="{{ rg.open }}" style="border-bottom:1px solid rgba(15,40,25,.06)">
+        <summary style="padding:7px 12px 7px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="font-size:14px;font-weight:600">{{ rg.name }} region</span><span style="display:flex;align-items:center;gap:12px;font-size:13px;color:#62666d">{{ rg.sub }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary>
+        <div style="padding:0 0 8px">
+          <sc-for list="{{ rg.districts }}" as="d" hint-placeholder-count="3">
+            <details open="{{ d.open }}">
+              <summary style="padding:8px 20px 8px 44px;display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="font-size:14px;font-weight:500">{{ d.name }}</span><span style="display:flex;align-items:center;gap:12px;font-size:13px;color:#62666d">{{ d.sub }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></summary>
+              <sc-for list="{{ d.subs }}" as="sc" hint-placeholder-count="3">
+                <div style="padding:6px 20px 6px 64px;display:flex;justify-content:space-between;gap:12px;font-size:13.5px"><span>{{ sc.name }}</span><span style="color:#62666d;font-variant-numeric:tabular-nums">{{ sc.sub }}</span></div>
+              </sc-for>
+            </details>
+          </sc-for>
+        </div>
+      </details>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.audit }}">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <select value="{{ au.type }}" onChange="{{ au.onType }}" aria-label="Record type" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;background:#fff">
+      <option value="all">All records</option><option value="Order">Orders</option><option value="Warehouse order">Warehouse orders</option><option value="Hotspot">Hotspots</option><option value="User">Users</option><option value="Role">Roles</option><option value="Product">Products</option>
+    </select>
+    <div role="tablist" aria-label="Action" style="display:flex;gap:2px;padding:3px;background:#eef0f2;border-radius:8px">
+      <sc-for list="{{ au.acts }}" as="f" hint-placeholder-count="4">
+        <button role="tab" aria-selected="{{ f.on }}" onClick="{{ f.pick }}" style="height:30px;padding:0 10px;border:none;border-radius:6px;background:{{ f.bg }};box-shadow:{{ f.sh }};color:{{ f.fg }};font-size:13px;font-weight:500;cursor:pointer">{{ f.label }}</button>
+      </sc-for>
+    </div>
+    <div style="flex:1"></div>
+    <span style="font-size:13px;color:#62666d">{{ au.count }}</span>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:120px 170px 90px minmax(0,1fr) 30px 16px;gap:12px;padding:7px 12px 7px 14px;background:rgba(246,248,247,.6);border-bottom:1px solid rgba(15,40,25,.09);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d"><span>When</span><span>User</span><span>Action</span><span>Record</span><span></span><span></span></div>
+    <sc-for list="{{ au.rows }}" as="e" hint-placeholder-count="8">
+      <details style="border-bottom:1px solid rgba(15,40,25,.06)">
+        <summary style="display:grid;grid-template-columns:120px 170px 90px minmax(0,1fr) 30px 16px;gap:12px;align-items:center;padding:7px 12px 7px 14px;font-size:13.5px">
+          <span style="color:#62666d;white-space:nowrap">{{ e.time }}</span>
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.user }}</span>
+          <span><span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:600;background:{{ e.chip.bg }};color:{{ e.chip.fg }}">{{ e.action }}</span></span>
+          <span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-weight:500">{{ e.type }} {{ e.id }}</span> <span style="color:#62666d">— {{ e.summary }}</span></span>
+          <button onClick="{{ e.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#62666d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </summary>
+        <div style="padding:4px 24px 14px 24px;display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:13.5px">{{ e.summary }}</div>
+          <sc-if value="{{ e.hasChanges }}">
+            <div style="border:1px solid rgba(15,40,25,.09);border-radius:8px;overflow:hidden;max-width:560px">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:6px 12px;background:rgba(246,248,247,.6);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d"><span>Field</span><span>Old value</span><span>New value</span></div>
+              <sc-for list="{{ e.changes }}" as="c" hint-placeholder-count="1">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:6px 12px;border-top:1px solid rgba(15,40,25,.06);font-size:13px;font-family:ui-monospace,Menlo,monospace"><span>{{ c.f }}</span><span style="color:#c62828">{{ c.o }}</span><span style="color:#177534">{{ c.n }}</span></div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="font-size:12px;color:#62666d">{{ e.meta }}</div>
+        </div>
+      </details>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ dr.open }}">
+  <div onClick="{{ dr.close }}" style="position:fixed;inset:56px 0 0 0;background:rgba(12,13,15,.35);z-index:94"></div>
+  <aside role="dialog" aria-label="{{ dr.title }}" style="position:fixed;top:56px;right:0;bottom:0;width:min(460px,100vw);background:rgba(255,255,255,.9);-webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);border-left:1px solid rgba(15,40,25,.09);box-shadow:-16px 0 40px rgba(16,24,40,.12);z-index:95;display:flex;flex-direction:column">
+    <div style="padding:12px 12px 12px 16px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div><div style="font-size:14px;font-weight:600">{{ dr.title }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ dr.sub }}</div></div>
+      <button onClick="{{ dr.close }}" aria-label="Close" style="width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#4a4e55;display:flex;align-items:center;justify-content:center" style-hover="background:#f2f3f5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+    </div>
+    <div style="flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+      <sc-if value="{{ dr.user }}">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b9097">Person</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">First name<input value="{{ uf.first }}" onChange="{{ uf.on.first }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Last name<input value="{{ uf.last }}" onChange="{{ uf.on.last }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Phone number<input type="tel" value="{{ uf.phone }}" onChange="{{ uf.on.phone }}" placeholder="+256 7XX XXX XXX" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"><span style="font-size:12px;color:#62666d;font-weight:400">The invitation code is sent here by SMS.</span></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Email <span style="font-weight:400;color:#62666d">Optional</span><input type="email" value="{{ uf.email }}" onChange="{{ uf.on.email }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b9097">Roles</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{ uf.roles }}" as="x" hint-placeholder-count="8">
+              <button onClick="{{ x.toggle }}" aria-pressed="{{ x.on }}" style="height:30px;padding:0 10px;border-radius:8px;border:1px solid {{ x.bd }};background:{{ x.bg }};color:#0c0d0f;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px"><sc-if value="{{ x.on }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#177534" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>{{ x.name }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b9097">Working area</div>
+          <div role="tablist" style="display:flex;gap:2px;padding:3px;background:#eef0f2;border-radius:8px;align-self:flex-start">
+            <sc-for list="{{ uf.kinds }}" as="k" hint-placeholder-count="2"><button role="tab" aria-selected="{{ k.on }}" onClick="{{ k.pick }}" style="height:30px;padding:0 12px;border:none;border-radius:6px;background:{{ k.bg }};box-shadow:{{ k.sh }};color:{{ k.fg }};font-size:13px;font-weight:500;cursor:pointer">{{ k.label }}</button></sc-for>
+          </div>
+          <sc-if value="{{ uf.isStore }}">
+            <select value="{{ uf.store }}" onChange="{{ uf.on.store }}" aria-label="Store" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;background:#fff">
+              <option value="">Choose a store</option>
+              <sc-for list="{{ storeNames }}" as="sn" hint-placeholder-count="7"><option value="{{ sn }}">{{ sn }}</option></sc-for>
+            </select>
+          </sc-if>
+          <sc-if value="{{ uf.isHs }}">
+            <select value="{{ uf.hotspot }}" onChange="{{ uf.on.hotspot }}" aria-label="Primary hotspot" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;background:#fff">
+              <option value="">Choose a primary hotspot</option>
+              <sc-for list="{{ hsOpts }}" as="h" hint-placeholder-count="5"><option value="{{ h.id }}">{{ h.label }}</option></sc-for>
+            </select>
+            <div style="font-size:13px;color:#62666d">Also covers</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ uf.extra }}" as="h" hint-placeholder-count="4">
+                <label style="display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" checked="{{ h.on }}" onChange="{{ h.toggle }}">{{ h.label }}</label>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ uf.existing }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b9097">Access</div>
+            <div style="border:1px solid rgba(15,40,25,.09);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+              <div style="font-size:14px"><div style="font-weight:500">{{ uf.sessionsTxt }}</div><div style="font-size:12.5px;color:#62666d">Last active {{ uf.lastSeen }}</div></div>
+              <sc-if value="{{ uf.hasSessions }}"><button onClick="{{ uf.signOut }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;font-size:13px;font-weight:500;cursor:pointer">Sign out everywhere</button></sc-if>
+              <sc-if value="{{ uf.invited }}"><button onClick="{{ uf.resend }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;font-size:13px;font-weight:500;cursor:pointer">Resend invitation</button></sc-if>
+            </div>
+            <button onClick="{{ uf.toggleActive }}" style="align-self:flex-start;background:none;border:none;padding:0;font-size:14px;font-weight:500;color:{{ uf.activeFg }};cursor:pointer">{{ uf.activeLabel }}</button>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ dr.product }}">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Category
+          <select value="{{ pf.category }}" onChange="{{ pf.on.category }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400;background:#fff"><option value="Male">Male</option><option value="Female">Female</option></select>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Brand<input value="{{ pf.brand }}" onChange="{{ pf.on.brand }}" placeholder="e.g. Engabu" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Type<input value="{{ pf.type }}" onChange="{{ pf.on.type }}" placeholder="e.g. Studded" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Unit of measure
+            <select value="{{ pf.unit }}" onChange="{{ pf.on.unit }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400;background:#fff"><sc-for list="{{ unitNames }}" as="un" hint-placeholder-count="3"><option value="{{ un }}">{{ un }}</option></sc-for></select>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Condoms per unit<input type="number" min="1" value="{{ pf.per }}" onChange="{{ pf.on.per }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+        </div>
+      </sc-if>
+    </div>
+    <div style="padding:10px 14px;border-top:1px solid rgba(15,40,25,.09);display:flex;justify-content:flex-end;gap:10px;background:rgba(246,248,247,.6)">
+      <button onClick="{{ dr.close }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer">Cancel</button>
+      <button onClick="{{ dr.save }}" disabled="{{ dr.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer">{{ dr.saveLabel }}</button>
+    </div>
+  </aside>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() { if (this.props.ready) this.props.ready(); }
+  ROLES = ['MOH administrator', 'District focal person', 'Warehouse officer', 'Store in charge', 'Other supplier', 'VHT', 'Hotspot manager', 'Delivery agent'];
+  RDESC = { 'MOH administrator': 'National oversight and system administration', 'District focal person': 'Runs a district store and its hotspot orders', 'Warehouse officer': 'Fulfils district orders at NMS or JMS', 'Store in charge': 'Receives and issues stock at a facility store', 'Other supplier': 'Submits donated or procured stock', VHT: 'Maps hotspots and requests stock for them', 'Hotspot manager': 'Reports stockouts and confirms deliveries', 'Delivery agent': 'Carries stock and delivery notes to hotspots' };
+  PERMS = [
+    ['Orders', [['orders.view', 'View orders'], ['orders.notify', 'Send stockout notifications'], ['orders.review', 'Review, confirm and hold orders'], ['orders.dispatch', 'Dispatch orders to riders']]],
+    ['Stock', [['stock.view', 'View stock levels'], ['stock.request', 'Order stock from a warehouse'], ['stock.receive', 'Receive stock and record discrepancies']]],
+    ['Warehouse', [['wh.review', 'Review district orders'], ['wh.dispatch', 'Dispatch from the warehouse']]],
+    ['Hotspots', [['hs.map', 'Map and activate hotspots'], ['hs.edit', 'Edit hotspot details and contact persons']]],
+    ['Deliveries', [['dl.record', 'Record deliveries and upload evidence'], ['dl.ack', 'Acknowledge receipt']]],
+    ['Administration', [['adm.users', 'Invite and manage users'], ['adm.roles', 'Manage roles and permissions'], ['adm.catalogue', 'Manage products, units and stores'], ['adm.audit', 'View the audit log']]],
+  ];
+  STORES = ['MOH · National', 'NMS · Entebbe', 'JMS · Kampala', 'Wakiso district store', 'Mukono district store', 'Gulu district store', 'Mbarara district store'];
+  constructor(props) {
+    super(props);
+    const U = (id, first, last, email, phone, roles, area, status, lastSeen, sessions, hotspots) => ({ id, first, last, email, phone, roles, kind: area.startsWith('HS-') ? 'hotspot' : 'store', store: area.startsWith('HS-') ? '' : area, hotspot: area.startsWith('HS-') ? area : '', hotspots: hotspots || [], status, lastSeen, sessions });
+    const all = this.PERMS.flatMap(g => g[1].map(p => p[0]));
+    this.state = {
+      users: [
+        U('u1', 'Ruth', 'Akello', 'r.akello@health.go.ug', '+256 772 100 201', ['MOH administrator'], 'MOH · National', 'Active', 'Today, 08:05', 2),
+        U('u2', 'Sarah', 'Namubiru', 's.namubiru@wakiso.go.ug', '+256 701 220 415', ['District focal person'], 'Wakiso district store', 'Active', 'Today, 08:40', 1),
+        U('u3', 'Harriet', 'Achieng', 'h.achieng@mukono.go.ug', '+256 782 330 118', ['District focal person'], 'Mukono district store', 'Active', 'Yesterday, 16:22', 1),
+        U('u4', 'Denis', 'Okot', 'd.okot@gulu.go.ug', '+256 772 451 090', ['District focal person'], 'Gulu district store', 'Active', 'Yesterday, 11:02', 0),
+        U('u5', 'Daniel', 'Ochieng', 'd.ochieng@nms.go.ug', '+256 772 600 118', ['Warehouse officer'], 'NMS · Entebbe', 'Active', 'Today, 07:58', 1),
+        U('u6', 'Paul', 'Ssekandi', 'p.ssekandi@jms.co.ug', '+256 752 118 334', ['Warehouse officer'], 'JMS · Kampala', 'Active', 'Today, 07:31', 1),
+        U('u7', 'Joseph', 'Ssemwogerere', '', '+256 776 902 331', ['VHT', 'Hotspot manager'], 'HS-0215', 'Active', 'Today, 08:12', 1, ['HS-0231', 'HS-0222']),
+        U('u8', 'Grace', 'Nakato', '', '+256 772 418 903', ['Hotspot manager'], 'HS-0231', 'Active', 'Today, 08:17', 1),
+        U('u9', 'Ronald', 'Kizza', '', '+256 754 220 118', ['Hotspot manager'], 'HS-0198', 'Active', 'Yesterday, 14:10', 1),
+        U('u10', 'Agnes', 'Namata', '', '+256 703 661 245', ['Hotspot manager'], 'HS-0207', 'Invited', '—', 0),
+        U('u11', 'Musa', 'Kato', '', '+256 701 334 920', ['Delivery agent'], 'Wakiso district store', 'Active', 'Today, 07:50', 1),
+        U('u12', 'Peter', 'Okello', '', '+256 782 105 447', ['Delivery agent'], 'Wakiso district store', 'Active', 'Today, 06:10', 1),
+        U('u13', 'Brian', 'Mugisha', '', '+256 759 440 812', ['Delivery agent'], 'Wakiso district store', 'Deactivated', '2 Nov', 0),
+      ],
+      perms: {
+        'MOH administrator': all,
+        'District focal person': ['orders.view', 'orders.review', 'orders.dispatch', 'stock.view', 'stock.request', 'stock.receive', 'hs.map', 'hs.edit', 'adm.users'],
+        'Warehouse officer': ['stock.view', 'wh.review', 'wh.dispatch'],
+        'Store in charge': ['orders.view', 'stock.view', 'stock.receive'],
+        'Other supplier': ['stock.view'],
+        VHT: ['orders.view', 'orders.notify', 'hs.map', 'dl.ack'],
+        'Hotspot manager': ['orders.view', 'orders.notify', 'dl.ack'],
+        'Delivery agent': ['orders.view', 'dl.record'],
+      },
+      products: [
+        { id: 'CND-001', category: 'Male', brand: 'Engabu', type: 'Standard', unit: 'Piece', per: 1, active: true },
+        { id: 'CND-002', category: 'Male', brand: 'Engabu', type: 'Standard', unit: 'Box', per: 144, active: true },
+        { id: 'CND-003', category: 'Male', brand: 'Engabu', type: 'Standard', unit: 'Carton', per: 4320, active: true },
+        { id: 'CND-004', category: 'Female', brand: 'FC2', type: 'Standard', unit: 'Piece', per: 1, active: true },
+        { id: 'CND-005', category: 'Female', brand: 'FC2', type: 'Standard', unit: 'Box', per: 100, active: true },
+        { id: 'CND-006', category: 'Male', brand: 'Protector Plus', type: 'Studded', unit: 'Piece', per: 1, active: false },
+      ],
+      units: [{ name: 'Piece', note: 'A single condom — every order and stock count uses this' }, { name: 'Box', note: 'Retail box' }, { name: 'Carton', note: 'Shipping carton from the warehouse' }],
+      q: '', role: 'all', status: 'all', drawer: null, form: {}, selRole: 'District focal person', syncing: false, synced: false, aType: 'all', aAct: 'all', newUnit: '', log: [],
+    };
+  }
+  tst(text) { if (this.props.act) this.props.act('toast', { toast: text }); }
+  audit(action, type, id, summary, changes) { this.setState(st => ({ log: [{ time: 'Just now', user: 'Ruth Akello', action, type, id, summary, changes: changes || [] }, ...st.log] })); }
+  setF = (k, v) => this.setState(st => ({ form: { ...st.form, [k]: v } }));
+  seg(items, cur, pick) { return items.map(([k, label, n]) => { const on = k === cur; return { label, n: n ?? '', on, pick: () => pick(k), bg: on ? '#fff' : 'transparent', sh: on ? '0 1px 2px rgba(12,13,15,.1)' : 'none', fg: on ? '#0c0d0f' : '#62666d' }; }); }
+
+  renderVals() {
+    const v = this._rv();
+    const L = this.props.lib;
+    if (L && L.menu && this.KEBAB) this.KEBAB.forEach(([path, fn]) => {
+      const arr = path.split('.').reduce((a, k) => (a ? a[k] : undefined), v);
+      if (Array.isArray(arr)) arr.forEach(r => { r.menu = e => { e.preventDefault(); e.stopPropagation(); L.menu(e, fn.call(this, r) || []); }; });
+    });
+    return v;
+  }
+  setUser(id, patch) { this.setState(st => ({ users: st.users.map(u => (u.id === id ? { ...u, ...patch } : u)) })); }
+  KEBAB = [
+    ['u.rows', function (r) { const { lib: L } = this.props; const u = this.state.users.find(x => `${x.first} ${x.last}` === r.name); if (!u) return []; const it = [{ label: 'Edit user', icon: 'pencil', run: r.edit }]; if (u.status === 'Invited') it.push({ label: 'Resend invitation', icon: 'refresh', run: () => this.tst(`Invitation resent to ${u.phone}.`) }); if (u.sessions > 0) it.push({ label: 'Sign out everywhere', icon: 'ban', run: () => { this.setUser(u.id, { sessions: 0 }); this.tst(`${u.first} has been signed out of all devices.`); } }); it.push({ label: 'Copy phone number', icon: 'copy', run: () => L.copy(u.phone, 'phone number') }, 'sep'); const off = u.status === 'Deactivated'; it.push({ label: off ? 'Reactivate user' : 'Deactivate user', icon: off ? 'check' : 'ban', danger: !off, run: () => { this.setUser(u.id, { status: off ? 'Active' : 'Deactivated', sessions: 0 }); this.audit('Updated', 'User', `${u.first} ${u.last}`, off ? 'Reactivated' : 'Deactivated', [{ f: 'status', o: u.status.toLowerCase(), n: off ? 'active' : 'deactivated' }]); this.tst(`${u.first} ${u.last} ${off ? 'reactivated' : 'deactivated'}.`); } }); return it; }],
+    ['pr.rows', function (r) { const p = this.state.products.find(x => x.id === r.id); if (!p) return []; return [{ label: 'Duplicate', icon: 'copy', run: () => { const id = 'CND-' + String(this.state.products.length + 1).padStart(3, '0'); this.setState(st => ({ products: [...st.products, { ...p, id }] })); this.audit('Created', 'Product', id, `Duplicated from ${p.id}`); this.tst(`${id} created from ${p.id}.`); } }, 'sep', { label: p.active ? 'Deactivate' : 'Activate', icon: p.active ? 'ban' : 'check', danger: p.active, run: () => { this.setState(st => ({ products: st.products.map(x => (x.id === p.id ? { ...x, active: !x.active } : x)) })); this.audit('Updated', 'Product', p.id, p.active ? 'Deactivated' : 'Activated', [{ f: 'is_active', o: String(p.active), n: String(!p.active) }]); } }]; }],
+    ['st.rows', function (r) { const { go, lib: L } = this.props; return [{ label: 'View users', icon: 'role_vht', run: () => { this.setState({ q: '', role: 'all', status: 'all' }); go('users'); } }, { label: 'Copy store code', icon: 'copy', run: () => L.copy(r.code, 'store code') }]; }],
+    ['au.rows', function (e) { const { lib: L } = this.props; return [{ label: `Show only ${e.type.toLowerCase()} records`, icon: 'filter', run: () => this.setState({ aType: e.type }) }, { label: 'Copy record ID', icon: 'copy', run: () => L.copy(String(e.id), 'record ID') }]; }],
+  ];
+  _rv() {
+    const { store: s, nav, lib: L } = this.props;
+    if (!s || !L || !nav) return { pg: {}, dr: {} };
+    const S = this.state;
+    const page = nav.page || 'users';
+    const hsName = id => (s.hotspots.find(h => h.id === id) || {}).name || id;
+    const v = { pg: { [page]: true }, roleNames: this.ROLES, storeNames: this.STORES, unitNames: S.units.map(u => u.name), hsOpts: s.hotspots.map(h => ({ id: h.id, label: `${h.name} · ${h.subcounty}` })) };
+    const stChip = st => L.chip(st, st === 'Active' ? 'success' : st === 'Invited' ? 'info' : 'neutral');
+
+    if (page === 'users') {
+      const q = S.q.trim().toLowerCase();
+      const base = S.users.filter(u => (S.role === 'all' || u.roles.includes(S.role)) && (!q || `${u.first} ${u.last} ${u.email} ${u.phone}`.toLowerCase().includes(q)));
+      const rows = base.filter(u => S.status === 'all' || u.status === S.status);
+      const cnt = st => base.filter(u => st === 'all' || u.status === st).length;
+      v.u = {
+        q: S.q, onQ: e => this.setState({ q: e.target.value }), role: S.role, onRole: e => this.setState({ role: e.target.value }),
+        statuses: this.seg([['all', 'All', cnt('all')], ['Active', 'Active', cnt('Active')], ['Invited', 'Invited', cnt('Invited')], ['Deactivated', 'Deactivated', cnt('Deactivated')]], S.status, k => this.setState({ status: k })),
+        rows: rows.map(u => ({ initials: (u.first[0] || '') + (u.last[0] || ''), name: `${u.first} ${u.last}`, contact: u.email || u.phone, roles: u.roles, area: u.kind === 'hotspot' ? hsName(u.hotspot) : u.store, areaSub: u.kind === 'hotspot' ? (u.hotspots.length ? `Hotspot · +${u.hotspots.length} more` : 'Hotspot') : 'Store', chip: stChip(u.status), last: u.lastSeen, edit: () => this.setState({ drawer: 'user', form: { ...u, roles: [...u.roles], hotspots: [...u.hotspots] } }) })),
+        none: !rows.length,
+        invite: () => this.setState({ drawer: 'user', form: { id: null, first: '', last: '', email: '', phone: '', roles: [], kind: 'store', store: '', hotspot: '', hotspots: [], status: 'Invited', lastSeen: '—', sessions: 0 } }),
+      };
+    }
+
+    if (page === 'roles') {
+      const sel = S.selRole;
+      const own = S.perms[sel] || [];
+      v.rl = {
+        list: this.ROLES.map(r => { const on = r === sel; const n = S.users.filter(u => u.roles.includes(r)).length; return { name: r, sub: `${(S.perms[r] || []).length} permissions`, users: `${n} user${n === 1 ? '' : 's'}`, on, pick: () => this.setState({ selRole: r }), bg: on ? 'rgba(69,186,80,.12)' : 'transparent', fw: on ? 600 : 500 }; }),
+        name: sel, desc: this.RDESC[sel], count: `${own.length} of ${this.PERMS.reduce((a, g) => a + g[1].length, 0)} permissions`,
+        groups: this.PERMS.map(([label, ps]) => ({ label, perms: ps.map(([k, pl]) => { const on = own.includes(k); const locked = sel === 'MOH administrator' && k.startsWith('adm.'); return { label: pl, on, locked, track: on ? '#45ba50' : '#d5d8dc', jc: on ? 'flex-end' : 'flex-start', toggle: () => { this.setState(st => ({ perms: { ...st.perms, [sel]: on ? own.filter(x => x !== k) : [...own, k] } })); this.audit('Updated', 'Role', sel, `${on ? 'Revoked' : 'Granted'} “${pl}”`, [{ f: 'permission', o: on ? k : '—', n: on ? '—' : k }]); } }; }) })),
+      };
+    }
+
+    if (page === 'products') {
+      v.pr = { rows: S.products.map(p => ({ ...p, per: L.num(p.per), chip: p.active ? L.chip('Active', 'success') : L.chip('Inactive', 'neutral') })), add: () => this.setState({ drawer: 'product', form: { category: 'Male', brand: '', type: '', unit: 'Piece', per: '1' } }) };
+    }
+    if (page === 'units') {
+      v.un = { val: S.newUnit, on: e => this.setState({ newUnit: e.target.value }), cant: S.newUnit.trim().length < 2 || S.units.some(u => u.name.toLowerCase() === S.newUnit.trim().toLowerCase()),
+        add: () => { const name = S.newUnit.trim(); this.setState(st => ({ units: [...st.units, { name, note: 'Added just now' }], newUnit: '' })); this.audit('Created', 'Unit', name, `Added unit of measure “${name}”`); this.tst(`${name} added to units of measure.`); },
+        rows: S.units.map(u => { const n = S.products.filter(p => p.unit === u.name).length; return { name: u.name, note: u.note, used: `${n} product${n === 1 ? '' : 's'}` }; }) };
+    }
+    if (page === 'stores') {
+      const uc = n => S.users.filter(u => u.store === n).length;
+      const mf = q => `${L.num(q.male)} / ${L.num(q.female)}`;
+      v.st = { rows: [
+        { name: 'JMS · Kampala', sub: 'Joint Medical Store', type: 'National', code: 'jms', users: uc('JMS · Kampala'), stock: mf(s.whStock.JMS), flag: false },
+        { name: 'NMS · Entebbe', sub: 'National Medical Stores', type: 'National', code: 'nms', users: uc('NMS · Entebbe'), stock: mf(s.whStock.NMS), flag: true },
+        { name: 'Wakiso district store', sub: 'Central region', type: 'District', code: 'aXmBzv61LbM', users: uc('Wakiso district store'), stock: mf(s.districtStock), flag: false },
+        { name: 'Mukono district store', sub: 'Central region', type: 'District', code: 'ccs8Ldr4qRf', users: uc('Mukono district store'), stock: '3,900 / 210', flag: false },
+        { name: 'Gulu district store', sub: 'Northern region', type: 'District', code: 'x75Yh65MaUa', users: uc('Gulu district store'), stock: '7,250 / 0', flag: false },
+        { name: 'Mbarara district store', sub: 'Western region', type: 'District', code: 'ztIyIYAzFKp', users: uc('Mbarara district store'), stock: '11,600 / 540', flag: false },
+      ] };
+    }
+    if (page === 'geo') {
+      const hsIn = sc => s.hotspots.filter(h => h.subcounty === sc).length;
+      const sub = (name, fac) => ({ name, sub: `${fac} facilities · ${hsIn(name)} hotspots` });
+      v.geo = {
+        status: S.syncing ? 'Syncing with DHIS2…' : S.synced ? 'Synced just now · no changes' : 'Last synced today, 06:00 · runs nightly',
+        busy: S.syncing, btn: S.syncing ? 'Syncing…' : 'Sync now',
+        sync: () => { this.setState({ syncing: true }); setTimeout(() => { this.setState({ syncing: false, synced: true }); this.tst('DHIS2 sync finished. No new organisation units.'); }, 1400); },
+        counts: [{ n: '4', label: 'Regions' }, { n: '146', label: 'Districts' }, { n: '2,184', label: 'Sub-counties' }, { n: '7,412', label: 'Facilities' }],
+        regions: [
+          { name: 'Central', sub: '27 districts', open: true, districts: [
+            { name: 'Wakiso', sub: `${s.hotspots.length} hotspots · 1 store`, open: true, subs: [sub('Katabi TC', 14), sub('Kajjansi TC', 11), sub('Nansana Municipality', 22), sub('Kira Municipality', 19), sub('Ssisa', 9), sub('Busukuma', 7)] },
+            { name: 'Kampala', sub: '5 divisions', open: false, subs: [{ name: 'Central Division', sub: '41 facilities' }, { name: 'Kawempe Division', sub: '58 facilities' }] },
+            { name: 'Mukono', sub: '1 store', open: false, subs: [{ name: 'Mukono Municipality', sub: '18 facilities' }, { name: 'Goma', sub: '12 facilities' }] } ] },
+          { name: 'Eastern', sub: '43 districts', open: false, districts: [{ name: 'Mbale', sub: '—', open: false, subs: [{ name: 'Industrial Division', sub: '16 facilities' }] }] },
+          { name: 'Northern', sub: '41 districts', open: false, districts: [{ name: 'Gulu', sub: '1 store', open: false, subs: [{ name: 'Bardege-Layibi Division', sub: '13 facilities' }] }] },
+          { name: 'Western', sub: '35 districts', open: false, districts: [{ name: 'Mbarara', sub: '1 store', open: false, subs: [{ name: 'Kakoba Division', sub: '15 facilities' }] }] },
+        ],
+      };
+    }
+    if (page === 'audit') {
+      const CH = [[/^Notified|^Requested stock at|^Requested .* from/, 'Created', null], [/^Opened the order/, 'Updated', ['order_status', 'queued', 'review']], [/^Confirmed (?!receipt)/, 'Updated', ['order_status', 'review', 'confirmed']], [/^Released from hold/, 'Updated', ['order_status', 'on_hold', 'confirmed']], [/^Put on hold/, 'Updated', ['order_status', 'review', 'on_hold']], [/^Handed over/, 'Updated', ['order_status', 'confirmed', 'dispatched']], [/^Collected/, 'Updated', ['order_status', 'dispatched', 'in_transit']], [/^Delivered/, 'Updated', ['order_status', 'in_transit', 'delivered']], [/^Confirmed receipt/, 'Updated', ['order_status', 'delivered', 'received']], [/^Accepted/, 'Updated', ['order_status', 'sent', 'queued']], [/^Dispatched/, 'Updated', ['quantity_issued', 'null', '…']], [/^Received and verified/, 'Updated', ['order_status', 'dispatched', 'received']], [/^Mapped and activated/, 'Created', ['status', '—', 'active']], [/^District stock updated/, 'Updated', ['quantity_in_stock', '…', '…']]];
+      const fromEvents = s.events.filter(e => e.ref).map(e => {
+        const rule = CH.find(c => c[0].test(e.text));
+        const type = e.ref.startsWith('ORD') ? 'Order' : e.ref.startsWith('WR') ? 'Warehouse order' : e.ref.startsWith('HS') ? 'Hotspot' : e.ref.startsWith('RPT') ? 'Monthly report' : 'Record';
+        return { time: L.t(e.t), user: e.actor === 'CLIMS' ? 'System' : e.actor, action: rule ? rule[1] : 'Updated', type, id: e.ref, summary: e.text, changes: rule && rule[2] ? [{ f: rule[2][0], o: rule[2][1], n: rule[2][2] }] : [] };
+      });
+      const all = [...S.log, ...fromEvents, { time: '14 Nov, 10:22', user: 'Ruth Akello', action: 'Created', type: 'User', id: 'Agnes Namata', summary: 'Invited as hotspot manager for Kireka Truck Stop Lodge', changes: [{ f: 'status', o: '—', n: 'invited' }] }, { time: '2 Nov, 15:40', user: 'Sarah Namubiru', action: 'Updated', type: 'User', id: 'Brian Mugisha', summary: 'Deactivated — left the rider pool', changes: [{ f: 'status', o: 'active', n: 'deactivated' }] }];
+      const rows = all.filter(e => (S.aType === 'all' || e.type === S.aType) && (S.aAct === 'all' || e.action === S.aAct));
+      const AC = { Created: L.chip('Created', 'success'), Updated: L.chip('Updated', 'info'), Deleted: L.chip('Deleted', 'danger') };
+      v.au = {
+        type: S.aType, onType: e => this.setState({ aType: e.target.value }),
+        acts: this.seg([['all', 'All'], ['Created', 'Created'], ['Updated', 'Updated'], ['Deleted', 'Deleted']], S.aAct, k => this.setState({ aAct: k })),
+        count: `${rows.length} entries`,
+        rows: rows.map(e => ({ ...e, chip: AC[e.action] || AC.Updated, hasChanges: e.changes.length > 0, meta: 'IP 41.210.146.22 · Chrome on Android' })),
+      };
+    }
+
+    // drawer
+    const F = S.form;
+    v.dr = { open: !!S.drawer, user: S.drawer === 'user', product: S.drawer === 'product', close: () => this.setState({ drawer: null }) };
+    if (S.drawer === 'user') {
+      const on = {}; ['first', 'last', 'email', 'phone', 'store', 'hotspot'].forEach(k => { on[k] = e => this.setF(k, e.target.value); });
+      const existing = !!F.id;
+      v.uf = {
+        first: F.first, last: F.last, email: F.email, phone: F.phone, store: F.store, hotspot: F.hotspot, on,
+        roles: this.ROLES.map(r => { const o = F.roles.includes(r); return { name: r, on: o, bd: o ? '#45ba50' : '#d5d8dc', bg: o ? 'rgba(69,186,80,.1)' : '#fff', toggle: () => this.setF('roles', o ? F.roles.filter(x => x !== r) : [...F.roles, r]) }; }),
+        kinds: this.seg([['store', 'Store'], ['hotspot', 'Hotspot']], F.kind, k => this.setF('kind', k)),
+        isStore: F.kind === 'store', isHs: F.kind === 'hotspot',
+        extra: s.hotspots.filter(h => h.id !== F.hotspot).map(h => { const o = F.hotspots.includes(h.id); return { label: `${h.name} · ${h.subcounty}`, on: o, toggle: () => this.setF('hotspots', o ? F.hotspots.filter(x => x !== h.id) : [...F.hotspots, h.id]) }; }),
+        existing, invited: F.status === 'Invited', hasSessions: F.sessions > 0,
+        sessionsTxt: F.status === 'Invited' ? 'Invitation not accepted yet' : `${F.sessions} active session${F.sessions === 1 ? '' : 's'}`, lastSeen: F.lastSeen,
+        signOut: () => { this.setF('sessions', 0); this.tst(`${F.first} has been signed out of all devices.`); },
+        resend: () => this.tst(`Invitation resent to ${F.phone}.`),
+        activeLabel: F.status === 'Deactivated' ? 'Reactivate user' : 'Deactivate user', activeFg: F.status === 'Deactivated' ? '#177534' : '#c62828',
+        toggleActive: () => this.setF('status', F.status === 'Deactivated' ? 'Active' : 'Deactivated'),
+      };
+      const ok = F.first.trim() && F.last.trim() && /^\+?[0-9 ()-]{7,20}$/.test(F.phone.trim()) && F.roles.length && (F.kind === 'store' ? F.store : F.hotspot);
+      Object.assign(v.dr, {
+        title: existing ? `${F.first} ${F.last}` : 'Invite a user', sub: existing ? 'Edit details, roles and working area' : 'They get an SMS with a code to activate their account',
+        saveLabel: existing ? 'Save changes' : 'Send invitation', cant: !ok,
+        save: () => {
+          const rec = { ...F, first: F.first.trim(), last: F.last.trim(), hotspots: F.kind === 'hotspot' ? F.hotspots : [], store: F.kind === 'store' ? F.store : '', hotspot: F.kind === 'hotspot' ? F.hotspot : '' };
+          if (existing) { const old = S.users.find(u => u.id === F.id); this.setState(st => ({ users: st.users.map(u => (u.id === F.id ? rec : u)), drawer: null })); this.audit('Updated', 'User', `${rec.first} ${rec.last}`, 'Updated user details', old && old.status !== rec.status ? [{ f: 'status', o: old.status.toLowerCase(), n: rec.status.toLowerCase() }] : old && old.roles.join() !== rec.roles.join() ? [{ f: 'roles', o: old.roles.join(', '), n: rec.roles.join(', ') }] : []); this.tst(`${rec.first} ${rec.last} updated.`); }
+          else { rec.id = 'u' + Date.now(); this.setState(st => ({ users: [rec, ...st.users], drawer: null, status: 'all' })); this.audit('Created', 'User', `${rec.first} ${rec.last}`, `Invited as ${rec.roles.join(', ').toLowerCase()}`, [{ f: 'status', o: '—', n: 'invited' }]); this.tst(`Invitation sent to ${rec.phone}.`); }
+        },
+      });
+    }
+    if (S.drawer === 'product') {
+      const on = {}; ['category', 'brand', 'type', 'unit', 'per'].forEach(k => { on[k] = e => this.setF(k, e.target.value); });
+      v.pf = { ...F, on };
+      const per = parseInt(F.per, 10);
+      Object.assign(v.dr, {
+        title: 'Add a product', sub: 'Category, brand and type identify the product', saveLabel: 'Add product',
+        cant: !(F.brand || '').trim() || !(F.type || '').trim() || !(per > 0),
+        save: () => { const id = 'CND-' + String(S.products.length + 1).padStart(3, '0'); this.setState(st => ({ products: [...st.products, { id, category: F.category, brand: F.brand.trim(), type: F.type.trim(), unit: F.unit, per, active: true }], drawer: null })); this.audit('Created', 'Product', id, `${F.brand.trim()} · ${F.type.trim()} (${F.unit}, ${per} per unit)`); this.tst(`${F.brand.trim()} ${F.type.trim()} added to the catalogue.`); },
+      });
+    }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

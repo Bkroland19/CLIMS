@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<template id="__bundler_thumbnail" data-bg-color="#f6f7f9"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" fill="#f6f7f9"></rect><rect x="30" y="30" width="40" height="40" rx="9" fill="#0c0d0f"></rect><path d="M41 50.5l6 6 12-13" fill="none" stroke="#45ba50" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path></svg></template>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:radial-gradient(1000px 480px at 100% -12%,rgba(69,186,80,.07),transparent 60%),#f9fafb;background-attachment:fixed;min-height:100vh;color:#0c0d0f;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button,input,select,textarea{font-family:inherit;font-size:inherit}
+button{white-space:nowrap}
+button[role=radio],button[role=radio] *{white-space:normal}
+button:disabled{opacity:.45;cursor:not-allowed !important;box-shadow:none !important}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;border-color:#2f9e42 !important;box-shadow:0 0 0 3px rgba(69,186,80,.22)}
+button:focus-visible,a:focus-visible{outline:2px solid #2f9e42;outline-offset:2px}
+input[type=checkbox],input[type=radio]{accent-color:#45ba50;width:16px;height:16px;margin:0}
+input::placeholder,textarea::placeholder{color:#8b9097}
+a{color:#177534}
+a:hover{color:#0f5a27}
+details>summary{list-style:none;cursor:pointer}
+details>summary::-webkit-details-marker{display:none}
+details[open]>summary svg{transform:rotate(180deg)}
+@keyframes clims-shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+@media (prefers-reduced-motion: reduce){[aria-busy="true"] *{animation:none !important}}
+@keyframes clims-spin{to{transform:rotate(360deg)}}
+::selection{background:rgba(69,186,80,.25)}
+</style>
+</helmet>
+<div style="min-height:100vh">
+  <sc-if value="{{ isOnb }}">
+    <sc-if value="{{ sk.onb }}"><div aria-busy="true" aria-label="Loading" style="display:flex;flex-direction:column;align-items:center;padding:40px 20px;gap:24px"><div style="height:22px;width:150px;border-radius:6px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="width:100%;max-width:520px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:28px 32px;display:flex;flex-direction:column;gap:16px"><div style="height:10px;width:28%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:22px;width:62%;border-radius:6px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:10px;width:92%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:10px;width:70%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="display:flex;flex-direction:column;gap:8px;margin-top:4px"><div style="height:9px;width:30%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:36px;width:100%;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:36px;width:100%;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></div></sc-if>
+    <div style="display:{{ wsDisp }}"><dc-import name="Onboarding" ready="{{ RD.onb }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,760px"></dc-import></div>
+  </sc-if>
+
+  <sc-if value="{{ isMob }}">
+    <div style="min-height:100vh;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:20px 48px;padding:20px 20px 130px">
+      <div style="flex:0 1 260px;min-width:220px;display:flex;flex-direction:column;gap:18px;padding-top:8px">
+        <div><div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#177534">CLIMS mobile</div><div style="font-size:22px;font-weight:600;margin-top:4px;letter-spacing:-.01em">{{ mob.app }}</div><div style="font-size:14px;color:#62666d;margin-top:2px">{{ mob.user }} · {{ mob.org }}</div></div>
+        <div style="font-size:13px;color:#0a5a84;line-height:1.5;text-wrap:pretty;padding:10px 12px;border-radius:8px;background:rgba(10,106,155,.08)">This role works in the CLIMS mobile app only. It has no access to the web system.</div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:600;color:#62666d">Device</div>
+          <div role="radiogroup" style="display:flex;gap:2px;padding:3px;background:#eceef1;border-radius:9px">
+            <sc-for list="{{ mob.devices }}" as="o" hint-placeholder-count="2"><button role="radio" aria-checked="{{ o.on }}" onClick="{{ o.pick }}" style="flex:1;height:30px;padding:0 10px;border:none;border-radius:7px;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};font-size:13px;font-weight:500;cursor:pointer">{{ o.label }}</button></sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:600;color:#62666d">Network</div>
+          <div role="radiogroup" style="display:flex;gap:2px;padding:3px;background:#eceef1;border-radius:9px">
+            <sc-for list="{{ mob.nets }}" as="o" hint-placeholder-count="2"><button role="radio" aria-checked="{{ o.on }}" onClick="{{ o.pick }}" style="flex:1;height:30px;padding:0 10px;border:none;border-radius:7px;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};font-size:13px;font-weight:500;cursor:pointer">{{ o.label }}</button></sc-for>
+          </div>
+          <sc-if value="{{ mob.hasQ }}"><div style="font-size:12.5px;color:#a84c06;line-height:1.4">{{ mob.qTxt }}</div></sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:600;color:#62666d">Size</div>
+          <div role="radiogroup" style="display:flex;gap:2px;padding:3px;background:#eceef1;border-radius:9px">
+            <sc-for list="{{ mob.zooms }}" as="o" hint-placeholder-count="2"><button role="radio" aria-checked="{{ o.on }}" onClick="{{ o.pick }}" style="flex:1;height:30px;padding:0 10px;border:none;border-radius:7px;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};font-size:13px;font-weight:500;cursor:pointer">{{ o.label }}</button></sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="width:{{ mob.w }};height:{{ mob.h }};position:relative;flex:none">
+        <div style="position:absolute;left:0;top:0;width:{{ mob.fw }};height:{{ mob.fh }};transform:scale({{ mob.sc }});transform-origin:0 0">
+          <dc-import name="MobileApp" ready="{{ RD.mob }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" role="{{ mob.role }}" device="{{ mob.device }}" toast="{{ mobT }}" hint-size="380px,800px"></dc-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+    <header style="position:fixed;top:0;left:0;right:0;height:56px;z-index:85;background:#fff;border-bottom:1px solid #e4e6e9;display:flex;align-items:center;gap:12px;padding:0 16px 0 16px">
+      <button onClick="{{ toggleSb }}" aria-label="{{ sbLabel }}" title="{{ sbLabel }}" style="width:36px;height:36px;border-radius:8px;border:none;background:transparent;color:#4a4e55;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none" style-hover="background:#f2f3f5;color:#0c0d0f">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path></svg>
+      </button>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+        <span style="font-size:17px;font-weight:700;letter-spacing:-.01em">CLIMS</span>
+        <span style="width:1px;height:20px;background:#e1e4e8;flex:none"></span>
+        <span style="font-size:14px;color:#62666d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ministry of Health · Uganda</span>
+      </div>
+      <div style="position:relative">
+        <button onClick="{{ toggleBell }}" aria-label="Notifications" style="position:relative;width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#4a4e55" style-hover="background:#f2f3f5;color:#0c0d0f">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+          <sc-if value="{{ bell.has }}"><span style="position:absolute;top:2px;right:1px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#c62828;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff">{{ bell.count }}</span></sc-if>
+        </button>
+        <sc-if value="{{ bell.open }}">
+          <div style="position:absolute;right:0;top:46px;width:380px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e6e8eb;border-radius:10px;box-shadow:0 16px 40px rgba(16,24,40,.14);z-index:90;overflow:hidden">
+            <div style="padding:14px 12px;border-bottom:1px solid #e4e6e9;display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:600">Notifications</span><span style="font-size:12px;color:#62666d">In-app</span></div>
+            <sc-for list="{{ bell.items }}" as="n" hint-placeholder-count="3">
+              <div style="padding:12px 12px;border-bottom:1px solid #f0f1f3;display:flex;gap:12px">
+                <span style="width:8px;height:8px;border-radius:50%;background:{{ n.dot }};margin-top:6px;flex:none"></span>
+                <div style="min-width:0"><div style="font-size:13.5px;line-height:1.45">{{ n.text }}</div><div style="font-size:12px;color:#62666d;margin-top:3px">{{ n.meta }}</div></div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ bell.empty }}"><div style="padding:32px 16px;text-align:center;font-size:13px;color:#62666d">You're all caught up.</div></sc-if>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding-left:14px;margin-left:2px;border-left:1px solid #e4e6e9;min-width:0">
+        <div style="width:32px;height:32px;border-radius:50%;background:#45ba50;color:#020203;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">{{ user.initials }}</div>
+        <sc-if value="{{ wideTop }}"><div style="min-width:0;line-height:1.25"><div style="font-size:13.5px;font-weight:600;white-space:nowrap">{{ user.name }}</div><div style="font-size:12px;color:#62666d;white-space:nowrap">{{ user.org }}</div></div></sc-if>
+      </div>
+    </header>
+
+    <sc-if value="{{ sbScrim }}"><div onClick="{{ closeSb }}" style="position:fixed;inset:56px 0 0 0;background:rgba(12,13,15,.4);z-index:70"></div></sc-if>
+    <sc-if value="{{ sbShow }}" hint-placeholder-val="{{ true }}">
+      <aside aria-label="Sidebar" style="position:fixed;top:56px;left:0;bottom:0;width:{{ sbW }};background:#fff;border-right:1px solid #e4e6e9;z-index:80;display:flex;flex-direction:column;transition:width .18s ease;overflow:hidden">
+        <nav aria-label="Main" style="padding:{{ navPad }};flex:1;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:18px">
+          <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="2">
+            <div role="group" aria-label="{{ g.label }}" style="display:flex;flex-direction:column;gap:2px">
+              <sc-if value="{{ g.hasLabel }}"><div style="padding:0 12px 8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8b9097;white-space:nowrap">{{ g.label }}</div></sc-if>
+              <sc-if value="{{ g.sep }}"><div style="height:1px;background:#eef0f2;margin:0 8px 10px"></div></sc-if>
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                <button onClick="{{ it.onClick }}" aria-current="{{ it.cur }}" title="{{ it.title }}" aria-label="{{ it.title }}" style="position:relative;height:36px;flex:none;padding:{{ it.pad }};border:none;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};font-size:14px;font-weight:{{ it.fw }};cursor:pointer;display:flex;align-items:center;justify-content:{{ it.jc }};gap:12px;text-align:left" style-hover="background:#f2f3f5;color:#0c0d0f">
+                  <span style="width:18px;height:18px;flex:none;background:{{ it.ic }};-webkit-mask:{{ it.mask }};mask:{{ it.mask }}"></span>
+                  <sc-if value="{{ it.exp }}"><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.label }}</span></sc-if>
+                  <sc-if value="{{ it.pillBadge }}"><span style="min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#0c0d0f;color:#fafafb;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ it.badge }}</span></sc-if>
+                  <sc-if value="{{ it.dotBadge }}"><span style="position:absolute;top:7px;right:9px;width:8px;height:8px;border-radius:50%;background:#c62828;border:2px solid #fff"></span></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </sc-for>
+        </nav>
+        <div style="padding:10px 12px;border-top:1px solid #e4e6e9">
+          <div title="{{ roleLabel }}" style="display:flex;align-items:center;justify-content:{{ footJc }};gap:10px;padding:6px 4px">
+            <span style="width:32px;height:32px;border-radius:8px;background:rgba(69,186,80,.14);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:16px;height:16px;background:#177534;-webkit-mask:{{ roleMask }};mask:{{ roleMask }}"></span></span>
+            <sc-if value="{{ exp }}"><div style="min-width:0;line-height:1.25"><div style="font-size:11px;color:#8b9097;font-weight:600;letter-spacing:.06em;text-transform:uppercase">Workspace</div><div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ roleLabel }}</div></div></sc-if>
+          </div>
+        </div>
+      </aside>
+    </sc-if>
+
+    <div style="padding-top:56px;padding-left:{{ padL }};transition:padding-left .18s ease">
+      <div style="background:#fff;border-bottom:1px solid #e4e6e9">
+        <div style="max-width:1440px;margin:0 auto;padding:{{ bandPad }}">
+          <nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;overflow:hidden;min-width:0">
+            <span style="color:#8b9097">{{ crumb.role }}</span>
+            <span style="color:#c4c7cc">/</span>
+            <button onClick="{{ crumb.go }}" style="background:none;border:none;padding:0;font-size:13px;font-weight:600;color:{{ crumb.sc }};cursor:pointer">{{ crumb.section }}</button>
+            <sc-if value="{{ crumb.hasDetail }}"><span style="color:#c4c7cc">/</span><span style="font-weight:600;color:#0c0d0f;overflow:hidden;text-overflow:ellipsis">{{ crumb.detail }}</span></sc-if>
+          </nav>
+          <sc-if value="{{ hasSub }}"><p style="margin:6px 0 0;color:#4a4e55;font-size:14px;line-height:1.45;max-width:760px;text-wrap:pretty">{{ pageSub }}</p></sc-if>
+          <sc-if value="{{ hasTabs }}">
+            <div role="tablist" style="display:flex;gap:28px;margin:8px 0 -1px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none">
+              <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="2">
+                <button role="tab" aria-selected="{{ tb.on }}" onClick="{{ tb.onClick }}" style="height:36px;padding:0 2px;border:none;border-bottom:2px solid {{ tb.bd }};background:none;color:{{ tb.fg }};font-size:14px;font-weight:{{ tb.fw }};cursor:pointer;display:flex;align-items:center;gap:8px">{{ tb.label }}<sc-if value="{{ tb.hasBadge }}"><span style="min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#0c0d0f;color:#fafafb;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ tb.badge }}</span></sc-if></button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      <main style="max-width:1440px;margin:0 auto;padding:16px 20px 168px">
+        <sc-if value="{{ sk.table }}"><div aria-busy="true" aria-label="Loading" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;gap:8px;align-items:center"><div style="height:32px;width:240px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:32px;width:120px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="flex:1"></div><div style="height:32px;width:112px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div>
+          <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+            <div style="height:34px;background:rgba(246,248,247,.6);border-bottom:1px solid rgba(15,40,25,.09);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,.8fr) 36px;gap:16px;align-items:center;padding:0 0 0 16px"><div style="height:8px;width:50%;border-radius:4px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:8px;width:40%;border-radius:4px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:8px;width:45%;border-radius:4px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:8px;width:50%;border-radius:4px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:8px;width:40%;border-radius:4px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div></div></div>
+            <sc-for list="{{ sk.rows }}" as="w" hint-placeholder-count="8"><div style="height:50px;border-bottom:1px solid rgba(15,40,25,.06);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,.8fr) 36px;gap:16px;align-items:center;padding:0 0 0 16px"><div style="height:11px;width:{{ w.a }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="display:flex;flex-direction:column;gap:7px"><div style="height:11px;width:{{ w.b }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:9px;width:{{ w.c }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:11px;width:{{ w.d }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:22px;width:84px;border-radius:999px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:11px;width:{{ w.e }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px;justify-self:end;padding-right:9px"><span style="width:4px;height:4px;border-radius:50%;background:#e1e4e8"></span><span style="width:4px;height:4px;border-radius:50%;background:#e1e4e8"></span><span style="width:4px;height:4px;border-radius:50%;background:#e1e4e8"></span></div></div></sc-for>
+          </div>
+        </div></sc-if>
+        <sc-if value="{{ sk.dash }}"><div aria-busy="true" aria-label="Loading" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
+            <sc-for list="{{ sk.k4 }}" as="w" hint-placeholder-count="4"><div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div style="height:10px;width:{{ w.b }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:32px;width:32px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:22px;width:34%;border-radius:6px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:9px;width:{{ w.c }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+            <div style="flex:2 1 480px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+              <div style="padding:12px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="height:12px;width:140px;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div>
+              <sc-for list="{{ sk.rows4 }}" as="w" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.06)"><div style="height:22px;width:84px;border-radius:999px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px"><div style="height:11px;width:{{ w.b }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:9px;width:{{ w.c }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:32px;width:112px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for>
+            </div>
+            <div style="flex:1 1 300px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:18px">
+              <div style="height:12px;width:120px;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div>
+              <sc-for list="{{ sk.k2 }}" as="w" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;gap:12px"><div style="height:11px;width:45%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:11px;width:18%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:8px;width:100%;border-radius:4px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:9px;width:40%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for>
+            </div>
+          </div>
+        </div></sc-if>
+        <sc-if value="{{ sk.detail }}"><div aria-busy="true" aria-label="Loading" style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px"><div style="display:flex;gap:12px;align-items:center"><div style="height:20px;width:128px;border-radius:6px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:22px;width:92px;border-radius:999px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:10px;width:min(380px,70%);border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div>
+            <div style="padding:10px 14px 16px;border-top:1px solid rgba(15,40,25,.06);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+              <sc-for list="{{ sk.k6 }}" as="w" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;gap:8px"><div style="height:4px;border-radius:2px;background:#eceef1"></div><div style="height:9px;width:{{ w.d }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+            <div style="flex:2 1 520px;min-width:0;display:flex;flex-direction:column;gap:12px">
+              <div style="height:60px;width:100%;border-radius:10px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div>
+              <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+                <div style="padding:12px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="height:12px;width:120px;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div>
+                <sc-for list="{{ sk.rows3 }}" as="w" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center;padding:12px 14px;border-bottom:1px solid rgba(15,40,25,.06)"><div style="display:flex;flex-direction:column;gap:7px"><div style="height:11px;width:{{ w.b }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:9px;width:{{ w.c }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="height:11px;width:{{ w.e }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:30px;width:100%;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:11px;width:{{ w.d }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for>
+                <div style="padding:10px 14px;display:flex;justify-content:flex-end;gap:10px;background:rgba(246,248,247,.6)"><div style="height:36px;width:120px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:36px;width:200px;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div>
+              </div>
+            </div>
+            <div style="flex:1 1 300px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+              <div style="height:10px;width:30%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:14px;width:60%;border-radius:6px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div>
+              <sc-for list="{{ sk.rows4 }}" as="w" hint-placeholder-count="4"><div style="display:flex;justify-content:space-between;gap:12px"><div style="height:10px;width:35%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:10px;width:{{ w.e }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for>
+            </div>
+          </div>
+        </div></sc-if>
+        <sc-if value="{{ sk.form }}"><div aria-busy="true" aria-label="Loading" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+          <div style="flex:2 1 520px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+            <sc-for list="{{ sk.k3 }}" as="w" hint-placeholder-count="3"><div style="padding:12px 14px;border-bottom:1px solid rgba(15,40,25,.06);display:flex;flex-direction:column;gap:14px"><div style="display:flex;gap:10px;align-items:center"><div style="height:24px;width:24px;border-radius:999px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:12px;width:160px;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px"><div style="display:flex;flex-direction:column;gap:8px"><div style="height:9px;width:40%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:36px;width:100%;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div><div style="display:flex;flex-direction:column;gap:8px"><div style="height:9px;width:50%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:36px;width:100%;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></div></div></sc-for>
+          </div>
+          <div style="flex:1 1 280px;min-width:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px"><div style="height:12px;width:100px;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><sc-for list="{{ sk.k3 }}" as="w" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;gap:12px"><div style="height:10px;width:35%;border-radius:5px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div><div style="height:10px;width:{{ w.e }};border-radius:5px;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div></sc-for><div style="height:36px;width:100%;border-radius:8px;flex:none;background:linear-gradient(90deg,#eceef1 0%,#f6f7f9 45%,#eceef1 90%);background-size:300% 100%;animation:clims-shimmer 1.4s linear infinite"></div></div>
+        </div></sc-if>
+        <div style="display:{{ wsDisp }}">
+        <sc-if value="{{ is.vht }}"><dc-import name="VhtWorkspace" ready="{{ RD.vht }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.hm }}"><dc-import name="HotspotManagerWorkspace" ready="{{ RD.hm }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.dcfp }}"><dc-import name="DcfpWorkspace" ready="{{ RD.dcfp }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.wh }}"><dc-import name="WarehouseWorkspace" ready="{{ RD.wh }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.rider }}"><dc-import name="RiderWorkspace" ready="{{ RD.rider }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.admin }}"><dc-import name="AdminWorkspace" ready="{{ RD.admin }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.moh }}"><dc-import name="MohWorkspace" ready="{{ RD.moh }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+        <sc-if value="{{ is.rep }}"><dc-import name="ReportsWorkspace" ready="{{ RD.rep }}" store="{{ store }}" act="{{ act }}" nav="{{ nav }}" go="{{ go }}" lib="{{ lib }}" hint-size="100%,640px"></dc-import></sc-if>
+      </div>
+      </main>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showBar }}" hint-placeholder-val="{{ true }}">
+    <div style="position:fixed;left:{{ dock.left }};right:16px;bottom:16px;z-index:90;display:flex;justify-content:center;pointer-events:none">
+      <div style="pointer-events:auto;width:100%;max-width:1100px;background:rgba(18,22,20,.86);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);color:#fafafb;border-radius:16px;box-shadow:0 16px 48px rgba(12,13,15,.32),inset 0 0 0 1px rgba(255,255,255,.07);padding:{{ dock.pad }};display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px">
+          <span style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8fd696;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#45ba50"></span>Prototype</span>
+          <div role="tablist" aria-label="View as" style="display:flex;flex-wrap:wrap;gap:2px;padding:3px;background:#1e2125;border-radius:8px">
+              <sc-for list="{{ roleChips }}" as="r" hint-placeholder-count="7">
+                <button role="tab" onClick="{{ r.onClick }}" style="height:28px;padding:0 10px;border-radius:8px;border:none;background:{{ r.bg }};color:{{ r.fg }};font-size:12.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">
+                  <span>{{ r.label }}</span>
+                  <sc-if value="{{ r.next }}"><span title="Acts next" style="width:6px;height:6px;border-radius:50%;background:#45ba50"></span></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          <div style="flex:1 1 8px"></div>
+          <div style="font-size:13px;color:#c9cdd2;min-width:0;flex:0 1 auto;max-width:440px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:#8fd696;font-weight:600">{{ guide.prefix }}</span> <span style="color:#fff;font-weight:600">{{ guide.who }}</span> — {{ guide.text }}</div>
+          <button onClick="{{ guide.go }}" style="height:30px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap">{{ guide.cta }}</button>
+          <button onClick="{{ reset }}" title="Start the whole flow again" style="height:30px;padding:0 10px;border-radius:8px;border:1px solid #2e3237;background:transparent;color:#c9cdd2;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>Reset
+            </button>
+          <button onClick="{{ dock.toggle }}" aria-label="{{ dock.label }}" title="{{ dock.label }}" style="width:30px;height:30px;border-radius:8px;border:1px solid #2e3237;background:transparent;color:#c9cdd2;cursor:pointer;display:flex;align-items:center;justify-content:center;transform:{{ dock.rot }}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+        </div>
+        <sc-if value="{{ dock.open }}">
+          <div style="display:flex;flex-wrap:wrap;gap:10px 18px">
+            <sc-for list="{{ phaseGroups }}" as="pg" hint-placeholder-count="2">
+              <div style="flex:{{ pg.flex }} 1 300px;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:{{ pg.fg }}">{{ pg.label }}</div>
+                <div style="display:grid;grid-template-columns:repeat({{ pg.cols }},minmax(0,1fr));gap:6px">
+                  <sc-for list="{{ pg.items }}" as="p" hint-placeholder-count="5">
+                    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+                      <div style="height:3px;border-radius:2px;background:{{ p.bar }}"></div>
+                      <div style="font-size:11px;line-height:1.25;color:{{ p.fg }};text-wrap:balance;overflow-wrap:anywhere">{{ p.label }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ menu.open }}">
+    <div onClick="{{ menu.close }}" style="position:fixed;inset:0;z-index:120"></div>
+    <div role="menu" style="position:fixed;top:{{ menu.top }};left:{{ menu.left }};width:240px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;box-shadow:0 12px 32px rgba(16,24,40,.14),0 2px 6px rgba(16,24,40,.06);padding:4px;z-index:121">
+      <sc-for list="{{ menu.items }}" as="m" hint-placeholder-count="3">
+        <sc-if value="{{ m.isSep }}"><div role="separator" style="height:1px;background:#eef0f2;margin:4px 0"></div></sc-if>
+        <sc-if value="{{ m.isItem }}"><button role="menuitem" onClick="{{ m.run }}" style="width:100%;height:34px;padding:0 10px;border:none;border-radius:6px;background:transparent;color:{{ m.fg }};font-size:13.5px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px" style-hover="background:#f2f3f5"><sc-if value="{{ m.hasIcon }}"><span style="width:16px;height:16px;flex:none;background:{{ m.ic }};-webkit-mask:{{ m.mask }};mask:{{ m.mask }}"></span></sc-if><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span></button></sc-if>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasToast }}">
+    <div role="status" style="position:fixed;right:24px;top:68px;max-width:400px;background:rgba(18,22,20,.9);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:#fafafb;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.45;box-shadow:0 16px 40px rgba(12,13,15,.25);z-index:100;display:flex;gap:10px;align-items:flex-start">
+      <span style="width:8px;height:8px;border-radius:50%;background:{{ toast.dot }};margin-top:6px;flex:none"></span>
+      <span>{{ toast.text }}</span>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;districtStock&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Short of stock&quot;,&quot;Enough stock&quot;],&quot;default&quot;:&quot;Short of stock&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Scenario&quot;},&quot;showGuide&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Scenario&quot;}}">
+class Component extends DCLogic {
+  state = { skel: true, ready: {}, menu: null, s: null, w: 1400, sb: false, bell: false, toast: null };
+  KEY = 'clims-prototype-v2';
+  BASE = Date.UTC(2026, 10, 18, 8, 10);
+  NAV = {
+    vht: { label: 'Village health team', user: ['Joseph Ssemwogerere', 'VHT · Katabi & Kajjansi'],
+      groups: [['Field work', ['hotspots', 'requests']]],
+      items: { hotspots: { label: 'Hotspots', icon: 'pin', pages: ['hotspots', 'map'] }, requests: { label: 'Stock requests', icon: 'megaphone', pages: ['request', 'requests'] } },
+      pages: { hotspots: ['Hotspots', 'Hotspots you cover. Map new ones as you find them.', 'My hotspots'], map: ['Hotspots', 'Register a hotspot you have visited and activate it so it can request condoms.', 'Map a new hotspot'], request: ['Stock requests', 'Notify the district of a stockout on behalf of a hotspot you cover.', 'New request'], requests: ['Stock requests', 'Orders raised for the hotspots you cover, and where each one is.', 'History'] },
+      detail: { hotspot: ['hotspots', 'Hotspot details'] } },
+    hm: { label: 'Hotspot manager', user: ['Grace Nakato', 'Kasenyi Landing Site'],
+      groups: [['Overview', ['dashboard']], ['Ordering', ['orders']]],
+      items: { dashboard: { label: 'Dashboard', icon: 'dashboard', pages: ['dashboard'] }, orders: { label: 'Orders', icon: 'inbox', pages: ['request', 'orders'] } },
+      pages: { dashboard: ['Hotspot dashboard', 'Stock at Kasenyi Landing Site and the progress of your latest order.', 'Dashboard'], request: ['Orders', 'Tell the district you are out of condoms or running low.', 'Notify stockout'], orders: ['Orders', 'Every order for this hotspot. Confirm receipt when a delivery arrives.', 'Order history'] },
+      detail: { order: ['orders', 'Order'] } },
+    dcfp: { label: 'District focal person', user: ['Sarah Namubiru', 'DCFP · Wakiso district'],
+      groups: [['Overview', ['dashboard']], ['Fulfilment', ['orders', 'restock', 'dispatch']], ['Network', ['hotspots']]],
+      items: { dashboard: { label: 'Dashboard', icon: 'dashboard', pages: ['dashboard'] }, orders: { label: 'Orders', icon: 'inbox', pages: ['orders', 'pending'] }, restock: { label: 'Restock', icon: 'warehouse', pages: ['warehouse', 'stock'] }, dispatch: { label: 'Dispatch', icon: 'truck', pages: ['dispatch'] }, hotspots: { label: 'Hotspots', icon: 'pin', pages: ['hotspots'] } },
+      pages: { dashboard: ['District dashboard', 'What needs your attention in Wakiso district today, in the order it needs doing.', 'Dashboard'], orders: ['Orders', 'Stockout notifications from hotspots. Review each one, check stock, then confirm or hold.', 'Queue'], pending: ['Orders', 'Orders waiting for stock, checked against what is in the district store now.', 'Held for stock'], warehouse: ['Restock', 'Stock ordered from NMS or JMS, and consignments waiting to be received.', 'Warehouse requests'], stock: ['Restock', 'Condoms in the Wakiso district store, by batch, and every movement in and out.', 'District store'], dispatch: ['Dispatch', 'Confirmed orders ready to go out with a rider, and deliveries in progress.', 'Dispatch'], hotspots: ['Hotspots', 'Hotspots registered in Wakiso district.', 'Hotspots'] },
+      detail: { order: ['orders', 'Review order'], newwr: ['restock', 'New warehouse request'], wr: ['restock', 'Warehouse request'], dorder: ['dispatch', 'Dispatch order'] } },
+    wh: { label: 'Warehouse', user: null,
+      groups: [['Fulfilment', ['requests']], ['Inventory', ['stock']]],
+      items: { requests: { label: 'District requests', icon: 'inbox', pages: ['requests'] }, stock: { label: 'Stock', icon: 'package', pages: ['stock'] } },
+      pages: { requests: ['District requests', 'Stock orders from district stores. Review, check stock, then dispatch or hold.', 'Requests'], stock: ['Warehouse stock', 'Condom stock held at this warehouse.', 'Stock'] },
+      detail: { wr: ['requests', 'District request'] } },
+    rider: { label: 'Delivery rider', user: ['Musa Kato', 'Rider · UFB 412K'],
+      groups: [['Work', ['deliveries']]],
+      items: { deliveries: { label: 'Deliveries', icon: 'truck', pages: ['deliveries', 'history'] } },
+      pages: { deliveries: ['Deliveries', 'Deliveries assigned to you. Carry the delivery note and have it signed at the hotspot.', 'Active'], history: ['Deliveries', 'Deliveries you have handed over.', 'Completed'] },
+      detail: { delivery: ['deliveries', 'Delivery'] } },
+    moh: { label: 'Ministry of Health', user: ['Dr. Ruth Akello', 'MOH · AIDS Control Programme'],
+      groups: [['Overview', ['dashboard']], ['Oversight', ['orders']], ['Administration', ['users', 'catalogue', 'locations', 'audit']]],
+      items: { dashboard: { label: 'Dashboard', icon: 'dashboard', pages: ['dashboard'] }, orders: { label: 'Orders', icon: 'list', pages: ['orders', 'warehouse'] }, users: { label: 'Users & access', icon: 'role_vht', pages: ['users', 'roles'] }, catalogue: { label: 'Product catalogue', icon: 'package', pages: ['products', 'units'] }, locations: { label: 'Stores & locations', icon: 'map', pages: ['stores', 'geo'] }, audit: { label: 'Audit log', icon: 'shield', pages: ['audit'] } },
+      pages: { dashboard: ['MOH dashboard', 'National view of condom stock, hotspot orders and deliveries.', 'Dashboard'], orders: ['Orders', 'Every hotspot order with its full audit trail.', 'Hotspot orders'], warehouse: ['Orders', 'District store orders to NMS and JMS.', 'Warehouse requests'],
+        users: ['Users & access', 'Everyone who can sign in to CLIMS, the roles they hold and where they work.', 'Users'], roles: ['Users & access', 'What each role can see and do. A user can hold more than one role.', 'Roles & permissions'],
+        products: ['Product catalogue', 'Condom products. Category, brand and type together identify a product.', 'Condoms'], units: ['Product catalogue', 'Units condoms are counted in, and how many pieces each holds.', 'Units of measure'],
+        stores: ['Stores & locations', 'Stock-holding points: national warehouses and district stores.', 'Stores'], geo: ['Stores & locations', 'Regions, districts, sub-counties and facilities, synced from DHIS2.', 'Geography'],
+        audit: ['Audit log', 'Every create, update and delete in CLIMS, with who did it and what changed.', 'Audit log'] },
+      detail: { order: ['orders', 'Order audit trail'] } },
+  };
+
+  _navRep = (() => {
+    const SUB = { hm: 'Send the monthly hotspot report to MOH. CLIMS checks the figures before they are sent.', vht: 'Send your monthly outreach report to MOH. CLIMS checks the figures before they are sent.', dcfp: 'Send the monthly district stock report to MOH. CLIMS checks the figures before they are sent.', wh: 'Send the monthly warehouse stock report to MOH. CLIMS checks the figures before they are sent.' };
+    Object.keys(SUB).forEach(k => { const c = this.NAV[k]; c.groups.push(['Reporting', ['reports']]); c.items.reports = { label: 'Monthly reports', icon: 'clipboard', pages: ['reports'] }; c.pages.reports = ['Monthly reports', SUB[k], 'Reports']; c.detail.report = ['reports', 'Monthly report']; });
+    const m = this.NAV.moh; m.groups[1][1].push('reports'); m.items.reports = { label: 'Reports', icon: 'clipboard', pages: ['reports'] };
+    m.pages.reports = ['Reports', 'Monthly reports sent to the MOH server by hotspots, VHTs, districts and warehouses.', 'Submissions']; m.detail.report = ['reports', 'Report'];
+    return true;
+  })();
+  ICONS = {
+    chev: "<path d='m9 18 6-6-6-6'/>",
+    chevl: "<path d='m11 17-5-5 5-5'/><path d='m18 17-5-5 5-5'/>",
+    chevr: "<path d='m6 17 5-5-5-5'/><path d='m13 17 5-5-5-5'/>",
+    menu: "<line x1='4' x2='20' y1='12' y2='12'/><line x1='4' x2='20' y1='6' y2='6'/><line x1='4' x2='20' y1='18' y2='18'/>",
+    logout: "<path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/><polyline points='16 17 21 12 16 7'/><line x1='21' x2='9' y1='12' y2='12'/>",
+    dashboard: "<rect width='7' height='9' x='3' y='3' rx='1'/><rect width='7' height='5' x='14' y='3' rx='1'/><rect width='7' height='9' x='14' y='12' rx='1'/><rect width='7' height='5' x='3' y='16' rx='1'/>",
+    inbox: "<polyline points='22 12 16 12 14 15 10 15 8 12 2 12'/><path d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/>",
+    package: "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><path d='m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7'/><path d='m7.5 4.27 9 5.15'/>",
+    warehouse: "<path d='M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z'/><path d='M6 18h12'/><path d='M6 14h12'/><rect width='12' height='12' x='6' y='10'/>",
+    truck: "<path d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/><path d='M15 18H9'/><path d='M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14'/><circle cx='17' cy='18' r='2'/><circle cx='7' cy='18' r='2'/>",
+    pin: "<path d='M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0'/><circle cx='12' cy='10' r='3'/>",
+    pinplus: "<path d='M19.914 11.105A7.298 7.298 0 0 0 20 10a8 8 0 0 0-16 0c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 0 1.202 0 32 32 0 0 0 .824-.738'/><circle cx='12' cy='10' r='3'/><path d='M16 18h6'/><path d='M19 15v6'/>",
+    megaphone: "<path d='m3 11 18-5v12L3 14v-3z'/><path d='M11.6 16.8a3 3 0 1 1-5.8-1.6'/>",
+    check: "<circle cx='12' cy='12' r='10'/><path d='m9 12 2 2 4-4'/>",
+    list: "<path d='M3 12h.01'/><path d='M3 18h.01'/><path d='M3 6h.01'/><path d='M8 12h13'/><path d='M8 18h13'/><path d='M8 6h13'/>",
+    clock: "<circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/>",
+    alert: "<path d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/><path d='M12 9v4'/><path d='M12 17h.01'/>",
+    role_vht: "<path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M22 21v-2a4 4 0 0 0-3-3.87'/><path d='M16 3.13a4 4 0 0 1 0 7.75'/>",
+    role_hm: "<path d='M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0'/><circle cx='12' cy='8' r='2'/><path d='M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712'/>",
+    role_dcfp: "<path d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/><path d='M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27'/>",
+    role_moh: "<line x1='3' x2='21' y1='22' y2='22'/><line x1='6' x2='6' y1='18' y2='11'/><line x1='10' x2='10' y1='18' y2='11'/><line x1='14' x2='14' y1='18' y2='11'/><line x1='18' x2='18' y1='18' y2='11'/><polygon points='12 2 20 7 4 7'/>",
+    eye: "<path d='M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0'/><circle cx='12' cy='12' r='3'/>",
+    pencil: "<path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/><path d='m15 5 4 4'/>",
+    copy: "<rect width='14' height='14' x='8' y='8' rx='2' ry='2'/><path d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/>",
+    printer: "<path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><path d='M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6'/><rect x='6' y='14' width='12' height='8' rx='1'/>",
+    phone: "<path d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'/>",
+    ban: "<circle cx='12' cy='12' r='10'/><path d='m4.9 4.9 14.2 14.2'/>",
+    refresh: "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M8 16H3v5'/>",
+    download: "<path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><polyline points='7 10 12 15 17 10'/><line x1='12' x2='12' y1='15' y2='3'/>",
+    filter: "<polygon points='22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3'/>",
+    dot: "<circle cx='12' cy='12' r='3'/>",
+    clipboard: "<rect width='8' height='4' x='8' y='2' rx='1' ry='1'/><path d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/><path d='M12 11h4'/><path d='M12 16h4'/><path d='M8 11h.01'/><path d='M8 16h.01'/>",
+    shield: "<path d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/><path d='m9 12 2 2 4-4'/>",
+    map: "<path d='M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z'/><path d='M15 5.764v15'/><path d='M9 3.236v15'/>",
+  };
+  NAVICON = { dashboard: 'dashboard', orders: 'inbox', stock: 'package', warehouse: 'warehouse', dispatch: 'truck', hotspots: 'pin', map: 'pinplus', request: 'megaphone', requests: 'list', 'wh:requests': 'inbox', deliveries: 'truck', history: 'check', 'moh:orders': 'list', 'hm:orders': 'list' };
+  mask(n) {
+    const p = this.ICONS[n] || (n === 'role_wh' ? this.ICONS.warehouse : n === 'role_rider' ? this.ICONS.truck : this.ICONS.dot);
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>${p}</svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") center / contain no-repeat`;
+  }
+
+  RD = { onb: () => this.markReady('onb'), vht: () => this.markReady('vht'), hm: () => this.markReady('hm'), dcfp: () => this.markReady('dcfp'), wh: () => this.markReady('wh'), rider: () => this.markReady('rider'), moh: () => this.markReady('moh'), admin: () => this.markReady('admin'), rep: () => this.markReady('rep'), mob: () => this.markReady('mob') };
+  markReady(k) { if (!this.state.ready[k]) this.setState(st => ({ ready: { ...st.ready, [k]: true } })); }
+  flash = (ms = 420) => { this.setState({ skel: true }); clearTimeout(this.skT); this.skT = setTimeout(() => this.setState({ skel: false }), ms); };
+  openMenu(e, items) {
+    if (!items || !items.length) return;
+    const b = e.currentTarget.getBoundingClientRect();
+    const W = 240; const h = items.reduce((a, it) => a + (it === 'sep' ? 9 : 34), 10);
+    let top = b.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, b.top - 4 - h);
+    const left = Math.max(8, Math.min(b.right - W, window.innerWidth - W - 8));
+    this.setState({ menu: { top, left, items } });
+  }
+  menuVals() {
+    const M = this.state.menu;
+    if (!M) return { open: false, items: [] };
+    return { open: true, top: M.top + 'px', left: M.left + 'px', close: () => this.setState({ menu: null }),
+      items: M.items.map(it => (it === 'sep' ? { isSep: true, isItem: false } : { isSep: false, isItem: true, label: it.label, hasIcon: !!it.icon, mask: it.icon ? this.mask(it.icon) : '', fg: it.danger ? '#c62828' : '#0c0d0f', ic: it.danger ? '#c62828' : '#62666d', run: () => { this.setState({ menu: null }); if (it.run) it.run(); } })) };
+  }
+  skVals(s, role) {
+    const ADMINP = ['users', 'roles', 'products', 'units', 'stores', 'geo', 'audit'];
+    const pg0 = (s.nav[role] || {}).page;
+    const ck = ['reports', 'report'].includes(pg0) ? 'rep' : role === 'moh' && ADMINP.includes(pg0) ? 'admin' : role;
+    const on = !!this.state.skel || !this.state.ready[ck];
+    let vr = 'onb';
+    if (role !== 'onb') { const c0 = this.NAV[role]; const inList = Object.values(c0.items).some(it => it.pages.includes(pg0)); vr = !inList ? (['newwr', 'report'].includes(pg0) ? 'form' : 'detail') : pg0 === 'dashboard' ? 'dash' : ['request', 'map'].includes(pg0) ? 'form' : 'table'; }
+    const W = [62, 78, 54, 70, 58, 82, 66, 74];
+    const rows = W.map((x, i) => ({ a: W[(i + 2) % 8] * 0.7 + '%', b: x + '%', c: Math.round(W[(i + 5) % 8] * 0.6) + '%', d: W[(i + 3) % 8] + '%', e: Math.round(W[(i + 6) % 8] * 0.7) + '%' }));
+    return { sk: { on, dash: on && vr === 'dash', table: on && vr === 'table', detail: on && vr === 'detail', form: on && vr === 'form', onb: on && vr === 'onb', rows, rows4: rows.slice(0, 4), rows3: rows.slice(0, 3), k4: rows.slice(0, 4), k6: rows.slice(0, 6), k3: rows.slice(0, 3), k2: rows.slice(0, 2) }, wsDisp: on ? 'none' : 'block' };
+  }
+
+  nice(m) { if (!(m > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(m))); const f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+  fmtK(v) { const a = Math.abs(v); if (a >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'; if (a >= 1000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k'; return String(Math.round(v * 10) / 10); }
+  spark(vals, w = 84, h = 32) {
+    const mn = Math.min(...vals), mx = Math.max(...vals), r = mx - mn || 1, n = vals.length;
+    const pts = vals.map((v, i) => [(i / (n - 1)) * w, h - 4 - ((v - mn) / r) * (h - 10)]);
+    const line = 'M' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L');
+    return { line, area: line + ` L${w},${h} L0,${h} Z`, ex: pts[n - 1][0], ey: pts[n - 1][1] };
+  }
+  kpiCard(k) {
+    const sv = k.series; const n = sv.length; const d = sv[n - 1] - sv[n - 2];
+    const good = k.goodUp == null || d === 0 ? null : (d > 0) === k.goodUp;
+    const T = good == null ? ['#4a4e55', '#f2f3f5'] : good ? ['#177534', 'rgba(23,117,52,.1)'] : ['#a84c06', 'rgba(168,76,6,.1)'];
+    const sp = this.spark(sv); const color = k.icc || k.color || '#45ba50';
+    const fmt = k.dfmt || (x => Number(x).toLocaleString('en-US'));
+    return { ...k, icc: color, mask: k.mask || this.mask(k.icon || 'dot'), line: sp.line, area: sp.area, ex: sp.ex.toFixed(1), ey: sp.ey.toFixed(1), fill: color + '1f',
+      delta: k.deltaText || (d === 0 ? '— 0' : (d > 0 ? '▲ ' : '▼ ') + fmt(Math.abs(d))), dfg: k.dfg || T[0], dbg: k.dbg || T[1], sub: k.sub ?? 'vs last week', cursor: k.onClick ? 'pointer' : 'default' };
+  }
+  axis(max, steps = 4) { return Array.from({ length: steps + 1 }, (_, i) => ({ top: (100 - (i / steps) * 100) + '%', label: this.fmtK((max * i) / steps), col: i === 0 ? '#e4e6e9' : '#f0f1f3' })); }
+  buildLine(o) {
+    const W = 600, H = o.h || 180;
+    const all = o.series.flatMap(x => x.vals).concat(o.ref ? [o.ref.value] : []);
+    const max = this.nice(Math.max(...all) * 1.1); const n = o.series[0].vals.length;
+    const X = i => (i / (n - 1)) * W, Y = v => H - (v / max) * H;
+    const mk = x => { if (!x) return { d: 'M0,0', area: 'M0,0', color: 'transparent', fill: 'transparent' }; const d = 'M' + x.vals.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' L'); return { d, area: x.fill ? d + ` L${W},${H} L0,${H} Z` : 'M0,0', color: x.color, fill: x.fill || 'transparent' }; };
+    const last = o.series[0].vals[n - 1]; const ry = o.ref ? Y(o.ref.value) : 0;
+    return { title: o.title, sub: o.sub, hpx: H + 'px', vb: `0 0 ${W} ${H}`, l1: mk(o.series[0]), l2: mk(o.series[1]), grid: this.axis(max),
+      legend: o.series.map(x => ({ label: x.label, color: x.color, h: '3px' })), hasLegend: o.series.length > 1,
+      hasRef: !!o.ref, ref: { d: o.ref ? `M0,${ry.toFixed(1)} L${W},${ry.toFixed(1)}` : 'M0,0', top: (ry / H * 100).toFixed(2) + '%', label: o.ref ? o.ref.label : '' },
+      end: { top: (Y(last) / H * 100).toFixed(2) + '%', color: o.series[0].color }, xl: this.xLabels(o, n) };
+  }
+  xLabels(o, n) {
+    if (o.xi) return o.xi.map(i => ({ label: o.xl[i], left: (i / (n - 1) * 100).toFixed(2) + '%', tx: i === 0 ? 'none' : i === n - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }));
+    const k = o.xl.length; return o.xl.map((l, j) => ({ label: l, left: (k > 1 ? j / (k - 1) * 100 : 0).toFixed(2) + '%', tx: j === 0 ? 'none' : j === k - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }));
+  }
+  buildBars(o) {
+    const H = o.h || 180; const max = this.nice(Math.max(...o.a.vals, ...o.b.vals) * 1.1);
+    return { title: o.title, sub: o.sub, hpx: H + 'px', grid: this.axis(max), c1: o.a.color, c2: o.b.color, hasLegend: true,
+      legend: [{ label: o.a.label, color: o.a.color, h: '10px' }, { label: o.b.label, color: o.b.color, h: '10px' }],
+      bars: o.labels.map((l, i) => ({ label: l, h1: (o.a.vals[i] / max * 100).toFixed(1) + '%', h2: (o.b.vals[i] / max * 100).toFixed(1) + '%', tip: `${l} · ${o.a.label}: ${o.a.vals[i]} · ${o.b.label}: ${o.b.vals[i]}` })) };
+  }
+  buildHbars(o) {
+    const max = Math.max(...o.rows.map(r => r.value), 1);
+    return { title: o.title, sub: o.sub, legend: [], hasLegend: false, rows: o.rows.map(r => ({ label: r.label, value: r.value, pct: (r.value / max * 100).toFixed(1) + '%', color: r.color || '#45ba50', fw: r.strong ? 600 : 400 })) };
+  }
+
+  scen() { return (this.props.districtStock ?? 'Short of stock') === 'Enough stock' ? 'enough' : 'short'; }
+  NEAR = 3; MINSHELF = 6;
+  shelfMo(iso, clock) { const [y, m, d] = String(iso).split('-').map(Number); return (Date.UTC(y, m - 1, d) - (this.BASE + clock * 60000)) / 2630016000; }
+  eligible(lots, clock) { const o = { male: 0, female: 0 }; (lots || []).forEach(l => { if (this.shelfMo(l.exp, clock) > 0) o[l.k] += l.qty; }); return o; }
+  fefo(lots, k, qty, minMo, clock) { let need = +qty || 0; const lines = []; (lots || []).filter(l => l.k === k && l.qty > 0 && this.shelfMo(l.exp, clock) >= (minMo || 0.0001)).sort((a, b) => a.exp.localeCompare(b.exp)).forEach(l => { if (need <= 0) return; const take = Math.min(need, l.qty); lines.push({ k, batch: l.batch, mfg: l.mfg, exp: l.exp, qty: take }); need -= take; }); return { lines, short: need }; }
+  allocate(n, qty, lines) { if (lines && lines.length) { const out = []; lines.forEach(l => { const lot = n.districtLots.find(x => x.k === l.k && x.batch === l.batch); if (!lot) return; const take = Math.min(+l.qty || 0, lot.qty); if (!take) return; lot.qty -= take; out.push({ k: l.k, batch: l.batch, mfg: lot.mfg, exp: lot.exp, qty: take }); }); n.districtLots = n.districtLots.filter(x => x.qty > 0); return out; } const out = []; ['male', 'female'].forEach(k => { const r = this.fefo(n.districtLots, k, qty[k], 0, n.clock); r.lines.forEach(l => { const lot = n.districtLots.find(x => x.k === k && x.batch === l.batch); lot.qty -= l.qty; out.push(l); }); }); n.districtLots = n.districtLots.filter(x => x.qty > 0); return out; }
+  mobDef() { return { device: 'android', zoom: 'fit', offline: false, outbox: [], signed: {}, read: {}, pushed: {} }; }
+  whUser(w) { return w === 'NMS' ? 'Daniel Ochieng' : 'Paul Ssekandi'; }
+
+  componentDidMount() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) {}
+    if (!s || s.v !== 4 || s.scenario !== this.scen()) s = this.init();
+    this.setState({ s, w: window.innerWidth, h: window.innerHeight });
+    this.onR = () => this.setState({ w: window.innerWidth, h: window.innerHeight, menu: null });
+    window.addEventListener('resize', this.onR);
+    this.onSc = () => { if (this.state.menu) this.setState({ menu: null }); };
+    window.addEventListener('scroll', this.onSc, true);
+    this.onKey = e => { if (e.key === 'Escape' && this.state.menu) this.setState({ menu: null }); };
+    window.addEventListener('keydown', this.onKey);
+    this.skT = setTimeout(() => this.setState({ skel: false }), 650);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onR); window.removeEventListener('scroll', this.onSc, true); window.removeEventListener('keydown', this.onKey); clearTimeout(this.tt); clearTimeout(this.skT); }
+  componentDidUpdate() {
+    const s = this.state && this.state.s;
+    if (!s) return;
+    if (s.scenario !== this.scen()) { this.setState({ s: this.init() }); return; }
+    if (this._saved !== s) { this._saved = s; try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch (e) {} }
+  }
+
+  init() {
+    const sc = this.scen();
+    const J = 'Joseph Ssemwogerere';
+    const ds = sc === 'enough' ? { male: 14000, female: 800 } : { male: 1400, female: 60 };
+    const hs = (id, name, kind, village, subcounty, contact, phone, status, male, female, vhts, enteredBy, dispenser, dispCond, lat, lng, mappedAt) =>
+      ({ id, name, kind, village, subcounty, district: 'Wakiso', contact, phone, status, stock: { male, female }, vhts, enteredBy, dispenser, dispCond, lat, lng, mappedAt, comment: '' });
+    const hotspots = [
+      hs('HS-0231', 'Kasenyi Landing Site', 'Permanent', 'Kasenyi', 'Katabi TC', 'Grace Nakato', '+256 772 418 903', 'Active', 40, 0, [J], J, true, 'Working', 0.0702, 32.5265, -86400),
+      hs('HS-0198', 'Nansana Taxi Park', 'Permanent', 'Nansana West', 'Nansana Municipality', 'Ronald Kizza', '+256 754 220 118', 'Active', 380, 22, [], 'Sarah Namubiru', true, 'Working', 0.3637, 32.5281, -200000),
+      hs('HS-0207', 'Kireka Truck Stop Lodge', 'Permanent', 'Kireka', 'Kira Municipality', 'Agnes Namata', '+256 703 661 245', 'Active', 60, 4, [], 'Sarah Namubiru', false, '', 0.3460, 32.6450, -180000),
+      hs('HS-0215', 'Bwebajja Nite Spot', 'Permanent', 'Bwebajja', 'Kajjansi TC', J, '+256 776 902 331', 'Active', 150, 10, [J], J, true, 'Working', 0.1590, 32.5400, -120000),
+      hs('HS-0222', 'Kajjansi Weekly Market', 'Temporary', 'Kajjansi', 'Kajjansi TC', 'Mariam Nansubuga', '+256 700 812 554', 'Inactive', 0, 0, [J], J, true, 'Broken', 0.2050, 32.5520, -95000),
+    ];
+    const LDV = { 'HS-0231': -25800, 'HS-0198': -4790, 'HS-0207': -38500, 'HS-0215': -30200 };
+    hotspots.forEach(h => { h.lastDelivery = LDV[h.id] ?? null; });
+    const LOT = (k, batch, mfg, exp, qty) => ({ k, batch, mfg, exp, qty });
+    const A = (m, f) => [LOT('male', 'ENG-2407-088', '2024-07-08', '2029-06-30', m), LOT('female', 'FC2-2405-031', '2024-05-20', '2029-04-30', f)];
+    const A138 = A(400, 20), A137 = A(600, 40), L29 = A(6000, 200);
+    const O = (id, hsId, items, status, createdAt, by, byRole, reason, extra) => {
+      const h = hotspots.find(x => x.id === hsId);
+      return { id, hotspotId: hsId, hotspot: h.name, items, approved: { ...items }, status, createdAt, by, byRole, reason, note: '', check: null, wr: null, delivery: null, receipt: null, holdReason: null, confirmedAt: null, alloc: null, ...(extra || {}) };
+    };
+    const orders = [
+      O('ORD-0139', 'HS-0198', { male: 500, female: 0 }, 'queued', -1080, 'Ronald Kizza', 'Hotspot manager', 'Running low'),
+      O('ORD-0140', 'HS-0207', { male: 1500, female: 60 }, 'on_hold', -1560, 'Agnes Namata', 'Hotspot manager', 'Out of stock', { holdReason: 'District stock not available', check: { ok: false, male: { req: 1500, avail: 1400, ok: false }, female: { req: 60, avail: 60, ok: true } } }),
+      O('ORD-0138', 'HS-0215', { male: 400, female: 20 }, 'in_transit', -1500, J, 'Hotspot manager', 'Out of stock', { confirmedAt: -300, delivery: { dn: 'DN-2026-0087', riderId: 'R2', rider: 'Peter Okello', phone: '+256 782 105 447', plate: 'UEK 019D', at: -150, pickedAt: -120, lines: A138 }, alloc: A138 }),
+      O('ORD-0137', 'HS-0198', { male: 600, female: 40 }, 'received', -5760, 'Ronald Kizza', 'Hotspot manager', 'Out of stock', { confirmedAt: -5000, delivery: { dn: 'DN-2026-0085', riderId: 'R1', rider: 'Musa Kato', phone: '+256 701 334 920', plate: 'UFB 412K', at: -4900, pickedAt: -4870, deliveredAt: -4790, recipient: 'Ronald Kizza', qty: { male: 600, female: 40 }, found: { male: 0, female: 2 }, photo: null, lines: A137 }, alloc: A137, receipt: { at: -4770, qty: { male: 600, female: 40 }, issue: '' } }),
+    ];
+    const W = (id, warehouse, district, by, items, status, createdAt, extra) => ({ id, warehouse, district, by, items, linked: [], note: '', status, createdAt, check: null, hold: null, dispatch: null, receipt: null, ...(extra || {}) });
+    const wrs = [
+      W('WR-2026-0031', 'JMS', 'Gulu', 'Okot Denis', { male: 8000, female: 0 }, 'sent', -200),
+      W('WR-2026-0030', 'NMS', 'Mukono', 'Harriet Achieng', { male: 12000, female: 600 }, 'queued', -1300),
+      W('WR-2026-0029', 'JMS', 'Wakiso', 'Sarah Namubiru', { male: 6000, female: 200 }, 'received', -46000, {
+        dispatch: { at: -44600, waybill: 'WB-JMS-26-0412', vehicle: 'UBJ 220Q', driver: 'Moses Ouma', qty: { male: 6000, female: 200 }, lines: L29 },
+        receipt: { at: -43200, counted: { male: 6000, female: 200 }, damaged: { male: 0, female: 0 }, accepted: { male: 6000, female: 200 }, lines: L29.map(l => ({ ...l, onWaybill: l.qty, counted: l.qty, damaged: 0, condition: 'Intact', accepted: l.qty })), grn: 'GRN-WAK-2026-014', discrepancy: null } }),
+    ];
+    const b2 = { male: ds.male + 400, female: ds.female + 20 };
+    const b1 = { male: b2.male + 600, female: b2.female + 40 };
+    const ledger = [
+      { t: -300, ref: 'ORD-0138', text: 'Allocated to Bwebajja Nite Spot', male: -400, female: -20, bal: { ...ds } },
+      { t: -5000, ref: 'ORD-0137', text: 'Allocated to Nansana Taxi Park', male: -600, female: -40, bal: b2 },
+      { t: -43200, ref: 'WR-2026-0029', text: 'Received from JMS', male: 6000, female: 200, bal: b1 },
+    ];
+    const events = [
+      { t: -5760, actor: 'Ronald Kizza', role: 'Hotspot manager', text: 'Notified a stockout at Nansana Taxi Park — Male 600 · Female 40', ref: 'ORD-0137' },
+      { t: -5000, actor: 'Sarah Namubiru', role: 'DCFP', text: 'Confirmed Male 600 · Female 40 — Ronald Kizza notified', ref: 'ORD-0137' },
+      { t: -4900, actor: 'Sarah Namubiru', role: 'DCFP', text: 'Handed over to rider Musa Kato with delivery note DN-2026-0085', ref: 'ORD-0137' },
+      { t: -4790, actor: 'Musa Kato', role: 'Rider', text: 'Delivered to Ronald Kizza — signed delivery note photographed', ref: 'ORD-0137' },
+      { t: -4770, actor: 'Ronald Kizza', role: 'Hotspot manager', text: 'Confirmed receipt of Male 600 · Female 40', ref: 'ORD-0137' },
+      { t: -1560, actor: 'Agnes Namata', role: 'Hotspot manager', text: 'Notified a stockout at Kireka Truck Stop Lodge — Male 1,500 · Female 60', ref: 'ORD-0140' },
+      { t: -1500, actor: J, role: 'Hotspot manager', text: 'Notified a stockout at Bwebajja Nite Spot — Male 400 · Female 20', ref: 'ORD-0138' },
+      { t: -1380, actor: 'Sarah Namubiru', role: 'DCFP', text: 'Put on hold — district stock not available', ref: 'ORD-0140' },
+      { t: -1300, actor: 'Harriet Achieng', role: 'DCFP', text: 'Requested Male 12,000 · Female 600 from NMS', ref: 'WR-2026-0030' },
+      { t: -1080, actor: 'Ronald Kizza', role: 'Hotspot manager', text: 'Requested stock at Nansana Taxi Park — Male 500', ref: 'ORD-0139' },
+      { t: -300, actor: 'Sarah Namubiru', role: 'DCFP', text: 'Confirmed Male 400 · Female 20 — Joseph Ssemwogerere notified', ref: 'ORD-0138' },
+      { t: -200, actor: 'Okot Denis', role: 'DCFP', text: 'Requested Male 8,000 from JMS', ref: 'WR-2026-0031' },
+      { t: -150, actor: 'Sarah Namubiru', role: 'DCFP', text: 'Handed over to rider Peter Okello with delivery note DN-2026-0087', ref: 'ORD-0138' },
+      { t: -120, actor: 'Peter Okello', role: 'Rider', text: 'Collected Male 400 · Female 20 and delivery note DN-2026-0087', ref: 'ORD-0138' },
+    ].reverse();
+    const fig = a => { const K = ['open', 'recv', 'dist', 'loss', 'close', 'exp']; const o = {}; a.forEach((x, i) => { o[K[i]] = x == null ? '' : String(x); }); return o; };
+    const bal = (a, ex) => [a[0], a[1], a[2], a[3], a[0] + a[1] - a[2] - a[3], ...(ex != null ? [ex] : [])];
+    const RP = (own, form, unit, unitId, district, reporter, period, status, m, f, x, meta) => ({ id: `RPT-${period.slice(2).replace('-', '')}-${unitId.replace('-', '')}`, own, form, unit, unitId, district, reporter, period, status, values: { male: fig(m), female: fig(f), lossReason: '', comment: '', ...(x || {}) }, errors: [], runs: 0, savedAt: null, sentAt: null, receipt: null, seen: true, ...(meta || {}) });
+    const SENT = (at, runs, receipt) => ({ runs, sentAt: at, savedAt: at, receipt });
+    const D = 1440;
+    const KS = ['Kasenyi Landing Site', 'HS-0231', 'Wakiso', 'Grace Nakato'], VH = ['Katabi & Kajjansi VHT', 'VHT-0417', 'Wakiso', J], WK = ['Wakiso district store', 'WAKISO', 'Wakiso', 'Sarah Namubiru'];
+    const reports = [
+      RP('hm', 'hotspot', ...KS, '2026-10', 'draft', [120, 500, 560, 0, 80], [6, 20, 30, 0, 0], { daysOut: '34', dispenser: 'Working' }, { savedAt: -900 }),
+      RP('hm', 'hotspot', ...KS, '2026-09', 'sent', bal([300, 600, 760, 20]), bal([10, 40, 44, 0]), { daysOut: '3', dispenser: 'Working', lossReason: 'Damaged' }, SENT(-37 * D + 134, 2, 'SRV-2609-4388')),
+      RP('hm', 'hotspot', ...KS, '2026-08', 'sent', bal([180, 800, 680, 0]), bal([12, 40, 42, 0]), { daysOut: '0', dispenser: 'Working' }, SENT(-70 * D + 95, 1, 'SRV-2608-3961')),
+      RP('vht', 'vht', ...VH, '2026-10', 'draft', [200, 400], [10, 30], { visited: '', sessions: '', reached: '' }),
+      RP('vht', 'vht', ...VH, '2026-09', 'sent', bal([150, 500, 450, 0]), bal([6, 30, 26, 0]), { visited: '3', sessions: '12', reached: '340' }, SENT(-35 * D + 60, 1, 'SRV-2609-4420')),
+      RP('dcfp', 'district', ...WK, '2026-10', 'draft', [8200, 6000, 11600], [300, 200, 360], { daysOut: '' }),
+      RP('dcfp', 'district', ...WK, '2026-09', 'sent', bal([14000, 0, 5800, 0]), bal([520, 0, 220, 0]), { daysOut: '0' }, SENT(-39 * D + 120, 1, 'SRV-2609-4351')),
+      RP('NMS', 'warehouse', 'National Medical Stores', 'NMS', 'National', 'Daniel Ochieng', '2026-10', 'draft', [560000, null, 180000], [14000, null, 4000]),
+      RP('NMS', 'warehouse', 'National Medical Stores', 'NMS', 'National', 'Daniel Ochieng', '2026-09', 'sent', bal([640000, 100000, 180000, 0], 40000), bal([16000, 2000, 4000, 0], 1000), {}, SENT(-41 * D + 200, 1, 'SRV-2609-4302')),
+      RP('JMS', 'warehouse', 'Joint Medical Store', 'JMS', 'National', 'Paul Ssekandi', '2026-10', 'draft', [210000, null, 62000], [900, null, 500]),
+      RP('JMS', 'warehouse', 'Joint Medical Store', 'JMS', 'National', 'Paul Ssekandi', '2026-09', 'sent', bal([260000, 0, 50000, 0], 0), bal([1200, 0, 300, 0], 0), {}, SENT(-40 * D + 300, 1, 'SRV-2609-4327')),
+      RP(null, 'hotspot', 'Nansana Taxi Park', 'HS-0198', 'Wakiso', 'Ronald Kizza', '2026-10', 'sent', bal([200, 600, 420, 0]), bal([4, 40, 22, 0]), { daysOut: '0', dispenser: 'Working' }, SENT(-1500, 1, 'SRV-2610-4809')),
+      RP(null, 'hotspot', 'Busia Border Lodge', 'HS-0412', 'Busia', 'Florence Awori', '2026-10', 'sent', bal([90, 400, 380, 10]), bal([0, 20, 18, 0]), { daysOut: '2', dispenser: 'Working', lossReason: 'Damaged' }, SENT(-700, 2, 'SRV-2610-4816')),
+      RP(null, 'vht', 'Namakwekwe parish VHT', 'VHT-1182', 'Mbale', 'Simon Wanyama', '2026-10', 'sent', bal([100, 300, 320, 0]), bal([4, 20, 20, 0]), { visited: '2', sessions: '8', reached: '210' }, SENT(-3000, 1, 'SRV-2610-4801')),
+      RP(null, 'district', 'Mukono district store', 'MUKONO', 'Mukono', 'Harriet Achieng', '2026-10', 'sent', bal([21000, 0, 15400, 200]), bal([400, 0, 300, 0]), { daysOut: '0', lossReason: 'Expired' }, SENT(-2900, 2, 'SRV-2610-4803')),
+      RP(null, 'district', 'Gulu district store', 'GULU', 'Gulu', 'Okot Denis', '2026-10', 'sent', bal([6500, 8000, 9200, 0]), bal([200, 0, 120, 0]), { daysOut: '0' }, SENT(-4300, 1, 'SRV-2610-4795')),
+      RP(null, 'hotspot', 'Kireka Truck Stop Lodge', 'HS-0207', 'Wakiso', 'Agnes Namata', '2026-10', 'draft', [60, 0], [4, 0], { daysOut: '', dispenser: '' }),
+    ];
+    [[-4300, 'Okot Denis', 'DCFP', 'GULU'], [-3000, 'Simon Wanyama', 'VHT', 'VHT1182'], [-2900, 'Harriet Achieng', 'DCFP', 'MUKONO'], [-1500, 'Ronald Kizza', 'Hotspot manager', 'HS0198'], [-700, 'Florence Awori', 'Hotspot manager', 'HS0412']]
+      .forEach(([t, actor, role, u]) => events.push({ t, actor, role, text: 'Sent the October 2026 report to MOH', ref: 'RPT-2610-' + u }));
+    events.push({ t: -900, actor: 'Grace Nakato', role: 'Hotspot manager', text: 'Saved a draft of the October 2026 report', ref: 'RPT-2610-HS0231' });
+    events.sort((a, b) => b.t - a.t);
+    return {
+      v: 4, scenario: sc, clock: 0, heroId: null, flow: 'orders',
+      seq: { ord: 140, wr: 31, dn: 87, hs: 231, srv: 4817, grn: 14 },
+      role: 'hm',
+      nav: { onb: { page: 'start' }, vht: { page: 'hotspots' }, hm: { page: 'dashboard' }, dcfp: { page: 'dashboard' }, wh: { page: 'requests', wh: 'NMS' }, rider: { page: 'deliveries' }, moh: { page: 'dashboard' } },
+      districtStock: ds,
+      districtLots: [LOT('male', 'ENG-2206-021', '2022-06-02', '2027-01-31', 400), LOT('male', 'ENG-2407-088', '2024-07-08', '2029-06-30', ds.male - 400), LOT('female', 'FC2-2405-031', '2024-05-20', '2029-04-30', ds.female)],
+      whLots: {
+        NMS: [LOT('male', 'ENG-2112-007', '2021-12-03', '2026-12-31', 20000), LOT('male', 'ENG-2205-019', '2022-05-16', '2027-04-30', 60000), LOT('male', 'ENG-2310-044', '2023-10-09', '2028-09-30', 150000), LOT('male', 'ENG-2409-117', '2024-09-23', '2029-08-31', 250000), LOT('female', 'FC2-2203-012', '2022-03-14', '2027-02-28', 2000), LOT('female', 'FC2-2408-044', '2024-08-05', '2029-07-31', 10000)],
+        JMS: [LOT('male', 'ENG-2301-052', '2023-01-18', '2027-12-31', 40000), LOT('male', 'ENG-2407-088', '2024-07-08', '2029-06-30', 110000), LOT('female', 'FC2-2405-031', '2024-05-20', '2029-04-30', 300)],
+      },
+      whStock: { NMS: { male: 480000, female: 12000 }, JMS: { male: 150000, female: 300 } },
+      hotspots, orders, wrs, ledger, events, reports,
+      riders: [
+        { id: 'R1', name: 'Musa Kato', phone: '+256 701 334 920', plate: 'UFB 412K', status: 'Available' },
+        { id: 'R2', name: 'Peter Okello', phone: '+256 782 105 447', plate: 'UEK 019D', status: 'On delivery' },
+        { id: 'R3', name: 'Brian Mugisha', phone: '+256 759 440 812', plate: 'UGA 771P', status: 'Off duty' },
+      ],
+    };
+  }
+
+  reduce(s, type, p) {
+    if (type === 'reset') { const n0 = this.init(); n0.flow = s.flow || 'orders'; return { n: n0, toast: { text: 'Prototype reset. The flow starts with the hotspot manager.' } }; }
+    const n = JSON.parse(JSON.stringify(s));
+    const P = ['male', 'female'];
+    const tick = m => { n.clock += m; };
+    const ev = (actor, role, text, ref) => n.events.unshift({ t: n.clock, actor, role, text, ref });
+    const O = id => n.orders.find(o => o.id === id);
+    const W = id => n.wrs.find(w => w.id === id);
+    const R = id => n.reports.find(r => r.id === id);
+    const PL = { '2026-10': 'October 2026', '2026-09': 'September 2026', '2026-08': 'August 2026' };
+    const RR = r => ({ hotspot: 'Hotspot manager', vht: 'VHT', district: 'DCFP', warehouse: r.unitId })[r.form];
+    const H = id => n.hotspots.find(h => h.id === id);
+    const q = x => P.map(k => (+x[k] ? `${k === 'male' ? 'Male' : 'Female'} ${Number(x[k]).toLocaleString('en-US')}` : null)).filter(Boolean).join(' · ') || 'nothing';
+    const check = (items, stock) => { const c = { ok: true }; P.forEach(k => { const req = +items[k] || 0; c[k] = { req, avail: stock[k], ok: req <= stock[k] }; if (!c[k].ok) c.ok = false; }); return c; };
+    const ledger = (ref, text, d) => { P.forEach(k => { n.districtStock[k] += d[k] || 0; }); n.ledger.unshift({ t: n.clock, ref, text, male: d.male || 0, female: d.female || 0, bal: { ...n.districtStock } }); };
+    const pad = x => String(x).padStart(4, '0');
+    const neg = x => ({ male: -(+x.male || 0), female: -(+x.female || 0) });
+    let toast = p.toast ? { text: p.toast } : null;
+    let go = p.go ? { ...p.go } : null;
+    switch (type) {
+      case 'nav': go = { ...p }; break;
+      case 'notify': {
+        tick(7);
+        const id = 'ORD-' + pad(++n.seq.ord);
+        const h = H(p.hotspotId);
+        n.orders.unshift({ id, hotspotId: h.id, hotspot: h.name, items: p.items, approved: { ...p.items }, status: 'queued', createdAt: n.clock, by: p.by, byRole: p.byRole, reason: p.reason, note: p.note || '', check: null, wr: null, delivery: null, receipt: null, holdReason: null, confirmedAt: null, found: p.remaining || null });
+        if (p.remaining) h.stock = { male: +p.remaining.male || 0, female: +p.remaining.female || 0 };
+        ev(p.by, p.byRole, `${p.reason === 'Out of stock' ? 'Notified a stockout' : 'Requested stock'} at ${h.name} — ${q(p.items)}`, id);
+        ev('CLIMS', 'System', `${id} added to the Wakiso district order queue`, id);
+        const hero = O(n.heroId);
+        if (!hero || hero.status === 'received') n.heroId = id;
+        toast = { text: `${id} sent to Wakiso district. You'll be notified when it's confirmed.` };
+        if (go && go.id === '$new') go.id = id;
+        break;
+      }
+      case 'openOrder': { const o = O(p.id); if (o && o.status === 'queued') { tick(38); o.status = 'review'; ev('Sarah Namubiru', 'DCFP', 'Opened the order for review', o.id); } break; }
+      case 'checkStock': { const o = O(p.id); tick(3); o.approved = p.approved; o.check = check(o.approved, n.districtStock); ev('Sarah Namubiru', 'DCFP', o.check.ok ? 'Checked district stock — all items available' : 'Checked district stock — not enough stock', o.id); break; }
+      case 'confirmOrder': {
+        const o = O(p.id); const c = check(o.approved, n.districtStock);
+        if (!c.ok) { toast = { text: 'Not enough stock to confirm this order.', warn: true }; go = null; break; }
+        tick(4); o.check = c; o.status = 'confirmed'; o.confirmedAt = n.clock; o.alloc = this.allocate(n, o.approved, p.lines);
+        ledger(o.id, `Allocated to ${o.hotspot}`, neg(o.approved));
+        ev('Sarah Namubiru', 'DCFP', `Confirmed ${q(o.approved)} — ${H(o.hotspotId).contact} notified`, o.id);
+        toast = { text: `${o.id} confirmed. ${H(o.hotspotId).contact} has been notified.` };
+        break;
+      }
+      case 'holdOrder': { const o = O(p.id); tick(2); o.status = 'on_hold'; o.holdReason = p.reason || 'District stock not available'; ev('Sarah Namubiru', 'DCFP', `Put on hold — ${o.holdReason.toLowerCase()}`, o.id); toast = toast || { text: `${o.id} is on hold. ${H(o.hotspotId).contact} has been told it is waiting for stock.` }; break; }
+      case 'createWR': {
+        tick(14);
+        const id = 'WR-2026-' + pad(++n.seq.wr);
+        n.wrs.unshift({ id, warehouse: p.warehouse, district: 'Wakiso', by: 'Sarah Namubiru', items: p.items, linked: p.linked, note: p.note || '', status: 'sent', createdAt: n.clock, check: null, hold: null, dispatch: null, receipt: null });
+        ev('Sarah Namubiru', 'DCFP', `Requested ${q(p.items)} from ${p.warehouse}`, id);
+        p.linked.forEach(oid => { const o = O(oid); if (o) { o.wr = id; ev('Sarah Namubiru', 'DCFP', `Waiting on warehouse request ${id} (${p.warehouse})`, oid); } });
+        toast = { text: `${id} sent to ${p.warehouse}.` };
+        if (go && go.id === '$new') go.id = id;
+        break;
+      }
+      case 'whOpen': { const w = W(p.id); if (w && w.status === 'sent') { tick(95); w.status = 'review'; ev(this.whUser(w.warehouse), w.warehouse, 'Opened the request for review', w.id); } break; }
+      case 'whAccept': { const w = W(p.id); tick(12); w.status = 'queued'; ev(this.whUser(w.warehouse), w.warehouse, 'Accepted the request and queued it for picking', w.id); toast = { text: `${w.id} accepted and queued.` }; break; }
+      case 'whCheck': { const w = W(p.id); tick(18); w.check = check(w.items, this.eligible(n.whLots[w.warehouse], n.clock)); ev(this.whUser(w.warehouse), w.warehouse, w.check.ok ? 'Checked warehouse stock — available (expired batches excluded)' : 'Checked warehouse stock — not enough in-date stock', w.id); break; }
+      case 'whDispatch': {
+        const w = W(p.id); tick(150);
+        const lots = n.whLots[w.warehouse];
+        const qty = { male: 0, female: 0 };
+        p.lines.forEach(l => { qty[l.k] += l.qty; const lot = lots.find(x => x.k === l.k && x.batch === l.batch); if (lot) lot.qty -= l.qty; });
+        n.whLots[w.warehouse] = lots.filter(x => x.qty > 0);
+        P.forEach(k => { n.whStock[w.warehouse][k] -= qty[k]; });
+        w.status = 'dispatched';
+        w.dispatch = { at: n.clock, waybill: p.waybill, vehicle: p.vehicle, driver: p.driver, qty, lines: p.lines };
+        ev(this.whUser(w.warehouse), w.warehouse, `Dispatched ${q(qty)} on waybill ${p.waybill} — ${p.lines.length} batch line${p.lines.length === 1 ? '' : 's'}, first-expiry-first-out`, w.id);
+        toast = { text: `${w.id} dispatched to ${w.district} district store.` };
+        break;
+      }
+      case 'whHold': { const w = W(p.id); tick(6); w.status = 'on_hold'; w.hold = { reason: p.reason, at: n.clock }; ev(this.whUser(w.warehouse), w.warehouse, `Put on hold — ${p.reason.toLowerCase()}`, w.id); toast = { text: `${w.id} on hold. ${w.district} DCFP has been notified.` }; break; }
+      case 'whRequeue': { const w = W(p.id); tick(30); w.status = 'queued'; w.check = null; ev(this.whUser(w.warehouse), w.warehouse, 'Returned the request to the queue to re-check stock', w.id); break; }
+      case 'whRestock': { tick(60); n.whStock[p.wh].male += 100000; n.whStock[p.wh].female += 10000; [['male', 'ENG-2511-136', '2025-11-03', '2030-10-31', 100000], ['female', 'FC2-2510-078', '2025-10-13', '2030-09-30', 10000]].forEach(([k, batch, mfg, exp, qty]) => { const lot = n.whLots[p.wh].find(x => x.batch === batch); if (lot) lot.qty += qty; else n.whLots[p.wh].push({ k, batch, mfg, exp, qty }); }); ev(this.whUser(p.wh), p.wh, 'Received a supplier delivery — Male 100,000 · Female 10,000', null); toast = { text: `${p.wh} stock replenished.` }; break; }
+      case 'receiveWR': {
+        const w = W(p.id);
+        n.clock = Math.max(n.clock + 30, w.dispatch.at + 1260);
+        const before = { ...n.districtStock };
+        const accepted = { male: 0, female: 0 }, counted = { male: 0, female: 0 }, damaged = { male: 0, female: 0 };
+        p.lines.forEach(l => { accepted[l.k] += l.accepted; counted[l.k] += l.counted; damaged[l.k] += l.damaged; });
+        w.status = 'received';
+        ev('Sarah Namubiru', 'DCFP', `Received ${w.id} and checked ${p.lines.length} batch${p.lines.length === 1 ? '' : 'es'} against waybill ${w.dispatch.waybill}`, w.id);
+        if (p.discrepancy) ev('Sarah Namubiru', 'DCFP', `Documented a discrepancy: ${p.discrepancy.type} — ${p.discrepancy.note}`, w.id);
+        tick(5);
+        ledger(w.id, `Received from ${w.warehouse}`, accepted);
+        p.lines.forEach(l => { if (!l.accepted) return; const lot = n.districtLots.find(x => x.k === l.k && x.batch === l.batch); if (lot) lot.qty += l.accepted; else n.districtLots.push({ k: l.k, batch: l.batch, mfg: l.mfg, exp: l.exp, qty: l.accepted }); });
+        const grn = 'GRN-WAK-2026-' + String(++n.seq.grn).padStart(3, '0');
+        w.receipt = { at: n.clock, counted, damaged, accepted, lines: p.lines, grn, discrepancy: p.discrepancy, before, after: { ...n.districtStock } };
+        ev('Sarah Namubiru', 'DCFP', `Issued goods received note ${grn}`, w.id);
+        ev('CLIMS', 'System', `District stock updated — ${q(n.districtStock)} on hand`, w.id);
+        const held = n.orders.filter(o => o.status === 'on_hold').length;
+        toast = { text: held ? `${grn} issued. ${held} order${held > 1 ? 's' : ''} on hold can now be reviewed.` : `${grn} issued. Stock updated.` };
+        break;
+      }
+      case 'releaseOrder': {
+        const o = O(p.id); const c = check(o.approved, n.districtStock);
+        if (!c.ok) { toast = { text: 'Still not enough stock for this order.', warn: true }; break; }
+        tick(6); o.check = c; o.status = 'confirmed'; o.confirmedAt = n.clock; o.alloc = this.allocate(n, o.approved, p.lines);
+        ledger(o.id, `Allocated to ${o.hotspot}`, neg(o.approved));
+        ev('Sarah Namubiru', 'DCFP', `Released from hold and confirmed — ${H(o.hotspotId).contact} notified`, o.id);
+        toast = { text: `${o.id} confirmed and ready to dispatch.` };
+        break;
+      }
+      case 'dispatchOrder': {
+        const o = O(p.id); const r = n.riders.find(x => x.id === p.riderId); tick(35);
+        const dn = 'DN-2026-' + pad(++n.seq.dn);
+        o.status = 'dispatched';
+        o.delivery = { dn, riderId: r.id, rider: r.name, phone: r.phone, plate: r.plate, at: n.clock, lines: o.alloc || [] };
+        r.status = 'On delivery';
+        ev('Sarah Namubiru', 'DCFP', `Handed over to rider ${r.name} with delivery note ${dn}`, o.id);
+        toast = { text: `${o.id} handed over to ${r.name}.` };
+        break;
+      }
+      case 'pickup': { const o = O(p.id); tick(20); o.status = 'in_transit'; o.delivery.pickedAt = n.clock; ev(o.delivery.rider, 'Rider', `Collected ${q(o.approved)} and delivery note ${o.delivery.dn}`, o.id); toast = { text: 'Trip started. Ride safely.' }; break; }
+      case 'deliver': {
+        const o = O(p.id); tick(65); o.status = 'delivered';
+        Object.assign(o.delivery, { deliveredAt: n.clock, qty: p.qty, found: p.found, recipient: p.recipient, photo: p.photo, sig: p.sig || null });
+        const r = n.riders.find(x => x.id === o.delivery.riderId); if (r) r.status = 'Available';
+        ev(o.delivery.rider, 'Rider', `Delivered ${q(p.qty)} to ${p.recipient} — signed delivery note photographed`, o.id);
+        toast = { text: `Delivery recorded. ${p.recipient} will confirm receipt in CLIMS.` };
+        break;
+      }
+      case 'confirmReceipt': {
+        const o = O(p.id); tick(12); o.status = 'received';
+        o.receipt = { at: n.clock, qty: p.qty, issue: p.issue || '' };
+        const h = H(o.hotspotId); P.forEach(k => { h.stock[k] += +p.qty[k] || 0; }); h.lastDelivery = o.delivery && o.delivery.deliveredAt != null ? o.delivery.deliveredAt : n.clock;
+        ev(p.by || h.contact, p.byRole || 'Hotspot manager', `Confirmed receipt of ${q(p.qty)}`, o.id);
+        if (p.issue) ev(p.by || h.contact, p.byRole || 'Hotspot manager', `Reported an issue: ${p.issue}`, o.id);
+        toast = { text: `${o.id} closed. Stock at ${h.name} updated.` };
+        break;
+      }
+      case 'mob': { n.mob = { ...this.mobDef(), ...(n.mob || {}), ...(p.set || {}) }; break; }
+      case 'queue': { n.mob = { ...this.mobDef(), ...(n.mob || {}) }; n.mob.outbox = [...(n.mob.outbox || []), { ...p.item, at: n.clock }]; toast = { text: 'Saved on this phone. It sends automatically when you are back online.' }; break; }
+      case 'online': {
+        let cur = n; cur.mob = { ...this.mobDef(), ...(cur.mob || {}) }; const q0 = cur.mob.outbox || []; cur.mob.outbox = []; cur.mob.offline = false;
+        q0.forEach(it => { const r = this.reduce(cur, it.type, { ...it.p, go: undefined, toast: undefined }); cur = r.n; });
+        return { n: cur, toast: { text: q0.length ? `Back online — ${q0.length} saved action${q0.length > 1 ? 's' : ''} sent.` : 'Back online.' } };
+      }
+      case 'flow': n.flow = p.flow; break;
+      case 'rptSave': { const r = R(p.id); tick(2); r.values = p.values; r.savedAt = n.clock; toast = { text: 'Draft saved.' }; break; }
+      case 'rptValidate': {
+        const r = R(p.id); tick(3);
+        r.values = p.values; r.savedAt = n.clock; r.runs = (r.runs || 0) + 1; r.errors = p.errors;
+        ev(r.reporter, RR(r), r.runs === 1 ? `Entered the ${PL[r.period]} figures and submitted them for validation` : 'Corrected the figures and resubmitted them for validation', r.id);
+        const k = p.errors.length;
+        if (k) { r.status = 'errors'; ev('CLIMS', 'System', `Validation found ${k} error${k === 1 ? '' : 's'} — returned to ${r.reporter} to rectify`, r.id); toast = { text: `${k} error${k === 1 ? '' : 's'} to fix before this report can be sent.`, warn: true }; }
+        else { r.status = 'validated'; ev('CLIMS', 'System', 'Validation passed — no errors', r.id); }
+        break;
+      }
+      case 'rptSend': {
+        const r = R(p.id); tick(1);
+        r.status = 'sent'; r.sentAt = n.clock; r.seen = false; r.errors = [];
+        r.receipt = `SRV-${r.period.slice(2).replace('-', '')}-${++n.seq.srv}`;
+        ev(r.reporter, RR(r), `Sent the ${PL[r.period]} report to MOH`, r.id);
+        ev('CLIMS', 'System', `Data sent to the MOH server — receipt ${r.receipt}`, r.id);
+        toast = { text: `${PL[r.period]} report sent to MOH. Receipt ${r.receipt}.` };
+        break;
+      }
+      case 'rptSeen': { const r = R(p.id); if (r && !r.seen) { r.seen = true; ev('Dr. Ruth Akello', 'MOH', 'Reviewed the report', r.id); } break; }
+      case 'rptRemind': { const r = R(p.id); ev('Dr. Ruth Akello', 'MOH', `Reminded ${r.reporter} that the ${PL[r.period]} report is due`, r.id); toast = { text: `Reminder sent to ${r.reporter}.` }; break; }
+      case 'mapHotspot': {
+        tick(25);
+        const id = 'HS-' + pad(++n.seq.hs);
+        n.hotspots.push({ id, district: 'Wakiso', status: 'Active', stock: { male: 0, female: 0 }, mappedAt: n.clock, ...p.hotspot });
+        ev(p.hotspot.enteredBy, 'VHT', `Mapped and activated ${p.hotspot.name}`, id);
+        toast = { text: `${p.hotspot.name} is active as ${id}.` };
+        if (go && go.id === '$new') go.id = id;
+        break;
+      }
+    }
+    if (go) {
+      const role = go.role || n.role;
+      n.role = role;
+      const cur = n.nav[role] || {};
+      n.nav[role] = { ...cur, page: go.page !== undefined ? go.page : cur.page, id: go.page !== undefined ? (go.id ?? null) : cur.id, ...(go.wh ? { wh: go.wh } : {}), ...(go.extra || {}) };
+    }
+    return { n, toast };
+  }
+
+  act = (type, p = {}) => {
+    let t = null;
+    this.setState(st => { const r = this.reduce(st.s, type, p); t = r.toast; return { s: r.n, sb: false, bell: false, toast: r.toast || st.toast }; }, () => {
+      if (t) { clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: null }), 4200); }
+    });
+    if (type === 'nav' || p.go) { window.scrollTo(0, 0); this.flash(); }
+  };
+  go = (page, id, extra) => this.act('nav', { page, id: id ?? null, ...(extra || {}) });
+
+  guide(s) {
+    const o = s.orders.find(x => x.id === s.heroId);
+    if (!o) return { role: 'hm', page: 'request', who: 'Hotspot manager', text: 'Notify a stockout at Kasenyi Landing Site (or let the VHT do it on her behalf).', phase: 0 };
+    const w = o.wr && s.wrs.find(x => x.id === o.wr);
+    switch (o.status) {
+      case 'queued': case 'review': return { role: 'dcfp', page: 'order', id: o.id, who: 'DCFP', text: `Review ${o.id}, check district stock, then confirm or hold.`, phase: 1 };
+      case 'on_hold':
+        if (!w) return { role: 'dcfp', page: 'newwr', id: o.id, who: 'DCFP', text: `${o.id} is on hold — request stock from NMS or JMS.`, phase: 2 };
+        if (['sent', 'review', 'queued', 'on_hold'].includes(w.status)) return { role: 'wh', page: 'wr', id: w.id, wh: w.warehouse, who: w.warehouse, text: `Review ${w.id}, check stock, then dispatch or hold.`, phase: 2 };
+        if (w.status === 'dispatched') return { role: 'dcfp', page: 'wr', id: w.id, who: 'DCFP', text: `Receive ${w.id} and verify it against the waybill.`, phase: 3 };
+        return { role: 'dcfp', page: 'pending', who: 'DCFP', text: `Stock updated — review pending orders and release ${o.id}.`, phase: 3 };
+      case 'confirmed': return { role: 'dcfp', page: 'dorder', id: o.id, who: 'DCFP', text: `Assign a rider to ${o.id} and print the delivery note.`, phase: 4 };
+      case 'dispatched': return { role: 'rider', page: 'delivery', id: o.id, who: 'Rider', text: `Collect ${o.id} and its delivery note from the district store.`, phase: 5 };
+      case 'in_transit': return { role: 'rider', page: 'delivery', id: o.id, who: 'Rider', text: 'Hand over the stock and photograph the signed delivery note.', phase: 5 };
+      case 'delivered': return { role: 'hm', page: 'order', id: o.id, who: 'Hotspot manager', text: `Confirm the stock for ${o.id} was received.`, phase: 6 };
+      default: return { role: 'moh', page: 'order', id: o.id, who: 'MOH', text: `${o.id} is closed — review its audit trail.`, phase: 7, done: true };
+    }
+  }
+
+  guideR(s) {
+    const r = (s.reports || []).find(x => x.id === 'RPT-2610-HS0231');
+    if (!r) return { role: 'hm', page: 'reports', who: 'Hotspot manager', text: 'Open monthly reports.', phase: 0 };
+    const n = r.errors.length; const skipFix = r.runs <= 1;
+    const base = { role: 'hm', page: 'report', id: r.id, who: 'Hotspot manager' };
+    switch (r.status) {
+      case 'draft': return { ...base, text: 'Order closed — now file the October monthly report for Kasenyi Landing Site.', phase: 0 };
+      case 'errors': return { ...base, text: `Validation found ${n} error${n === 1 ? '' : 's'} — fix them and send again.`, phase: 2 };
+      case 'validated': return { ...base, text: 'Validation passed — send the report to the MOH server.', phase: 3, skipFix };
+      default: return r.seen
+        ? { role: 'moh', page: 'reports', who: 'MOH', text: 'Order delivered and the October report received. VHTs, DCFPs and warehouses report the same way.', phase: 5, done: true, skipFix }
+        : { role: 'moh', page: 'report', id: r.id, who: 'MOH', text: 'The October report from Kasenyi Landing Site has arrived — review it.', phase: 4, skipFix };
+    }
+  }
+
+  badges(s) {
+    const b = {};
+    const cnt = (arr, f) => arr.filter(f).length;
+    const wh = s.nav.wh.wh;
+    b['dcfp:orders'] = cnt(s.orders, o => o.status === 'queued' || o.status === 'review');
+    b['dcfp:warehouse'] = cnt(s.wrs, w => w.district === 'Wakiso' && w.status === 'dispatched');
+    b['dcfp:pending'] = cnt(s.orders, o => o.status === 'on_hold' && ['male', 'female'].every(k => (+o.approved[k] || 0) <= s.districtStock[k]));
+    b['dcfp:dispatch'] = cnt(s.orders, o => o.status === 'confirmed');
+    b['hm:orders'] = cnt(s.orders, o => o.hotspotId === 'HS-0231' && o.status === 'delivered');
+    b['wh:requests'] = cnt(s.wrs, w => w.warehouse === wh && ['sent', 'review', 'queued'].includes(w.status));
+    b['rider:deliveries'] = cnt(s.orders, o => o.delivery && o.delivery.riderId === 'R1' && (o.status === 'dispatched' || o.status === 'in_transit'));
+    b['vht:requests'] = cnt(s.orders, o => { const h = s.hotspots.find(x => x.id === o.hotspotId); return h && h.vhts.includes('Joseph Ssemwogerere') && o.status === 'delivered'; });
+    const RS = s.reports || [];
+    ['hm', 'vht', 'dcfp'].forEach(k => { b[k + ':reports'] = cnt(RS, r => r.own === k && r.status !== 'sent'); });
+    b['wh:reports'] = cnt(RS, r => r.own === wh && r.status !== 'sent');
+    b['moh:reports'] = cnt(RS, r => r.status === 'sent' && !r.seen);
+    return b;
+  }
+
+  lib(s) {
+    const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const p2 = x => String(x).padStart(2, '0');
+    const day = m => Math.floor((m + 490) / 1440);
+    const t = m => {
+      if (m == null) return '—';
+      const d = new Date(this.BASE + m * 60000);
+      const hm = `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+      const dd = day(s.clock) - day(m);
+      return dd === 0 ? `Today, ${hm}` : dd === 1 ? `Yesterday, ${hm}` : `${d.getUTCDate()} ${MO[d.getUTCMonth()]}, ${hm}`;
+    };
+    const date = m => { const d = new Date(this.BASE + m * 60000); return `${d.getUTCDate()} ${MO[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+    const num = x => (x == null || x === '' || isNaN(x)) ? '—' : Number(x).toLocaleString('en-US');
+    const dur = m => { m = Math.max(0, Math.round(m)); if (m < 60) return `${m} min`; if (m < 1440) return `${Math.floor(m / 60)} h ${m % 60} min`; return `${Math.floor(m / 1440)} d ${Math.floor((m % 1440) / 60)} h`; };
+    const TONE = { info: ['#0a6a9b', 'rgba(10,106,155,.1)'], success: ['#177534', 'rgba(23,117,52,.1)'], warning: ['#a84c06', 'rgba(168,76,6,.1)'], danger: ['#c62828', 'rgba(198,40,40,.1)'], neutral: ['#62666d', '#f2f3f5'] };
+    const chip = (label, tone) => ({ label, fg: TONE[tone][0], bg: TONE[tone][1] });
+    const OS = { queued: ['In queue', 'info'], review: ['Under review', 'info'], on_hold: ['On hold', 'warning'], confirmed: ['Confirmed', 'success'], dispatched: ['With rider', 'info'], in_transit: ['Out for delivery', 'info'], delivered: ['Delivered', 'success'], received: ['Received', 'neutral'] };
+    const WS = { sent: ['Sent', 'info'], review: ['Under review', 'info'], queued: ['Queued', 'info'], on_hold: ['On hold', 'warning'], dispatched: ['In transit', 'info'], received: ['Received', 'success'] };
+    const ROLEDOT = { 'Hotspot manager': '#1f8fd1', VHT: '#7c5cd6', DCFP: '#45ba50', NMS: '#e08a2e', JMS: '#e08a2e', Rider: '#c2418f', MOH: '#0a6a9b', System: '#8b9097' };
+    const P = [{ k: 'male', name: 'Male condoms', brand: 'Engabu', short: 'Male' }, { k: 'female', name: 'Female condoms', brand: 'FC2', short: 'Female' }];
+    const items = x => P.map(p => (+(x || {})[p.k] ? `${p.short} ${num(x[p.k])}` : null)).filter(Boolean).join(' · ') || '—';
+    const step = (label, state, sub, i) => {
+      const S = {
+        done: { bg: '#45ba50', fg: '#020203', bd: '1px solid #45ba50', fw: 500, tc: '#0c0d0f', mark: '✓', bar: '#45ba50', kc: '#177534', kicker: 'Done' },
+        cur: { bg: '#fff', fg: '#177534', bd: '2px solid #45ba50', fw: 600, tc: '#0c0d0f', mark: String(i + 1), bar: '#0c0d0f', kc: '#0c0d0f', kicker: 'In progress' },
+        warn: { bg: 'rgba(168,76,6,.1)', fg: '#a84c06', bd: '1px solid #a84c06', fw: 600, tc: '#a84c06', mark: '!', bar: '#e0a03a', kc: '#a84c06', kicker: 'Needs attention' },
+        skip: { bg: '#f2f3f5', fg: '#62666d', bd: '1px dashed #c9ccd1', fw: 400, tc: '#62666d', mark: '–', bar: 'repeating-linear-gradient(90deg,#d5d8dc 0 6px,transparent 6px 10px)', kc: '#8b9097', kicker: 'Not needed' },
+        todo: { bg: '#fff', fg: '#62666d', bd: '1px solid #e4e6e9', fw: 400, tc: '#62666d', mark: String(i + 1), bar: '#e4e6e9', kc: '#8b9097', kicker: `Step ${i + 1}` },
+      }[state];
+      return { label, sub: sub || '', ...S };
+    };
+    const tl = refs => s.events.filter(e => e.ref && refs.includes(e.ref)).slice().reverse().map(e => ({ text: e.text, actor: e.actor, role: e.role, time: t(e.t), dot: ROLEDOT[e.role] || '#8b9097' }));
+    const feed = (f, lim) => s.events.filter(f).slice(0, lim || 8).map(e => ({ text: e.text, actor: e.actor, role: e.role, time: t(e.t), ref: e.ref || '', dot: ROLEDOT[e.role] || '#8b9097' }));
+    const fdate = iso => { if (!iso) return '—'; const [y, m, d] = String(iso).split('-').map(Number); return `${d} ${MO[m - 1]} ${y}`; };
+    const expTag = iso => {
+      const mo = this.shelfMo(iso, s.clock);
+      const st = mo <= 0 ? 'expired' : mo < this.NEAR ? 'near' : mo < this.MINSHELF ? 'short' : 'ok';
+      const left = mo <= 0 ? 'Expired' : mo < 1 ? `${Math.max(1, Math.round(mo * 30.44))} days left` : `${Math.floor(mo)} months left`;
+      const c = { expired: chip('Expired', 'danger'), near: chip('Near expiry', 'warning'), short: chip(`Under ${this.MINSHELF} months`, 'info'), ok: chip('OK', 'success') }[st];
+      return { mo, st, left, chip: c, flag: st !== 'ok', fg: st === 'expired' ? '#c62828' : st === 'near' ? '#a84c06' : '#62666d' };
+    };
+    const lineRows = arr => (arr || []).map(l => { const tg = expTag(l.exp); const p = P.find(x => x.k === l.k) || P[0]; return { k: l.k, name: p.name, short: p.short, brand: p.brand, batch: l.batch, mfg: fdate(l.mfg), exp: fdate(l.exp), left: tg.left, expFg: tg.fg, chip: tg.chip, flag: tg.flag, qty: num(l.qty), _qty: l.qty }; });
+    return {
+      fdate, expTag, lineRows, nearMonths: this.NEAR, minShelf: this.MINSHELF,
+      fefo: (lots, k, qty, minMo) => this.fefo(lots, k, qty, minMo, s.clock),
+      P, num, t, date, dur, chip, TONE, items, step, tl, feed, ROLEDOT, clock: s.clock, mask: n => this.mask(n),
+      oChip: st => chip(OS[st][0], OS[st][1]),
+      wChip: st => chip(WS[st][0], WS[st][1]),
+      minLevel: { male: 5000, female: 300 },
+      low: { male: 200, female: 20 },
+      whName: w => (w === 'NMS' ? 'National Medical Stores' : 'Joint Medical Store'),
+      whUser: w => this.whUser(w),
+      nextDn: 'DN-2026-' + String(s.seq.dn + 1).padStart(4, '0'),
+      kpiCols: (() => { const w = this.state.w; const cw = w - (w >= 1024 ? (this.state.col ? 68 : 248) : 0) - 40; return cw >= 1080 ? 4 : cw >= 520 ? 2 : 1; })(),
+      kpi: k => this.kpiCard(k),
+      chartLine: o => this.buildLine(o),
+      chartBars: o => this.buildBars(o),
+      chartH: o => this.buildHbars(o),
+      weeks: n => Array.from({ length: n }, (_, i) => { if (i === n - 1) return 'This wk'; const d = new Date(this.BASE + (s.clock - (n - 1 - i) * 10080) * 60000); return `${d.getUTCDate()} ${MO[d.getUTCMonth()]}`; }),
+      days: (n, k) => Array.from({ length: k }, (_, j) => { const back = Math.round((n - 1) * (1 - j / (k - 1))); if (back === 0) return 'Today'; const d = new Date(this.BASE + (s.clock - back * 1440) * 60000); return `${d.getUTCDate()} ${MO[d.getUTCMonth()]}`; }),
+      menu: (e, items) => this.openMenu(e, items),
+      copy: (txt, what) => { try { if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(() => {}); } catch (err) {} this.act('toast', { toast: 'Copied ' + (what ? what + ' ' : '') + txt + '.' }); },
+      call: (name, phone) => this.act('toast', { toast: 'Calling ' + name + ' on ' + phone + '…' }),
+      toast: text => this.act('toast', { toast: text }),
+      goRole: (role, page, id, extra) => this.act('nav', { role, page, id: id ?? null, ...(extra || {}) }),
+    };
+  }
+
+  renderVals() {
+    const s = this.state.s;
+    const showBar = this.props.showGuide ?? true;
+    if (!s) return { sk: {}, menu: { open: false, items: [] }, RD: this.RD, wsDisp: 'none', showBar: false, isApp: false, isOnb: false, roleChips: [], phases: [], guide: {}, navItems: [], user: {}, ic: {}, is: {}, bell: {}, toast: {} };
+    const role = s.role;
+    const lib = this.lib(s);
+    const go0 = this.guide(s); const gr = this.guideR(s);
+    const g = go0.done ? { ...gr, phase: gr.phase + 7 } : go0;
+    const ROLES = [['onb', 'Onboarding'], ['vht', 'VHT'], ['hm', 'Hotspot manager'], ['dcfp', 'DCFP'], ['wh', 'Warehouse'], ['rider', 'Rider'], ['moh', 'MOH']];
+    const roleChips = ROLES.map(([id, label]) => {
+      const on = id === role;
+      return { label, next: id === g.role && !g.done, onClick: () => this.act('nav', { role: id }), bg: on ? '#fafafb' : 'transparent', fg: on ? '#0c0d0f' : '#c9cdd2', bd: on ? '#fafafb' : '#3a3d43' };
+    });
+    const hero = s.orders.find(x => x.id === s.heroId);
+    const skipWh = hero && !hero.wr && (go0.done || go0.phase >= 4);
+    const PH = ['Stockout notified', 'Order review', 'Warehouse request', 'Receive & verify', 'Dispatch to rider', 'Delivery', 'Receipt confirmed', 'Data entry', 'Validation', 'Rectify errors', 'Sent to MOH', 'MOH review'];
+    const oPh = go0.done ? 7 : go0.phase, rPh = gr.done ? 5 : gr.phase;
+    const phases = PH.map((label, i) => {
+      const isR = i >= 7, j = isR ? i - 7 : i;
+      const skipped = (!isR && skipWh && (j === 2 || j === 3)) || (isR && j === 2 && !!gr.skipFix && rPh > 2);
+      const done = (isR ? !!gr.done : !!go0.done) || j < (isR ? rPh : oPh);
+      const cur = !g.done && i === g.phase;
+      return { label: skipped ? `${label} · not needed` : label, bar: skipped ? '#2a2d33' : done ? '#45ba50' : cur ? '#fafafb' : '#2a2d33', fg: cur ? '#fafafb' : done && !skipped ? '#8fd696' : '#7d828a' };
+    });
+    const guide = {
+      prefix: g.done ? 'Done:' : 'Next:', who: g.who, text: g.text,
+      cta: role === g.role ? 'Show me' : `Go to ${g.who}`,
+      go: () => this.act('nav', { role: g.role, page: g.page, id: g.id ?? null, ...(g.wh ? { wh: g.wh } : {}) }),
+    };
+    const dOpen = this.state.dock === true;
+    const base = { ...this.skVals(s, role), RD: this.RD, menu: this.menuVals(), phaseGroups: [{ label: 'Order distribution', flex: 7, cols: 7, items: phases.slice(0, 7), fg: !go0.done ? '#fafafb' : '#8fd696' }, { label: 'Monthly reporting', flex: 5, cols: 5, items: phases.slice(7), fg: gr.done ? '#8fd696' : go0.done ? '#fafafb' : '#7d828a' }], dock: { open: dOpen, toggle: () => this.setState(st => ({ dock: st.dock !== true })), label: dOpen ? 'Hide flow progress' : 'Show flow progress', rot: dOpen ? 'rotate(180deg)' : 'none', left: (this.state.w >= 1024 && !['onb', 'vht', 'hm', 'rider'].includes(role)) ? ((this.state.col ? 68 : 248) + 16) + 'px' : '16px', pad: dOpen ? '10px 12px 14px 16px' : '10px 12px 10px 16px' }, showBar, roleChips, phases, guide, reset: () => this.act('reset'), store: s, act: this.act, go: this.go, lib, nav: s.nav[role], hasToast: !!this.state.toast, toast: this.state.toast ? { text: this.state.toast.text, dot: this.state.toast.warn ? '#e0a03a' : '#45ba50' } : {} };
+    if (role === 'onb') return { ...base, isOnb: true, isApp: false, isMob: false, navItems: [], user: {}, ic: {}, is: {}, bell: {} };
+    if (['vht', 'hm', 'rider'].includes(role)) {
+      const mob = { ...this.mobDef(), ...(s.mob || {}) };
+      const ios = mob.device === 'ios';
+      const fw = ios ? 414 : 380, fh = ios ? 868 : 800;
+      const sc = mob.zoom === 'full' ? 1 : Math.max(0.45, Math.min(1, ((this.state.h || 860) - 152) / fh));
+      const U = { vht: ['Joseph Ssemwogerere', 'VHT · Katabi & Kajjansi', 'VHT app'], hm: ['Grace Nakato', 'Kasenyi Landing Site', 'Hotspot manager app'], rider: ['Musa Kato', 'Rider · UFB 412K', 'Rider app'] }[role];
+      const seg = (items, cur, pick) => items.map(([k, label]) => { const on = k === cur; return { label, on, pick: () => { if (!on) pick(k); }, bg: on ? '#fff' : 'transparent', fg: on ? '#0c0d0f' : '#4a4e55', sh: on ? '0 1px 2px rgba(12,13,15,.14)' : 'none' }; });
+      const nq = (mob.outbox || []).length;
+      return { ...base, sk: {}, wsDisp: 'block', hasToast: false, isOnb: false, isApp: false, isMob: true, navItems: [], user: {}, ic: {}, is: {}, bell: {},
+        mobT: this.state.toast ? { text: this.state.toast.text, warn: !!this.state.toast.warn } : null,
+        mob: { role, device: mob.device, user: U[0], org: U[1], app: U[2], w: Math.round(fw * sc) + 'px', h: Math.round(fh * sc) + 'px', fw: fw + 'px', fh: fh + 'px', sc: String(sc),
+          devices: seg([['android', 'Android'], ['ios', 'iPhone']], mob.device, k => this.act('mob', { set: { device: k } })),
+          nets: seg([['on', 'Online'], ['off', 'Offline']], mob.offline ? 'off' : 'on', k => (k === 'on' ? this.act('online') : this.act('mob', { set: { offline: true } }))),
+          zooms: seg([['fit', 'Fit to window'], ['full', '100%']], mob.zoom, k => this.act('mob', { set: { zoom: k } })),
+          hasQ: !!mob.offline, qTxt: nq ? `${nq} action${nq > 1 ? 's' : ''} saved on the phone. Go online to send.` : 'Actions are saved on the phone until you go online.' } };
+    }
+
+    const cfg = this.NAV[role];
+    const nav = s.nav[role];
+    const wide = this.state.w >= 1024;
+    const badges = this.badges(s);
+    const page = nav.page;
+    const itemOf = pg => Object.keys(cfg.items).find(k => cfg.items[k].pages.includes(pg));
+    const det = cfg.detail[page];
+    const listItem = itemOf(page);
+    const curItem = listItem || (det && det[0]) || cfg.groups[0][1][0];
+    const ci = cfg.items[curItem];
+    const pm = cfg.pages[page] || [];
+    const REP = ['reports', 'report'].includes(page);
+    const bsum = k => cfg.items[k].pages.reduce((a, p) => a + (badges[role + ':' + p] || 0), 0);
+    const colX = this.state.w >= 1024 && !!this.state.col;
+    const navGroups = cfg.groups.map(([label, ids], gi) => ({ label: label || '', hasLabel: !!label && !colX, sep: colX && gi > 0, items: ids.map(id => {
+      const it = cfg.items[id]; const active = id === curItem; const badge = bsum(id);
+      return { label: it.label, active, cur: active ? 'page' : undefined, badge, hasBadge: badge > 0, onClick: () => this.act('nav', { page: it.pages[0] }), bg: active ? 'rgba(69,186,80,.12)' : 'transparent', fg: active ? '#0c0d0f' : '#4a4e55', fw: active ? 600 : 500, ic: active ? '#177534' : '#8b9097', mask: this.mask(it.icon), exp: !colX, title: it.label, jc: colX ? 'center' : 'flex-start', pad: colX ? '0' : '0 10px 0 12px', pillBadge: !colX && badge > 0, dotBadge: colX && badge > 0 };
+    }) }));
+    const tabs = listItem && ci.pages.length > 1 ? ci.pages.map(p => { const on = p === page; const b = badges[role + ':' + p] || 0; return { label: cfg.pages[p][2], on, onClick: () => this.act('nav', { page: p }), fg: on ? '#0c0d0f' : '#62666d', bd: on ? '#0c0d0f' : 'transparent', fw: on ? 600 : 500, hasBadge: b > 0, badge: b }; }) : [];
+    const wh = nav.wh || 'NMS';
+    const u = role === 'wh' ? [lib.whUser(wh), wh === 'NMS' ? 'NMS · Entebbe' : 'JMS · Kampala'] : cfg.user;
+    const initials = u[0].replace('Dr. ', '').split(' ').map(x => x[0]).slice(0, 2).join('');
+    const roleLabel = role === 'wh' ? wh : cfg.label;
+    // in-app notifications (user_notifications) for this role
+    const mine = { hm: e => { const o = s.orders.find(x => x.id === e.ref); return o && o.hotspotId === 'HS-0231' && e.role !== 'Hotspot manager' && e.role !== 'System'; },
+      vht: e => { const o = s.orders.find(x => x.id === e.ref); const h = o && s.hotspots.find(x => x.id === o.hotspotId); return h && h.vhts.includes('Joseph Ssemwogerere') && e.role !== 'VHT' && e.role !== 'System'; },
+      dcfp: e => { const o = s.orders.find(x => x.id === e.ref); const w = s.wrs.find(x => x.id === e.ref); return (o && e.role !== 'DCFP' && e.role !== 'System') || (w && w.district === 'Wakiso' && (e.role === 'NMS' || e.role === 'JMS')); },
+      wh: e => { const w = s.wrs.find(x => x.id === e.ref); return w && w.warehouse === wh && e.role === 'DCFP'; },
+      rider: e => /rider Musa Kato/.test(e.text),
+      moh: e => e.role !== 'System' };
+    const bellItems = lib.feed(mine[role], 6).map(e => ({ text: e.text, meta: `${e.actor} · ${e.ref} · ${e.time}`, dot: e.dot }));
+    const bellCount = Object.keys(badges).filter(k => k.startsWith(role + ':')).reduce((a, k) => a + badges[k], 0);
+    return {
+      ...base, isOnb: false, isApp: true,
+      narrow: !wide, sbShow: wide || this.state.sb, sbPos: wide ? 'sticky' : 'fixed', sbScrim: !wide && this.state.sb,
+      openSb: () => this.setState({ sb: true }), closeSb: () => this.setState({ sb: false }),
+      ic: { vht: role === 'vht', hm: role === 'hm', dcfp: role === 'dcfp', wh: role === 'wh', rider: role === 'rider', moh: role === 'moh' },
+      is: { vht: role === 'vht' && !REP, hm: role === 'hm' && !REP, dcfp: role === 'dcfp' && !REP, wh: role === 'wh' && !REP, rider: role === 'rider', moh: role === 'moh' && !REP && !['users', 'roles', 'products', 'units', 'stores', 'geo', 'audit'].includes(nav.page), admin: role === 'moh' && ['users', 'roles', 'products', 'units', 'stores', 'geo', 'audit'].includes(nav.page), rep: REP },
+      roleLabel, navGroups, tabs, hasTabs: tabs.length > 0, user: { name: u[0], org: u[1], initials },
+      roleMask: this.mask('role_' + role), padL: wide ? '264px' : '0px',
+      crumb: { role: roleLabel, section: ci.label, go: () => this.act('nav', { page: ci.pages[0] }), hasDetail: !listItem && !!det, detail: det ? det[1] : '', sc: listItem ? '#0c0d0f' : '#62666d' },
+      pageTitle: listItem ? (pm[0] || ci.label) : det ? det[1] : ci.label,
+      pageSub: listItem ? (pm[1] || '') : '', hasSub: !!listItem,
+      bell: { open: this.state.bell, has: bellCount > 0, count: bellCount, items: bellItems, empty: bellItems.length === 0 },
+      toggleBell: () => this.setState(st => ({ bell: !st.bell })),
+      sbShow: wide || this.state.sb, sbScrim: !wide && this.state.sb, sbW: wide ? (colX ? '68px' : '248px') : '264px', padL: wide ? (colX ? '68px' : '248px') : '0px',
+      exp: !colX, footJc: colX ? 'center' : 'flex-start', navPad: colX ? '14px 12px' : '14px 14px 16px', wideTop: this.state.w >= 760,
+      toggleSb: () => (wide ? this.setState(st => ({ col: !st.col })) : this.setState(st => ({ sb: !st.sb }))),
+      sbLabel: wide ? (colX ? 'Expand sidebar' : 'Collapse sidebar') : 'Open menu',
+      bandPad: listItem ? (tabs.length ? '12px 20px 0' : '12px 20px 14px') : '12px 20px',
+    };
+  }
+}
+</script>
+</body>
+</html>
