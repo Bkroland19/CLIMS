@@ -1,167 +1,241 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useId } from 'react';
 
-import { Brand } from '@/components/layout/Brand';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarHeader,
+  SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import type { NavGroup } from '@/navigation/navigation';
-import { HOME_PATH } from '@/navigation/paths';
+import {
+  countOf,
+  type NavCounts,
+  type NavItem,
+  type NavLocation,
+  type NavSection,
+  type Workspace,
+} from '@/navigation/navigation';
 
-interface NavGroupSectionProps {
-  group: NavGroup;
-  pathname: string;
+/** Read after a badge's number by screen readers, which cannot see the pill. */
+const COUNT_SUFFIX = 'need attention';
+
+interface NavEntryProps {
+  item: NavItem;
+  location: NavLocation;
+  counts: NavCounts | undefined;
 }
 
-function NavGroupSection({ group, pathname }: NavGroupSectionProps) {
-  const { state, isMobile, setOpen, setOpenMobile } = useSidebar();
-  const isActive = group.items.some((item) => item.path === pathname);
-  const [isExpanded, setIsExpanded] = useState(isActive);
-
-  // Navigating into a group (by link, back button or redirect) reveals it.
-  const [wasActive, setWasActive] = useState(isActive);
-  if (isActive !== wasActive) {
-    setWasActive(isActive);
-    if (isActive) setIsExpanded(true);
-  }
-
-  const Icon = group.icon;
-  const isCollapsedToIcons = state === 'collapsed' && !isMobile;
+function NavEntry({ item, location, counts }: NavEntryProps) {
+  const { setOpenMobile } = useSidebar();
+  const href = item.pages[0].path;
+  const isActive = location.item === item;
+  const isExactPage = location.page?.path === href;
+  const count = countOf(item, counts);
+  const Icon = item.icon;
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
-      <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton
-            tooltip={group.label}
-            onClick={() => {
-              // In icon mode the sub-links are hidden, so open the sidebar to show them.
-              if (isCollapsedToIcons) {
-                setOpen(true);
-                setIsExpanded(true);
-              }
-            }}
-            className={cn(
-              'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground h-10 gap-3 rounded-lg px-3 font-medium',
-              isActive && 'text-sidebar-foreground',
-            )}
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={isActive}
+        tooltip={item.label}
+        className={cn(
+          'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground h-9 gap-3 rounded-lg pr-2.5 pl-3 text-sm font-medium',
+          'data-[active=true]:bg-primary/12 data-[active=true]:text-sidebar-foreground data-[active=true]:font-semibold',
+          count > 0 && 'pr-10',
+        )}
+      >
+        <Link
+          href={href}
+          // The current item's link may lead to its first tab rather than this
+          // exact page, so it is "current" without being "this page".
+          aria-current={isExactPage ? 'page' : isActive ? 'true' : undefined}
+          onClick={() => {
+            setOpenMobile(false);
+          }}
+        >
+          <Icon
+            className={cn('size-4.5!', isActive ? 'text-success' : 'text-muted-foreground')}
+            aria-hidden="true"
+          />
+          <span>{item.label}</span>
+          {count > 0 ? <span className="sr-only">{`, ${count} ${COUNT_SUFFIX}`}</span> : null}
+        </Link>
+      </SidebarMenuButton>
+      {count > 0 ? (
+        <>
+          <SidebarMenuBadge
+            aria-hidden="true"
+            className="bg-foreground text-background peer-data-active/menu-button:text-background peer-hover/menu-button:text-background top-2! right-2.5 rounded-full px-1.5 text-[0.6875rem] font-semibold"
           >
-            <Icon className={cn('size-5!', isActive && 'text-success')} aria-hidden="true" />
-            <span>{group.label}</span>
-            <ChevronRight
-              className={cn(
-                'ml-auto size-4! transition-transform duration-200',
-                isExpanded && 'rotate-90',
-              )}
-              aria-hidden="true"
-            />
-          </SidebarMenuButton>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarMenuSub className="mr-0 ml-5.5 gap-0.5 pr-0">
-            {group.items.map((item) => {
-              const isCurrent = item.path === pathname;
+            {count}
+          </SidebarMenuBadge>
+          {/* Icon mode has no room for the number; a dot says "something is waiting". */}
+          <span
+            aria-hidden="true"
+            className="bg-destructive ring-sidebar pointer-events-none absolute top-1 right-1 hidden size-2 rounded-full ring-2 group-data-[collapsible=icon]:block"
+          />
+        </>
+      ) : null}
+    </SidebarMenuItem>
+  );
+}
+
+interface NavSectionGroupProps {
+  section: NavSection;
+  isFirst: boolean;
+  location: NavLocation;
+  counts: NavCounts | undefined;
+}
+
+function NavSectionGroup({ section, isFirst, location, counts }: NavSectionGroupProps) {
+  const labelId = useId();
+  return (
+    <SidebarGroup className="p-0" role="group" aria-labelledby={labelId}>
+      {/* With the labels hidden in icon mode, a rule keeps the sections apart. */}
+      {isFirst ? null : (
+        <SidebarSeparator className="mb-2.5 hidden group-data-[collapsible=icon]:block" />
+      )}
+      <SidebarGroupLabel
+        id={labelId}
+        className="text-muted-foreground h-auto px-3 pb-2 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
+      >
+        {section.label}
+      </SidebarGroupLabel>
+      <SidebarMenu className="gap-0.5">
+        {section.items.map((item) => (
+          <NavEntry key={item.id} item={item} location={location} counts={counts} />
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
+
+interface WorkspaceSwitcherProps {
+  workspaces: readonly Workspace[];
+  current: Workspace;
+}
+
+/** The sidebar's foot: which workspace this is, and the way to the others. */
+function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProps) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const Icon = current.icon;
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              tooltip={`Workspace: ${current.label}`}
+              className="hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent h-auto gap-2.5 rounded-lg px-1 py-1.5"
+            >
+              <span className="bg-primary/14 text-success flex size-8 shrink-0 items-center justify-center rounded-lg">
+                <Icon className="size-4" aria-hidden="true" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col text-left leading-tight">
+                <span className="text-muted-foreground text-[0.6875rem] font-semibold tracking-[0.06em] uppercase">
+                  Workspace
+                </span>
+                <span className="truncate text-[0.84375rem] font-semibold">{current.label}</span>
+              </span>
+              <ChevronsUpDown
+                className="text-muted-foreground size-4 shrink-0"
+                aria-hidden="true"
+              />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side={isMobile ? 'top' : 'right'} align="end" className="w-60">
+            <DropdownMenuLabel className="text-muted-foreground text-xs font-medium">
+              Switch workspace
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {workspaces.map((workspace) => {
+              const WorkspaceIcon = workspace.icon;
+              const isCurrent = workspace === current;
               return (
-                <SidebarMenuSubItem key={item.path}>
-                  <SidebarMenuSubButton
-                    asChild
-                    isActive={isCurrent}
-                    className={cn(
-                      'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground relative h-8 rounded-lg px-3',
-                      // The reference design's active marker: a short green bar on the leading edge.
-                      isCurrent &&
-                        'text-sidebar-foreground before:bg-primary font-medium before:absolute before:top-1/2 before:-left-px before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full',
-                    )}
+                <DropdownMenuItem key={workspace.id} asChild>
+                  <Link
+                    href={workspace.basePath}
+                    aria-current={isCurrent ? 'true' : undefined}
+                    onClick={() => {
+                      setOpenMobile(false);
+                    }}
                   >
-                    <Link
-                      href={item.path}
-                      aria-current={isCurrent ? 'page' : undefined}
-                      onClick={() => {
-                        setOpenMobile(false);
-                      }}
-                    >
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
+                    <WorkspaceIcon aria-hidden="true" />
+                    <span className="flex-1 truncate">{workspace.label}</span>
+                    {isCurrent ? <Check className="text-success" aria-hidden="true" /> : null}
+                  </Link>
+                </DropdownMenuItem>
               );
             })}
-          </SidebarMenuSub>
-        </CollapsibleContent>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarMenuItem>
-    </Collapsible>
+    </SidebarMenu>
   );
 }
 
 interface AppSidebarProps {
-  groups: readonly NavGroup[];
+  workspaces: readonly Workspace[];
+  /** Where the current address sits in the navigation. */
+  location: NavLocation;
+  /** Badge counts by page path. Leave out while there is nothing to count. */
+  counts?: NavCounts;
 }
 
-/** The primary navigation: one collapsible section per workspace. */
-export function AppSidebar({ groups }: AppSidebarProps) {
-  const pathname = usePathname();
-  const { state, toggleSidebar, isMobile } = useSidebar();
-  const isCollapsed = state === 'collapsed' && !isMobile;
+/**
+ * The primary navigation: the current workspace's labelled sections, with
+ * count badges, and a workspace switcher at the foot. Collapses to icons on
+ * desktop and becomes a sheet on phones; the top bar's button toggles both.
+ */
+export function AppSidebar({ workspaces, location, counts }: AppSidebarProps) {
+  const { workspace } = location;
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="h-16 justify-center border-b px-4 group-data-[collapsible=icon]:px-1.5">
-        <Link
-          href={HOME_PATH}
-          className="focus-visible:ring-sidebar-ring rounded-lg outline-none focus-visible:ring-2"
-        >
-          <Brand compact={isCollapsed} />
-        </Link>
-      </SidebarHeader>
-
+    <Sidebar
+      collapsible="icon"
+      // Sits under the full-width top bar rather than beside it.
+      className="top-header h-[calc(100svh-var(--spacing-header))]!"
+    >
       <SidebarContent>
-        <SidebarGroup className="px-3 py-4 group-data-[collapsible=icon]:px-2">
-          <nav aria-label="Main">
-            <SidebarMenu className="gap-1">
-              {groups.map((group) => (
-                <NavGroupSection key={group.id} group={group} pathname={pathname} />
-              ))}
-            </SidebarMenu>
-          </nav>
-        </SidebarGroup>
+        <nav
+          aria-label="Main"
+          className="flex flex-col gap-4.5 px-3.5 pt-3.5 pb-4 group-data-[collapsible=icon]:px-3"
+        >
+          {workspace.sections.map((section, index) => (
+            <NavSectionGroup
+              key={section.label}
+              section={section}
+              isFirst={index === 0}
+              location={location}
+              counts={counts}
+            />
+          ))}
+        </nav>
       </SidebarContent>
 
-      <SidebarFooter className="hidden border-t p-3 group-data-[collapsible=icon]:p-2 md:flex">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={toggleSidebar}
-              tooltip="Expand sidebar"
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground h-9 justify-center gap-2 rounded-lg"
-            >
-              <ChevronLeft
-                className={cn(
-                  'size-5! transition-transform duration-200',
-                  isCollapsed && 'rotate-180',
-                )}
-                aria-hidden="true"
-              />
-              <span>Collapse</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarFooter className="border-t px-3 py-2.5">
+        <WorkspaceSwitcher workspaces={workspaces} current={workspace} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
