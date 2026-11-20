@@ -1,0 +1,391 @@
+PostgreSQL · schema public · draft 5
+CLIMS Target Database Schema
+A normalized redesign of the Condom Logistics Information Management System
+database — reconciled against the legacy MySQL-ported-to-Postgres source.
+24 modelled tables · 29 tables in total · 47 foreign keys · every id and foreign key is a uuid · every table
+carries created_at / updated_at
+This document accompanies the entity-relationship diagram on the project whiteboard. It records the purpose of
+every table and field, the design decisions made while normalizing the legacy schema, and the points still open
+for confirmation.
+
+-- 1 of 12 --
+
+Overview & methodology
+The legacy CLIMS database (MySQL, ported column-for-column to Postgres) has no real foreign keys: almost
+every relationship is an untyped varchar column holding a district UID, a hotspot id, or the literal string ‘jms’,
+matched by the application at query time rather than by the database. Several columns are also overloaded —
+the same field holds a user id in one row and a hotspot id in another — and a number of columns are legacy
+artefacts that are always NULL or always blank.
+This target schema normalizes that structure: every relationship becomes a typed uuid foreign key, every
+overloaded column is split into the distinct relationships it was standing in for (for example, a transaction's
+polymorphic ‘receiving organization unit’ becomes two columns, receiving_store_id and receiving_hot_spot_id),
+and legacy columns that were never populated are left out. New tables were added where the legacy design
+was missing a concept entirely — role-based permissions, an audit trail, a proper contact-person entity, and
+sessions — and every table now carries created_at/updated_at and a uuid primary key.
+The design went through five drafts: an initial normalization pass, a request to use uuid keys and round out the
+users/roles/organisation_units/condom_inventories tables, a round adding audit, session, contact-person and
+hot-spot fields, and a final pass reconciling every table against the legacy source file the project team supplied
+(3_erd_target_postgres.html) — which caught a handful of genuinely missing fields and corrected two earlier
+guesses (see the sections below).
+Design decisions
+Users’ working area — Resolved. users.store_id and users.hot_spot_id (whichever is set) now determine a
+user's area. The earlier region_id/district_id/subcounty_id columns on users were redundant with that and have
+been removed.
+Stock-holding locations — Resolved. The legacy data only ever uses ‘jms’ or a district UID as a stock-holding
+location, never a facility-level organisation unit. That confirms stores (not organisation_units) is the right target
+for condom_inventories.store_id, transactions.sending_store_id/receiving_store_id, and orders.
+One hot spot per user — Resolved. A user can cover more than one hot spot. hot_spot_user is a new join
+table for this — the legacy schema even had an empty, unused hotspot_user_mappings table for the same
+purpose. users.hot_spot_id remains as the user's primary/default hot spot.
+Orders and the condom being ordered — Resolved. orders.condom_id now names the product an order is
+for. The legacy orders table had no such column at all, which was flagged as an open question from the first
+draft.
+condom_inventories.organisation_unit_stocking — Resolved. An earlier draft added this as a separate
+facility-level column alongside store_id. The source file shows it is the same underlying value as store_id (both
+are ‘district UID or jms’), so the duplicate column was removed and store_id kept.
+hot_spots.type / hot_spots.status — Corrected. An earlier draft put a ‘permanent or not’ type and an ‘active
+or inactive’ status on contact_persons. The source file confirms both columns actually belong on hot_spots, so
+they were moved.
+Role → permission model — New. The legacy schema stored a single role per user as free text (roles.id as a
+string). The target schema adds roles, permissions, role_permission and role_user so a user can hold more
+than one role and a role can hold more than one permission.
+Orphaned notifications (legacy data) — Open — not a schema question. Existing user_notifications.order_id
+values in the legacy data point at an orders table that is empty. This is a data-migration concern for whoever
+
+-- 2 of 12 --
+
+loads the legacy data into the new schema, not something the schema design itself can resolve.
+Still open for confirmation
+The legacy source file doesn't cover every table in the target schema (it has no stores or contact_persons table
+at all), so a few fields are still best-guess additions rather than confirmed by source. They're marked ‘inferred —
+confirm’ on the diagram and listed here:
+l contact_persons.name and contact_persons.phone_number — a contact person needs to be identifiable
+somehow; no source table exists to confirm the field names.
+l stores.name — the legacy data has no stores table at all (stock locations are bare text codes), so this is a
+new, unconfirmed field.
+l users.location — present in the source (varchar(15)) but its meaning isn't documented; kept as-is pending
+clarification.
+Schema reference
+Every modelled table, grouped by area. Blue table-name bars mark tables that don't exist in the legacy schema at all. ‘Key’ marks
+primary keys (PK), unique columns (UK) and foreign keys (FK); a composite primary key shows as PK,FK on each of its columns.
+Geography & reference data
+regions
+Top of the DHIS2 administrative hierarchy. Synced by UID from DHIS2; everything below hangs off it.
+Type Column Key Notes
+uuid id PK
+varchar uid UK DHIS2 UID
+varchar name
+timestamp created_at
+timestamp updated_at
+districts
+Districts within a region, synced by UID from DHIS2.
+Type Column Key Notes
+uuid id PK
+varchar uid UK DHIS2 UID
+varchar name
+uuid region_id FK
+timestamp created_at
+timestamp updated_at
+
+-- 3 of 12 --
+
+subcounties
+Subcounties within a district, synced by UID from DHIS2 — the administrative level most other tables key off.
+Type Column Key Notes
+uuid id PK
+varchar uid UK DHIS2 UID
+varchar name
+uuid district_id FK
+timestamp created_at
+timestamp updated_at
+organisation_units
+Health facilities (DHIS2 organisation units) within a subcounty, carrying the facility attributes used for reporting:
+level, ownership, authority, registry id.
+Type Column Key Notes
+uuid id PK
+varchar uid UK facility UID
+varchar name
+varchar shortname
+integer nhfrid from source — national health facility registry id
+varchar hflevel
+varchar ownership
+varchar authority
+varchar status
+uuid subcounty_id FK
+timestamp created_at
+timestamp updated_at
+stores
+The stock-holding points confirmed in the legacy data: JMS (national) and the district stores. Everything that
+moves condom stock ultimately references a store.
+Type Column Key Notes
+uuid id PK
+varchar code UK jms or district UID
+varchar name not in source — no stores table there
+varchar store_type national or district
+uuid district_id FK unique
+timestamp created_at
+timestamp updated_at
+
+-- 4 of 12 --
+
+unit_of_measures
+Units condoms are counted in (e.g. box, carton).
+Type Column Key Notes
+uuid id PK
+varchar name UK
+timestamp created_at
+timestamp updated_at
+Access control
+roles
+Named roles (e.g. district focal person, JMS admin) a user can hold.
+Type Column Key Notes
+uuid id PK
+varchar name UK
+varchar description
+timestamp created_at
+timestamp updated_at
+permissions
+Granular permissions that can be attached to a role.
+Type Column Key Notes
+uuid id PK
+varchar name UK
+varchar description
+timestamp created_at
+timestamp updated_at
+role_permission
+Many-to-many join between roles and permissions.
+Type Column Key Notes
+uuid role_id PK,FK
+uuid permission_id PK,FK
+timestamp created_at
+timestamp updated_at
+
+-- 5 of 12 --
+
+users
+System users and staff. A user's working area comes from store_id or hot_spot_id, whichever is set;
+organisation_unit_id and subcounty_id record their facility/geography context.
+Type Column Key Notes
+uuid id PK
+varchar email UK
+varchar username UK source has this non-unique — made unique, confirm
+varchar password
+varchar first_name
+varchar last_name
+varchar phone_number
+varchar location from source — meaning unclear, confirm
+varchar status
+uuid organisation_unit_id FK
+uuid subcounty_id FK
+uuid store_id FK nullable — area derives from here
+uuid hot_spot_id FK nullable, primary hotspot — see hot_spot_user for others
+varchar remember_token
+timestamp created_at
+timestamp updated_at
+role_user
+Many-to-many join between users and roles — a user can hold more than one role (the legacy schema only
+allowed one).
+Type Column Key Notes
+uuid user_id PK,FK
+uuid role_id PK,FK
+timestamp created_at
+timestamp updated_at
+sessions
+Active login sessions.
+Type Column Key Notes
+varchar id PK session token, not a uuid
+uuid user_id FK nullable
+varchar ip_address
+varchar user_agent
+
+-- 6 of 12 --
+
+Type Column Key Notes
+text payload
+integer last_activity
+timestamp created_at
+timestamp updated_at
+Product catalogue
+condoms
+The product catalogue. category, brand and type together identify a specific condom product.
+Type Column Key Notes
+uuid id PK
+varchar category from source
+varchar brand from source
+varchar type from source
+uuid unit_of_measure_id FK
+integer number_of_condoms_per_unit
+timestamp created_at
+timestamp updated_at
+Hot-spot network
+hot_spots
+Field distribution points (bars, lodges, taxi stages, etc.) where condoms are made available, each with its own
+dispenser.
+Type Column Key Notes
+uuid id PK
+varchar name
+varchar type from source — permanent or not
+varchar village from source
+uuid subcounty_id FK replaces district_id
+uuid entered_by_id FK
+numeric latitude
+numeric longitude
+boolean has_condom_dispenser
+varchar dispenser_condition
+varchar status from source — active or inactive
+text comment from source
+
+-- 7 of 12 --
+
+Type Column Key Notes
+timestamp created_at
+timestamp updated_at
+contact_persons
+People reachable at a hot spot. Pulled out of hot_spots so a hot spot can have more than one contact over
+time.
+Type Column Key Notes
+uuid id PK
+varchar name inferred — confirm
+varchar phone_number inferred — confirm
+uuid hot_spot_id FK
+timestamp created_at
+timestamp updated_at
+contact_person_user
+Many-to-many join between contact persons and system users, for a contact person who is also a system user.
+Type Column Key Notes
+uuid contact_person_id PK,FK
+uuid user_id PK,FK
+timestamp created_at
+timestamp updated_at
+hot_spot_user
+Many-to-many join letting a user cover more than one hot spot — users.hot_spot_id alone only captures their
+primary one.
+Type Column Key Notes
+uuid hot_spot_id PK,FK resolves ‘can a user cover more than one hotspot’
+uuid user_id PK,FK
+timestamp created_at
+timestamp updated_at
+Inventory & stock movement
+condom_inventories
+The stock ledger: one row per condom / store / batch, carrying the original and current stock levels.
+
+-- 8 of 12 --
+
+Type Column Key Notes
+uuid id PK
+uuid condom_id FK
+uuid store_id FK = source's organization_unit_stocking
+uuid unit_of_measure_id FK
+uuid created_by_id FK
+varchar batch_number from source
+integer original_stock
+integer quantity_in_stock
+numeric condom_unit_cost
+timestamp created_at
+timestamp updated_at
+transactions
+Stock movements against an inventory row: an addition, a distribution, or an acknowledgement of a distribution.
+Type Column Key Notes
+uuid id PK
+varchar transaction_type addition, distribution or acknowledgement
+varchar status
+date transaction_date
+integer balance_on_hand from source
+uuid condom_inventory_id FK
+uuid sending_store_id FK
+uuid receiving_store_id FK one receiver max
+uuid receiving_hot_spot_id FK one receiver max
+uuid transacted_by_id FK
+integer transaction_quantity
+timestamp created_at
+timestamp updated_at
+evidence
+Uploaded supporting documents (delivery note, acknowledgement note, issuing note, request note) attached to
+a transaction.
+Type Column Key Notes
+uuid id PK
+uuid transaction_id FK
+varchar upload
+varchar file_name
+
+-- 9 of 12 --
+
+Type Column Key Notes
+varchar document_upload_type delivery, acknowledgement, issuing or request note
+timestamp created_at
+timestamp updated_at
+hot_spot_stocks
+Deliveries of stock out to a hot spot — who delivered it, who received it, and the batch/expiry details.
+Type Column Key Notes
+uuid id PK
+uuid hot_spot_id FK
+uuid condom_id FK
+integer quantity_brought renamed from quantity
+integer stock_found from source — stock already there on arrival
+varchar batch_number
+date expiry_date
+date date_of_delivery
+uuid person_delivering_id FK
+uuid contact_person_delivering_id FK
+timestamp created_at
+timestamp updated_at
+Ordering & notifications
+orders
+Requests to move stock from one store to another: what was asked for versus what was actually issued.
+Type Column Key Notes
+uuid id PK
+uuid condom_id FK resolves ‘should orders name the condom’
+integer quantity_needed from source
+integer quantity_issued from source, nullable until fulfilled
+varchar order_status renamed from status
+date order_date
+uuid ordered_by_id FK
+uuid handled_by_id FK nullable
+uuid ordered_for_store_id FK
+uuid ordered_from_store_id FK
+uuid unit_of_measure_id FK
+text comment from source
+
+-- 10 of 12 --
+
+Type Column Key Notes
+timestamp created_at
+timestamp updated_at
+user_notifications
+In-app notifications — stockout alerts and order-created alerts — to or from users, hot spots and stores.
+Type Column Key Notes
+uuid id PK
+varchar type stockout or ordercreated
+text message
+varchar status from source — read or unread
+uuid sent_from_user_id FK ordercreated
+uuid sent_from_hot_spot_id FK stockout
+uuid sent_to_store_id FK
+uuid sent_by_id FK
+uuid order_id FK nullable
+timestamp created_at
+timestamp updated_at
+System / audit
+audit_trails
+A generic change log: who changed which record, and the old and new values.
+Type Column Key Notes
+uuid id PK
+varchar auditable_type
+uuid auditable_id polymorphic, no FK
+varchar action created, updated or deleted
+text old_values
+text new_values
+uuid user_id FK nullable
+varchar ip_address
+timestamp created_at
+timestamp updated_at
+Laravel framework tables (unmodeled)
+Standard Laravel infrastructure tables, unchanged from the framework defaults and not part of the domain
+schema: personal_access_tokens, migrations, failed_jobs, password_resets, notifications.
+
+-- 11 of 12 --
+
+CLIMS target schema — entity-relationship diagram (draft 5)
+
+-- 12 of 12 --
+
