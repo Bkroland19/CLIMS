@@ -16,7 +16,7 @@ import { testRouter } from './navigation';
 export const testSession: Session = {
   token: 'test-token',
   user: {
-    id: 1,
+    id: '1',
     username: 'snakato',
     role: 'Admin',
     firstname: 'Sarah',

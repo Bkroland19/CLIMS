@@ -2,6 +2,8 @@
 import { usePathname } from 'next/navigation';
 import type { ComponentType, ReactNode } from 'react';
 
+import { matchesPath } from '@/navigation/navigation';
+
 /*
  * Renders the screen at the test router's current address, from the same
  * files Next.js routes to: the `page.tsx` under `src/app`, inside the layout
@@ -55,9 +57,17 @@ const routes = new Map<string, Route>(
 /** Every address that has a `page.tsx`, as the navigation table would write it. */
 export const routedPaths: readonly string[] = [...routes.keys()].sort();
 
+/** The route for `pathname`: a fixed path first, then the first `[param]` folder it fits. */
+function routeFor(pathname: string): Route | undefined {
+  const exact = routes.get(pathname);
+  if (exact) return exact;
+  const pattern = routedPaths.find((path) => path.includes('[') && matchesPath(path, pathname));
+  return pattern === undefined ? undefined : routes.get(pattern);
+}
+
 export function AppUnderTest() {
   const pathname = usePathname();
-  const route = routes.get(pathname);
+  const route = routeFor(pathname);
 
   if (!route) {
     return (

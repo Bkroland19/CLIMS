@@ -7,12 +7,21 @@ export interface RecordedRequest {
   authorization: string | null;
 }
 
-type Reply = { status: number; body?: unknown } | { failure: 'network' | 'timeout' };
+type FixedReply = { status: number; body?: unknown } | { failure: 'network' | 'timeout' };
+
+/**
+ * A reply, or a function choosing one from the request. A function is the
+ * way to answer a screen that asks for several things at once, whose request
+ * order is not fixed.
+ */
+type Reply = FixedReply | ((request: RecordedRequest) => FixedReply);
 
 /**
  * A scripted stand-in for the network. Replies are consumed in order; the last
  * one repeats, so a single-reply script answers every request the same way.
  */
+export type { Reply as FakeReply };
+
 export function createFakeAdapter(...script: Reply[]): {
   adapter: AxiosAdapter;
   requests: RecordedRequest[];
@@ -22,16 +31,18 @@ export function createFakeAdapter(...script: Reply[]): {
 
   const adapter: AxiosAdapter = (config: InternalAxiosRequestConfig) => {
     const authorization: unknown = config.headers.get('Authorization');
-    requests.push({
+    const request: RecordedRequest = {
       method: (config.method ?? 'get').toUpperCase(),
       url: config.url ?? '',
       body: typeof config.data === 'string' ? (JSON.parse(config.data) as unknown) : config.data,
       authorization: typeof authorization === 'string' ? authorization : null,
-    });
+    };
+    requests.push(request);
 
-    const reply = script[Math.min(cursor, script.length - 1)];
+    const scripted = script[Math.min(cursor, script.length - 1)];
     cursor += 1;
-    if (!reply) return Promise.reject(new Error('createFakeAdapter needs at least one reply'));
+    if (!scripted) return Promise.reject(new Error('createFakeAdapter needs at least one reply'));
+    const reply = typeof scripted === 'function' ? scripted(request) : scripted;
 
     if ('failure' in reply) {
       return Promise.reject(
