@@ -19,8 +19,14 @@ compose=(docker compose --project-name clims-prod
 # Fail before changing running services if configuration or image access is invalid.
 "${compose[@]}" config --quiet
 "${compose[@]}" pull backend frontend
-"${compose[@]}" build postgres nginx
-"${compose[@]}" up -d --no-build --wait --wait-timeout 300 postgres backend frontend nginx
+infrastructure=(postgres nginx)
+services=(postgres backend frontend nginx)
+if [[ -f $release/infra/docker/seaweedfs/Dockerfile.prod ]]; then
+  infrastructure+=(seaweedfs)
+  services+=(seaweedfs)
+fi
+"${compose[@]}" build "${infrastructure[@]}"
+"${compose[@]}" up -d --no-build --wait --wait-timeout 300 "${services[@]}"
 
 # Keep the last healthy release discoverable; failed deployments do not advance it.
 if [[ -L $root/current && $(readlink "$root/current") != "$release" ]]; then

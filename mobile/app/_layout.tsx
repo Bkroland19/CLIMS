@@ -1,87 +1,41 @@
-import { useFonts } from "expo-font";
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import "react-native-reanimated";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { AppThemeProvider, useTheme } from "@/context/theme/ThemeProvider";
-import { OfflineBanner, ToastProvider } from "@/components/ui";
-
-import ReactQueryProvider from "./providers/ReactQueryProvider";
-import GlobalProvider from "@/context/auth/GlobalProvider";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import "react-native-reanimated";
+import { ThemeProvider, useTheme } from "@/lib/theme";
+import { SessionProvider, useSession } from "@/lib/session";
 
 SplashScreen.preventAutoHideAsync();
 
-/** Bridges our tokens into React Navigation + the status bar. */
-function ThemedShell({ children }: { children: React.ReactNode }) {
-  const { isDark, colors } = useTheme();
-  const base = isDark ? DarkTheme : DefaultTheme;
+function Shell() {
+  const { T, scheme } = useTheme();
+  const { restoring } = useSession();
+  useEffect(() => {
+    if (!restoring) SplashScreen.hideAsync();
+  }, [restoring]);
+  if (restoring) return null;
   return (
-    <ThemeProvider
-      value={{
-        ...base,
-        colors: {
-          ...base.colors,
-          primary: colors.brand,
-          background: colors.bg,
-          card: colors.surface,
-          text: colors.text,
-          border: colors.border,
-        },
-      }}
-    >
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <ToastProvider>
-        {children}
-        <OfflineBanner />
-      </ToastProvider>
-    </ThemeProvider>
+    <>
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: T.bg } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+      </Stack>
+    </>
   );
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, error] = useFonts({
-    "Poppins-Black": require("../assets/fonts/Poppins-Black.ttf"),
-    "Poppins-Bold": require("../assets/fonts/Poppins-Bold.ttf"),
-    "Poppins-ExtraBold": require("../assets/fonts/Poppins-ExtraBold.ttf"),
-    "Poppins-ExtraLight": require("../assets/fonts/Poppins-ExtraLight.ttf"),
-    "Poppins-Light": require("../assets/fonts/Poppins-Light.ttf"),
-    "Poppins-Medium": require("../assets/fonts/Poppins-Medium.ttf"),
-    "Poppins-Regular": require("../assets/fonts/Poppins-Regular.ttf"),
-    "Poppins-SemiBold": require("../assets/fonts/Poppins-SemiBold.ttf"),
-    "Poppins-Thin": require("../assets/fonts/Poppins-Thin.ttf"),
-  });
-
-  useEffect(() => {
-    if (error) {
-      throw error;
-    }
-
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, error]);
-
   return (
-    <GlobalProvider>
-      <SafeAreaProvider>
-        <AppThemeProvider>
-          <ThemedShell>
-            <ReactQueryProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-              </Stack>
-            </ReactQueryProvider>
-          </ThemedShell>
-        </AppThemeProvider>
-      </SafeAreaProvider>
-    </GlobalProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <SessionProvider>
+          <Shell />
+        </SessionProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

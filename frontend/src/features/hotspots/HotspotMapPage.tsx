@@ -31,7 +31,7 @@ function HotspotMap({ apiKey, hotspots }: HotspotMapProps) {
     id: 'clims-google-maps',
     googleMapsApiKey: apiKey,
   });
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = hotspots.find((hotspot) => hotspot.id === selectedId);
 
   if (loadError) {
@@ -77,7 +77,7 @@ function HotspotMap({ apiKey, hotspots }: HotspotMapProps) {
               {formatText(selected.contact_person_telephone)}
             </p>
             <div>
-              <StatusBadge status={selected.hotspot_status} />
+              <StatusBadge status={selected.status} />
             </div>
           </div>
         </InfoWindowF>

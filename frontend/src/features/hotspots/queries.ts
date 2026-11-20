@@ -4,12 +4,13 @@ import { toast } from 'sonner';
 import { useApiQuery, useHttp } from '@/lib/api';
 
 import {
-  createHotspot,
-  deleteHotspot,
+  actOnHotspot,
+  listDistricts,
+  listHotspotNotifications,
   listHotspots,
-  updateHotspot,
-  type Hotspot,
-  type HotspotInput,
+  submitHotspot,
+  type HotspotAction,
+  type HotspotSubmission,
 } from './api';
 
 const hotspotsKey = ['hotspots'] as const;
@@ -18,31 +19,42 @@ export function useHotspots() {
   return useApiQuery(hotspotsKey, listHotspots);
 }
 
-/** Creates a hotspot, or updates `hotspot` when one is given. */
-export function useSaveHotspot(hotspot: Hotspot | null) {
+export function useHotspotNotifications() {
+  return useApiQuery([...hotspotsKey, 'notifications'], listHotspotNotifications);
+}
+
+export function useDistricts() {
+  return useApiQuery(['districts'], listDistricts);
+}
+
+export function useSubmitHotspot() {
   const http = useHttp();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: HotspotInput) =>
-      hotspot ? updateHotspot(http, hotspot.id, input) : createHotspot(http, input),
+    mutationFn: (input: HotspotSubmission) => submitHotspot(http, input),
     onSuccess: async () => {
-      toast.success(hotspot ? 'Hotspot updated' : 'Hotspot added');
+      toast.success('Hotspot submitted for district verification');
       await queryClient.invalidateQueries({ queryKey: hotspotsKey });
     },
     meta: { handlesOwnErrors: true },
   });
 }
 
-export function useDeleteHotspot() {
+const actionToasts: Record<HotspotAction, string> = {
+  verify: 'Hotspot verified',
+  activate: 'Hotspot activated',
+  reject: 'Hotspot rejected',
+};
+
+export function useHotspotAction() {
   const http = useHttp();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => deleteHotspot(http, id),
-    onSuccess: async () => {
-      toast.success('Hotspot deleted');
+    mutationFn: ({ id, action, reason }: { id: string; action: HotspotAction; reason?: string }) =>
+      actOnHotspot(http, id, action, reason),
+    onSuccess: async (_, { action }) => {
+      toast.success(actionToasts[action]);
       await queryClient.invalidateQueries({ queryKey: hotspotsKey });
     },
-    // The confirmation dialog shows the failure itself.
-    meta: { handlesOwnErrors: true },
   });
 }

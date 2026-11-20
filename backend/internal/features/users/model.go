@@ -1,18 +1,34 @@
 package users
 
-import "clims-backend/internal/features/rbac"
+import (
+	"time"
+
+	"clims-backend/internal/features/rbac"
+)
 
 type User struct {
-	ID           string      `json:"id"`
-	Username     string      `json:"username"`
-	Email        string      `json:"email"`
-	Firstname    string      `json:"firstname"`
-	Lastname     string      `json:"lastname"`
-	Phone        string      `json:"phone_number"`
-	Status       string      `json:"status"`
-	Role         *rbac.Role  `json:"role"`
-	Roles        []rbac.Role `json:"roles"`
-	PasswordHash string      `json:"-"`
+	FacilityAssignment
+	ID          string     `json:"id"`
+	Username    string     `json:"username"`
+	Email       string     `json:"email"`
+	FirstName   string     `json:"first_name"`
+	LastName    string     `json:"last_name"`
+	Firstname   string     `json:"firstname"`
+	Lastname    string     `json:"lastname"`
+	Phone       string     `json:"phone_number"`
+	Location    *string    `json:"location"`
+	SubcountyID *string    `json:"subcounty_id"`
+	StoreID     *string    `json:"store_id"`
+	CreatedAt   *time.Time `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at"`
+	Status      string     `json:"status"`
+	LastLoginAt *time.Time `json:"last_login_at"`
+	LoginCount  int        `json:"login_count"`
+	// ActiveSessions counts the devices currently signed in.
+	ActiveSessions int         `json:"active_sessions"`
+	Role           *rbac.Role  `json:"role"`
+	Roles          []rbac.Role `json:"roles"`
+	PasswordHash   string      `json:"-"`
 }
 
 func (u *User) HasPermission(code string) bool {

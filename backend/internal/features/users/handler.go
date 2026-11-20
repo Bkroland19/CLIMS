@@ -31,9 +31,15 @@ func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleIDs []string) er
 		return response.Error(c, 500, "failed to hash password", nil)
 	}
 	if err != nil {
+		if message, ok := DuplicateIdentifier(err); ok {
+			return response.Error(c, 409, message, nil)
+		}
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return response.Error(c, 409, "email already exists", nil)
+		if errors.As(err, &pgErr) {
+			switch pgErr.ConstraintName {
+			case "users_organisation_unit_id_fkey", "users_hot_spot_id_fkey":
+				return response.Error(c, 422, "unknown organisation unit or hot spot", nil)
+			}
 		}
 		return response.Error(c, 500, "failed to create user", nil)
 	}
@@ -89,6 +95,7 @@ func (h *Handler) CreateUser(c fiber.Ctx) error {
 	if (req.RoleID == "") == (req.RoleIDs == nil) {
 		return response.Error(c, 422, "provide either role_id or role_ids", nil)
 	}
+	req.AccountInput.Assignment = req.FacilityAssignment
 	if req.RoleIDs != nil {
 		return h.createUser(c, req.AccountInput, *req.RoleIDs)
 	}

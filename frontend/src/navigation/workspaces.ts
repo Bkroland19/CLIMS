@@ -12,6 +12,7 @@ import {
   Store,
   Truck,
   Users,
+  UsersRound,
   Warehouse,
 } from 'lucide-react';
 
@@ -27,7 +28,6 @@ import { HOME_PATH } from './paths';
  */
 
 const DESCRIPTIONS = {
-  hotspots: 'Places where condoms are distributed, and who to contact at each.',
   hotspotMap: 'Where hotspots are. Select a marker to see its contact person and status.',
 } as const;
 
@@ -342,7 +342,8 @@ export const workspaces: readonly Workspace[] = [
                 path: '/dcfp/hotspots',
                 tab: 'List',
                 title: 'Hotspots',
-                description: DESCRIPTIONS.hotspots,
+                description:
+                  'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.',
                 layout: 'table',
               },
               {
@@ -433,6 +434,35 @@ export const workspaces: readonly Workspace[] = [
             '/warehouse/reports',
             'Send the monthly warehouse stock report to MOH. CLIMS checks the figures before they are sent.',
           ),
+        ],
+      },
+    ],
+  },
+  {
+    // The prototype puts VHTs in the mobile app only; this web page is their hotspot submissions.
+    id: 'vht',
+    label: 'Village health team',
+    icon: UsersRound,
+    basePath: '/vht',
+    sections: [
+      {
+        label: 'Network',
+        items: [
+          {
+            id: 'hotspots',
+            label: 'My hotspots',
+            icon: MapPin,
+            pages: [
+              {
+                path: '/vht',
+                tab: 'My hotspots',
+                title: 'My hotspots',
+                description:
+                  'Hotspots you identified, and where each one is in district verification.',
+                layout: 'table',
+              },
+            ],
+          },
         ],
       },
     ],

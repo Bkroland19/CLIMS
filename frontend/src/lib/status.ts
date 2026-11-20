@@ -37,6 +37,7 @@ const INFO = new Set([
 ]);
 const CAUTION = new Set([
   'pending',
+  'submitted',
   'pending verification',
   'in progress',
   'processing',

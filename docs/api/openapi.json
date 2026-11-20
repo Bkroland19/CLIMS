@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "CLIMS API",
-    "version": "2.0.1",
-    "description": "Current Go/Fiber API for authentication, users, RBAC, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
+    "version": "2.1.0",
+    "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, inventory reporting, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
   },
   "servers": [
     {
@@ -22,6 +22,15 @@
       "name": "RBAC"
     },
     {
+      "name": "Orders"
+    },
+    {
+      "name": "Hotspots"
+    },
+    {
+      "name": "Inventory"
+    },
+    {
       "name": "Health"
     }
   ],
@@ -31,12 +40,477 @@
     }
   ],
   "paths": {
+    "/api/v1/orders/stockouts": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "reportOrderStockout",
+        "summary": "Report a hotspot stockout",
+        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. It queues the order and notifies the routed district store.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStockoutRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/notifications": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listOrderNotifications",
+        "summary": "List order notifications",
+        "description": "Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/events": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listOrderEvents",
+        "summary": "View order workflow history",
+        "description": "Requires orders:read and access to the order. Returns up to 50 events per page.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/actions/{action}": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "transitionOrder",
+        "summary": "Advance an order workflow",
+        "description": "Review, check-stock and dispatch require orders:process and the supplying store. Hotspot orders need no review: check-stock works on queued, reviewed and on_hold hotspot orders, and on reviewed and on_hold warehouse requests. request-replenishment requires orders:replenish, the district store and warehouse_store_id. Warehouse receive requires orders:receive, the requesting store and quantity_received; it also reserves the received stock for the held hotspot order and confirms it when enough is on hand. A discrepancy requires discrepancy_note. Dispatch accepts an optional quantity_issued for a partial dispatch. Hotspot dispatch requires rider_id and deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. Review and check-stock accept an empty body.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "review",
+                "check-stock",
+                "dispatch",
+                "request-replenishment",
+                "receive",
+                "deliver"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderActionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listOrders",
+        "summary": "List orders",
+        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "createOrder",
+        "summary": "Request stock",
+        "description": "Requires orders:create. The requesting store must match the current user’s store unless they have orders:all_stores. The date defaults to the database current date.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{id}": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "getOrder",
+        "summary": "Get an order",
+        "description": "Requires orders:read. An order is visible to either store or users with orders:all_stores.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/fulfill": {
+      "patch": {
+        "tags": ["Orders"],
+        "operationId": "fulfillOrder",
+        "summary": "Record quantities issued",
+        "description": "Requires orders:fulfill and the supplying store, or orders:all_stores in addition to orders:fulfill. Fulfillment records a single issuance up to the quantity requested.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FulfillOrderRequest"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "tags": ["Auth"],
         "operationId": "register",
         "summary": "Register an unassigned account",
-        "description": "Creates an active account with no assigned role. Role and status fields are rejected. Limited to 10 requests per IP per minute.",
+        "description": "Creates an active account with no assigned role. Role and status fields are rejected. Limited to 10 requests per IP per minute. Email addresses, usernames and phone numbers must each be unused: a taken value returns 409 naming the field. Emails and usernames are compared case-insensitively and phone numbers by their digits, so 0772 123456 and +256772123456 conflict.",
         "responses": {
           "201": {
             "description": "Success",
@@ -82,7 +556,7 @@
         "tags": ["Auth"],
         "operationId": "login",
         "summary": "Log in",
-        "description": "Returns a 24-hour HS256 JWT and the current account profile. Limited to 10 failed attempts per IP per minute. Successful requests do not consume the limit.",
+        "description": "Sign in with an email address, username or phone number in `login`, and the password. Each identifier belongs to one account. Email addresses are tried first; if one account's username equals another's phone number and the password opens both, the response is 409 and the user signs in with their email address. Wrong credentials return 401 without saying which part was wrong. Returns a 24-hour HS256 JWT and the current account profile. Limited to 10 failed attempts per IP per minute. Successful requests do not consume the limit.",
         "responses": {
           "200": {
             "description": "Success",
@@ -102,6 +576,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
@@ -212,7 +689,7 @@
         "tags": ["Users"],
         "operationId": "createUser",
         "summary": "Create a user with roles",
-        "description": "Creates an account with one or more existing roles. Requires users:create and roles:assign.",
+        "description": "Creates an account with one or more existing roles. Requires users:create and roles:assign. Email addresses, usernames and phone numbers must each be unused: a taken value returns 409 naming the field. Emails and usernames are compared case-insensitively and phone numbers by their digits, so 0772 123456 and +256772123456 conflict.",
         "responses": {
           "201": {
             "description": "Success",
@@ -659,6 +1136,872 @@
           }
         ]
       }
+    },
+    "/api/v1/hotspots": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspots",
+        "summary": "List hotspots",
+        "description": "Requires hotspots:read. Returns hotspots you submitted and those in the district of your assigned store; hotspots:all_districts returns every hotspot. Filter the DCFP queue with status=submitted or status=verified.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "submitted"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "submitHotspot",
+        "summary": "Submit an identified hotspot",
+        "description": "Requires hotspots:submit (VHT). Records the hotspot as submitted and notifies the DCFP of its district.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotSubmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots/notifications": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotNotifications",
+        "summary": "List hotspot notifications",
+        "description": "Requires hotspots:read. Lists submissions addressed to the district of your assigned store, and activations and rejections of hotspots you submitted; hotspots:all_districts lists all. Returns up to 50 per page.",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots/{id}/actions/{action}": {
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "transitionHotspot",
+        "summary": "Verify, activate or reject a hotspot",
+        "description": "Requires hotspots:activate (DCFP) and the hotspot's district as the district of your assigned store, or hotspots:all_districts. verify moves submitted to verified; activate moves verified to active; reject moves submitted or verified to rejected and requires a reason. Activation and rejection notify the submitting VHT. Any other state returns 409. verify and activate take no body.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["verify", "activate", "reject"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotActionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots/districts": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotDistricts",
+        "summary": "List districts for submission",
+        "description": "Requires hotspots:submit. Lists every district by name for the submission form's district_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistrictListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "logout",
+        "summary": "Sign out",
+        "description": "Ends the session that issued this token. The token is rejected from then on.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "listOwnSessions",
+        "summary": "List your sessions",
+        "description": "Lists your unexpired sessions, newest first, including revoked ones. `current` marks the session of this token.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{id}": {
+      "delete": {
+        "tags": ["Auth"],
+        "operationId": "revokeOwnSession",
+        "summary": "Sign out one of your sessions",
+        "description": "Revokes one of your live sessions, for example a lost device. Returns 404 for another user's session or one that has already ended.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}/sessions": {
+      "get": {
+        "tags": ["Users"],
+        "operationId": "listUserSessions",
+        "summary": "List a user's sessions",
+        "description": "Requires users:read. Lists the user's unexpired sessions, including revoked ones.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "operationId": "revokeUserSessions",
+        "summary": "Sign a user out everywhere",
+        "description": "Requires users:update. Revokes every live session of the user. Disabling an account does this too.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokedSessionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "refreshSession",
+        "summary": "Refresh the access token",
+        "description": "Public; send the refresh token from login or the previous refresh. Returns a new access token and a new refresh token for the same session; the old refresh token stops working. Reusing an old refresh token more than 30 seconds after it was replaced is treated as theft and signs the session out. Returns 401 when the token is unknown, used, revoked or expired, and 403 when the account is disabled.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/stock": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listStock",
+        "summary": "Stock at stores",
+        "description": "Requires inventory:read. Balances at the national warehouse and district stores per product and unit: on hand, reserved for confirmed orders, available, and incoming on dispatched replenishments. Users see their assigned store (a hotspot manager, their hotspot); orders:all_stores sees every store.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "store_type",
+            "in": "query",
+            "description": "Warehouse or district stores.",
+            "schema": {
+              "type": "string",
+              "enum": ["national", "district"]
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/hotspots": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listHotspotStock",
+        "summary": "Stock supplied to hotspots",
+        "description": "Requires inventory:read. Per hotspot and product: quantity delivered and deliveries in the period, last delivery, quantity in transit, quantity still requested, held requests and the last stockout. Hotspot consumption is not recorded, so this reports supply rather than a count at the hotspot. District users see hotspots their store supplies. Users see their assigned store (a hotspot manager, their hotspot); orders:all_stores sees every store.",
+        "parameters": [
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "description": "One hotspot.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotStockListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/movements": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listStockMovements",
+        "summary": "Stock movement ledger",
+        "description": "Requires inventory:read. Every change to a store's on-hand stock, newest first, with the balance after it. Order dispatch and receipt are recorded automatically and link their order. Users see their assigned store (a hotspot manager, their hotspot); orders:all_stores sees every store.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "One kind of movement.",
+            "schema": {
+              "type": "string",
+              "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "operationId": "recordStockMovement",
+        "summary": "Record stock received or an adjustment",
+        "description": "Requires inventory:manage and the store as your assigned store, or orders:all_stores. A receipt adds a positive quantity, for example a delivery from a supplier to the warehouse. An adjustment corrects stock after a count in either direction and needs a note. Stock cannot fall below what open orders have reserved (409).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockMovementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/summary": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "getInventorySummary",
+        "summary": "National stock summary",
+        "description": "Requires inventory:read and orders:all_stores. Per product and unit: warehouse and district stock on hand and available, stock in transit, quantity delivered to hotspots in the period, and open and held hotspot requests.",
+        "parameters": [
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventorySummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -667,10 +2010,340 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Paste the token returned by POST /api/v1/auth/login. Role and permission changes take effect on the next protected request."
+        "description": "Paste the access token returned by POST /api/v1/auth/login (Swagger UI does this for you). Access tokens last 15 minutes; renew them with POST /api/v1/auth/refresh. Each token belongs to a login session; signing out or revoking the session rejects it at once. Role and permission changes take effect on the next protected request."
       }
     },
     "schemas": {
+      "OrderStockoutRequest": {
+        "type": "object",
+        "properties": {
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_needed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["hot_spot_id", "condom_id", "unit_of_measure_id", "quantity_needed"],
+        "additionalProperties": false
+      },
+      "OrderActionRequest": {
+        "type": "object",
+        "properties": {
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rider_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_received": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "discrepancy_note": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "delivery_note": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "quantity_issued": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "description": "dispatch only. Issues less than quantity_needed and releases the rest of the reservation. Defaults to quantity_needed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "fulfilled",
+              "queued",
+              "reviewed",
+              "on_hold",
+              "confirmed",
+              "dispatched",
+              "received",
+              "delivered"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "order_id", "actor_id", "action", "status", "created_at"]
+      },
+      "OrderEventListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderEvent"
+            }
+          }
+        },
+        "required": ["success", "data"]
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": [
+          "condom_id",
+          "quantity_needed",
+          "ordered_for_store_id",
+          "ordered_from_store_id",
+          "unit_of_measure_id"
+        ],
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_needed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "order_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "ordered_for_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordered_from_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FulfillOrderRequest": {
+        "type": "object",
+        "required": ["quantity_issued"],
+        "properties": {
+          "quantity_issued": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "id",
+          "condom_id",
+          "quantity_needed",
+          "order_date",
+          "ordered_for_store_id",
+          "ordered_from_store_id",
+          "unit_of_measure_id",
+          "comment",
+          "ordered_by_id",
+          "handled_by_id",
+          "quantity_issued",
+          "order_status",
+          "created_at",
+          "updated_at",
+          "hot_spot_id",
+          "parent_order_id",
+          "rider_id",
+          "quantity_received",
+          "discrepancy_note",
+          "delivery_note"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_needed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "order_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "ordered_for_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordered_from_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "ordered_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "handled_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "quantity_issued": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "nullable": true
+          },
+          "order_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "fulfilled",
+              "queued",
+              "reviewed",
+              "on_hold",
+              "confirmed",
+              "dispatched",
+              "received",
+              "delivered"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "parent_order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "rider_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "quantity_received": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "nullable": true
+          },
+          "discrepancy_note": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          },
+          "delivery_note": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          }
+        }
+      },
+      "OrderResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Order"
+          }
+        }
+      },
+      "OrderListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        }
+      },
       "RegisterRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -708,6 +2381,19 @@
           },
           "phone_number": {
             "type": "string",
+            "maxLength": 15
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
             "maxLength": 15
           }
         }
@@ -767,6 +2453,29 @@
               "7f5046a1-34b9-476b-bffc-e1cca9455e07",
               "f8391ab1-3212-423e-a7d3-5141d8b6dbf8"
             ]
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 15
+          },
+          "organisation_unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         },
         "oneOf": [
@@ -781,14 +2490,20 @@
       "LoginRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["email", "password"],
+        "required": ["password"],
         "properties": {
-          "email": {
+          "login": {
             "type": "string",
-            "format": "email",
+            "minLength": 1,
             "maxLength": 255,
             "example": "user@example.test",
-            "description": "Trimmed, lowercased, and unique without regard to case."
+            "description": "Email address, username or phone number, each unique to one account. Emails and usernames are case-insensitive; phone numbers match in any format, e.g. 0772 123456 or +256772123456."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "deprecated": true,
+            "description": "Older name for `login`, still accepted. Send one of the two."
           },
           "password": {
             "type": "string",
@@ -884,7 +2599,16 @@
           "phone_number",
           "status",
           "role",
-          "roles"
+          "roles",
+          "organisation_unit_id",
+          "hot_spot_id",
+          "subcounty_id",
+          "store_id",
+          "first_name",
+          "last_name",
+          "location",
+          "created_at",
+          "updated_at"
         ],
         "properties": {
           "id": {
@@ -919,6 +2643,61 @@
             "items": {
               "$ref": "#/components/schemas/Role"
             }
+          },
+          "organisation_unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_login_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "login_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Successful logins since login counting began."
+          },
+          "active_sessions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Devices currently signed in: live, unrevoked sessions."
           }
         }
       },
@@ -1053,10 +2832,19 @@
           },
           "data": {
             "type": "object",
-            "required": ["token", "token_type", "expires_in", "user"],
+            "required": [
+              "token",
+              "token_type",
+              "expires_in",
+              "refresh_token",
+              "refresh_expires_in",
+              "session_id",
+              "user"
+            ],
             "properties": {
               "token": {
-                "type": "string"
+                "type": "string",
+                "description": "Access token. Send as `Authorization: Bearer <token>`."
               },
               "token_type": {
                 "type": "string",
@@ -1064,7 +2852,22 @@
               },
               "expires_in": {
                 "type": "integer",
-                "enum": [86400]
+                "minimum": 0,
+                "maximum": 900,
+                "description": "Seconds until the access token expires (15 minutes, or sooner when the session ends first)."
+              },
+              "refresh_token": {
+                "type": "string",
+                "description": "Single use. Exchange it at POST /api/v1/auth/refresh before the session expires; store it securely."
+              },
+              "refresh_expires_in": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Seconds until the session ends and a new login is required (30 days after login)."
+              },
+              "session_id": {
+                "type": "string",
+                "format": "uuid"
               },
               "user": {
                 "$ref": "#/components/schemas/User"
@@ -1228,6 +3031,787 @@
               "7f5046a1-34b9-476b-bffc-e1cca9455e07",
               "f8391ab1-3212-423e-a7d3-5141d8b6dbf8"
             ]
+          }
+        }
+      },
+      "HotspotSubmissionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "district_id"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "village": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20
+          },
+          "contact_person_name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "contact_person_telephone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 15
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true,
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Give together with longitude."
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true,
+            "minimum": -180,
+            "maximum": 180
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "example": "Guest house"
+          },
+          "has_condom_dispenser": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dispenser_condition": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["Good", "Poor", "Broken"],
+            "description": "Required when has_condom_dispenser is true; omit otherwise."
+          }
+        }
+      },
+      "Hotspot": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "village": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact_person_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact_person_telephone": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "submitted, verified, active or rejected for submitted hotspots; legacy hotspots keep their recorded status."
+          },
+          "district_id": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "submitted_by_id": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "has_condom_dispenser": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dispenser_condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejection_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "HotspotResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Hotspot"
+          }
+        }
+      },
+      "HotspotListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hotspot"
+            }
+          }
+        }
+      },
+      "HotspotEvent": {
+        "type": "object",
+        "required": ["id", "hot_spot_id", "actor_id", "action", "status", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["submitted", "verify", "activate", "reject"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "verified", "active", "rejected"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotEventListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotEvent"
+            }
+          }
+        }
+      },
+      "HotspotActionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Required for reject only."
+          }
+        }
+      },
+      "District": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "DistrictListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/District"
+            }
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "required": ["id", "created_at", "last_seen_at", "expires_at", "current"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_agent": {
+            "type": "string",
+            "nullable": true
+          },
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated at most once a minute."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session ends and refreshing stops (30 days after login)."
+          },
+          "revoked_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "refreshed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "refresh_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SessionListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            }
+          }
+        }
+      },
+      "RevokedSessionsResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": ["revoked"],
+            "properties": {
+              "revoked": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "TokenPair": {
+        "type": "object",
+        "required": [
+          "token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "refresh_expires_in",
+          "session_id"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Access token. Send as `Authorization: Bearer <token>`."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": ["Bearer"]
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 900,
+            "description": "Seconds until the access token expires (15 minutes, or sooner when the session ends first)."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Single use. Exchange it at POST /api/v1/auth/refresh before the session expires; store it securely."
+          },
+          "refresh_expires_in": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds until the session ends and a new login is required (30 days after login)."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["refresh_token"],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "RefreshResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TokenPair"
+          }
+        }
+      },
+      "StockBalance": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reserved": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "incoming": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dispatched to this store by the warehouse and not yet received."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotStock": {
+        "type": "object",
+        "properties": {
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deliveries": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_delivered_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "in_transit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requested": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "on_hold_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_stockout_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockMovement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Positive adds stock, negative removes it."
+          },
+          "on_hand_after": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null for system entries such as opening balances."
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockMovementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["store_id", "condom_id", "unit_of_measure_id", "reason", "quantity"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["receipt", "adjustment"]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": -1000000000,
+            "maximum": 1000000000,
+            "description": "Positive for a receipt; nonzero for an adjustment."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "Required for an adjustment."
+          }
+        }
+      },
+      "InventorySummary": {
+        "type": "object",
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "warehouse_on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warehouse_available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "district_on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "district_available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "in_transit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered_to_hotspots": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "open_hotspot_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "on_hold_requests": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StockListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockBalance"
+            }
+          }
+        }
+      },
+      "HotspotStockListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotStock"
+            }
+          }
+        }
+      },
+      "StockMovementListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockMovement"
+            }
+          }
+        }
+      },
+      "InventorySummaryResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventorySummary"
+            }
+          }
+        }
+      },
+      "StockMovementResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockMovement"
           }
         }
       }

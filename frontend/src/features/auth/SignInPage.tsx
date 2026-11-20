@@ -19,12 +19,8 @@ import { ACTIVATED_PARAM } from '@/navigation/paths';
 import { useSignIn } from './hooks';
 
 const credentialsSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Enter your email address.')
-    .max(255)
-    .pipe(z.email('Enter a valid email address.')),
+  // An email address, username or phone number; the API works out which.
+  login: z.string().trim().min(1, 'Enter your email, username or phone number.').max(255),
   // Not trimmed: a password may legitimately begin or end with a space.
   password: z.string().min(1, 'Enter your password.').max(200),
 });
@@ -47,7 +43,7 @@ export default function SignInPage() {
     formState: { errors },
   } = useForm<CredentialsForm>({
     resolver: zodResolver(credentialsSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { login: '', password: '' },
   });
 
   return (
@@ -86,19 +82,19 @@ export default function SignInPage() {
                 </Alert>
               ) : null}
 
-              <Field data-invalid={errors.email ? true : undefined}>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Field data-invalid={errors.login ? true : undefined}>
+                <FieldLabel htmlFor="login">Email, username or phone</FieldLabel>
                 <Input
-                  id="email"
-                  type="email"
+                  id="login"
+                  type="text"
                   autoComplete="username"
                   autoCapitalize="none"
                   spellCheck={false}
-                  aria-invalid={errors.email ? true : undefined}
-                  aria-describedby={errors.email ? 'email-error' : undefined}
-                  {...register('email')}
+                  aria-invalid={errors.login ? true : undefined}
+                  aria-describedby={errors.login ? 'login-error' : undefined}
+                  {...register('login')}
                 />
-                <FieldError id="email-error" errors={[errors.email]} />
+                <FieldError id="login-error" errors={[errors.login]} />
               </Field>
 
               <Field data-invalid={errors.password ? true : undefined}>

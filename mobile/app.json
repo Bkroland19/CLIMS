@@ -2,7 +2,7 @@
   "expo": {
     "name": "last_mile_condom_distribution",
     "slug": "lmd",
-    "version": "2.0.1",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lmd",
@@ -54,7 +54,7 @@
       "eas": {
         "projectId": "34fc2cbe-c7f6-460e-ae08-a69ce4573a85"
       },
-      "releaseVersion": "2.0.1"
+      "releaseVersion": "2.1.0"
     }
   }
 }

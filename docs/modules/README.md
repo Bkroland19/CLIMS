@@ -4,13 +4,15 @@
 
 The backend is a single Go service with feature packages under `backend/internal/features/`. Each module owns its HTTP routes and handlers; account and role persistence remain in the shared PostgreSQL database.
 
-| Module            | Owns                                                                              | Main dependencies                                             |
-| ----------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| [auth](auth.md)   | Public signup, login, JWT issuance, own-profile endpoint                          | Users repository and account-creation service                 |
-| [users](users.md) | Account records, account creation, active-account middleware, user administration | RBAC role model, permission gate, and `RoleCatalog` interface |
-| [rbac](rbac.md)   | Role catalog, permission assignments, permission middleware                       | PostgreSQL; no auth or users package dependency               |
-| health            | Process and database probes                                                       | PostgreSQL connection pool                                    |
-| apidocs           | Public Swagger UI and OpenAPI asset routes                                        | Root `docs/api/` filesystem                                   |
+| Module                    | Owns                                                                              | Main dependencies                                             |
+| ------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [auth](auth.md)           | Public signup, login, JWT issuance, own-profile endpoint                          | Users repository and account-creation service                 |
+| [users](users.md)         | Account records, account creation, active-account middleware, user administration | RBAC role model, permission gate, and `RoleCatalog` interface |
+| [rbac](rbac.md)           | Role catalog, permission assignments, permission middleware                       | PostgreSQL; no auth or users package dependency               |
+| [hotspots](hotspots.md)   | VHT hotspot submission and DCFP verification and activation                       | PostgreSQL; RBAC permission gate and current user             |
+| [inventory](inventory.md) | Stock balances, movement ledger, hotspot supply and national stock reports        | PostgreSQL; orders tables and the RBAC permission gate        |
+| health                    | Process and database probes                                                       | PostgreSQL connection pool                                    |
+| apidocs                   | Public Swagger UI and OpenAPI asset routes                                        | Root `docs/api/` filesystem                                   |
 
 ## Composition and dependencies
 

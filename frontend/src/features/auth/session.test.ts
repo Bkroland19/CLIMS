@@ -28,6 +28,15 @@ describe('sessionSchema', () => {
     expect(parsed.user.id).toBe(id);
   });
 
+  it('keeps the refresh token when the API issues one', () => {
+    const parsed = sessionSchema.parse({
+      token: 't',
+      refresh_token: 'r',
+      user: { id: 1, username: 'u' },
+    });
+    expect(parsed.refresh_token).toBe('r');
+  });
+
   it('reads the role name from the Go API role object', () => {
     const parsed = sessionSchema.parse({
       token: 't',

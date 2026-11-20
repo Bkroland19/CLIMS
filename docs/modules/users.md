@@ -37,13 +37,21 @@ Admin creation accepts signup fields plus either one existing `role_id` or a non
 
 Public signup starts with `roles: []` and `role: null`. Legacy imports map recognized numeric role IDs to assignments. Unresolved legacy values grant no management permissions. Legacy accounts with a null email return an empty email string in responses.
 
-The repository joins roles and permission mappings when looking up users. PostgreSQL's normalized email index prevents concurrent duplicate email registrations. Other database failures return a server error rather than being reported as duplicate emails.
+The repository joins roles and permission mappings when looking up users.
+
+Email addresses, usernames and phone numbers each belong to one account, since all three sign users in. Unique indexes enforce this, so concurrent requests cannot create duplicates: emails and usernames are compared case-insensitively, and phone numbers by the national form of their digits (`normalize_phone`), so `0772 123456` and `+256772123456` conflict. Accounts without a phone number do not conflict. Creating an account with a taken value returns 409 naming the field: `email already exists`, `username already exists` or `phone number already belongs to another account`. Other database failures return a server error.
+
+The legacy data shared some usernames and phone numbers. Migration 12 kept each on the oldest account, by creation time and then legacy ID. Later accounts with the same username were renamed by appending their legacy ID, for example `Ritah` became `Ritah-1208`, and later accounts with the same phone number had it cleared. The original values are kept in `previous_username` and `previous_phone_number` for an administrator to review. Importing the legacy backup after migrations applies the same rule; accounts created through the API never are renamed or cleared.
+
+## Work context
+
+Administrator creation accepts existing `organisation_unit_id` and `hot_spot_id` UUIDs. Migration 5 resolves unambiguous legacy references to these UUIDs, and the legacy import uses the same lookup. User profiles include nullable `store_id` and `subcounty_id` fields. The orders API uses `store_id` to scope order access. Both assignments are read-only through the users API.
 
 ## Access changes and administrator protection
 
 `UpdateUserAccess` updates role or account status inside a transaction. It takes a PostgreSQL transaction advisory lock before reading and updating the account, serializing account-access changes. A request that would disable or demote the last active account with the `admin` role returns 409. This guard applies to concurrent API requests; operators with direct database access must preserve the invariant themselves.
 
-Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, organization assignment, or organization-scoped access.
+Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, changes to an existing account’s work context, or organization-scoped access.
 
 ## Administrator provisioning
 

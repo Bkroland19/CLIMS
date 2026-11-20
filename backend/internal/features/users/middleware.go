@@ -27,6 +27,17 @@ func ActiveUser(repo *Repository) fiber.Handler {
 		if user.Status != "active" {
 			return response.Error(c, 403, "account is disabled", nil)
 		}
+		sessionID := CurrentSessionID(c)
+		if sessionID == "" {
+			return response.Error(c, 401, "unauthorized", nil)
+		}
+		active, err := repo.sessionActive(c.Context(), id, sessionID)
+		if err != nil {
+			return response.Error(c, 500, "failed to load session", nil)
+		}
+		if !active {
+			return response.Error(c, 401, "session has ended; sign in again", nil)
+		}
 		c.Locals(rbac.PrincipalKey, user)
 		return c.Next()
 	}
