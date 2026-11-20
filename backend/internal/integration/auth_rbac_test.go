@@ -18,6 +18,7 @@ import (
 
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -141,6 +142,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtMiddleware, activeUser)
 	orders.RegisterRoutes(v1, orders.NewRepository(pool), jwtMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewHandler(hotspots.NewRepository(pool)), jwtMiddleware, activeUser)
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
 		t.Helper()
@@ -350,6 +352,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
+	testHotSpotWorkflow(t, pool, request, login, adminToken)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
