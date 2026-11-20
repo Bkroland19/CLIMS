@@ -7,7 +7,7 @@ import { createSessionStore, sessionSchema, type Session } from './session';
 const session: Session = {
   token: 'tok_1',
   user: {
-    id: 4,
+    id: '4',
     username: 'nakato',
     role: 'admin',
     firstname: 'Nakato',
@@ -17,9 +17,15 @@ const session: Session = {
 };
 
 describe('sessionSchema', () => {
-  it('normalises a numeric role id and a string id', () => {
-    const parsed = sessionSchema.parse({ token: 't', user: { id: '12', username: 'u', role: 3 } });
-    expect(parsed.user).toMatchObject({ id: 12, role: '3', firstname: null, email: null });
+  it('normalises a numeric role id and a numeric user id', () => {
+    const parsed = sessionSchema.parse({ token: 't', user: { id: 12, username: 'u', role: 3 } });
+    expect(parsed.user).toMatchObject({ id: '12', role: '3', firstname: null, email: null });
+  });
+
+  it('keeps the Go API user id, a UUID string, as it is', () => {
+    const id = '0b9e6f1c-4a51-4f7e-9d0a-2f3c8e1b7a64';
+    const parsed = sessionSchema.parse({ token: 't', user: { id, username: 'u' } });
+    expect(parsed.user.id).toBe(id);
   });
 
   it('reads the role name from the Go API role object', () => {
@@ -41,7 +47,8 @@ describe('sessionSchema', () => {
     { name: 'an empty token', value: { token: '', user: { id: 1, username: 'u' } } },
     { name: 'a missing user', value: { token: 't' } },
     { name: 'a user without an id', value: { token: 't', user: { username: 'u' } } },
-    { name: 'a non-numeric id', value: { token: 't', user: { id: 'abc', username: 'u' } } },
+    { name: 'an empty id', value: { token: 't', user: { id: '', username: 'u' } } },
+    { name: 'a fractional id', value: { token: 't', user: { id: 1.5, username: 'u' } } },
     { name: 'an empty username', value: { token: 't', user: { id: 1, username: '' } } },
   ])('rejects $name', ({ value }) => {
     expect(sessionSchema.safeParse(value).success).toBe(false);

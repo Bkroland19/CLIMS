@@ -4,7 +4,6 @@ import { GoogleMap, InfoWindowF, MarkerF, useJsApiLoader } from '@react-google-m
 import { MapPinOff } from 'lucide-react';
 import { useState } from 'react';
 
-import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorState } from '@/components/states/ErrorState';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -94,9 +93,7 @@ export default function HotspotMapPage() {
 
   return (
     <>
-      <PageHeader description="Where hotspots are. Select a marker to see its contact person and status." />
-
-      <div className="bg-card overflow-hidden rounded-xl border">
+      <div className="bg-card rounded-card overflow-hidden border">
         {googleMapsApiKey === null ? (
           <EmptyState
             icon={MapPinOff}

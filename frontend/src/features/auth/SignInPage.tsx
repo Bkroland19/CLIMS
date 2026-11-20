@@ -1,7 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CircleAlert, Eye, EyeOff } from 'lucide-react';
+import { CircleAlert, CircleCheck, Eye, EyeOff } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { getErrorMessage } from '@/lib/api';
+import { ACTIVATED_PARAM } from '@/navigation/paths';
 
 import { useSignIn } from './hooks';
 
@@ -29,9 +31,15 @@ const credentialsSchema = z.object({
 
 type CredentialsForm = z.infer<typeof credentialsSchema>;
 
+/** `?activated=1`: the visitor has just activated an invitation (see the onboarding feature). */
+const activatedParamSchema = z.literal('1');
+
 /** The sign-in screen. On success the guard around it moves the user on. */
 export default function SignInPage() {
   const signIn = useSignIn();
+  const isJustActivated = activatedParamSchema.safeParse(
+    useSearchParams().get(ACTIVATED_PARAM),
+  ).success;
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const {
     register,
@@ -53,7 +61,7 @@ export default function SignInPage() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border p-5 sm:p-6">
+        <div className="bg-card rounded-card border p-5 sm:p-6">
           <form
             noValidate
             onSubmit={handleSubmit((credentials) => {
@@ -61,6 +69,15 @@ export default function SignInPage() {
             })}
           >
             <FieldGroup>
+              {isJustActivated && !signIn.isError ? (
+                <Alert variant="success">
+                  <CircleCheck aria-hidden="true" />
+                  <AlertTitle>Your account is active</AlertTitle>
+                  <AlertDescription>
+                    Sign in with your email address and the password you just created.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               {signIn.isError ? (
                 <Alert variant="destructive">
                   <CircleAlert aria-hidden="true" />
@@ -114,7 +131,7 @@ export default function SignInPage() {
               </Field>
 
               <Button type="submit" disabled={signIn.isPending} className="w-full">
-                {signIn.isPending ? <Spinner data-icon="inline-start" /> : null}
+                {signIn.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
                 {signIn.isPending ? 'Signing in…' : 'Sign in'}
               </Button>
             </FieldGroup>

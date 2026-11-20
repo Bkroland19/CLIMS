@@ -35,6 +35,14 @@ describe('hotspotSchema', () => {
     expect(hotspotSchema.parse(valid)).toMatchObject({ latitude: 0.3295, longitude: 32.6016 });
   });
 
+  it('sends the contact phone in +256 form', () => {
+    expect(hotspotSchema.parse(valid).contact_person_telephone).toBe('+256700000002');
+    expect(
+      hotspotSchema.parse({ ...valid, contact_person_telephone: '0772 000 000' })
+        .contact_person_telephone,
+    ).toBe('+256772000000');
+  });
+
   it('accepts coordinates on the equator and the prime meridian', () => {
     expect(hotspotSchema.safeParse({ ...valid, latitude: '0', longitude: '0' }).success).toBe(true);
   });
@@ -43,6 +51,9 @@ describe('hotspotSchema', () => {
     { field: 'hotspot_name', value: '  ' },
     { field: 'contact_person_name', value: '' },
     { field: 'contact_person_telephone', value: 'none' },
+    { field: 'contact_person_telephone', value: '' },
+    { field: 'contact_person_telephone', value: '+254 712 345 678' },
+    { field: 'contact_person_telephone', value: '0414 123456' },
     { field: 'latitude', value: '' },
     { field: 'latitude', value: '90.1' },
     { field: 'latitude', value: '0° 19′ N' },

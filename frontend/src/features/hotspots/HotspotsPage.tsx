@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { RowActions } from '@/components/data-table/RowActions';
 import { ExportButton } from '@/components/ExportButton';
-import { PageHeader } from '@/components/PageHeader';
+import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { lookupName, useOrganizationUnits } from '@/features/reference/queries';
@@ -74,15 +74,10 @@ export default function HotspotsPage() {
 
   return (
     <>
-      <PageHeader
-        description="Places where condoms are distributed, and who to contact at each."
-        actions={
-          <>
-            <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
-            {addButton}
-          </>
-        }
-      />
+      <PageActions>
+        <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
+        {addButton}
+      </PageActions>
 
       <DataTable
         label="Hotspots"
