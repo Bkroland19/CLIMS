@@ -18,7 +18,7 @@ See [creating PostgreSQL migrations](migrations.md) for pinned CLI scaffolding, 
 | [Auth](modules/auth.md)                  | Registration, login, JWTs, and rate limits                                       |
 | [Users](modules/users.md)                | Accounts, creation service, administration, and account status                   |
 | [RBAC](modules/rbac.md)                  | Legacy roles, permissions, and administrator protections                         |
-| [Hotspots](modules/hotspots.md)          | Hotspot activation workflow: VHT submission, DCFP verification and activation    |
+| [Hotspots](modules/hotspots.md)          | Hotspot submission, review, activation and deactivation                          |
 | [Inventory](modules/inventory.md)        | Stock reports for the warehouse, districts and hotspots, and recording stock     |
 | [API / Swagger](api/README.md)           | Endpoint reference, authentication examples, OpenAPI maintenance, and validation |
 

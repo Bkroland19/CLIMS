@@ -1137,257 +1137,12 @@
         ]
       }
     },
-    "/api/v1/hotspots": {
-      "get": {
-        "tags": ["Hotspots"],
-        "operationId": "listHotspots",
-        "summary": "List hotspots",
-        "description": "Requires hotspots:read. Returns hotspots you submitted and those in the district of your assigned store; hotspots:all_districts returns every hotspot. Filter the DCFP queue with status=submitted or status=verified.",
-        "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "example": "submitted"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 50
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0,
-              "default": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HotspotListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      },
-      "post": {
-        "tags": ["Hotspots"],
-        "operationId": "submitHotspot",
-        "summary": "Submit an identified hotspot",
-        "description": "Requires hotspots:submit (VHT). Records the hotspot as submitted and notifies the DCFP of its district.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HotspotSubmissionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HotspotResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/v1/hotspots/notifications": {
-      "get": {
-        "tags": ["Hotspots"],
-        "operationId": "listHotspotNotifications",
-        "summary": "List hotspot notifications",
-        "description": "Requires hotspots:read. Lists submissions addressed to the district of your assigned store, and activations and rejections of hotspots you submitted; hotspots:all_districts lists all. Returns up to 50 per page.",
-        "parameters": [
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0,
-              "default": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HotspotEventListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/v1/hotspots/{id}/actions/{action}": {
-      "post": {
-        "tags": ["Hotspots"],
-        "operationId": "transitionHotspot",
-        "summary": "Verify, activate or reject a hotspot",
-        "description": "Requires hotspots:activate (DCFP) and the hotspot's district as the district of your assigned store, or hotspots:all_districts. verify moves submitted to verified; activate moves verified to active; reject moves submitted or verified to rejected and requires a reason. Activation and rejection notify the submitting VHT. Any other state returns 409. verify and activate take no body.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "action",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": ["verify", "activate", "reject"]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HotspotResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HotspotActionRequest"
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/hotspots/districts": {
       "get": {
         "tags": ["Hotspots"],
         "operationId": "listHotspotDistricts",
         "summary": "List districts for submission",
-        "description": "Requires hotspots:submit. Lists every district by name for the submission form's district_id.",
+        "description": "Requires hotspots:submit. Lists districts by name for the submission form's district_id, optionally only those in region_id.",
         "responses": {
           "200": {
             "description": "Success",
@@ -1420,7 +1175,17 @@
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/auth/logout": {
@@ -2001,6 +1766,552 @@
             "$ref": "#/components/responses/InternalError"
           }
         }
+      }
+    },
+    "/api/v1/hotspots": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspots",
+        "summary": "List hotspots",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:read"],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "inactive"]
+            }
+          },
+          {
+            "name": "review_status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["submitted", "rejected", "active", "deactivated"]
+            }
+          },
+          {
+            "name": "submitted_by_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Only hotspots this VHT submitted."
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Only hotspots in this district."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "submitHotspot",
+        "summary": "Submit a hotspot",
+        "description": "Requires hotspots:submit. The hotspot starts inactive with review status submitted, and notifies the district's DCFPs.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:submit"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotSubmissionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots/notifications": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotNotifications",
+        "summary": "List hotspot notifications",
+        "description": "Requires hotspots:read. Events addressed to the user and, with hotspots:activate, to their district; hotspots:all_districts sees every addressed event. Newest first.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:read"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "getHotspot",
+        "summary": "Get a hotspot",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:read"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": ["Hotspots"],
+        "operationId": "updateHotspot",
+        "summary": "Edit a hotspot",
+        "description": "Requires hotspots:submit. Only the submitter can edit, and only while the hotspot is inactive. A changed contact person is added as the current contact. A deactivated hotspot cannot move to another district (409). Editing a rejected hotspot resubmits it with review status submitted. Notifies the district.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:submit"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotDetails"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}/events": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotEvents",
+        "summary": "List hotspot workflow history",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Oldest first.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:read"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}/comments": {
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "commentOnHotspot",
+        "summary": "Comment on a hotspot",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. A comment from the submitter notifies the district; any other comment notifies the submitter. The status does not change.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:read"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotCommentRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}/activate": {
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "activateHotspot",
+        "summary": "Activate a hotspot",
+        "description": "Requires hotspots:activate. Applies to a submitted or deactivated hotspot; a rejected one must be resubmitted first. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:activate"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotCommentRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}/deactivate": {
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "deactivateHotspot",
+        "summary": "Deactivate a hotspot",
+        "description": "Requires hotspots:activate. Applies to an active hotspot and sets review status deactivated. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:activate"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotCommentRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}/reject": {
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "rejectHotspot",
+        "summary": "Reject a hotspot",
+        "description": "Requires hotspots:activate. Applies to a submitted hotspot and sets review status rejected; the hotspot stays inactive. The VHT can edit it to resubmit. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:activate"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotCommentRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/regions": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotRegions",
+        "summary": "List regions for submission",
+        "description": "Requires hotspots:submit. Lists regions by name for the submission form's region_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotPlaceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots/subcounties": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotSubcounties",
+        "summary": "List subcounties for submission",
+        "description": "Requires hotspots:submit. Lists a district's subcounties by name for the submission form's subcounty_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotPlaceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "district_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     }
   },
@@ -3034,243 +3345,6 @@
           }
         }
       },
-      "HotspotSubmissionRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["name", "district_id"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40
-          },
-          "district_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "village": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 20
-          },
-          "contact_person_name": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 40
-          },
-          "contact_person_telephone": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 15
-          },
-          "latitude": {
-            "type": "number",
-            "nullable": true,
-            "minimum": -90,
-            "maximum": 90,
-            "description": "Give together with longitude."
-          },
-          "longitude": {
-            "type": "number",
-            "nullable": true,
-            "minimum": -180,
-            "maximum": 180
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 100
-          },
-          "type": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 40,
-            "example": "Guest house"
-          },
-          "has_condom_dispenser": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "dispenser_condition": {
-            "type": "string",
-            "nullable": true,
-            "enum": ["Good", "Poor", "Broken"],
-            "description": "Required when has_condom_dispenser is true; omit otherwise."
-          }
-        }
-      },
-      "Hotspot": {
-        "type": "object",
-        "required": ["id"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          },
-          "village": {
-            "type": "string",
-            "nullable": true
-          },
-          "contact_person_name": {
-            "type": "string",
-            "nullable": true
-          },
-          "contact_person_telephone": {
-            "type": "string",
-            "nullable": true
-          },
-          "latitude": {
-            "type": "number",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "nullable": true
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "nullable": true,
-            "description": "submitted, verified, active or rejected for submitted hotspots; legacy hotspots keep their recorded status."
-          },
-          "district_id": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
-          "submitted_by_id": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
-          "created_at": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "type": {
-            "type": "string",
-            "nullable": true
-          },
-          "has_condom_dispenser": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "dispenser_condition": {
-            "type": "string",
-            "nullable": true
-          },
-          "rejection_reason": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "HotspotResponse": {
-        "type": "object",
-        "required": ["success", "data"],
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/Hotspot"
-          }
-        }
-      },
-      "HotspotListResponse": {
-        "type": "object",
-        "required": ["success", "data"],
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Hotspot"
-            }
-          }
-        }
-      },
-      "HotspotEvent": {
-        "type": "object",
-        "required": ["id", "hot_spot_id", "actor_id", "action", "status", "created_at"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "hot_spot_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "actor_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "action": {
-            "type": "string",
-            "enum": ["submitted", "verify", "activate", "reject"]
-          },
-          "status": {
-            "type": "string",
-            "enum": ["submitted", "verified", "active", "rejected"]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "HotspotEventListResponse": {
-        "type": "object",
-        "required": ["success", "data"],
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HotspotEvent"
-            }
-          }
-        }
-      },
-      "HotspotActionRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1000,
-            "description": "Required for reject only."
-          }
-        }
-      },
       "District": {
         "type": "object",
         "required": ["id", "name"],
@@ -3812,6 +3886,422 @@
           },
           "data": {
             "$ref": "#/components/schemas/StockMovement"
+          }
+        }
+      },
+      "HotspotPlace": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "HotspotContactPerson": {
+        "type": "object",
+        "description": "The hotspot manager on site.",
+        "required": ["id", "name", "phone_number"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone_number": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Hotspot": {
+        "type": "object",
+        "description": "Converted legacy hotspots can lack fields that the API requires for new submissions.",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "village",
+          "region",
+          "district",
+          "subcounty",
+          "latitude",
+          "longitude",
+          "has_condom_dispenser",
+          "dispenser_condition",
+          "status",
+          "review_status",
+          "submitted_by_id",
+          "contact_person",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "village": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HotspotPlace"
+              }
+            ],
+            "nullable": true
+          },
+          "district": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HotspotPlace"
+              }
+            ],
+            "nullable": true
+          },
+          "subcounty": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HotspotPlace"
+              }
+            ],
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "has_condom_dispenser": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dispenser_condition": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"],
+            "description": "Only an active hotspot is in use."
+          },
+          "review_status": {
+            "type": "string",
+            "enum": ["submitted", "rejected", "active", "deactivated"],
+            "description": "The workflow step. Every value except active means status is inactive."
+          },
+          "submitted_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "contact_person": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HotspotContactPerson"
+              }
+            ],
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotComment": {
+        "type": "object",
+        "required": ["id", "user_id", "action", "comment", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "enum": ["comment", "activated", "deactivated", "rejected"],
+            "description": "comment, or the DCFP decision the comment was recorded with."
+          },
+          "comment": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Hotspot"
+          },
+          {
+            "type": "object",
+            "required": ["comments"],
+            "properties": {
+              "comments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HotspotComment"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "HotspotEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "hot_spot_id",
+          "hot_spot_name",
+          "actor_id",
+          "action",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "example": "submitted",
+            "description": "submitted, updated, resubmitted, commented, activated, deactivated or rejected."
+          },
+          "status": {
+            "type": "string",
+            "example": "submitted",
+            "description": "The review status after the step."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type",
+          "region_id",
+          "district_id",
+          "subcounty_id",
+          "latitude",
+          "longitude",
+          "contact_person_name",
+          "contact_person_phone",
+          "has_condom_dispenser"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Unique within the village, ignoring case and extra spaces."
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "Bar"
+          },
+          "region_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Must belong to the district, which must belong to the region."
+          },
+          "village": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "contact_person_name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The hotspot manager."
+          },
+          "contact_person_phone": {
+            "type": "string",
+            "example": "+256700123456",
+            "description": "9 to 15 digits with an optional leading +; spaces, dashes and parentheses are removed."
+          },
+          "has_condom_dispenser": {
+            "type": "boolean"
+          },
+          "dispenser_condition": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "example": "Good"
+          }
+        }
+      },
+      "HotspotSubmissionRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/HotspotDetails"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "comment": {
+                "type": "string",
+                "maxLength": 2000,
+                "nullable": true,
+                "description": "Optional; stored as the hotspot's first comment."
+              }
+            }
+          }
+        ]
+      },
+      "HotspotCommentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["comment"],
+        "properties": {
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "HotspotDetailResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotspotDetail"
+          }
+        }
+      },
+      "HotspotListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hotspot"
+            }
+          }
+        }
+      },
+      "HotspotEventListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotEvent"
+            }
+          }
+        }
+      },
+      "HotspotPlaceListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotPlace"
+            }
           }
         }
       }
