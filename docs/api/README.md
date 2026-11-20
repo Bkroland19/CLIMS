@@ -8,7 +8,7 @@ All routes use `/api/v1`. Login and registration are public; all other endpoints
 
 | Method | Path                       | Access                                                                            |
 | ------ | -------------------------- | --------------------------------------------------------------------------------- |
-| POST   | `/auth/register`           | Public, creates an active account with the `registered user` role                           |
+| POST   | `/auth/register`           | Public, creates an active account with the `registered user` role                 |
 | POST   | `/auth/login`              | Public, returns a 15-minute access token, a refresh token and the account profile |
 | GET    | `/auth/me`                 | Any active account, including unassigned accounts                                 |
 | POST   | `/auth/refresh`            | Public; exchanges a single-use refresh token for new tokens                       |
