@@ -11,7 +11,7 @@ import { HOME_PATH } from './paths';
 /** Shown inside the app shell for an address that matches no screen. */
 export default function NotFoundPage() {
   return (
-    <div className="bg-card rounded-xl border">
+    <div className="bg-card rounded-card border">
       <EmptyState
         icon={Compass}
         title="There is no page at this address"

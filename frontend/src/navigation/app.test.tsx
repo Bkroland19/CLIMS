@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -10,15 +10,22 @@ import { testRouter } from '@/test/navigation';
 import { renderApp } from '@/test/renderApp';
 
 import { signInHref } from './guards';
-import { navGroups } from './navGroups';
-import { HOME_PATH, SIGN_IN_PATH } from './paths';
+import { allPaths } from './navigation';
+import { HOME_PATH, PUBLIC_PATHS } from './paths';
+import { workspaces } from './workspaces';
 
 const routes = <AppUnderTest />;
 
 describe('navigation table', () => {
   it('lists exactly the screens that have a page', () => {
-    const listed = navGroups.flatMap((group) => group.items.map((item) => item.path)).sort();
-    expect(routedPaths.filter((path) => path !== SIGN_IN_PATH)).toEqual(listed);
+    const listed = allPaths(workspaces).sort();
+    // Sign-in and onboarding sit outside the signed-in app, so the sidebar table does not list them.
+    expect(routedPaths.filter((path) => !PUBLIC_PATHS.includes(path))).toEqual(listed);
+  });
+
+  it('gives every path one entry', () => {
+    const listed = allPaths(workspaces);
+    expect(new Set(listed).size).toBe(listed.length);
   });
 
   it('redirects the bare address to the default workspace', () => {
@@ -42,7 +49,7 @@ describe('route guard', () => {
   it('keeps the sign-in address clean when the visitor was headed for the default page', () => {
     expect(signInHref('/moh')).toBe('/sign-in');
     expect(signInHref('/')).toBe('/sign-in');
-    expect(signInHref('/dcfp/stock?page=2')).toBe('/sign-in?from=%2Fdcfp%2Fstock%3Fpage%3D2');
+    expect(signInHref('/dcfp/orders?page=2')).toBe('/sign-in?from=%2Fdcfp%2Forders%3Fpage%3D2');
   });
 
   it('does not follow a return address that leaves the app', async () => {
@@ -84,7 +91,16 @@ describe('route guard', () => {
   it('shows a not-found page for an unknown address, inside the app', async () => {
     renderApp(routes, { route: '/no/such/page', signedIn: true });
     expect(await screen.findByText('There is no page at this address')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+  });
+
+  it('keeps the workspace of a mistyped address inside it', async () => {
+    renderApp(routes, { route: '/dcfp/no-such-page', signedIn: true });
+    await screen.findByText('There is no page at this address');
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
+      'District focal person',
+    );
   });
 });
 
@@ -92,7 +108,7 @@ describe('signing in', () => {
   it('signs in and lands on the page the visitor originally asked for', async () => {
     const user = userEvent.setup();
     const { store, requests } = renderApp(routes, {
-      route: '/dcfp/stock',
+      route: '/dcfp/orders',
       replies: [
         {
           status: 200,
@@ -114,7 +130,7 @@ describe('signing in', () => {
     await user.type(screen.getByLabelText('Password'), 'a-test-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('heading', { name: 'Condom stock' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Orders' })).toBeInTheDocument();
     expect(store.getState().auth.session?.token).toBe('tok');
     expect(requests[0]).toMatchObject({
       url: '/auth/login',
@@ -152,6 +168,116 @@ describe('signing in', () => {
   });
 });
 
+describe('app shell', () => {
+  it("shows only the current workspace's sections in the sidebar", async () => {
+    renderApp(routes, { route: '/dcfp/hotspot-map', signedIn: true });
+    await screen.findByRole('heading', { level: 1, name: 'Hotspot map' });
+
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    for (const section of ['Overview', 'Fulfilment', 'Network']) {
+      expect(within(nav).getByRole('group', { name: section })).toBeInTheDocument();
+    }
+    expect(within(nav).queryByRole('link', { name: 'Procurement' })).not.toBeInTheDocument();
+    // On a tab other than the first, the item is current without being this page.
+    expect(within(nav).getByRole('link', { name: 'Hotspots' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
+  it('heads the page with its breadcrumb, title and description', async () => {
+    renderApp(routes, { route: '/moh/users', signedIn: true });
+    await screen.findByRole('heading', { level: 1, name: 'User management' });
+
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveTextContent('Ministry of Health/Users & access');
+    expect(
+      screen.getByText('Everyone who can sign in to CLIMS, and the roles they hold.'),
+    ).toBeInTheDocument();
+    const tabs = screen.getByRole('navigation', { name: 'Users & access pages' });
+    expect(within(tabs).getByRole('link', { name: 'Roles & permissions' })).toHaveAttribute(
+      'href',
+      '/moh/users/roles',
+    );
+  });
+
+  it('shows no tabs for a section with one page', async () => {
+    renderApp(routes, { route: '/moh/audit', signedIn: true });
+    await screen.findByRole('heading', { level: 1, name: 'Audit log' });
+    expect(screen.queryByRole('navigation', { name: /pages$/ })).not.toBeInTheDocument();
+  });
+
+  it("moves between a section's pages with its tabs, each at its own address", async () => {
+    const user = userEvent.setup();
+    renderApp(routes, { route: '/dcfp/hotspots', signedIn: true });
+    await screen.findByRole('heading', { level: 1, name: 'Hotspots' });
+
+    const tabs = screen.getByRole('navigation', { name: 'Hotspots pages' });
+    expect(within(tabs).getByRole('link', { name: 'List' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    await user.click(within(tabs).getByRole('link', { name: 'Map' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Hotspot map' }),
+    ).toBeInTheDocument();
+    expect(testRouter.location).toBe('/dcfp/hotspot-map');
+    expect(
+      within(screen.getByRole('navigation', { name: 'Hotspots pages' })).getByRole('link', {
+        name: 'Map',
+      }),
+    ).toHaveAttribute('aria-current', 'page');
+    // The breadcrumb's section now leads back to the first tab.
+    expect(
+      within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', {
+        name: 'Hotspots',
+      }),
+    ).toHaveAttribute('href', '/dcfp/hotspots');
+  });
+
+  it('switches workspace from the foot of the sidebar', async () => {
+    const user = userEvent.setup();
+    renderApp(routes, { route: '/moh/users', signedIn: true });
+    await screen.findByRole('heading', { name: 'User management' });
+
+    await user.click(screen.getByRole('button', { name: /Workspace\s*Ministry of Health/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Warehouse' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Warehouse dashboard' }),
+    ).toBeInTheDocument();
+    expect(testRouter.location).toBe('/warehouse');
+    expect(
+      within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', {
+        name: 'District requests',
+      }),
+    ).toHaveAttribute('href', '/warehouse/requests');
+  });
+
+  it('collapses the sidebar from the top bar and remembers it', async () => {
+    const user = userEvent.setup();
+    const { storage } = renderApp(routes, { route: '/moh/users', signedIn: true });
+    await screen.findByRole('heading', { name: 'User management' });
+
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
+    expect(storage.getItem('clims.sidebar-open')).toBe('false');
+  });
+
+  it('says plainly that notifications are not connected yet', async () => {
+    const user = userEvent.setup();
+    renderApp(routes, { route: '/moh/users', signedIn: true });
+    await screen.findByRole('heading', { name: 'User management' });
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+
+    expect(await screen.findByText('Notifications are not connected yet.')).toBeInTheDocument();
+  });
+});
+
 describe('theme', () => {
   it('starts light, switches to dark on request and remembers the choice', async () => {
     const user = userEvent.setup();
@@ -175,7 +301,7 @@ describe('signing out', () => {
     const { store, storage } = renderApp(routes, { route: '/moh/users', signedIn: true });
     await screen.findByRole('heading', { name: 'User management' });
 
-    await user.click(screen.getByRole('button', { name: /Account menu/ }));
+    await user.click(screen.getByRole('button', { name: /account menu/i }));
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
@@ -192,7 +318,7 @@ describe('signing out', () => {
     });
     await screen.findByRole('heading', { name: 'Procurement' });
 
-    await user.click(screen.getByRole('button', { name: /Account menu/ }));
+    await user.click(screen.getByRole('button', { name: /account menu/i }));
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();

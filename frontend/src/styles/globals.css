@@ -5,6 +5,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Layout metrics. `static` keeps the variable on :root so plain CSS below can use it. */
+@theme static {
+  /* Top bar height, shared by the app header and the sidebar header. */
+  --spacing-header: 3.5rem;
+}
+
 @theme inline {
   --font-sans: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-sans);
@@ -27,6 +33,15 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
+  /* Who did something, in timelines and activity feeds. Always shown beside
+     the role's name: the colour is a second cue, never the only one. */
+  --color-role-hotspot-manager: var(--role-hotspot-manager);
+  --color-role-vht: var(--role-vht);
+  --color-role-dcfp: var(--role-dcfp);
+  --color-role-warehouse: var(--role-warehouse);
+  --color-role-rider: var(--role-rider);
+  --color-role-moh: var(--role-moh);
+  --color-role-system: var(--role-system);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -35,9 +50,11 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  /* Table header band: the reference's half-strength secondary, pre-mixed
-     with the card so a sticky header cell is opaque over scrolling content. */
-  --color-table-head: color-mix(in oklch, var(--secondary) 50%, var(--card));
+  /* Table header band: primary at 7%, pre-mixed with the card (in sRGB, so it
+     matches the prototype's rgba overlay) so a sticky header cell is opaque
+     over scrolling content. The card comes first because the build's fallback
+     for browsers without color-mix() uses the first colour. */
+  --color-table-head: color-mix(in srgb, var(--card), var(--primary) 7%);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -50,7 +67,9 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  /* Cards are 12px in the reference theme; the multiplier scale would give 11.2px. */
+  /* Cards: 10px, flat, 1px border, no shadow. */
+  --radius-card: calc(var(--radius) * 1.25);
+  /* Popovers and dialogs: 12px. The multiplier scale would give 11.2px. */
   --radius-xl: calc(var(--radius) * 1.5);
   --radius-2xl: calc(var(--radius) * 2);
   --radius-3xl: calc(var(--radius) * 2.5);
@@ -63,12 +82,17 @@
  *   - `--primary` keeps the reference green and is for FILLS (buttons, bars).
  *     It is 2.5:1 on white, so green TEXT and icons use `--success` instead.
  *   - status and chart colours are darkened until text passes 4.5:1 on its own
- *     10% tint and chart marks pass 3:1 on the card.
+ *     10% tint and chart marks pass 3:1 on the card. `--destructive` also
+ *     passes on its 20% tint, the destructive button's hover.
+ * Measured ratios are in DESIGN.md ("Contrast").
  */
 :root {
   --radius: 0.5rem;
 
-  --background: #fafafb;
+  --background: #f9fafb;
+  /* A faint primary glow in the canvas's top-right corner (see `bg-canvas`).
+     Transparent first, so browsers without color-mix() get no glow at all. */
+  --canvas-glow: color-mix(in srgb, transparent, var(--primary) 7%);
   --foreground: #0c0d0f;
   --card: #ffffff;
   --card-foreground: #0c0d0f;
@@ -84,7 +108,7 @@
   --accent: #f2f3f5;
   --accent-foreground: #0c0d0f;
 
-  --destructive: #c62828;
+  --destructive: #b71c1c;
   --success: #177534;
   --warning: #a84c06;
   --info: #0a6a9b;
@@ -104,6 +128,17 @@
   --chart-4: #e2710a;
   --chart-5: #c9417f;
 
+  /* The prototype's role colours. DCFP (2.5:1) and warehouse (2.7:1) are under
+     3:1 on white, which is acceptable only because the role is always named
+     in text beside the dot. */
+  --role-hotspot-manager: #1f8fd1;
+  --role-vht: #7c5cd6;
+  --role-dcfp: #45ba50;
+  --role-warehouse: #e08a2e;
+  --role-rider: #c2418f;
+  --role-moh: var(--info);
+  --role-system: #8b9097;
+
   --sidebar: #fdfdfd;
   --sidebar-foreground: #0c0d0f;
   --sidebar-primary: #45ba50;
@@ -114,7 +149,9 @@
   --sidebar-ring: #2f9e42;
 }
 
-/* Dark theme: the reference design's own values, except the chart series. */
+/* Dark theme: the reference design's own values, except the chart series and
+   `--destructive`, lifted from #f14d4c so text passes 4.5:1 on its 30% tint
+   (the destructive button's dark hover). */
 .dark {
   --background: #020203;
   --foreground: #eeeeee;
@@ -132,7 +169,7 @@
   --accent: #101214;
   --accent-foreground: #eeeeee;
 
-  --destructive: #f14d4c;
+  --destructive: #ff6b6a;
   --success: #45ba50;
   --warning: #ff8918;
   --info: #00b5eb;
@@ -148,6 +185,16 @@
   --chart-3: #9a78e0;
   --chart-4: #d9740f;
   --chart-5: #d1528c;
+
+  /* Every prototype role colour already passes 3:1 on the dark card; MOH
+     follows the dark info blue, as it does in light. */
+  --role-hotspot-manager: #1f8fd1;
+  --role-vht: #7c5cd6;
+  --role-dcfp: #45ba50;
+  --role-warehouse: #e08a2e;
+  --role-rider: #c2418f;
+  --role-moh: var(--info);
+  --role-system: #8b9097;
 
   --sidebar: #040406;
   --sidebar-foreground: #eeeeee;
@@ -171,7 +218,7 @@
     caret-color: var(--success);
     accent-color: var(--success);
     /* Keep a focused or linked element clear of the sticky header. */
-    scroll-padding-top: 5rem;
+    scroll-padding-top: calc(var(--spacing-header) + 1rem);
     /* Remove the double-tap-to-zoom delay; pinch zoom still works. */
     touch-action: manipulation;
     -webkit-tap-highlight-color: color-mix(in oklch, var(--primary) 20%, transparent);
@@ -182,13 +229,40 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-canvas text-foreground antialiased;
   }
 
   ::selection {
     background-color: color-mix(in oklch, var(--primary) 35%, transparent);
     color: var(--foreground);
   }
+}
+
+/* The page canvas: the background colour with the primary glow at the top right. */
+@utility bg-canvas {
+  background-color: var(--background);
+  background-image: radial-gradient(1000px 480px at 100% -12%, var(--canvas-glow), transparent 60%);
+}
+
+/*
+ * Status chip metrics from the prototype theme: a 22px pill with a dot,
+ * 10.5px bold caps and a hairline of its own colour. Tone classes supply the
+ * colours (see `components/StatusBadge`).
+ */
+@utility status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.375rem;
+  padding-inline: 0.4375rem 0.5625rem;
+  border-radius: calc(infinity* 1px);
+  font-size: 0.65625rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 30%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -199,5 +273,85 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Print. A page prints without the app around it:
+ *   - the shell (top bar, sidebar, skip link), `Button`s, toasts and anything
+ *     marked `data-print-hide` (sample-data notices, page actions) never print;
+ *   - when the page marks one element `data-print-region` (a delivery note, a
+ *     goods received note), only that element prints, at full width.
+ * Colours are ink on paper whatever the theme: the light values, repeated here
+ * because a dark page would otherwise print light text on white paper.
+ */
+@page {
+  margin: 15mm;
+}
+
+@media print {
+  :root,
+  .dark {
+    color-scheme: light;
+    --background: #ffffff;
+    --canvas-glow: transparent;
+    --foreground: #0c0d0f;
+    --card: #ffffff;
+    --card-foreground: #0c0d0f;
+    --popover: #ffffff;
+    --popover-foreground: #0c0d0f;
+    --secondary: #f2f3f5;
+    --muted: #f2f3f5;
+    --muted-foreground: #62666d;
+    --border: #c9ccd1;
+    --destructive: #b71c1c;
+    --success: #177534;
+    --warning: #a84c06;
+    --info: #0a6a9b;
+  }
+
+  html {
+    scroll-padding-top: 0;
+  }
+
+  [data-print-hide],
+  [data-slot='sidebar'],
+  [data-slot='button'],
+  [data-sonner-toaster],
+  a[href='#main'] {
+    display: none !important;
+  }
+
+  /* With a print region: drop everything that neither is it, holds it, nor sits inside it. */
+  body:has([data-print-region])
+    *:not([data-print-region], [data-print-region] *, :has([data-print-region])) {
+    display: none !important;
+  }
+
+  /* Its ancestors stop being grids, columns and scroll boxes, so it gets the page's width. */
+  body:has([data-print-region]) :has([data-print-region]) {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+
+  [data-print-region] {
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding-block: 0 !important;
+  }
+
+  [data-print-region] * {
+    overflow: visible !important;
+  }
+
+  tr {
+    break-inside: avoid;
   }
 }
