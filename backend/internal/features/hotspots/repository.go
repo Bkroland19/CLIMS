@@ -289,12 +289,31 @@ func (r *Repository) notifications(ctx context.Context, access scope, limit, off
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[Event])
 }
 
-func (r *Repository) districts(ctx context.Context) ([]District, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, name FROM districts ORDER BY name, id`)
+// The location lookups feed the submission form: region, then district, then subcounty.
+func (r *Repository) regions(ctx context.Context) ([]Place, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, name FROM regions ORDER BY name, id`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[Place])
+}
+
+// districts lists every district, or only a region's when regionID is set.
+func (r *Repository) districts(ctx context.Context, regionID *string) ([]District, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, name FROM districts
+		WHERE $1::uuid IS NULL OR region_id = $1 ORDER BY name, id`, regionID)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[District])
+}
+
+func (r *Repository) subcounties(ctx context.Context, districtID string) ([]Place, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, name FROM subcounties WHERE district_id = $1 ORDER BY name, id`, districtID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByPos[Place])
 }
 
 // checkDetails validates the location chain and the "no duplicate name in the

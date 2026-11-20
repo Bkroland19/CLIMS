@@ -254,7 +254,25 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	if !notified(dcfp, id, "commented") {
 		t.Fatal("submitter comment did not notify the district")
 	}
-	if len(request("GET", "/hotspots/districts", nil, vht, 200)["data"].([]any)) < 146 {
-		t.Fatal("district picker is missing the converted districts")
+
+	// Location lookups chain region, district and subcounty for the submission form.
+	includes := func(path, id string) bool {
+		t.Helper()
+		for _, item := range request("GET", path, nil, vht, 200)["data"].([]any) {
+			if item.(map[string]any)["id"] == id {
+				return true
+			}
+		}
+		return false
 	}
+	if len(request("GET", "/hotspots/districts", nil, vht, 200)["data"].([]any)) < 146 ||
+		!includes("/hotspots/regions", region) || !includes("/hotspots/districts?region_id="+region, district) ||
+		includes("/hotspots/districts?region_id="+region, otherDistrict) && otherRegion != region ||
+		!includes("/hotspots/subcounties?district_id="+district, subcounty) ||
+		includes("/hotspots/subcounties?district_id="+district, otherSubcounty) {
+		t.Fatal("location lookups do not chain region, district and subcounty")
+	}
+	request("GET", "/hotspots/subcounties", nil, vht, 400)
+	request("GET", "/hotspots/districts?region_id=nope", nil, vht, 400)
+	request("GET", "/hotspots/regions", nil, dcfp, 403)
 }

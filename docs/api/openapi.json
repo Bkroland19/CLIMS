@@ -1142,7 +1142,7 @@
         "tags": ["Hotspots"],
         "operationId": "listHotspotDistricts",
         "summary": "List districts for submission",
-        "description": "Requires hotspots:submit. Lists every district by name for the submission form's district_id.",
+        "description": "Requires hotspots:submit. Lists districts by name for the submission form's district_id, optionally only those in region_id.",
         "responses": {
           "200": {
             "description": "Success",
@@ -1175,7 +1175,17 @@
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/auth/logout": {
@@ -2176,6 +2186,99 @@
           {
             "name": "id",
             "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/regions": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotRegions",
+        "summary": "List regions for submission",
+        "description": "Requires hotspots:submit. Lists regions by name for the submission form's region_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotPlaceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/hotspots/subcounties": {
+      "get": {
+        "tags": ["Hotspots"],
+        "operationId": "listHotspotSubcounties",
+        "summary": "List subcounties for submission",
+        "description": "Requires hotspots:submit. Lists a district's subcounties by name for the submission form's subcounty_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotPlaceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "district_id",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
@@ -4158,6 +4261,25 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/HotspotEvent"
+            }
+          }
+        }
+      },
+      "HotspotPlaceListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotPlace"
             }
           }
         }
