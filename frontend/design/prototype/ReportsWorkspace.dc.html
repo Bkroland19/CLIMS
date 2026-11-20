@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:14px">
+
+<sc-if value="{{ pg.missing }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:32px 16px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center">
+    <div style="font-size:14px;font-weight:600">That report isn't available</div>
+    <button onClick="{{ toList }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;font-size:14px;font-weight:500;cursor:pointer">Back to reports</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.list }}" hint-placeholder-val="{{ true }}">
+  <sc-if value="{{ due.has }}" hint-placeholder-val="{{ true }}">
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center">
+        <div style="min-width:0"><div style="font-size:14px;font-weight:600">{{ due.title }}</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ due.sub }}</div></div>
+        <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ due.chip.bg }};color:{{ due.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ due.chip.label }}</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px">
+        <sc-for list="{{ due.steps }}" as="st" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 120px;min-width:0">
+            <span style="height:4px;border-radius:2px;background:{{ st.bar }}"></span><span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ st.kc }};margin-top:4px">{{ st.kicker }}</span>
+            <div style="min-width:0"><div style="font-size:14px;font-weight:{{ st.fw }};color:{{ st.tc }}">{{ st.label }}</div><div style="font-size:12px;color:#62666d;margin-top:1px">{{ st.sub }}</div></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:10px 14px;background:rgba(246,248,247,.6);border-top:1px solid rgba(15,40,25,.06);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+        <span style="font-size:14px;text-wrap:pretty;flex:1 1 260px;min-width:0">{{ due.msg }}</span>
+        <sc-if value="{{ due.primary }}"><button onClick="{{ due.open }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">{{ due.cta }}</button></sc-if>
+        <sc-if value="{{ due.secondary }}"><button onClick="{{ due.open }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">{{ due.cta }}</button></sc-if>
+      </div>
+    </div>
+  </sc-if>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">Report history</div><div style="font-size:13px;color:#62666d;margin-top:2px">{{ histSub }}</div></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:680px">
+        <thead><tr>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Period</th>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Report</th>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Sent</th>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Validation</th>
+          <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+          <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+        </tr></thead>
+        <tbody>
+          <sc-for list="{{ hist }}" as="r" hint-placeholder-count="3">
+            <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+              <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:600">{{ r.period }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.id }}</div></td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.name }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap;line-height:1.35">{{ r.sent }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;color:{{ r.vfg }}">{{ r.val }}</td>
+              <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+              <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+    <sc-if value="{{ noHist }}"><div style="padding:28px 16px;text-align:center;font-size:14px;color:#62666d">No reports yet.</div></sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.inbox }}">
+  <div style="display:grid;grid-template-columns:repeat({{ kpiCols }},minmax(0,1fr));gap:12px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+      <button onClick="{{ k.onClick }}" aria-pressed="{{ k.on }}" style="text-align:left;background:{{ k.cardBg }};-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:10px;color:#0c0d0f;min-width:0;box-shadow:{{ k.ring }}" style-hover="background:rgba(69,186,80,.06)">
+        <span style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;width:100%"><span style="font-size:10.5px;color:#4a4e55;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.label }}</span><span style="width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.8);box-shadow:inset 0 0 0 1px rgba(15,40,25,.09),0 1px 2px rgba(15,40,25,.06)"><span style="width:15px;height:15px;background:{{ k.icc }};-webkit-mask:{{ k.mask }};mask:{{ k.mask }}"></span></span></span>
+        <span style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;width:100%">
+          <span style="min-width:0;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.01em;white-space:nowrap">{{ k.value }}</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#62666d;white-space:nowrap"><span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;font-weight:600;background:{{ k.dbg }};color:{{ k.dfg }}">{{ k.delta }}</span>{{ k.sub }}</span>
+          </span>
+          <svg width="84" height="32" viewBox="0 0 84 32" aria-hidden="true" style="flex:none;overflow:visible"><path d="{{ k.area }}" fill="{{ k.fill }}"></path><path d="{{ k.line }}" fill="none" stroke="{{ k.icc }}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="{{ k.ex }}" cy="{{ k.ey }}" r="2.5" fill="#fff" stroke="{{ k.icc }}" stroke-width="1.5"></circle></svg>
+        </span>
+      </button>
+    </sc-for>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <select value="{{ ib.per }}" onChange="{{ ib.onPer }}" aria-label="Reporting period" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;background:#fff">
+      <sc-for list="{{ ib.pers }}" as="p" hint-placeholder-count="3"><option value="{{ p.k }}">{{ p.label }}</option></sc-for>
+    </select>
+    <div role="tablist" aria-label="Level" style="display:flex;flex-wrap:wrap;gap:2px;padding:3px;background:#eef0f2;border-radius:8px">
+      <sc-for list="{{ ib.levels }}" as="f" hint-placeholder-count="5"><button role="tab" aria-selected="{{ f.on }}" onClick="{{ f.pick }}" style="height:30px;padding:0 10px;border:none;border-radius:6px;background:{{ f.bg }};box-shadow:{{ f.sh }};color:{{ f.fg }};font-size:13px;font-weight:500;cursor:pointer;display:flex;gap:6px;align-items:center">{{ f.label }}</button></sc-for>
+    </div>
+    <div role="tablist" aria-label="Status" style="display:flex;gap:2px;padding:3px;background:#eef0f2;border-radius:8px">
+      <sc-for list="{{ ib.statuses }}" as="f" hint-placeholder-count="2"><button role="tab" aria-selected="{{ f.on }}" onClick="{{ f.pick }}" style="height:30px;padding:0 10px;border:none;border-radius:6px;background:{{ f.bg }};box-shadow:{{ f.sh }};color:{{ f.fg }};font-size:13px;font-weight:500;cursor:pointer;display:flex;gap:6px;align-items:center">{{ f.label }}<span style="font-size:12px;color:#62666d">{{ f.n }}</span></button></sc-for>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:860px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Reporting unit</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Level</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Reported by</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Sent</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Validation</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+        <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ inbox }}" as="r" hint-placeholder-count="5">
+          <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:{{ r.fw }}">{{ r.unit }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.id }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div>{{ r.level }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.district }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.reporter }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap;line-height:1.35">{{ r.sent }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;color:{{ r.vfg }}">{{ r.val }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+            <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+    <sc-if value="{{ noInbox }}"><div style="padding:28px 16px;text-align:center;font-size:14px;color:#62666d">No reports match these filters.</div></sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.form }}">
+  <button onClick="{{ toList }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#62666d;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>{{ fm.backLabel }}</button>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+    <div style="padding:12px 14px 12px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center">
+      <h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">{{ fm.title }}</h2>
+      <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ fm.chip.bg }};color:{{ fm.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ fm.chip.label }}</span>
+      <span style="color:#62666d;font-size:14px;flex-basis:100%">{{ fm.sub }}</span>
+    </div>
+    <div style="padding:10px 14px 16px;border-top:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.5);display:flex;flex-wrap:wrap;gap:12px">
+      <sc-for list="{{ fm.steps }}" as="st" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 120px;min-width:0">
+          <span style="height:4px;border-radius:2px;background:{{ st.bar }}"></span><span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ st.kc }};margin-top:4px">{{ st.kicker }}</span>
+          <div style="min-width:0"><div style="font-size:14px;font-weight:{{ st.fw }};color:{{ st.tc }}">{{ st.label }}</div><div style="font-size:12px;color:#62666d;margin-top:1px">{{ st.sub }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 540px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div role="status" style="border-radius:12px;padding:10px 14px;background:{{ bn.bg }}">
+        <div style="font-size:14px;font-weight:600;color:{{ bn.fg }}">{{ bn.title }}</div>
+        <div style="font-size:14px;margin-top:2px;text-wrap:pretty">{{ bn.body }}</div>
+        <sc-if value="{{ bn.hasList }}">
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(198,40,40,.18)">
+            <sc-for list="{{ bn.list }}" as="e" hint-placeholder-count="3">
+              <button onClick="{{ e.go }}" style="text-align:left;background:none;border:none;padding:2px 0;font-size:14px;color:#0c0d0f;cursor:pointer;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;white-space:normal" style-hover="color:#c62828"><span style="font-weight:600;color:#c62828;white-space:nowrap">{{ e.where }}</span><span style="text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(198,40,40,.35);text-wrap:pretty">{{ e.msg }}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:1px;background:rgba(15,40,25,.08);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+        <div style="background:rgba(255,255,255,.95)">
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">1</span>Stock movement</div><div style="font-size:13px;color:#62666d;margin-top:4px;padding-left:34px">In pieces, for {{ fm.month }}. Rows marked CLIMS come from records already in the system.</div></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:12px;padding:8px 16px;background:rgba(246,248,247,.6);border-bottom:1px solid rgba(15,40,25,.09);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d">
+            <span>Item</span>
+            <sc-for list="{{ fm.cols }}" as="c" hint-placeholder-count="2"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.label }}</span></sc-for>
+          </div>
+          <sc-for list="{{ fm.stock }}" as="r" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start;padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.06)">
+              <div style="padding-top:2px;min-width:0">
+                <div style="font-size:14px;font-weight:500;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center">{{ r.label }}<sc-if value="{{ r.sys }}"><span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;font-size:11px;font-weight:600;background:rgba(10,106,155,.1);color:#0a6a9b">CLIMS</span></sc-if></div>
+                <div style="font-size:12.5px;color:#62666d;margin-top:2px;text-wrap:pretty">{{ r.hint }}</div>
+              </div>
+              <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="2">
+                <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                  <sc-if value="{{ c.edit }}"><input id="{{ c.fid }}" type="number" min="0" inputmode="numeric" aria-label="{{ c.aria }}" aria-invalid="{{ c.bad }}" value="{{ c.val }}" onChange="{{ c.on }}" style="width:100%;height:32px;padding:0 10px;border-radius:8px;border:1px solid {{ c.bd }};background:{{ c.bg }};font-size:14px;color:#0c0d0f;font-variant-numeric:tabular-nums"></sc-if>
+                  <sc-if value="{{ c.ro }}"><div aria-label="{{ c.aria }}" style="height:32px;padding:0 10px;border-radius:8px;background:#f6f7f9;border:1px solid #eef0f2;display:flex;align-items:center;font-size:14px;font-variant-numeric:tabular-nums;color:#0c0d0f">{{ c.txt }}</div></sc-if>
+                  <sc-if value="{{ c.bad }}"><div style="font-size:12.5px;color:#c62828;line-height:1.35;text-wrap:pretty">{{ c.err }}</div></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ fm.hasOther }}">
+          <div style="background:rgba(255,255,255,.8);padding:10px 14px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">2</span>{{ fm.otherTitle }}</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+              <sc-for list="{{ fm.other }}" as="f" hint-placeholder-count="2">
+                <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+                  <label for="{{ f.fid }}" style="font-size:13px;font-weight:500">{{ f.label }}</label>
+                  <sc-if value="{{ f.isNum }}"><input id="{{ f.fid }}" type="number" min="0" inputmode="numeric" aria-invalid="{{ f.bad }}" value="{{ f.val }}" onChange="{{ f.on }}" style="width:100%;height:32px;padding:0 10px;border-radius:8px;border:1px solid {{ f.bd }};background:{{ f.bg }};font-size:14px;color:#0c0d0f;font-variant-numeric:tabular-nums"></sc-if>
+                  <sc-if value="{{ f.isSel }}"><select id="{{ f.fid }}" aria-invalid="{{ f.bad }}" value="{{ f.val }}" onChange="{{ f.on }}" style="width:100%;height:32px;padding:0 10px;border-radius:8px;border:1px solid {{ f.bd }};background:{{ f.bg }};font-size:14px;color:#0c0d0f"><option value="">Choose…</option><sc-for list="{{ f.opts }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select></sc-if>
+                  <sc-if value="{{ f.ro }}"><div style="height:32px;padding:0 10px;border-radius:8px;background:#f6f7f9;border:1px solid #eef0f2;display:flex;align-items:center;font-size:14px;font-variant-numeric:tabular-nums">{{ f.txt }}</div></sc-if>
+                  <sc-if value="{{ f.hasHint }}"><div style="font-size:12.5px;color:#62666d">{{ f.hint }}</div></sc-if>
+                  <sc-if value="{{ f.bad }}"><div style="font-size:12.5px;color:#c62828;line-height:1.35;text-wrap:pretty">{{ f.err }}</div></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="background:rgba(255,255,255,.8);padding:10px 14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ fm.commentN }}</span>Comment for MOH<span style="font-weight:400;color:#62666d">· optional</span></div>
+          <sc-if value="{{ fm.canEdit }}"><textarea id="rf-comment" rows="3" value="{{ fm.comment }}" onChange="{{ fm.onComment }}" placeholder="Anything that explains this month's figures" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #8b9097;font-size:14px;resize:vertical"></textarea></sc-if>
+          <sc-if value="{{ fm.ro }}"><div style="font-size:14px;color:{{ fm.commentFg }};text-wrap:pretty">{{ fm.commentTxt }}</div></sc-if>
+        </div>
+      </div>
+
+      <details style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><summary style="padding:12px 12px 12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">Updates</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">Entry, validation and sending, oldest first</span></span><span style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(15,40,25,.09);display:flex;align-items:center;justify-content:center;flex:none;color:#62666d"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s"><path d="m6 9 6 6 6-6"></path></svg></span></summary><div style="padding:10px 14px 8px;border-top:1px solid rgba(15,40,25,.06)">
+        <sc-for list="{{ fm.tl }}" as="e" hint-placeholder-count="2">
+          <div style="display:flex;gap:12px">
+            <div style="display:flex;flex-direction:column;align-items:center"><span style="width:10px;height:10px;border-radius:50%;background:{{ e.dot }};margin-top:5px;flex:none"></span><span style="flex:1;width:1px;background:#e4e6e9;margin:4px 0"></span></div>
+            <div style="min-width:0;padding-bottom:14px"><div style="font-size:14px;line-height:1.4">{{ e.text }}</div><div style="font-size:12px;color:#62666d;margin-top:2px">{{ e.actor }} · {{ e.time }}</div></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ fm.noTl }}"><div style="font-size:14px;color:#62666d;padding-bottom:8px">Nothing yet.</div></sc-if>
+      </div></details>
+    </div>
+
+    <div style="flex:1 1 290px;min-width:0;position:sticky;top:80px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:14px;font-weight:600">{{ sd.title }}</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px">
+          <sc-for list="{{ sd.rows }}" as="x" hint-placeholder-count="5"><div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">{{ x.k }}</span><span style="text-align:right;min-width:0;color:{{ x.fg }}">{{ x.v }}</span></div></sc-for>
+        </div>
+      </div>
+      <div style="padding:12px 14px;border-top:1px solid rgba(15,40,25,.06);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:13px;font-weight:600">Validation checks</span><span style="font-size:12px;color:#62666d">{{ sd.checksSub }}</span></div>
+        <sc-for list="{{ sd.checks }}" as="c" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13.5px;min-height:22px">
+            <span style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex:none">
+              <sc-if value="{{ c.pass }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#177534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg></sc-if>
+              <sc-if value="{{ c.fail }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c62828" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></sc-if>
+              <sc-if value="{{ c.pend }}"><span style="width:14px;height:14px;border-radius:50%;border:1.5px dashed #b4b8be"></span></sc-if>
+              <sc-if value="{{ c.run }}">{{ c.spin }}</sc-if>
+            </span>
+            <span style="flex:1;min-width:0;color:{{ c.fg }}">{{ c.label }}</span>
+            <sc-if value="{{ c.hasN }}"><span style="font-size:12px;font-weight:600;color:#c62828;white-space:nowrap">{{ c.n }}</span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ sd.canSend }}">
+        <div style="padding:12px 14px 16px;border-top:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.6);display:flex;flex-direction:column;gap:10px">
+          <button onClick="{{ sd.send }}" disabled="{{ sd.busy }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">{{ sd.primaryLbl }}</button>
+          <button onClick="{{ sd.save }}" disabled="{{ sd.cantSave }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Save draft</button>
+          <div style="font-size:13px;color:#62666d;text-wrap:pretty">CLIMS checks the report before it leaves. If something is wrong it comes back to you to fix — nothing reaches MOH until it passes.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sd.isSent }}">
+        <div style="padding:12px 14px 16px;border-top:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.6);display:flex;flex-direction:column;gap:10px">
+          <button onClick="{{ sd.download }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>{{ sd.dlLabel }}</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { d: {}, busy: null, per: '2026-10', lvl: 'all', st: 'sent' };
+  CUR = '2026-10';
+  PER = {
+    '2026-10': { label: 'October 2026', month: 'October', days: 31, due: '20 Nov 2026' },
+    '2026-09': { label: 'September 2026', month: 'September', days: 30, due: '20 Oct 2026' },
+    '2026-08': { label: 'August 2026', month: 'August', days: 31, due: '20 Sep 2026' },
+  };
+  LV = { hotspot: 'Hotspot', vht: 'VHT', district: 'District', warehouse: 'Warehouse' };
+  FORMS = {
+    hotspot: { name: 'Hotspot monthly report', otherTitle: 'Service at the hotspot', stock: [
+      { k: 'open', label: 'Opening balance', hint: "Last month's closing balance", sys: true },
+      { k: 'recv', label: 'Received', hint: 'Deliveries confirmed in CLIMS', sys: true },
+      { k: 'dist', label: 'Distributed to clients', hint: 'Taken from the dispenser or handed out' },
+      { k: 'loss', label: 'Losses & adjustments', hint: 'Expired, damaged or missing' },
+      { k: 'close', label: 'Closing balance', hint: 'Physical count at month end' }],
+      other: [
+      { k: 'daysOut', label: 'Days out of stock', hint: 'Days with nothing in the dispenser', type: 'num', req: true, max: 'days' },
+      { k: 'dispenser', label: 'Dispenser condition', type: 'sel', opts: ['Working', 'Broken', 'No dispenser'], req: true }] },
+    vht: { name: 'VHT outreach report', otherTitle: 'Outreach', stock: [
+      { k: 'open', label: 'Opening balance', hint: "Last month's closing balance", sys: true },
+      { k: 'recv', label: 'Received', hint: 'Issued to you in CLIMS', sys: true },
+      { k: 'dist', label: 'Distributed during outreach', hint: 'Handed out at hotspots and in the community' },
+      { k: 'loss', label: 'Losses & adjustments', hint: 'Expired, damaged or missing' },
+      { k: 'close', label: 'Closing balance', hint: 'Condoms you hold at month end' }],
+      other: [
+      { k: 'visited', label: 'Hotspots visited', type: 'num', req: true, max: 'cover' },
+      { k: 'sessions', label: 'Outreach sessions held', type: 'num', req: true },
+      { k: 'reached', label: 'People reached', type: 'num', req: true }] },
+    district: { name: 'District stock report', otherTitle: 'District store', stock: [
+      { k: 'open', label: 'Opening balance', hint: "Last month's closing balance", sys: true },
+      { k: 'recv', label: 'Received from warehouses', hint: 'NMS and JMS consignments received in CLIMS', sys: true },
+      { k: 'dist', label: 'Issued to hotspots', hint: 'Orders confirmed in CLIMS', sys: true },
+      { k: 'loss', label: 'Losses & adjustments', hint: 'Expired, damaged or missing' },
+      { k: 'close', label: 'Closing balance', hint: 'Physical count of the district store' }],
+      other: [{ k: 'daysOut', label: 'Days the store was out of stock', type: 'num', req: true, max: 'days' }] },
+    warehouse: { name: 'Warehouse stock report', otherTitle: '', stock: [
+      { k: 'open', label: 'Opening balance', hint: "Last month's closing balance", sys: true },
+      { k: 'recv', label: 'Received from suppliers', hint: 'Supplier deliveries this month' },
+      { k: 'dist', label: 'Issued to districts', hint: 'Dispatches recorded in CLIMS', sys: true },
+      { k: 'loss', label: 'Losses & adjustments', hint: 'Expired, damaged or missing' },
+      { k: 'close', label: 'Closing balance', hint: 'Physical count at month end' },
+      { k: 'exp', label: 'Expiring within 6 months', hint: 'Part of the closing balance' }],
+      other: [] },
+  };
+  LOSS = { k: 'lossReason', label: 'Reason for losses & adjustments', type: 'sel', opts: ['Expired', 'Damaged', 'Stolen or missing', 'Count correction', 'Other'] };
+  CHECKS = [['req', 'Required fields complete'], ['num', 'Whole numbers, none negative'], ['bal', 'Stock balances for each product'], ['range', 'Values within range']];
+
+  componentDidMount() { if (this.props.ready) this.props.ready(); this.markSeen(); }
+  componentDidUpdate() { this.markSeen(); }
+  componentWillUnmount() { clearTimeout(this.bt); clearTimeout(this.seenT); }
+  markSeen() {
+    const { store: s, nav, act } = this.props;
+    if (!s || !nav || !s.reports || s.role !== 'moh' || nav.page !== 'report') return;
+    const r = s.reports.find(x => x.id === nav.id);
+    if (r && r.status === 'sent' && !r.seen && this._seen !== r.id) { this._seen = r.id; this.seenT = setTimeout(() => act('rptSeen', { id: r.id }), 900); }
+  }
+  sysLine(F) {
+    const n = F.stock.filter(f => f.sys).map(f => f.label.toLowerCase());
+    const list = n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0];
+    return `${list.charAt(0).toUpperCase() + list.slice(1)} ${n.length > 1 ? 'are' : 'is'} already filled in from CLIMS records.`;
+  }
+  seg(items, cur, pick) { return items.map(([k, label, n]) => { const on = k === cur; return { label, n: n ?? '', on, pick: () => pick(k), bg: on ? '#fff' : 'transparent', sh: on ? '0 1px 2px rgba(12,13,15,.12)' : 'none', fg: on ? '#0c0d0f' : '#4a4e55' }; }); }
+  spinner() { return React.createElement('span', { 'aria-hidden': true, style: { width: 14, height: 14, borderRadius: '50%', border: '2px solid #d7eedb', borderTopColor: '#177534', display: 'inline-block', boxSizing: 'border-box', animation: 'clims-spin .7s linear infinite' } }); }
+
+  validate(F, v, ctx) {
+    const L = this.props.lib; const E = [];
+    const blank = x => x == null || String(x).trim() === '';
+    const whole = x => /^\d+$/.test(String(x).trim());
+    const lbl = k => (F.stock.find(f => f.k === k) || {}).label;
+    L.P.forEach(p => {
+      const row = v[p.k] || {}; let bad = false;
+      F.stock.forEach(f => {
+        if (f.sys) return;
+        const x = row[f.k]; const field = p.k + '.' + f.k; const where = `${p.short} · ${f.label}`;
+        if (blank(x)) { E.push({ type: 'req', field, where, msg: 'Required. Enter 0 if none.' }); bad = true; }
+        else if (!whole(x)) { E.push({ type: 'num', field, where, msg: 'Enter a whole number of pieces, 0 or more.' }); bad = true; }
+      });
+      if (bad) return;
+      const g = k => +row[k] || 0;
+      const had = g('open') + g('recv'), out = g('dist') + g('loss'), exp = had - out;
+      if (out > had) { const k = F.stock.find(f => f.k === 'dist').sys ? 'loss' : 'dist'; E.push({ type: 'bal', field: p.k + '.' + k, where: `${p.short} · ${lbl(k)}`, msg: `Distributed plus losses (${L.num(out)}) is more than you had (${L.num(had)}).` }); }
+      else if (g('close') !== exp) E.push({ type: 'bal', field: p.k + '.close', where: `${p.short} · ${lbl('close')}`, msg: `Doesn't balance — opening + received − distributed − losses = ${L.num(exp)}. Recount, or record the difference as a loss or adjustment.` });
+      if (F.stock.some(f => f.k === 'exp') && g('exp') > g('close')) E.push({ type: 'range', field: p.k + '.exp', where: `${p.short} · ${lbl('exp')}`, msg: `Can't be more than the closing balance (${L.num(g('close'))}).` });
+    });
+    F.other.forEach(f => {
+      const x = v[f.k]; const field = f.k; const where = f.label;
+      if (blank(x)) { if (f.req) E.push({ type: 'req', field, where, msg: f.type === 'sel' ? 'Choose one.' : 'Required. Enter 0 if none.' }); return; }
+      if (f.type === 'num' && !whole(x)) { E.push({ type: 'num', field, where, msg: 'Enter a whole number, 0 or more.' }); return; }
+      const mx = f.max === 'days' ? ctx.days : f.max === 'cover' ? ctx.cover : f.max;
+      if (mx != null && +x > mx) E.push({ type: 'range', field, where, msg: f.max === 'days' ? `${ctx.month} has ${mx} days. Enter 0–${mx}.` : `You cover ${mx} hotspots. Enter 0–${mx}.` });
+    });
+    if (L.P.some(p => whole((v[p.k] || {}).loss) && +v[p.k].loss > 0) && blank(v.lossReason)) E.push({ type: 'req', field: 'lossReason', where: 'Reason for losses', msg: 'Say why stock was lost or adjusted.' });
+    return E;
+  }
+
+  run(r, F, vals, ctx) {
+    const errs = this.validate(F, vals, ctx);
+    const types = [...new Set(errs.map(e => e.type))];
+    const id = r.id;
+    clearTimeout(this.bt);
+    const step = i => {
+      if (i < this.CHECKS.length) { this.setState({ busy: { id, phase: 'validating', i, types, errs } }); this.bt = setTimeout(() => step(i + 1), 380); return; }
+      this.props.act('rptValidate', { id, values: vals, errors: errs });
+      this.setState(st => { const d = { ...st.d }; delete d[id]; return { d, busy: errs.length ? null : { id, phase: 'sending', i, types, errs } }; });
+      if (errs.length) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      this.bt = setTimeout(() => { this.props.act('rptSend', { id }); this.setState({ busy: null }); }, 1200);
+    };
+    step(0);
+  }
+
+  renderVals() {
+    const v = this._rv();
+    const L = this.props.lib;
+    if (L && L.menu) this.KEBAB.forEach(([path, fn]) => {
+      const arr = v[path];
+      if (Array.isArray(arr)) arr.forEach(r => { r.menu = e => { e.preventDefault(); e.stopPropagation(); L.menu(e, fn.call(this, r) || []); }; });
+    });
+    return v;
+  }
+  KEBAB = [
+    ['hist', function (r) { const { go, lib: L } = this.props; const it = [{ label: r.isSent ? 'View report' : 'Open report', icon: r.isSent ? 'eye' : 'pencil', run: () => go('report', r.id) }]; if (r.isSent) it.push({ label: 'Download PDF', icon: 'download', run: () => L.toast(`Downloading ${r.id} as PDF…`) }); it.push('sep', { label: 'Copy report ID', icon: 'copy', run: () => L.copy(r.id, 'report ID') }); return it; }],
+    ['inbox', function (r) { const { act, lib: L } = this.props; if (!r.isSent) return [{ label: `Remind ${r.reporter}`, icon: 'megaphone', run: () => act('rptRemind', { id: r.id }) }, 'sep', { label: 'Copy report ID', icon: 'copy', run: () => L.copy(r.id, 'report ID') }]; return [{ label: 'View report', icon: 'eye', run: r.open }, { label: 'Download CSV', icon: 'download', run: () => L.toast(`Downloading ${r.id} as CSV…`) }, 'sep', { label: 'Copy report ID', icon: 'copy', run: () => L.copy(r.id, 'report ID') }]; }],
+  ];
+
+  _rv() {
+    const { store: s, act, nav, go, lib: L } = this.props;
+    if (!s || !L || !nav || !s.reports) return { pg: {} };
+    const role = s.role; const isMoh = role === 'moh';
+    const me = role === 'wh' ? (nav.wh || 'NMS') : role;
+    const page = nav.page || 'reports';
+    const v = { pg: {}, toList: () => go('reports') };
+    const pl = n => (n === 1 ? '' : 's');
+    const chipOf = r => (isMoh
+      ? (r.status === 'sent' ? (r.seen ? L.chip('Received', 'success') : L.chip('New', 'info')) : L.chip('Not sent', 'warning'))
+      : { draft: L.chip('Draft', 'info'), errors: L.chip('Errors to fix', 'danger'), validated: L.chip('Ready to send', 'success'), sent: L.chip('Sent to MOH', 'success') }[r.status]);
+    const valTxt = r => (r.status === 'sent' ? (r.runs <= 1 ? 'Passed first time' : `Passed after ${r.runs - 1} correction${pl(r.runs - 1)}`)
+      : r.status === 'errors' ? `${r.errors.length} error${pl(r.errors.length)} found` : r.status === 'validated' ? 'Passed' : 'Not run yet');
+    const valFg = r => (r.status === 'errors' ? '#c62828' : r.status === 'draft' ? '#62666d' : '#0c0d0f');
+    const steps = (r, B) => {
+      const st = r.status; const n = r.errors.length; const runs = r.runs || 0; const b = B ? B.phase : null;
+      const passedClean = (st === 'sent' || st === 'validated' || b === 'sending') && runs <= 1 && !(B && B.errs.length);
+      return [
+        L.step('Data entry', runs || b ? 'done' : 'cur', r.savedAt != null ? `Saved ${L.t(r.savedAt)}` : 'Not started', 0),
+        L.step('Data validation', b === 'validating' ? 'cur' : runs || b ? 'done' : 'todo', b === 'validating' ? 'Checking…' : st === 'errors' ? `${n} error${pl(n)} found` : runs ? 'Passed' : 'Runs when you send', 1),
+        passedClean ? L.step('Rectify errors', 'skip', 'No errors found', 2) : L.step('Rectify errors', st === 'errors' && !b ? 'warn' : runs > 1 ? 'done' : 'todo', st === 'errors' && !b ? `${n} to fix` : runs > 1 ? `${runs - 1} round${pl(runs - 1)}` : 'Only if validation fails', 2),
+        L.step('Sent to MOH', st === 'sent' ? 'done' : b === 'sending' ? 'cur' : 'todo', st === 'sent' ? L.t(r.sentAt) : b === 'sending' ? 'Sending…' : '', 3),
+      ];
+    };
+
+    if (page === 'reports' && !isMoh) {
+      const mine = s.reports.filter(r => r.own === me).sort((a, b) => b.period.localeCompare(a.period));
+      const cur = mine.find(r => r.period === this.CUR);
+      if (cur) {
+        const F = this.FORMS[cur.form]; const P0 = this.PER[cur.period]; const n = cur.errors.length;
+        v.due = {
+          has: true, title: `${P0.label} · ${F.name}`, sub: `${cur.unit} · due ${P0.due}`, chip: chipOf(cur), steps: steps(cur, null),
+          msg: { draft: cur.savedAt != null ? `Draft saved ${L.t(cur.savedAt)}. ${this.sysLine(F)}` : `${this.sysLine(F)} Add the rest.`, errors: `Validation found ${n} error${pl(n)}. Fix ${n === 1 ? 'it' : 'them'} and send again.`, validated: 'Validation passed. Send the report to MOH.', sent: `Sent ${L.t(cur.sentAt)} · server receipt ${cur.receipt}.` }[cur.status],
+          primary: cur.status !== 'sent', secondary: cur.status === 'sent',
+          cta: { draft: cur.savedAt != null ? 'Continue report' : 'Start report', errors: 'Fix errors', validated: 'Review and send', sent: 'View report' }[cur.status],
+          open: () => go('report', cur.id),
+        };
+      } else v.due = { has: false };
+      v.hist = mine.map(r => ({ id: r.id, isSent: r.status === 'sent', period: this.PER[r.period].label, name: this.FORMS[r.form].name, sent: r.sentAt != null ? L.t(r.sentAt) : '—', val: valTxt(r), vfg: valFg(r), chip: chipOf(r), open: () => go('report', r.id) }));
+      v.noHist = !mine.length;
+      v.histSub = mine.length ? `${mine[0].unit} · reports are due on the 20th of the following month` : '';
+      v.pg = { list: true };
+    }
+
+    if (page === 'reports' && isMoh) {
+      const S = this.state; const isCur = S.per === this.CUR;
+      const inPer = s.reports.filter(r => r.period === S.per);
+      const NAT = { hotspot: [412, 263, [72, 75, 70, 78, 81], 'role_hm', '#1f8fd1', 'Hotspot reports'], vht: [1240, 702, [60, 63, 58, 66, 69], 'role_vht', '#7c5cd6', 'VHT reports'], district: [146, 97, [88, 90, 86, 92, 93], 'role_dcfp', '#45ba50', 'District reports'], warehouse: [2, 0, [100, 100, 100, 100, 100], 'warehouse', '#e08a2e', 'Warehouse reports'] };
+      v.kpis = Object.keys(NAT).map(k => {
+        const [exp, base, hist, icon, color, label] = NAT[k];
+        const hi = S.per === '2026-09' ? 4 : 3;
+        const sent = isCur ? base + inPer.filter(r => r.form === k && r.status === 'sent').length : Math.round(exp * hist[hi] / 100);
+        const pct = Math.round(sent / exp * 100);
+        const on = S.lvl === k;
+        return { ...L.kpi({ label, icon, color, value: `${pct}%`, series: isCur ? [...hist, pct] : hist.slice(0, hi + 1), deltaText: `${L.num(sent)} of ${L.num(exp)}`, dfg: '#4a4e55', dbg: '#f2f3f5', sub: isCur ? `sent · due ${this.PER[S.per].due.replace(' 2026', '')}` : 'sent', onClick: () => this.setState({ lvl: on ? 'all' : k }) }), on, cardBg: on ? 'rgba(236,248,238,.85)' : 'rgba(255,255,255,.92)', ring: on ? '0 0 0 1.5px rgba(69,186,80,.65),0 1px 2px rgba(15,40,25,.04)' : '0 0 0 1px rgba(15,40,25,.07),0 1px 2px rgba(15,40,25,.04)' };
+      });
+      const match = (r, st) => (S.lvl === 'all' || r.form === S.lvl) && (st === 'sent' ? r.status === 'sent' : r.status !== 'sent');
+      v.ib = {
+        per: S.per, onPer: e => this.setState({ per: e.target.value }), pers: Object.keys(this.PER).map(k => ({ k, label: this.PER[k].label })),
+        levels: this.seg([['all', 'All levels'], ['hotspot', 'Hotspots'], ['vht', 'VHTs'], ['district', 'Districts'], ['warehouse', 'Warehouses']], S.lvl, k => this.setState({ lvl: k })),
+        statuses: this.seg([['sent', 'Received', inPer.filter(r => match(r, 'sent')).length], ['open', 'Not sent', inPer.filter(r => match(r, 'open')).length]], S.st, k => this.setState({ st: k })),
+      };
+      const rows = inPer.filter(r => match(r, S.st)).sort((a, b) => (S.st === 'sent' ? b.sentAt - a.sentAt : a.unit.localeCompare(b.unit)));
+      v.inbox = rows.map(r => {
+        const isSent = r.status === 'sent';
+        return { id: r.id, isSent, reporter: r.reporter, unit: r.unit, level: this.LV[r.form], district: r.form === 'warehouse' ? 'National' : `${r.district} district`, sent: isSent ? L.t(r.sentAt) : '—',
+          val: isSent ? valTxt(r) : r.status === 'errors' ? 'Fixing errors' : r.status === 'validated' ? 'Passed, not sent' : r.savedAt != null ? 'Draft in progress' : 'Not started',
+          vfg: isSent ? '#0c0d0f' : r.status === 'errors' ? '#c62828' : '#62666d', chip: chipOf(r), fw: isSent && !r.seen ? 700 : 600,
+          open: () => (isSent ? act('rptSeen', { id: r.id, go: { page: 'report', id: r.id } }) : L.toast(`${r.unit} hasn't sent the ${this.PER[r.period].label} report yet.`)) };
+      });
+      v.noInbox = !rows.length;
+      v.kpiCols = L.kpiCols || 2;
+      v.pg = { inbox: true };
+    }
+
+    if (page === 'report') {
+      const r = s.reports.find(x => x.id === nav.id);
+      if (!r || (isMoh ? r.status !== 'sent' : r.own !== me)) return { pg: { missing: true }, toList: v.toList };
+      const F = this.FORMS[r.form]; const P0 = this.PER[r.period];
+      const B = this.state.busy && this.state.busy.id === r.id ? this.state.busy : null;
+      const ed = this.state.d[r.id] || {};
+      const dirty = Object.keys(ed).length > 0;
+      const canEdit = !isMoh && r.status !== 'sent' && !B;
+      const get = path => { const [a, b] = path.split('.'); return b ? ((r.values[a] || {})[b] ?? '') : (r.values[a] ?? ''); };
+      const val = path => (ed[path] !== undefined ? ed[path] : get(path));
+      const errOf = path => (r.status === 'errors' && !B && ed[path] === undefined ? r.errors.find(e => e.field === path) : null);
+      const set = (path, x) => this.setState(st => ({ d: { ...st.d, [r.id]: { ...(st.d[r.id] || {}), [path]: x } } }));
+      const merged = () => { const m = JSON.parse(JSON.stringify(r.values)); Object.entries(ed).forEach(([k, x]) => { const [a, b] = k.split('.'); if (b) { m[a] = m[a] || {}; m[a][b] = x; } else m[a] = x; }); return m; };
+      const mv = merged();
+      const fmtV = x => (x === '' || x == null ? '—' : /^\d+$/.test(String(x)) ? L.num(+x) : String(x));
+      const fid = path => 'rf-' + path.replace('.', '-');
+      const cover = r.own === 'vht' ? s.hotspots.filter(h => (h.vhts || []).includes('Joseph Ssemwogerere')).length : 3;
+      const ctx = { days: P0.days, month: P0.month, cover };
+      const anyLoss = L.P.some(p => +((mv[p.k] || {}).loss) > 0) || !!String(mv.lossReason || '').trim();
+      const others = [...F.other, ...(anyLoss ? [this.LOSS] : [])];
+      const hasOther = others.length > 0;
+      const cmt = String(val('comment') || '');
+      v.fm = {
+        backLabel: isMoh ? 'Reports' : 'Monthly reports', month: P0.month,
+        title: `${P0.label} · ${F.name}`, chip: chipOf(r),
+        sub: `${r.id} · ${r.unit}${r.form === 'warehouse' ? '' : ` · ${r.district} district`} · ${r.reporter}`,
+        steps: steps(r, B),
+        cols: L.P.map(p => ({ label: `${p.short} · ${p.brand}` })),
+        stock: F.stock.map(f => ({ label: f.label, hint: f.hint, sys: !!f.sys, cells: L.P.map(p => {
+          const path = p.k + '.' + f.k; const e = errOf(path); const edit = canEdit && !f.sys;
+          return { fid: fid(path), edit, ro: !edit, val: val(path), txt: fmtV(val(path)), aria: `${p.name} — ${f.label}`, bad: !!e, err: e ? e.msg : '', bd: e ? '#c62828' : '#8b9097', bg: e ? 'rgba(198,40,40,.04)' : '#fff', on: ev => set(path, ev.target.value) };
+        }) })),
+        hasOther, otherTitle: F.otherTitle || 'Other details',
+        other: others.map(f => {
+          const e = errOf(f.k);
+          const hint = f.max === 'cover' ? `You cover ${cover} hotspots` : f.max === 'days' ? `${f.hint ? f.hint + ' · ' : ''}0–${P0.days}` : f.hint || '';
+          return { fid: fid(f.k), label: f.label, isNum: canEdit && f.type === 'num', isSel: canEdit && f.type === 'sel', ro: !canEdit, val: val(f.k), txt: fmtV(val(f.k)), opts: f.opts || [], hint, hasHint: canEdit && !!hint && !e, bad: !!e, err: e ? e.msg : '', bd: e ? '#c62828' : '#8b9097', bg: e ? 'rgba(198,40,40,.04)' : '#fff', on: ev => set(f.k, ev.target.value) };
+        }),
+        commentN: hasOther ? '3' : '2', canEdit, ro: !canEdit,
+        comment: cmt, onComment: e => set('comment', e.target.value), commentTxt: cmt.trim() || 'No comment.', commentFg: cmt.trim() ? '#0c0d0f' : '#62666d',
+        tl: L.tl([r.id]),
+      };
+      v.fm.noTl = !v.fm.tl.length;
+
+      const n = r.errors.length;
+      const live = r.status === 'errors' ? r.errors.filter(e => ed[e.field] === undefined) : [];
+      const rounds = r.runs <= 1 ? 'first time' : `after ${r.runs - 1} correction${pl(r.runs - 1)}`;
+      let bn;
+      if (B) bn = B.phase === 'validating' ? { tone: 'info', title: 'Checking your figures…', body: 'CLIMS validates every report before it is sent to the MOH server.' } : { tone: 'info', title: 'Sending to the MOH server…', body: 'Validation passed. Keep this page open until it is sent.' };
+      else if (isMoh) bn = { tone: 'success', title: `Received ${L.t(r.sentAt)}`, body: `${r.reporter} sent this through CLIMS. It passed validation ${rounds}. Server receipt ${r.receipt}.` };
+      else if (r.status === 'sent') bn = { tone: 'success', title: `Sent to MOH ${L.t(r.sentAt)}`, body: `Passed validation ${rounds}. Server receipt ${r.receipt}. Sent reports can't be edited — contact the MOH M&E team if something needs correcting.` };
+      else if (r.status === 'errors' && dirty && !live.length) bn = { tone: 'info', title: 'All flagged fields changed', body: 'Send again — CLIMS will re-check the whole report.' };
+      else if (r.status === 'errors') bn = { tone: 'danger', title: dirty ? `${live.length} of ${n} error${pl(n)} still to fix` : `${n} error${pl(n)} to fix before this report can be sent`, body: dirty ? 'Send again when you are done — CLIMS re-checks everything.' : 'Validation sent the report back. Correct these fields, then send again.', list: live.map(e => ({ where: e.where, msg: e.msg, go: () => { const el = document.getElementById(fid(e.field)); if (el) el.focus(); } })) };
+      else if (r.status === 'validated') bn = { tone: 'success', title: 'Validation passed', body: 'Nothing to fix. Send the report to MOH.' };
+      else bn = { tone: 'info', title: `Enter your ${P0.month} figures`, body: `${this.sysLine(F)} When you send, CLIMS checks the figures first — if anything is wrong you'll fix it here before it reaches MOH.` };
+      v.bn = { ...bn, fg: L.TONE[bn.tone][0], bg: L.TONE[bn.tone][1], hasList: !!(bn.list && bn.list.length), list: bn.list || [] };
+
+      const checks = this.CHECKS.map(([k, label], j) => {
+        let st;
+        if (B && B.phase === 'validating') st = j < B.i ? (B.types.includes(k) ? 'fail' : 'pass') : j === B.i ? 'run' : 'pend';
+        else if (B || r.status === 'sent' || r.status === 'validated') st = 'pass';
+        else if (r.status === 'errors') st = r.errors.some(e => e.type === k) ? 'fail' : 'pass';
+        else st = 'pend';
+        const nn = st === 'fail' ? (B ? B.errs : r.errors).filter(e => e.type === k).length : 0;
+        return { label, pass: st === 'pass', fail: st === 'fail', pend: st === 'pend', run: st === 'run', spin: st === 'run' ? this.spinner() : null, hasN: nn > 0, n: `${nn} error${pl(nn)}`, fg: st === 'pend' ? '#62666d' : '#0c0d0f' };
+      });
+      const sent = r.status === 'sent';
+      const row = (k, val2, fg) => ({ k, v: val2, fg: fg || '#0c0d0f' });
+      v.sd = {
+        title: sent ? 'Submission' : 'Send to MOH',
+        rows: sent
+          ? [row('Reported by', r.reporter), row('Level', this.LV[r.form]), row('Period', P0.label), row('Sent', L.t(r.sentAt)), row('Server receipt', r.receipt), row('Validation', valTxt(r))]
+          : [row('Recipient', 'MOH · AIDS Control Programme'), row('Reporting unit', r.unit), row('Period', P0.label), row('Due', P0.due), row('Draft', dirty ? 'Unsaved changes' : r.savedAt != null ? `Saved ${L.t(r.savedAt)}` : 'Not saved yet', dirty ? '#a84c06' : '#0c0d0f')],
+        checks, checksSub: r.runs ? `Run ${r.runs} time${pl(r.runs)}` : B ? 'Running…' : 'Runs when you send',
+        canSend: !isMoh && !sent, isSent: sent, busy: !!B,
+        primaryLbl: B ? (B.phase === 'validating' ? 'Checking…' : 'Sending…') : r.status === 'errors' ? 'Re-check and send' : r.status === 'validated' ? 'Send to MOH' : 'Validate and send',
+        send: () => this.run(r, F, merged(), ctx),
+        save: () => { act('rptSave', { id: r.id, values: merged() }); this.setState(st => { const d = { ...st.d }; delete d[r.id]; return { d }; }); },
+        cantSave: !dirty || !!B,
+        dlLabel: isMoh ? 'Download CSV' : 'Download PDF',
+        download: () => L.toast(`Downloading ${r.id} as ${isMoh ? 'CSV' : 'PDF'}…`),
+      };
+      v.pg = { form: true };
+    }
+    return v;
+  }
+}
+</script>
+</body>
+</html>
