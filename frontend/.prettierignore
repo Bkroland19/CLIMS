@@ -4,3 +4,11 @@ node_modules
 next-env.d.ts
 package-lock.json
 src/styles/shadcn.css
+
+# Design reference pulled from Claude Design; not project code.
+design
+
+# End-to-end test output (npm run test:e2e)
+.next-e2e
+test-results
+playwright-report

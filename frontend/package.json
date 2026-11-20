@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "mock-api": "node dev/mock-api.mjs",
+    "mock-api": "node --experimental-strip-types --disable-warning=ExperimentalWarning dev/mock-api.mts",
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build"
   },
   "dependencies": {
@@ -45,8 +46,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "^9.39.5",
     "@next/eslint-plugin-next": "16.4.6",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@tanstack/eslint-plugin-query": "^5.107.1",
     "@tanstack/react-query-devtools": "^5.107.1",
@@ -77,6 +80,9 @@
   "overrides": {
     "@typescript-eslint/typescript-estree": {
       "minimatch": "^11.0.8"
+    },
+    "@axe-core/playwright": {
+      "playwright-core": "1.64.1"
     }
   }
 }
