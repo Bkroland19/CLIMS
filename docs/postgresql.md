@@ -37,6 +37,29 @@ make sql-convert
 
 This regenerates migration 1, its rollback, the PostgreSQL seed, and `infra/database/seed_manifest.json` from the original dump. Do not regenerate already deployed migrations after changing the source dump; add a new migration instead. The converter targets the syntax in this specific backup and rejects unsupported table definitions and INSERT formats.
 
+## Hotspot conversion
+
+Migration 8 reshapes `hot_spots` in place, so references from orders and users keep their UUIDs. The original rows are archived unchanged in `legacy_hot_spots`, and the legacy importer writes there. `import_legacy_hot_spots()` converts the archive and runs both in migration 8 and at the end of `make db-seed`. It only converts rows that have not been converted yet.
+
+The conversion:
+
+- maps `status` to `active`, with every other value becoming `inactive`
+- matches the legacy district by DHIS2 UID or name, and the subcounty (legacy `division`) only when exactly one subcounty in that district fits
+- parses GPS strings and normalises dispenser yes/no spellings
+- moves the contact person and comment into `contact_persons` and `hot_spot_comments`
+- turns legacy `users.hotspot_id` links into `hot_spot_user` rows
+
+Most legacy hotspots record no subcounty, so the `hot_spot_cleanup` view lists converted hotspots missing a district, subcounty, name or GPS. It shows the original district, subcounty and village text. To export it:
+
+```sh
+docker compose --env-file infra/env/dev.env -f infra/compose/docker-compose.yml \
+  -f infra/compose/docker-compose.dev.yml exec -T postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\copy (SELECT * FROM hot_spot_cleanup) TO STDOUT CSV HEADER"' \
+  > hot_spot_cleanup.csv
+```
+
+With the supplied backup, 17,992 of 18,221 hotspots get a district and 2,229 get a subcounty.
+
 ## Verify the historical dump conversion
 
 To verify without touching the application's database, start an isolated PostgreSQL container:
