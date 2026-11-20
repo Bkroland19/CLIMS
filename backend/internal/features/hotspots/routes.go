@@ -23,4 +23,5 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwtMiddleware, active
 	group.Post("/:id/comments", read, h.comment)
 	group.Post("/:id/activate", activate, h.decision("activate", "hotspot activated"))
 	group.Post("/:id/deactivate", activate, h.decision("deactivate", "hotspot deactivated"))
+	group.Post("/:id/reject", activate, h.decision("reject", "hotspot rejected"))
 }

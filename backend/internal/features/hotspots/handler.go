@@ -186,7 +186,8 @@ func hotSpotError(c fiber.Ctx, err error) error {
 		return response.Error(c, 404, "hotspot not found", nil)
 	case errors.Is(err, ErrInvalidLocation):
 		return response.Error(c, 422, err.Error(), nil)
-	case errors.Is(err, ErrDuplicateName), errors.Is(err, ErrNotEditable), errors.Is(err, ErrInvalidTransition):
+	case errors.Is(err, ErrDuplicateName), errors.Is(err, ErrNotEditable), errors.Is(err, ErrInvalidTransition),
+		errors.Is(err, ErrDistrictLocked):
 		return response.Error(c, 409, err.Error(), nil)
 	}
 	var dbError *pgconn.PgError

@@ -48,7 +48,11 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 		ORDER BY d.uid, s.uid LIMIT 1`).Scan(&region, &district, &subcounty, &store); err != nil {
 		t.Fatal(err)
 	}
-	scalar(&otherSubcounty, `SELECT id FROM subcounties WHERE district_id <> $1 ORDER BY uid LIMIT 1`, district)
+	var otherRegion, otherDistrict string
+	if err := pool.QueryRow(ctx, `SELECT d.region_id, d.id, s.id FROM subcounties s JOIN districts d ON d.id = s.district_id
+		WHERE d.id <> $1 ORDER BY s.uid LIMIT 1`, district).Scan(&otherRegion, &otherDistrict, &otherSubcounty); err != nil {
+		t.Fatal(err)
+	}
 
 	roleID := func(role string) string {
 		t.Helper()
@@ -189,6 +193,9 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	if !notified(vht, id, "deactivated") {
 		t.Fatal("deactivation did not notify the VHT")
 	}
+	moved := submission("Workflow Test Bar")
+	moved["region_id"], moved["district_id"], moved["subcounty_id"] = otherRegion, otherDistrict, otherSubcounty
+	request("PUT", path, moved, vht, 409) // Moving would hand the decision to another district.
 	final := data(request("POST", path+"/activate", map[string]any{"comment": "Reopened"}, dcfp, 200))
 	state(final, "active", "active")
 	actions := []string{}
@@ -212,6 +219,30 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 		}
 	}
 	request("GET", path+"/events", nil, otherVHT, 404)
+
+	// Rejection keeps the hotspot inactive until the VHT resubmits it by editing.
+	rejectedBody := submission("Rejected Test Inn")
+	rejected := data(request("POST", "/hotspots", rejectedBody, vht, 201))["id"].(string)
+	rejectedPath := "/hotspots/" + rejected
+	request("POST", rejectedPath+"/reject", map[string]any{}, dcfp, 422)
+	request("POST", rejectedPath+"/reject", map[string]any{"comment": "Duplicate"}, otherDCFP, 404)
+	state(data(request("POST", rejectedPath+"/reject", map[string]any{"comment": "Duplicate of Seja inn"}, dcfp, 200)),
+		"inactive", "rejected")
+	if !notified(vht, rejected, "rejected") {
+		t.Fatal("rejection did not notify the VHT")
+	}
+	request("POST", rejectedPath+"/reject", map[string]any{"comment": "Again"}, dcfp, 409)
+	request("POST", rejectedPath+"/activate", reason, dcfp, 409)
+	if !listed(dcfp, "?status=inactive", rejected) {
+		t.Fatal("a rejected hotspot should list as inactive")
+	}
+	rejectedBody["latitude"] = 0.36
+	state(data(request("PUT", rejectedPath, rejectedBody, vht, 200)), "inactive", "submitted")
+	if !notified(dcfp, rejected, "resubmitted") {
+		t.Fatal("resubmission did not notify the district")
+	}
+	state(data(request("POST", rejectedPath+"/activate", reason, dcfp, 200)), "active", "active")
+	request("POST", path+"/reject", reason, dcfp, 409) // Active hotspots are deactivated, not rejected.
 
 	// Lists put the most recently updated hotspot first; a comment counts.
 	second := data(request("POST", "/hotspots", submission("Second Test Lodge"), vht, 201))["id"].(string)

@@ -90,6 +90,9 @@ const (
 	EventCommented   = "commented"
 	EventActivated   = "activated"
 	EventDeactivated = "deactivated"
+	EventRejected    = "rejected"
+	// A rejected hotspot edited by its submitter goes back for review.
+	EventResubmitted = "resubmitted"
 )
 
 // Event is one workflow step; Status is the review status after it. Events

@@ -1930,7 +1930,7 @@
         "tags": ["Hotspots"],
         "operationId": "updateHotspot",
         "summary": "Edit a hotspot",
-        "description": "Requires hotspots:submit. Only the submitter can edit, and only while the hotspot is inactive. A changed contact person is added as the current contact. Notifies the district.",
+        "description": "Requires hotspots:submit. Only the submitter can edit, and only while the hotspot is inactive. A changed contact person is added as the current contact. A deactivated hotspot cannot move to another district (409). Editing a rejected hotspot resubmits it with review status submitted. Notifies the district.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2055,7 +2055,7 @@
         "tags": ["Hotspots"],
         "operationId": "activateHotspot",
         "summary": "Activate a hotspot",
-        "description": "Requires hotspots:activate. Applies to a submitted or deactivated hotspot. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
+        "description": "Requires hotspots:activate. Applies to a submitted or deactivated hotspot; a rejected one must be resubmitted first. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2101,6 +2101,51 @@
         "operationId": "deactivateHotspot",
         "summary": "Deactivate a hotspot",
         "description": "Requires hotspots:activate. Applies to an active hotspot and sets review status deactivated. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "x-required-permissions": ["hotspots:activate"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotCommentRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/hotspots/{id}/reject": {
+      "post": {
+        "tags": ["Hotspots"],
+        "operationId": "rejectHotspot",
+        "summary": "Reject a hotspot",
+        "description": "Requires hotspots:activate. Applies to a submitted hotspot and sets review status rejected; the hotspot stays inactive. The VHT can edit it to resubmit. Only for hotspots in the district of the DCFP's assigned store unless they have hotspots:all_districts. The comment is required and recorded with the decision. Notifies the submitter.",
         "responses": {
           "200": {
             "description": "Success",
@@ -3943,7 +3988,7 @@
           "action": {
             "type": "string",
             "example": "submitted",
-            "description": "submitted, updated, commented, activated or deactivated."
+            "description": "submitted, updated, resubmitted, commented, activated, deactivated or rejected."
           },
           "status": {
             "type": "string",

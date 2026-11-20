@@ -13,6 +13,7 @@ var (
 	ErrInvalidLocation   = errors.New("subcounty must belong to the district, and the district to the region")
 	ErrDuplicateName     = errors.New("a hotspot with this name already exists in the village")
 	ErrNotEditable       = errors.New("active hotspots cannot be edited")
+	ErrDistrictLocked    = errors.New("a deactivated hotspot cannot move to another district")
 	ErrInvalidTransition = errors.New("action is unavailable in the hotspot's current review status")
 )
 
@@ -28,6 +29,8 @@ type transition struct {
 var transitions = map[string]transition{
 	"activate":   {[]string{ReviewSubmitted, ReviewDeactivated}, ReviewActive, ActionActivated, EventActivated},
 	"deactivate": {[]string{ReviewActive}, ReviewDeactivated, ActionDeactivated, EventDeactivated},
+	// A rejected hotspot must be resubmitted by its VHT before it can be activated.
+	"reject": {[]string{ReviewSubmitted}, ReviewRejected, ActionRejected, EventRejected},
 }
 
 // scope decides which hotspots a user sees: their own submissions (submit),
@@ -156,24 +159,34 @@ func (r *Repository) submit(ctx context.Context, actorID string, input SubmitReq
 }
 
 // update lets the submitting VHT correct their hotspot while it is inactive.
+// Editing a rejected hotspot resubmits it for review. A deactivated hotspot keeps
+// its district, so moving it cannot hand the decision to another district's DCFP.
 func (r *Repository) update(ctx context.Context, actorID, id string, d Details) error {
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		var status string
-		if err := tx.QueryRow(ctx, `SELECT status FROM hot_spots WHERE id = $1 AND submitted_by_id = $2 FOR UPDATE`,
-			id, actorID).Scan(&status); err != nil {
+		var status, review string
+		var district *string
+		if err := tx.QueryRow(ctx, `SELECT status, review_status, district_id FROM hot_spots
+			WHERE id = $1 AND submitted_by_id = $2 FOR UPDATE`, id, actorID).Scan(&status, &review, &district); err != nil {
 			return err
 		}
 		if status != StatusInactive {
 			return ErrNotEditable
 		}
+		if review == ReviewDeactivated && (district == nil || *district != d.DistrictID) {
+			return ErrDistrictLocked
+		}
 		if err := checkDetails(ctx, tx, d, &id); err != nil {
 			return err
 		}
+		event := EventUpdated
+		if review == ReviewRejected {
+			review, event = ReviewSubmitted, EventResubmitted
+		}
 		if _, err := tx.Exec(ctx, `UPDATE hot_spots SET name = $2, type = $3, village = $4, district_id = $5,
 			subcounty_id = $6, latitude = $7, longitude = $8, has_condom_dispenser = $9,
-			dispenser_condition = $10, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+			dispenser_condition = $10, review_status = $11, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
 			id, d.Name, d.Type, d.Village, d.DistrictID, d.SubcountyID,
-			d.Latitude, d.Longitude, d.HasCondomDispenser, d.DispenserCondition); err != nil {
+			d.Latitude, d.Longitude, d.HasCondomDispenser, d.DispenserCondition, review); err != nil {
 			return err
 		}
 		// Keep earlier contacts as history; add a row only when the contact changed.
@@ -186,7 +199,7 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 			id, d.ContactPersonName, d.ContactPersonPhone); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, id, actorID, EventUpdated, true, nil)
+		return addEvent(ctx, tx, id, actorID, event, true, nil)
 	})
 }
 
