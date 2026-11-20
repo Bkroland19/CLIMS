@@ -85,13 +85,13 @@ Rows are written in the same transaction as the change. A push or SMS notificati
 
 ## Setup
 
-Migrations 8 and 14 grant the hotspot permissions to `admin` only. Grant the other roles through `PUT /api/v1/roles/{id}/permissions`:
+Migrations 8 and 15 grant the hotspot permissions to `admin` only. Grant the other roles through `PUT /api/v1/roles/{id}/permissions`:
 
 - `vht`: `hotspots:read` and `hotspots:submit`
 - `dfcp`: `hotspots:read` and `hotspots:activate`
 - national roles such as `moh`: `hotspots:read` and `hotspots:all_districts`
 
-Migration 14 fills `regions`, `districts`, `subcounties` and one store per district from `organization_units`. It assigns each legacy DCFP to their district's store. New DCFP accounts need `store_id` set to their district store.
+Migration 15 fills `regions`, `districts`, `subcounties` and one store per district from `organization_units`. It assigns each legacy DCFP to their district's store. New DCFP accounts need `store_id` set to their district store.
 
 ## Legacy data
 
