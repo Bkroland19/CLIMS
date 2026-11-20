@@ -1,0 +1,70 @@
+package hotspots
+
+import "strings"
+
+// Details is everything a VHT records about a hotspot, on submission and on edit.
+type Details struct {
+	Name               string   `json:"name" validate:"required,max=100"`
+	Type               string   `json:"type" validate:"required,max=100"`
+	RegionID           string   `json:"region_id" validate:"required,uuid_rfc4122"`
+	DistrictID         string   `json:"district_id" validate:"required,uuid_rfc4122"`
+	SubcountyID        string   `json:"subcounty_id" validate:"required,uuid_rfc4122"`
+	Village            string   `json:"village" validate:"required,max=100"`
+	Latitude           *float64 `json:"latitude" validate:"required,gte=-90,lte=90"`
+	Longitude          *float64 `json:"longitude" validate:"required,gte=-180,lte=180"`
+	ContactPersonName  string   `json:"contact_person_name" validate:"required,max=100"`
+	ContactPersonPhone string   `json:"contact_person_phone" validate:"required,phone"`
+	HasCondomDispenser *bool    `json:"has_condom_dispenser" validate:"required"`
+	DispenserCondition *string  `json:"dispenser_condition" validate:"omitempty,max=255"`
+}
+
+type SubmitRequest struct {
+	Details
+	// Optional note from the VHT; stored as the hotspot's first comment.
+	Note *string `json:"note" validate:"omitempty,max=2000"`
+	// Defaults to the submitting VHT.
+	HotSpotManagerID *string `json:"hotspot_manager_id" validate:"omitempty,uuid_rfc4122"`
+}
+
+// CommentRequest is a plain comment or the reason for activating or deactivating.
+type CommentRequest struct {
+	Comment string `json:"comment" validate:"required,max=2000"`
+}
+
+var phoneSeparators = strings.NewReplacer(" ", "", "-", "", "(", "", ")", "")
+
+func (d *Details) Normalize() {
+	d.Name = strings.TrimSpace(d.Name)
+	d.Type = strings.TrimSpace(d.Type)
+	d.Village = strings.TrimSpace(d.Village)
+	d.ContactPersonName = strings.TrimSpace(d.ContactPersonName)
+	d.ContactPersonPhone = phoneSeparators.Replace(strings.TrimSpace(d.ContactPersonPhone))
+	d.RegionID = strings.ToLower(strings.TrimSpace(d.RegionID))
+	d.DistrictID = strings.ToLower(strings.TrimSpace(d.DistrictID))
+	d.SubcountyID = strings.ToLower(strings.TrimSpace(d.SubcountyID))
+	d.DispenserCondition = trimmedOrNil(d.DispenserCondition)
+}
+
+func (r *SubmitRequest) Normalize() {
+	r.Details.Normalize()
+	r.Note = trimmedOrNil(r.Note)
+	if r.HotSpotManagerID != nil {
+		id := strings.ToLower(strings.TrimSpace(*r.HotSpotManagerID))
+		r.HotSpotManagerID = &id
+	}
+}
+
+func (r *CommentRequest) Normalize() {
+	r.Comment = strings.TrimSpace(r.Comment)
+}
+
+func trimmedOrNil(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
