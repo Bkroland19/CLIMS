@@ -4,62 +4,67 @@ import { resetMock } from './support/mock';
 import { choose, expectToast, open } from './support/ui';
 
 /*
- * The hotspot form on the DCFP hotspot list (the legacy `hotSpots` resource in the mock), which
- * seeds Lugogo, Gulu Main Market and Mbarara Taxi Park.
+ * Hotspot activation (`dev/mock/hotspots.mts`): a VHT submits a hotspot, the DCFP verifies then
+ * activates it, or rejects it with a reason. The mock seeds Kajjansi Weekly Market (submitted),
+ * Bwebajja Nite Spot (verified), Kasenyi Landing Site (active) and Nansana Taxi Park (rejected).
  */
 
 test.beforeEach(async ({ request }) => {
   await resetMock(request);
 });
 
-test('adds a hotspot', async ({ page }) => {
-  await open(page, '/dcfp/hotspots', 'Hotspots');
-  await page.getByRole('button', { name: 'Add hotspot' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Add hotspot' });
+test('a VHT submits a hotspot for district verification', async ({ page }) => {
+  await open(page, '/vht', 'My hotspots');
+  await page.getByRole('button', { name: 'Submit hotspot' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Submit a hotspot' });
 
-  await dialog.getByLabel('Hotspot name').fill('Kajjansi Weekly Market');
-  await choose(page, 'Status', /^active$/i);
-  await dialog.getByLabel('Contact person').fill('Nansubuga Aisha');
-  await dialog.getByLabel('Contact phone').fill('0772 555 010');
-  await dialog.getByLabel('Latitude').fill('0.2167');
-  await dialog.getByLabel('Longitude').fill('32.5500');
-  await page.getByRole('combobox', { name: 'Organisation unit' }).click();
-  await page.getByRole('option').first().click();
-  await dialog.getByRole('button', { name: 'Add hotspot' }).click();
+  await dialog.getByLabel('Hotspot name').fill('Kitoro Guest House');
+  await choose(page, 'District', 'Wakiso');
+  await dialog.getByLabel('Contact person').fill('Nalubega Ruth');
+  await dialog.getByLabel('Contact phone').fill('0772 555 011');
+  await dialog.getByRole('button', { name: 'Submit hotspot' }).click();
 
-  await expectToast(page, 'Hotspot added');
+  await expectToast(page, 'Hotspot submitted for district verification');
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('cell', { name: /Kajjansi Weekly Market/ }).first()).toBeVisible();
+  const row = page.getByRole('row', { name: /Kitoro Guest House/ });
+  await expect(row).toContainText('+256772555011');
+  await expect(row).toContainText('submitted');
 });
 
-test('edits a hotspot’s contact person', async ({ page }) => {
+test('the DCFP verifies a submitted hotspot, then activates it', async ({ page }) => {
   await open(page, '/dcfp/hotspots', 'Hotspots');
-  await page.getByRole('button', { name: 'Actions for Lugogo' }).click();
-  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  const row = page.getByRole('row', { name: /Kajjansi Weekly Market/ });
 
-  const dialog = page.getByRole('dialog', { name: /^Edit Lugogo/ });
-  await expect(dialog.getByLabel('Hotspot name')).toHaveValue('Lugogo');
-  await dialog.getByLabel('Contact person').fill('Kato Musa');
-  await dialog.getByRole('button', { name: 'Save changes' }).click();
+  await page.getByRole('button', { name: 'Actions for Kajjansi Weekly Market' }).click();
+  await page.getByRole('menuitem', { name: 'Verify' }).click();
+  await expectToast(page, 'Hotspot verified');
+  await expect(row).toContainText('verified');
 
-  await expectToast(page, 'Hotspot updated');
-  await expect(dialog).toBeHidden();
-  await expect(page.getByRole('cell', { name: 'Kato Musa' })).toBeVisible();
+  await page.getByRole('button', { name: 'Actions for Kajjansi Weekly Market' }).click();
+  await page.getByRole('menuitem', { name: 'Activate' }).click();
+  await expectToast(page, 'Hotspot activated');
+  await expect(row).toContainText('active');
+  // Nothing is left to do with an active hotspot.
+  await expect(
+    page.getByRole('button', { name: 'Actions for Kajjansi Weekly Market' }),
+  ).toBeHidden();
 });
 
-test('deletes a hotspot after confirming', async ({ page }) => {
+test('the DCFP rejects a hotspot only with a reason', async ({ page }) => {
   await open(page, '/dcfp/hotspots', 'Hotspots');
-  await page.getByRole('button', { name: 'Actions for Lugogo' }).click();
-  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'Actions for Bwebajja Nite Spot' }).click();
+  await page.getByRole('menuitem', { name: 'Reject' }).click();
 
-  const confirm = page.getByRole('alertdialog', { name: 'Delete Lugogo?' });
-  await confirm.getByRole('button', { name: 'Delete hotspot' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reject Bwebajja Nite Spot?' });
+  await dialog.getByRole('button', { name: 'Reject hotspot' }).click();
+  await expect(dialog.getByText('Say why the hotspot is rejected.')).toBeVisible();
 
-  await expectToast(page, 'Hotspot deleted');
-  await expect(confirm).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Actions for Lugogo' })).toBeHidden();
-  await page.reload();
-  await expect(page.getByRole('heading', { level: 1, name: 'Hotspots' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Actions for Gulu Main Market' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Actions for Lugogo' })).toBeHidden();
+  await dialog.getByLabel('Reason').fill('No condoms are handed out here.');
+  await dialog.getByRole('button', { name: 'Reject hotspot' }).click();
+
+  await expectToast(page, 'Hotspot rejected');
+  await expect(dialog).toBeHidden();
+  const row = page.getByRole('row', { name: /Bwebajja Nite Spot/ });
+  await expect(row).toContainText('rejected');
+  await expect(row).toContainText('No condoms are handed out here.');
 });

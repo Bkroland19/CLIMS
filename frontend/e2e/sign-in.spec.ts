@@ -38,7 +38,7 @@ test('empty fields are flagged before anything is sent', async ({ page }) => {
   await page.goto('/sign-in');
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  await expect(page.getByText('Enter your email address.')).toBeVisible();
+  await expect(page.getByText('Enter your email, username or phone number.')).toBeVisible();
   await expect(page.getByText('Enter your password.')).toBeVisible();
   await expect(page.getByLabel('Email')).toHaveAttribute('aria-invalid', 'true');
 });
