@@ -4,128 +4,226 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// testHotSpotActivation walks the activation map: a VHT submits, the district DCFP is notified,
-// verifies and activates, with the role grants an operator makes through the RBAC API.
+// testHotSpotActivation checks the legacy conversion, then walks the workflow:
+// a VHT submits, the district DCFP is notified, comments on issues, and
+// activates or deactivates the hotspot with a comment. otherStore belongs to a
+// different district and scopes the outsider DCFP.
 func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	request func(string, string, any, string, int) map[string]any,
 	login func(string, string, int) string,
-	admin, districtStore string,
+	admin, otherStore string,
 ) {
 	t.Helper()
 	ctx := context.Background()
-	var district string
-	if err := pool.QueryRow(ctx, `SELECT district_id FROM stores WHERE id = $1`, districtStore).Scan(&district); err != nil {
+	scalar := func(dest any, sql string, args ...any) {
+		t.Helper()
+		if err := pool.QueryRow(ctx, sql, args...).Scan(dest); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The legacy backup converts into the new shape on a fresh install.
+	var converted, archived, active, deactivated, comments, assignedDCFPs, placeholders int
+	scalar(&converted, `SELECT count(*) FROM hot_spots`)
+	scalar(&archived, `SELECT count(*) FROM legacy_hot_spots`)
+	scalar(&active, `SELECT count(*) FROM hot_spots WHERE status = 'active' AND review_status = 'active'`)
+	scalar(&deactivated, `SELECT count(*) FROM hot_spots WHERE status = 'inactive' AND review_status = 'deactivated'`)
+	scalar(&comments, `SELECT count(*) FROM hot_spot_comments`)
+	scalar(&assignedDCFPs, `SELECT count(*) FROM users u JOIN role_user ru ON ru.user_id = u.id
+		JOIN roles r ON r.id = ru.role_id
+		WHERE r.name = 'dfcp' AND u.store_id IS NOT NULL AND u.legacy_id IS NOT NULL`)
+	scalar(&placeholders, `SELECT count(*) FROM districts WHERE uid IN ('jms', 'nms')`)
+	if converted != 18221 || archived != 18221 || active != 17343 || deactivated != 878 ||
+		comments != 7425 || assignedDCFPs != 57 || placeholders != 0 {
+		t.Fatalf("legacy conversion: hotspots=%d archived=%d active=%d deactivated=%d comments=%d dcfps=%d placeholders=%d",
+			converted, archived, active, deactivated, comments, assignedDCFPs, placeholders)
+	}
+
+	var region, district, subcounty, store, otherSubcounty string
+	if err := pool.QueryRow(ctx, `SELECT d.region_id, d.id, s.id, st.id FROM districts d
+		JOIN subcounties s ON s.district_id = d.id JOIN stores st ON st.district_id = d.id
+		ORDER BY d.uid, s.uid LIMIT 1`).Scan(&region, &district, &subcounty, &store); err != nil {
 		t.Fatal(err)
 	}
-	grants := map[string][]string{"vht": {"hotspots:read", "hotspots:submit"}, "dfcp": {"hotspots:read", "hotspots:activate"}}
-	account := func(role, name string, store *string) string {
+	scalar(&otherSubcounty, `SELECT id FROM subcounties WHERE district_id <> $1 ORDER BY uid LIMIT 1`, district)
+
+	roleID := func(role string) string {
 		t.Helper()
-		var roleID string
-		if err := pool.QueryRow(ctx, `SELECT id FROM roles WHERE name = $1`, role).Scan(&roleID); err != nil {
-			t.Fatal(err)
-		}
-		request("PUT", "/roles/"+roleID+"/permissions", map[string]any{"permissions": grants[role]}, admin, 200)
+		var id string
+		scalar(&id, `SELECT id FROM roles WHERE name = $1`, role)
+		return id
+	}
+	grant := func(role string, permissions ...string) {
+		t.Helper()
+		request("PUT", "/roles/"+roleID(role)+"/permissions", map[string]any{"permissions": permissions}, admin, 200)
+	}
+	grant("vht", "hotspots:read", "hotspots:submit")
+	grant("dfcp", "hotspots:read", "hotspots:activate")
+	grant("store incharge", "hotspots:read")
+	account := func(role, name string, storeID *string) (string, string) {
+		t.Helper()
 		email := name + "@example.test"
-		profile := request("POST", "/users", map[string]any{
-			"username": name, "email": email, "password": "test-password-123", "role_ids": []string{roleID},
-		}, admin, 201)["data"].(map[string]any)
-		if _, err := pool.Exec(ctx, `UPDATE users SET store_id = $2 WHERE id = $1`, profile["user_id"], store); err != nil {
+		id := request("POST", "/users", map[string]any{
+			"username": name, "email": email, "password": "test-password-123", "role_ids": []string{roleID(role)},
+		}, admin, 201)["data"].(map[string]any)["user_id"].(string)
+		if _, err := pool.Exec(ctx, `UPDATE users SET store_id = $2 WHERE id = $1`, id, storeID); err != nil {
 			t.Fatal(err)
 		}
-		return login(email, "test-password-123", 200)
+		return id, login(email, "test-password-123", 200)
 	}
-	vht := account("vht", "activation-vht", nil)
-	dcfp := account("dfcp", "activation-dcfp", &districtStore)
-	outsider := account("dfcp", "activation-outsider", nil)
+	vhtID, vht := account("vht", "hotspot-vht", nil)
+	_, otherVHT := account("vht", "hotspot-other-vht", nil)
+	_, dcfp := account("dfcp", "hotspot-dcfp", &store)
+	_, otherDCFP := account("dfcp", "hotspot-other-dcfp", &otherStore)
+	// Read access with a store assignment alone must not reveal the district.
+	_, storekeeper := account("store incharge", "hotspot-storekeeper", &store)
 
-	found := false
-	for _, item := range request("GET", "/hotspots/districts", nil, vht, 200)["data"].([]any) {
-		found = found || item.(map[string]any)["id"] == district
-	}
-	if !found {
-		t.Fatal("district missing from the submission picker")
-	}
-
-	details := map[string]any{"name": "Lake view bar", "district_id": district, "village": "Seja",
-		"type": "Guest house", "has_condom_dispenser": true, "dispenser_condition": "Poor",
-		"latitude": 0.31, "longitude": 32.63}
-	request("POST", "/hotspots", details, dcfp, 403)
-	request("POST", "/hotspots", map[string]any{"name": "Bar", "district_id": uuid.NewString()}, vht, 422)
-	submit := func() string {
-		t.Helper()
-		hotspot := request("POST", "/hotspots", details, vht, 201)["data"].(map[string]any)
-		if hotspot["status"] != "submitted" || hotspot["district_id"] != district || hotspot["latitude"] != 0.31 ||
-			hotspot["type"] != "Guest house" || hotspot["has_condom_dispenser"] != true || hotspot["dispenser_condition"] != "Poor" {
-			t.Fatalf("unexpected submission: %v", hotspot)
+	submission := func(name string) map[string]any {
+		return map[string]any{
+			"name": name, "type": "Bar", "region_id": region, "district_id": district,
+			"subcounty_id": subcounty, "latitude": 0.3476, "longitude": 32.5825,
+			"contact_person_name": "Jane Contact", "contact_person_phone": "+256 700 123 456",
+			"has_condom_dispenser": true, "dispenser_condition": "Good",
 		}
-		return hotspot["id"].(string)
 	}
-	notified := func(token, id, action string) bool {
+	data := func(result map[string]any) map[string]any { return result["data"].(map[string]any) }
+	listed := func(token, query, id string) bool {
 		t.Helper()
-		for _, event := range request("GET", "/hotspots/notifications", nil, token, 200)["data"].([]any) {
-			if e := event.(map[string]any); e["hot_spot_id"] == id && e["action"] == action {
+		for _, item := range request("GET", "/hotspots"+query, nil, token, 200)["data"].([]any) {
+			if item.(map[string]any)["id"] == id {
 				return true
 			}
 		}
 		return false
 	}
-	act := func(id, action, token string, body any, code int, status string) map[string]any {
+	notified := func(token, id, action string) bool {
 		t.Helper()
-		result := request("POST", "/hotspots/"+id+"/actions/"+action, body, token, code)
-		if code != 200 {
-			return nil
+		for _, event := range request("GET", "/hotspots/notifications", nil, token, 200)["data"].([]any) {
+			e := event.(map[string]any)
+			if e["hot_spot_id"] == id && e["action"] == action {
+				return true
+			}
 		}
-		data := result["data"].(map[string]any)
-		if data["status"] != status {
-			t.Fatalf("%s: expected %s, got %v", action, status, result)
+		return false
+	}
+	state := func(h map[string]any, status, review string) {
+		t.Helper()
+		if h["status"] != status || h["review_status"] != review {
+			t.Fatalf("expected %s/%s, got %v/%v", status, review, h["status"], h["review_status"])
 		}
-		return data
 	}
 
-	id := submit()
-	if !notified(dcfp, id, "submitted") {
-		t.Fatal("district DCFP was not notified of the submission")
+	// Submission: inactive and submitted, comment kept, village optional.
+	body := submission("Workflow Test Bar")
+	body["comment"] = "Busy on weekends"
+	hotSpot := data(request("POST", "/hotspots", body, vht, 201))
+	id := hotSpot["id"].(string)
+	path := "/hotspots/" + id
+	state(hotSpot, "inactive", "submitted")
+	if hotSpot["submitted_by_id"] != vhtID || hotSpot["village"] != nil || len(hotSpot["comments"].([]any)) != 1 ||
+		hotSpot["contact_person"].(map[string]any)["phone_number"] != "+256700123456" {
+		t.Fatalf("unexpected submission: %v", hotSpot)
 	}
-	if events := request("GET", "/hotspots/notifications", nil, outsider, 200)["data"].([]any); len(events) != 0 {
-		t.Fatalf("notification leaked outside the district: %v", events)
-	}
-	act(id, "verify", vht, nil, 403, "")
-	act(id, "verify", outsider, nil, 404, "")
-	act(id, "approve", dcfp, nil, 404, "")
-	act(id, "activate", dcfp, nil, 409, "")
-	act(id, "verify", dcfp, map[string]any{"reason": "not needed"}, 422, "")
-	act(id, "verify", dcfp, nil, 200, "verified")
-	act(id, "verify", dcfp, nil, 409, "")
-	if notified(vht, id, "verify") {
-		t.Fatal("verification should not notify the VHT")
-	}
-	act(id, "activate", dcfp, nil, 200, "active")
-	if !notified(vht, id, "activate") {
-		t.Fatal("VHT was not notified of activation")
-	}
-	act(id, "reject", dcfp, map[string]any{"reason": "Duplicate"}, 409, "")
+	request("POST", "/hotspots", submission("  workflow   TEST bar "), vht, 409)
+	inVillage := submission("Workflow Test Bar")
+	inVillage["village"] = "Kabaale"
+	request("POST", "/hotspots", inVillage, vht, 201) // Same name, different village.
+	misplaced := submission("Elsewhere Bar")
+	misplaced["subcounty_id"] = otherSubcounty
+	request("POST", "/hotspots", misplaced, vht, 422)
+	incomplete := submission("Incomplete Bar")
+	delete(incomplete, "contact_person_phone")
+	request("POST", "/hotspots", incomplete, vht, 422)
+	request("POST", "/hotspots", submission("Not Allowed Bar"), dcfp, 403)
 
-	rejected := submit()
-	act(rejected, "reject", dcfp, nil, 422, "")
-	act(rejected, "reject", dcfp, map[string]any{"reason": "  "}, 422, "")
-	result := act(rejected, "reject", dcfp, map[string]any{"reason": " Already mapped as Seja bar "}, 200, "rejected")
-	if result["rejection_reason"] != "Already mapped as Seja bar" {
-		t.Fatalf("rejection reason not recorded: %v", result)
+	// Visibility: the submitter and their district's DCFP only.
+	if !notified(dcfp, id, "submitted") || notified(otherDCFP, id, "submitted") {
+		t.Fatal("submission notification reached the wrong district")
 	}
-	if !notified(vht, rejected, "reject") {
-		t.Fatal("VHT was not notified of rejection")
+	if !listed(dcfp, "?status=inactive", id) || listed(dcfp, "?status=active", id) ||
+		listed(otherVHT, "", id) || listed(storekeeper, "", id) {
+		t.Fatal("hotspot list scope or status filter is wrong")
 	}
-	act(rejected, "verify", dcfp, nil, 409, "")
+	request("GET", path, nil, otherVHT, 404)
+	request("GET", path, nil, otherDCFP, 404)
+	request("GET", path, nil, storekeeper, 404)
+	request("GET", "/hotspots?status=submitted", nil, dcfp, 400)
 
-	found = false
-	for _, item := range request("GET", "/hotspots?status=active", nil, vht, 200)["data"].([]any) {
-		found = found || item.(map[string]any)["id"] == id
+	// The DCFP flags an issue; the hotspot stays submitted and the VHT fixes it.
+	state(data(request("POST", path+"/comments", map[string]any{"comment": "GPS looks off"}, dcfp, 201)),
+		"inactive", "submitted")
+	if !notified(vht, id, "commented") {
+		t.Fatal("DCFP comment did not notify the VHT")
 	}
-	if !found {
-		t.Fatal("submitter cannot see the activated hotspot")
+	fixed := submission("Workflow Test Bar")
+	fixed["latitude"], fixed["contact_person_phone"] = 0.35, "0700999888"
+	request("PUT", path, fixed, otherVHT, 404)
+	request("PUT", path, fixed, dcfp, 403)
+	updated := data(request("PUT", path, fixed, vht, 200))
+	if updated["latitude"] != 0.35 || updated["contact_person"].(map[string]any)["phone_number"] != "0700999888" {
+		t.Fatalf("edit not applied: %v", updated)
+	}
+	if !notified(dcfp, id, "updated") {
+		t.Fatal("edit did not notify the district")
+	}
+
+	// Activation needs the district's DCFP and a comment.
+	reason := map[string]any{"comment": "Verified on site"}
+	request("POST", path+"/activate", reason, vht, 403)
+	request("POST", path+"/activate", map[string]any{"comment": "  "}, dcfp, 422)
+	request("POST", path+"/activate", reason, otherDCFP, 404)
+	request("POST", path+"/deactivate", reason, dcfp, 409)
+	state(data(request("POST", path+"/activate", reason, dcfp, 200)), "active", "active")
+	if !notified(vht, id, "activated") {
+		t.Fatal("activation did not notify the VHT")
+	}
+	request("POST", path+"/activate", reason, dcfp, 409)
+	request("PUT", path, fixed, vht, 409)
+
+	// Deactivation and reactivation, each with its own comment.
+	state(data(request("POST", path+"/deactivate", map[string]any{"comment": "Venue closed"}, dcfp, 200)),
+		"inactive", "deactivated")
+	if !notified(vht, id, "deactivated") {
+		t.Fatal("deactivation did not notify the VHT")
+	}
+	final := data(request("POST", path+"/activate", map[string]any{"comment": "Reopened"}, dcfp, 200))
+	state(final, "active", "active")
+	actions := []string{}
+	for _, comment := range final["comments"].([]any) {
+		actions = append(actions, comment.(map[string]any)["action"].(string))
+	}
+	if len(actions) != 5 || actions[3] != "deactivated" || actions[4] != "activated" {
+		t.Fatalf("comment thread: %v", actions)
+	}
+	history := []string{}
+	for _, event := range request("GET", path+"/events", nil, vht, 200)["data"].([]any) {
+		history = append(history, event.(map[string]any)["action"].(string))
+	}
+	want := []string{"submitted", "commented", "updated", "activated", "deactivated", "activated"}
+	if len(history) != len(want) {
+		t.Fatalf("history: %v", history)
+	}
+	for i := range want {
+		if history[i] != want[i] {
+			t.Fatalf("history: %v", history)
+		}
+	}
+	request("GET", path+"/events", nil, otherVHT, 404)
+
+	// Lists put the most recently updated hotspot first; a comment counts.
+	second := data(request("POST", "/hotspots", submission("Second Test Lodge"), vht, 201))["id"].(string)
+	request("POST", path+"/comments", map[string]any{"comment": "Restocked"}, vht, 201)
+	first := request("GET", "/hotspots?limit=2", nil, vht, 200)["data"].([]any)
+	if len(first) != 2 || first[0].(map[string]any)["id"] != id || first[1].(map[string]any)["id"] != second {
+		t.Fatalf("list order: %v", first)
+	}
+	if !notified(dcfp, id, "commented") {
+		t.Fatal("submitter comment did not notify the district")
+	}
+	if len(request("GET", "/hotspots/districts", nil, vht, 200)["data"].([]any)) < 146 {
+		t.Fatal("district picker is missing the converted districts")
 	}
 }

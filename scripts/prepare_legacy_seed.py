@@ -40,7 +40,8 @@ for match in re.finditer(r'^CREATE TABLE "(\w+)" \(\n(.*?)\n\);', schema, re.M |
         if table == "notifications" and column == "id":
             value += "::uuid"
         values.append(value)
-    target_table = "legacy_orders" if table == "orders" else table
+    # Archived source tables; migrations 6 and 14 replaced the originals.
+    target_table = {"orders": "legacy_orders", "hot_spots": "legacy_hot_spots"}.get(table, table)
     target_list = ", ".join(targets)
     value_list = ", ".join(values)
     conflict = " ON CONFLICT (legacy_id) DO NOTHING" if table == "roles" else ""
@@ -56,5 +57,6 @@ print(
 SELECT u.id, r.id FROM pg_temp.users source
 JOIN public.users u ON u.legacy_id = source.id::text
 JOIN public.roles r ON r.legacy_id = source.role;
+SELECT public.import_legacy_hot_spots();
 COMMIT;"""
 )
