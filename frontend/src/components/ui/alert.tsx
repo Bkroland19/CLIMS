@@ -10,6 +10,12 @@ const alertVariants = cva(
         default: 'bg-card text-card-foreground',
         destructive:
           'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+        // Tinted banners for a record's state: what is true now and what to do next.
+        info: 'border-info/25 bg-info/10 text-info *:data-[slot=alert-description]:text-foreground',
+        success:
+          'border-success/25 bg-success/10 text-success *:data-[slot=alert-description]:text-foreground',
+        warning:
+          'border-warning/25 bg-warning/10 text-warning *:data-[slot=alert-description]:text-foreground',
       },
     },
     defaultVariants: {
@@ -18,15 +24,29 @@ const alertVariants = cva(
   },
 );
 
+/**
+ * A boxed message. `default` and `destructive` interrupt (role="alert");
+ * the tinted `info`, `success` and `warning` banners describe a record's state
+ * and are announced politely (role="status"). Pass `role` to override.
+ *
+ * ```tsx
+ * <Alert variant="warning">
+ *   <TriangleAlert aria-hidden="true" />
+ *   <AlertTitle>Not enough stock</AlertTitle>
+ *   <AlertDescription>Put the order on hold and request stock.</AlertDescription>
+ * </Alert>
+ * ```
+ */
 function Alert({
   className,
   variant,
   ...props
 }: React.ComponentProps<'div'> & VariantProps<typeof alertVariants>) {
+  const isStatus = variant === 'info' || variant === 'success' || variant === 'warning';
   return (
     <div
       data-slot="alert"
-      role="alert"
+      role={isStatus ? 'status' : 'alert'}
       className={cn(alertVariants({ variant }), className)}
       {...props}
     />
