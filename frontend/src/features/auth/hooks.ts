@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { useHttp } from '@/lib/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
-import { signIn, type Credentials } from './api';
+import { signIn, signOut, type Credentials } from './api';
 import { selectCurrentUser, selectSession, sessionEnded, sessionStarted } from './authSlice';
 
 /** The current session, or `null` when signed out. */
@@ -33,16 +33,20 @@ export function useSignIn() {
 /**
  * Returns a function that signs out.
  *
- * The API issues stateless JWTs with no revocation endpoint, so signing out
- * means forgetting the token here. It ends immediately and unconditionally.
+ * It asks the API to end the server session, then forgets the token here
+ * without waiting, so signing out is immediate and works offline. The request
+ * captures the token as it starts, before the local session is cleared.
  */
 export function useSignOut() {
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
+  const http = useHttp();
 
   return useCallback(() => {
+    // An unreachable server leaves the session to expire on its own.
+    signOut(http).catch(() => undefined);
     dispatch(sessionEnded());
     // Cached responses belong to the user who fetched them.
     queryClient.clear();
-  }, [dispatch, queryClient]);
+  }, [dispatch, queryClient, http]);
 }

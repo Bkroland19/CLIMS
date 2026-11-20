@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { Session } from './session';
+import type { RefreshedTokens, Session } from './session';
 
 export interface AuthState {
   session: Session | null;
@@ -22,6 +22,12 @@ export const authSlice = createSlice({
     sessionEnded(state) {
       state.session = null;
     },
+    /** Swaps in renewed tokens; the user is unchanged. Ignored once signed out. */
+    tokensRefreshed(state, action: PayloadAction<RefreshedTokens>) {
+      if (!state.session) return;
+      state.session.token = action.payload.token;
+      state.session.refresh_token = action.payload.refresh_token;
+    },
   },
   selectors: {
     selectSession: (state) => state.session,
@@ -30,5 +36,5 @@ export const authSlice = createSlice({
   },
 });
 
-export const { sessionStarted, sessionEnded } = authSlice.actions;
+export const { sessionStarted, sessionEnded, tokensRefreshed } = authSlice.actions;
 export const { selectSession, selectCurrentUser, selectToken } = authSlice.selectors;

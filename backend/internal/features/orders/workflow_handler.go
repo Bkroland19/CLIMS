@@ -103,6 +103,7 @@ func validActionInput(action string, input *ActionInput) bool {
 		(input.DeliveryNote != nil) != (action == "deliver") ||
 		(input.QuantityReceived != nil) != (action == "receive") ||
 		(input.RiderID != nil && action != "dispatch") ||
+		(input.QuantityIssued != nil && (action != "dispatch" || *input.QuantityIssued < 1)) ||
 		(input.DiscrepancyNote != nil && action != "receive") {
 		return false
 	}

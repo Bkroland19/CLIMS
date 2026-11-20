@@ -6,19 +6,25 @@
 
 All routes use `/api/v1`. Login and registration are public; all other endpoints require `Authorization: Bearer <token>`.
 
-| Method | Path                       | Access                                                  |
-| ------ | -------------------------- | ------------------------------------------------------- |
-| POST   | `/auth/register`           | Public, creates an active account with no assigned role |
-| POST   | `/auth/login`              | Public, returns a 24-hour JWT and account profile       |
-| GET    | `/auth/me`                 | Any active account, including unassigned accounts       |
-| GET    | `/users?limit=50&offset=0` | `users:read` (limit 1–100)                              |
-| GET    | `/users/:id`               | `users:read`                                            |
-| POST   | `/users`                   | Both `users:create` and `roles:assign`                  |
-| PATCH  | `/users/:id/role`          | `roles:assign`                                          |
-| PATCH  | `/users/:id/status`        | `users:update`                                          |
-| GET    | `/roles`                   | `roles:read`                                            |
-| GET    | `/permissions`             | `roles:read`                                            |
-| PUT    | `/roles/:id/permissions`   | `roles:manage`                                          |
+| Method | Path                       | Access                                                                            |
+| ------ | -------------------------- | --------------------------------------------------------------------------------- |
+| POST   | `/auth/register`           | Public, creates an active account with no assigned role                           |
+| POST   | `/auth/login`              | Public, returns a 15-minute access token, a refresh token and the account profile |
+| GET    | `/auth/me`                 | Any active account, including unassigned accounts                                 |
+| POST   | `/auth/refresh`            | Public; exchanges a single-use refresh token for new tokens                       |
+| POST   | `/auth/logout`             | Any active account; ends the current session                                      |
+| GET    | `/auth/sessions`           | Any active account; lists its own sessions                                        |
+| DELETE | `/auth/sessions/:id`       | Any active account; signs out one of its own sessions                             |
+| GET    | `/users?limit=50&offset=0` | `users:read` (limit 1–100)                                                        |
+| GET    | `/users/:id`               | `users:read`                                                                      |
+| POST   | `/users`                   | Both `users:create` and `roles:assign`                                            |
+| PATCH  | `/users/:id/role`          | `roles:assign`                                                                    |
+| PATCH  | `/users/:id/status`        | `users:update`                                                                    |
+| GET    | `/users/:id/sessions`      | `users:read`                                                                      |
+| DELETE | `/users/:id/sessions`      | `users:update`; signs the user out everywhere                                     |
+| GET    | `/roles`                   | `roles:read`                                                                      |
+| GET    | `/permissions`             | `roles:read`                                                                      |
+| PUT    | `/roles/:id/permissions`   | `roles:manage`                                                                    |
 
 Registration accepts `username`, `email`, `password`, and optional `firstname`, `lastname`, and `phone_number`. Passwords require at least 8 characters and at most 72 UTF-8 bytes. Unknown JSON fields are rejected, including attempts to supply a role or status during public registration. Email uniqueness is case-insensitive. Existing nonunique usernames are preserved.
 
@@ -29,7 +35,7 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"user@example.com","password":"choose-a-strong-password"}'
+  -d '{"login":"user@example.com","password":"choose-a-strong-password"}'
 ```
 
 Admin-created accounts use the registration fields plus `role_id`. Assign a role with `{"role_id":7}` and change account status with `{"status":"active"}` or `{"status":"disabled"}`. Replace a role's permissions with `{"permissions":["users:read"]}`; an empty array revokes all its management permissions. Unknown permission codes are rejected atomically.
@@ -66,12 +72,13 @@ The tests create and remove uniquely named databases on that server. They cover 
 
 Start the stack and visit <http://localhost:8080/docs/>. The UI loads the [OpenAPI 3.0.3 contract](openapi.json) from `/docs/openapi.json` and uses the API's current origin, including a custom host port. No external validator receives the specification. Swagger UI assets are served locally and require no CDN connection at runtime.
 
-1. Call **Auth → Log in** with a valid account's email and password.
-2. Copy `data.token` from the response.
-3. Click **Authorize** and paste the token without adding a `Bearer ` prefix.
-4. Call protected endpoints. Required application permissions appear in each operation's description.
+Every operation opens in “Try it out” mode: fill in the parameters or request body and select **Execute** to send a real request and see the response, status and duration.
 
-Authorization is kept in page memory and is not persisted after a reload. “Try it out” sends real requests: registration creates accounts, and management operations can change access. Use a development database when exploring write operations.
+1. Call **Auth → Log in** with a valid account's email, username or phone number in `login`, and its password. In development, create an administrator first with `CLIMS_ADMIN_EMAIL=you@example.test CLIMS_ADMIN_PASSWORD=choose-a-long-password make create-admin`.
+2. A successful login authorizes the page with the returned token automatically. To use another token, click **Authorize** and paste it without a `Bearer ` prefix.
+3. Call protected endpoints. Required application permissions appear in each operation's description. Use list operations, such as `GET /api/v1/hotspots`, to find the UUIDs that path parameters need.
+
+Use the filter box to find operations by tag. Authorization is kept in page memory and is not persisted after a reload. Executed requests are real: registration creates accounts, and management and workflow operations change data and access. Use a development database when exploring write operations.
 
 Health operations are outside `/api/v1`: `/health/live` and `/health/ready` are public. Swagger UI and its specification are public documentation routes.
 

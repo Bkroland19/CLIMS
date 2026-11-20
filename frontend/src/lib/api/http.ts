@@ -25,8 +25,14 @@ export interface HttpClientOptions {
   baseUrl: string;
   /** Read on every request so a sign-in or sign-out takes effect immediately. */
   getToken: () => string | null;
-  /** Called when an authenticated request is rejected with 401. */
+  /** Called when an authenticated request is rejected with 401 and could not be refreshed. */
   onUnauthorized: () => void;
+  /**
+   * Renews the session after a 401 on `rejectedToken`, resolving `true` when
+   * the request is worth retrying with the current token. Without it, a 401
+   * ends the session at once.
+   */
+  refresh?: (rejectedToken: string) => Promise<boolean>;
   /** Upper bound on any one request. A hung connection must not hang the UI. */
   timeoutMs?: number;
   /** Replaces the network layer in tests. */
@@ -64,6 +70,7 @@ export function createHttpClient({
   baseUrl,
   getToken,
   onUnauthorized,
+  refresh,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   adapter,
 }: HttpClientOptions): HttpClient {
@@ -78,8 +85,10 @@ export function createHttpClient({
     method: Method,
     path: string,
     body: unknown,
-    { signal, anonymous = false }: RequestOptions = {},
+    options: RequestOptions = {},
+    isRetry = false,
   ): Promise<unknown> {
+    const { signal, anonymous = false } = options;
     const token = anonymous ? null : getToken();
 
     try {
@@ -98,7 +107,12 @@ export function createHttpClient({
       return unwrapEnvelope(response.data);
     } catch (error) {
       const apiError = toApiError(error);
-      if (apiError.kind === 'unauthorized' && !anonymous) onUnauthorized();
+      if (apiError.kind !== 'unauthorized' || anonymous) throw apiError;
+      // An expired access token is renewed once and the request retried.
+      if (!isRetry && token && refresh && (await refresh(token).catch(() => false))) {
+        return request(method, path, body, options, true);
+      }
+      onUnauthorized();
       throw apiError;
     }
   }
