@@ -25,9 +25,15 @@ target="$DEPLOY_USER@$DEPLOY_HOST"
 destination="$DEPLOY_PATH/releases/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 
 # Include only tracked runtime configuration from this release, never local env files.
-git archive "${DEPLOY_REF:-HEAD}" infra/compose/docker-compose.yml infra/compose/docker-compose.prod.yml \
-  infra/docker/nginx/Dockerfile.prod infra/docker/postgres/Dockerfile.prod \
-  infra/nginx/nginx.conf infra/nginx/app.prod.conf scripts/deploy_release.sh |
+ref=${DEPLOY_REF:-HEAD}
+bundle=(infra/compose/docker-compose.yml infra/compose/docker-compose.prod.yml
+  infra/docker/nginx/Dockerfile.prod infra/docker/postgres/Dockerfile.prod
+  infra/nginx/nginx.conf infra/nginx/app.prod.conf scripts/deploy_release.sh)
+# Older releases predate object storage and must remain deployable.
+if git cat-file -e "$ref:infra/docker/seaweedfs/Dockerfile.prod" 2>/dev/null; then
+  bundle+=(infra/docker/seaweedfs/Dockerfile.prod)
+fi
+git archive "$ref" "${bundle[@]}" |
   tar -x -C "$temporary"
 cp release/images.env "$temporary/images.env"
 tar -czf "$temporary/release.tar.gz" -C "$temporary" infra scripts images.env

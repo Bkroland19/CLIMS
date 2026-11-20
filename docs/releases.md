@@ -2,7 +2,7 @@
 
 [Documentation index](README.md)
 
-See the [2.0.0 release notes](releases/2.0.0.md) for the revamped platform release.
+See the [2.1.0 release notes](releases/2.1.0.md) for the latest release and the [2.0.0 release notes](releases/2.0.0.md) for the platform revamp.
 
 `.github/workflows/images.yml` builds the three application production Dockerfiles on pull requests without publishing. Pushing a version tag runs the complete [CI workflow](ci.md), publishes images to GitHub Container Registry (GHCR), and creates a GitHub Release after all three application images succeed. Normal pushes to `main` run CI; they do not publish images.
 
@@ -24,7 +24,7 @@ The mobile image is an export job containing iOS and Android JavaScript bundles 
 
 ## Shared application version
 
-The root `VERSION` file is authoritative, currently `2.0.1`. Backend, frontend, and mobile use one application version. Package manifests and lockfiles (including root tooling), the backend default version, Expo release metadata, and OpenAPI `info.version` must agree. CI checks this on every pull request and main push; the release preflight also requires the Git tag to be exactly `v` plus `VERSION`.
+The root `VERSION` file is authoritative, currently `2.1.0`. Backend, frontend, and mobile use one application version. Package manifests and lockfiles (including root tooling), the backend default version, Expo release metadata, and OpenAPI `info.version` must agree. CI checks this on every pull request and main push; the release preflight also requires the Git tag to be exactly `v` plus `VERSION`.
 
 ```sh
 make version-set VERSION=2.1.0
@@ -114,7 +114,7 @@ Provision an amd64 Linux server with Bash, OpenSSH, Docker Engine, Docker Compos
 
 The deployment job uses its short-lived `GITHUB_TOKEN` with `packages: read` to authenticate to GHCR over SSH. Registry credentials are passed through standard input and kept in a temporary Docker configuration that is removed when deployment finishes or fails. No long-lived registry token is needed on the server. For manual deployments outside Actions, authenticate Docker as the deployment user with package read access. Verify the SSH host key through a trusted server console before storing it; the workflow enforces host-key verification.
 
-Each run uploads tracked Compose/Nginx/infrastructure configuration from the tagged commit and the published `images.env` into `releases/<run-id>-<attempt>`. It validates Compose, pulls application images, builds the small PostgreSQL/Nginx infrastructure images, and starts production services with a five-minute health-check timeout. The mobile image remains an on-demand artifact exporter. The production project name stays `clims-prod`, preserving the existing database volume. No database seeding, volume removal, or image pruning runs during deployment.
+Each run uploads tracked Compose/Nginx/infrastructure configuration from the tagged commit and the published `images.env` into `releases/<run-id>-<attempt>`. It validates Compose, pulls application images, builds the PostgreSQL, Nginx, and SeaweedFS infrastructure images, and starts production services with a five-minute health-check timeout. The mobile image remains an on-demand artifact exporter. The production project name stays `clims-prod`, preserving the existing database volume. No database seeding, volume removal, or image pruning runs during deployment.
 
 The backend applies embedded database migrations at startup. Take a database backup before releases with schema changes. A failed health check fails the deployment job and leaves `current` pointing at the last successful configuration; it does not undo containers or migrations already applied. On success, `current` points to the new directory and `previous` records the prior healthy directory.
 
