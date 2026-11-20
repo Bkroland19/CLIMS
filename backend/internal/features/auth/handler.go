@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/request"
 	"clims-backend/internal/pkg/response"
@@ -41,11 +42,8 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	if len(req.Password) > 72 {
 		return response.Error(c, 422, "password must not exceed 72 bytes", nil)
 	}
-	return h.createUser(c, req.AccountInput, "")
-}
 
-func (h *Handler) createUser(c fiber.Ctx, req users.AccountInput, roleID string) error {
-	id, err := h.Service.Create(c.Context(), req, roleID)
+	id, err := h.Service.Create(c.Context(), req.AccountInput, rbac.RegisteredUserRoleID)
 	if errors.Is(err, users.ErrHashPassword) {
 		return response.Error(c, 500, "failed to hash password", nil)
 	}

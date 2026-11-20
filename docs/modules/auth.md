@@ -15,11 +15,11 @@ Source: `backend/internal/features/auth/`.
 
 | Method | Route                   | Access                                       |
 | ------ | ----------------------- | -------------------------------------------- |
-| POST   | `/api/v1/auth/register` | Public; active, unassigned account           |
+| POST   | `/api/v1/auth/register` | Public; active account with the default role |
 | POST   | `/api/v1/auth/login`    | Public; valid credentials and active account |
 | GET    | `/api/v1/auth/me`       | Valid JWT and active account                 |
 
-Registration trims usernames, trims and lowercases emails, rejects unknown fields, validates request fields, and delegates hashing and persistence to the users service. Signup accepts `first_name`, `last_name`, and optional `location`. The older `firstname` and `lastname` inputs are accepted as fallbacks. Account status, roles, and facility or hot spot assignments are managed by administrators. The response contains `data.user_id`; registration does not issue a token.
+Registration trims usernames, trims and lowercases emails, rejects unknown fields, validates request fields, and delegates hashing and persistence to the users service. Signup accepts `first_name`, `last_name`, and optional `location`. The older `firstname` and `lastname` inputs are accepted as fallbacks. Signup assigns the `registered user` role, which starts with no permissions. Administrators manage subsequent role changes, account status, and facility or hot spot assignments. The response contains `data.user_id`; registration does not issue a token.
 
 Passwords need at least eight characters and at most 72 UTF-8 bytes. Validation's 72-character limit is supplemented by an explicit byte-length check. Existing legacy usernames can repeat; email uniqueness is enforced by PostgreSQL after trimming and lowercasing.
 
@@ -37,6 +37,6 @@ Registration allows ten requests per IP per minute. Login allows ten failed requ
 
 ## Boundaries and limitations
 
-Auth does not own a repository or create role assignments. It uses the users repository for credential lookup and the shared users service for account creation. The server supplies JWT and active-account middleware during route registration.
+Auth uses the users repository for credential lookup and the shared users service to create the account and assign its default role in one transaction. The server supplies JWT and active-account middleware during route registration.
 
 `POST /auth/logout` ends the current session, and the web app calls it when a user signs out. `GET /auth/sessions` lists a user's own sessions and `DELETE /auth/sessions/{id}` signs out one of them, such as a lost device. Administrators list a user's sessions with `GET /users/{id}/sessions` (`users:read`) and sign them out everywhere with `DELETE /users/{id}/sessions` (`users:update`). Disabling an account revokes its sessions, so reactivation requires a new login. Tokens issued before sessions existed have no `sid` and are rejected; those users sign in again. There are no email-verification, password-reset, or refresh-token APIs. See [users](users.md) and [RBAC](rbac.md) for administration.

@@ -1,0 +1,1 @@
+DELETE FROM roles WHERE id = 'dbe80723-b6ae-42ec-a614-596a092a06a2';
