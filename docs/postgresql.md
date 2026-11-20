@@ -37,6 +37,30 @@ make sql-convert
 
 This regenerates migration 1, its rollback, the PostgreSQL seed, and `infra/database/seed_manifest.json` from the original dump. Do not regenerate already deployed migrations after changing the source dump; add a new migration instead. The converter targets the syntax in this specific backup and rejects unsupported table definitions and INSERT formats.
 
+## Hotspot conversion
+
+Migration 14 reshapes `hot_spots` in place, so references from orders, inventory and users keep their UUIDs. Every earlier row is archived unchanged in `legacy_hot_spots`, including hotspots submitted through migrations 8 and 9. The legacy importer writes there too. `import_legacy_hot_spots()` converts the archive and runs both in migration 14 and at the end of `make db-seed`. It only converts rows that have not been converted yet.
+
+The conversion:
+
+- gives legacy hotspots review status `active` when their status was active, and `deactivated` otherwise
+- maps earlier submissions: `verified` becomes `submitted`, and a `rejection_reason` becomes the DCFP's `rejected` comment
+- matches the legacy district by DHIS2 UID or name, and the subcounty (legacy `division`) only when exactly one subcounty in that district fits
+- parses GPS strings and normalises dispenser yes/no spellings
+- moves the contact person and comment into `contact_persons` and `hot_spot_comments`
+- records the legacy `entered_by` user as `submitted_by_id`
+
+Most legacy hotspots record no subcounty, so the `hot_spot_cleanup` view lists converted legacy hotspots missing a district, subcounty, name or GPS, alongside the original district, subcounty and village text. To export it:
+
+```sh
+docker compose --env-file infra/env/dev.env -f infra/compose/docker-compose.yml \
+  -f infra/compose/docker-compose.dev.yml exec -T postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\copy (SELECT * FROM hot_spot_cleanup) TO STDOUT CSV HEADER"' \
+  > hot_spot_cleanup.csv
+```
+
+With the supplied backup, 17,991 of 18,221 hotspots get a district and 2,229 get a subcounty.
+
 ## Verify the historical dump conversion
 
 To verify without touching the application's database, start an isolated PostgreSQL container:
