@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:14px">
+
+<sc-if value="{{ pg.hotspots }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+    <div style="font-size:14px;color:#62666d">{{ hsCount }}</div>
+    <button onClick="{{ toMap }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Map a new hotspot</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px">
+    <sc-for list="{{ cards }}" as="c" hint-placeholder-count="3">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div style="min-width:0"><button onClick="{{ c.open }}" style="background:none;border:none;padding:0;font:inherit;font-size:17px;font-weight:600;color:#0c0d0f;cursor:pointer;text-align:left" style-hover="text-decoration:underline">{{ c.name }}</button><div style="font-size:13px;color:#62666d;margin-top:2px">{{ c.id }} · {{ c.kind }} · {{ c.loc }}</div></div>
+          <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ c.chip.bg }};color:{{ c.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ c.chip.label }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <sc-for list="{{ c.stock }}" as="x" hint-placeholder-count="2">
+            <div style="background:rgba(246,248,247,.6);border-radius:8px;padding:10px 12px"><div style="font-size:12px;color:#62666d">{{ x.name }}</div><div style="font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ x.fg }}">{{ x.value }}</div></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:14px">
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d;flex:none">Contact person</span><span>{{ c.contact }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">Dispenser</span><span>{{ c.disp }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">Open order</span><span>{{ c.order }}</span></div>
+        </div>
+        <sc-if value="{{ c.mine }}"><div style="font-size:13px;color:#7c5cd6;font-weight:500">You are the contact person here</div></sc-if>
+
+        <sc-if value="{{ c.inactive }}"><div style="font-size:13px;color:#62666d;padding:12px;background:rgba(246,248,247,.6);border-radius:8px">Inactive — can't request stock until the district reactivates it.</div></sc-if>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:auto">
+          <sc-if value="{{ c.active }}"><button onClick="{{ c.request }}" style="flex:1 1 190px;height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Request stock for this hotspot</button></sc-if>
+          <button onClick="{{ c.open }}" style="flex:1 1 110px;height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">View details</button>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.hotspot }}">
+  <button onClick="{{ hd.back }}" style="align-self:flex-start;background:none;border:none;padding:0;font-size:14px;font-weight:500;color:#62666d;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>All hotspots</button>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-start;justify-content:space-between">
+    <div style="min-width:0;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><div style="font-size:22px;font-weight:600;line-height:1.2">{{ hd.name }}</div><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ hd.chip.bg }};color:{{ hd.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ hd.chip.label }}</span></div>
+      <div style="font-size:14px;color:#62666d">{{ hd.sub }}</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <a href="{{ hd.tel }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);display:inline-flex;align-items:center;gap:8px;text-decoration:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>{{ hd.callLabel }}</a>
+      <sc-if value="{{ hd.active }}"><button onClick="{{ hd.request }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Request stock</button></sc-if>
+    </div>
+  </div>
+  <sc-if value="{{ hd.inactive }}"><div style="border-radius:8px;padding:10px 14px;background:rgba(246,248,247,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08);font-size:14px;color:#62666d">Inactive — can't request stock until the district reactivates it.</div></sc-if>
+  <sc-if value="{{ hd.open }}">
+    <div style="border-radius:8px;padding:10px 14px;background:rgba(10,106,155,.08);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between">
+      <div style="min-width:0"><div style="font-size:14px;font-weight:600;color:#0a6a9b">Open order {{ hd.openId }}</div><div style="font-size:13px;color:#4a4e55;margin-top:2px">{{ hd.openSub }}</div></div>
+      <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ hd.openChip.bg }};color:{{ hd.openChip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ hd.openChip.label }}</span>
+    </div>
+  </sc-if>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 520px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+        <sc-if value="{{ hd.hasMap }}"><div style="position:relative;height:300px;background:#eef0f2"><iframe title="Map showing {{ hd.name }}" src="{{ hd.mapSrc }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe></div></sc-if>
+        <sc-if value="{{ hd.noMap }}"><div style="height:200px;background:repeating-linear-gradient(45deg,#f6f7f8 0 12px,#eef0f2 12px 24px);display:flex;align-items:center;justify-content:center;font-size:13px;color:#62666d">No GPS location captured</div></sc-if>
+        <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;justify-content:space-between;font-size:13px;border-top:1px solid rgba(15,40,25,.06)">
+          <div style="display:flex;flex-wrap:wrap;gap:4px 18px;color:#62666d"><span>GPS <span style="color:#0c0d0f;font-variant-numeric:tabular-nums">{{ hd.gps }}</span></span><span>Mapped {{ hd.mapped }} by {{ hd.mappedBy }}</span></div>
+          <sc-if value="{{ hd.hasMap }}"><a href="{{ hd.mapsUrl }}" target="_blank" rel="noopener" style="color:#177534;font-weight:500;text-decoration:none" style-hover="text-decoration:underline">Open in maps</a></sc-if>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09);display:flex;justify-content:space-between;gap:12px;align-items:baseline"><div style="font-size:14px;font-weight:600">Past orders</div><div style="font-size:13px;color:#62666d">{{ hd.orderCount }}</div></div>
+        <div style="overflow-x:auto;overflow-y:hidden"><table style="width:100%;border-collapse:collapse;min-width:620px">
+          <thead><tr><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap;padding-left:14px">Order</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Raised by</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Requested</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Delivered</th><th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px;border-bottom:1px solid rgba(15,40,25,.09);white-space:nowrap">Status</th></tr></thead>
+          <tbody><sc-for list="{{ hd.orders }}" as="r" hint-placeholder-count="2"><tr>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;padding-left:14px"><div style="font-weight:600">{{ r.id }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.time }} · {{ r.reason }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.by }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;font-variant-numeric:tabular-nums">{{ r.items }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35;color:#62666d">{{ r.delivered }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+          </tr></sc-for></tbody>
+        </table></div>
+        <sc-if value="{{ hd.noOrders }}"><div style="padding:24px 16px;text-align:center;font-size:14px;color:#62666d">No orders for this hotspot yet.</div></sc-if>
+      </div>
+    </div>
+    <div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><div style="font-size:14px;font-weight:600">Stock at hotspot</div><div style="font-size:13px;color:#62666d">Last delivery {{ hd.last }}</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <sc-for list="{{ hd.stock }}" as="x" hint-placeholder-count="2">
+            <div style="background:rgba(246,248,247,.6);border-radius:8px;padding:10px 12px"><div style="font-size:12px;color:#62666d">{{ x.name }}</div><div style="font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ x.fg }}">{{ x.value }}</div><div style="font-size:12px;color:{{ x.fg }}">{{ x.note }}</div></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:14px;font-weight:600">Contact person</div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="width:40px;height:40px;border-radius:50%;background:#45ba50;color:#020203;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ hd.initials }}</div>
+          <div style="min-width:0"><div style="font-size:15px;font-weight:600">{{ hd.contact }}</div><a href="{{ hd.tel }}" style="font-size:14px;color:#177534;text-decoration:none;font-variant-numeric:tabular-nums" style-hover="text-decoration:underline">{{ hd.phone }}</a></div>
+        </div>
+        <sc-if value="{{ hd.mine }}"><div style="font-size:13px;color:#7c5cd6;font-weight:500">You are the contact person here</div></sc-if>
+        <div style="font-size:13px;color:#62666d;text-wrap:pretty">Receives deliveries and confirms them with the rider.</div>
+      </div>
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:14px;font-weight:600">Details</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px">
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Type</span><span style="text-align:right;min-width:0">{{ hd.kind }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Village</span><span style="text-align:right;min-width:0">{{ hd.village }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Sub-county</span><span style="text-align:right;min-width:0">{{ hd.subcounty }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">District</span><span style="text-align:right;min-width:0">{{ hd.district }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Dispenser</span><span style="text-align:right;min-width:0">{{ hd.disp }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">VHTs</span><span style="text-align:right;min-width:0">{{ hd.vhts }}</span></div>
+        </div>
+        <sc-if value="{{ hd.hasComment }}"><div style="font-size:13px;color:#4a4e55;background:rgba(246,248,247,.6);border-radius:8px;padding:10px 12px;text-wrap:pretty">{{ hd.comment }}</div></sc-if>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.map }}">
+  <sc-if value="{{ mp.done }}">
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:28px 16px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
+      <div style="width:52px;height:52px;border-radius:50%;background:#45ba50;color:#020203;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div>
+      <div style="font-size:20px;font-weight:600">{{ mp.doneName }} is active</div>
+      <div style="font-size:14px;color:#62666d;max-width:480px;text-wrap:pretty">{{ mp.doneBody }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px">
+        <button onClick="{{ mp.again }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Map another hotspot</button>
+        <button onClick="{{ mp.firstStock }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Request first stock</button>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ mp.form }}">
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <sc-for list="{{ mp.tabs }}" as="t" hint-placeholder-count="4">
+        <div style="flex:1 1 140px;display:flex;flex-direction:column;gap:6px;min-width:0">
+          <div style="height:4px;border-radius:2px;background:{{ t.bar }}"></div>
+          <div style="font-size:13px;font-weight:{{ t.fw }};color:{{ t.fg }}">{{ t.n }}. {{ t.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden;max-width:820px;width:100%">
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:18px">
+
+        <sc-if value="{{ mp.s0 }}">
+          <div><div style="font-size:18px;font-weight:600">Where is the hotspot?</div><div style="font-size:14px;color:#62666d;margin-top:2px">Stand at the hotspot entrance when you capture the location.</div></div>
+          <div style="border-radius:8px;border:1px solid rgba(15,40,25,.09);min-height:180px;background:repeating-linear-gradient(45deg,#f6f7f8 0 12px,#eef0f2 12px 24px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px 14px;text-align:center">
+            <sc-if value="{{ mp.hasGps }}">
+              <div style="background:#fff;border:1px solid rgba(15,40,25,.09);border-radius:8px;padding:10px 14px">
+                <div style="font-size:12px;color:#62666d">Location captured</div>
+                <div style="font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px">{{ mp.gps }}</div>
+                <div style="font-size:12px;color:#177534;margin-top:2px">Accuracy ±{{ mp.acc }} m</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ mp.noGps }}"><div style="font-size:13px;color:#62666d">Map preview appears here once the location is captured</div></sc-if>
+            <button onClick="{{ mp.capture }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05);display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" x2="18" y1="12" y2="12"></line><line x1="6" x2="2" y1="12" y2="12"></line><line x1="12" x2="12" y1="6" y2="2"></line><line x1="12" x2="12" y1="22" y2="18"></line></svg>{{ mp.captureLabel }}</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Village<input value="{{ mp.f.village }}" onChange="{{ mp.on.village }}" placeholder="e.g. Kigungu" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Sub-county
+              <select value="{{ mp.f.subcounty }}" onChange="{{ mp.on.subcounty }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;background:#fff;font-size:14px;font-weight:400">
+                <option value="Katabi TC">Katabi TC</option>
+                <option value="Kajjansi TC">Kajjansi TC</option>
+                <option value="Nansana Municipality">Nansana Municipality</option>
+                <option value="Kira Municipality">Kira Municipality</option>
+                <option value="Ssisa">Ssisa</option>
+                <option value="Busukuma">Busukuma</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">District<input value="Wakiso" disabled="{{ true }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid rgba(15,40,25,.09);background:#f2f3f5;font-size:14px;font-weight:400;color:#62666d"></label>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mp.s1 }}">
+          <div><div style="font-size:18px;font-weight:600">About the hotspot</div><div style="font-size:14px;color:#62666d;margin-top:2px">Use the name people in the area know it by.</div></div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Hotspot name<input value="{{ mp.f.name }}" onChange="{{ mp.on.name }}" placeholder="e.g. Kigungu Landing Site" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:14px;font-weight:500">Type</div>
+            <div role="radiogroup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+              <sc-for list="{{ mp.kinds }}" as="x" hint-placeholder-count="2">
+                <button role="radio" aria-checked="{{ x.on }}" onClick="{{ x.pick }}" style="text-align:left;padding:12px 14px;border-radius:8px;border:{{ x.bd }};background:{{ x.bg }};cursor:pointer;display:flex;gap:12px;align-items:flex-start;color:#0c0d0f">
+                  <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ x.ring }};flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center"><sc-if value="{{ x.on }}"><span style="width:8px;height:8px;border-radius:50%;background:#45ba50"></span></sc-if></span>
+                  <span><span style="display:block;font-size:14px;font-weight:600">{{ x.label }}</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">{{ x.desc }}</span></span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Condom dispenser
+              <select value="{{ mp.f.disp }}" onChange="{{ mp.on.disp }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;background:#fff;font-size:14px;font-weight:400">
+                <option value="Working">Yes — working</option>
+                <option value="Needs repair">Yes — needs repair</option>
+                <option value="Broken">Yes — broken</option>
+                <option value="None">No dispenser</option>
+              </select>
+            </label>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Comment <span style="font-weight:400;color:#62666d;font-size:13px">Optional — anything the district should know</span><textarea rows="3" value="{{ mp.f.comment }}" onChange="{{ mp.on.comment }}" placeholder="e.g. Busy on weekends; around 200 fishermen land here daily" style="padding:10px 12px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400;resize:vertical"></textarea></label>
+        </sc-if>
+
+        <sc-if value="{{ mp.s2 }}">
+          <div><div style="font-size:18px;font-weight:600">Contact person</div><div style="font-size:14px;color:#62666d;margin-top:2px">Who receives deliveries and reports stockouts here.</div></div>
+          <div role="radiogroup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+            <sc-for list="{{ mp.whos }}" as="x" hint-placeholder-count="2">
+              <button role="radio" aria-checked="{{ x.on }}" onClick="{{ x.pick }}" style="text-align:left;padding:12px 14px;border-radius:8px;border:{{ x.bd }};background:{{ x.bg }};cursor:pointer;display:flex;gap:12px;align-items:flex-start;color:#0c0d0f">
+                <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ x.ring }};flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center"><sc-if value="{{ x.on }}"><span style="width:8px;height:8px;border-radius:50%;background:#45ba50"></span></sc-if></span>
+                <span><span style="display:block;font-size:14px;font-weight:600">{{ x.label }}</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">{{ x.desc }}</span></span>
+              </button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ mp.other }}">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Full name<input value="{{ mp.f.cname }}" onChange="{{ mp.on.cname }}" placeholder="e.g. Sarah Nakirya" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400"></label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Phone number<input type="tel" value="{{ mp.f.cphone }}" onChange="{{ mp.on.cphone }}" placeholder="+256 7XX XXX XXX" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid {{ mp.phoneBd }};font-size:14px;font-weight:400"><sc-if value="{{ mp.phoneErr }}"><span style="font-size:13px;color:#c62828;font-weight:400">Enter a phone number, e.g. +256 700 000000.</span></sc-if></label>
+            </div>
+            <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer"><input type="checkbox" checked="{{ mp.f.invite }}" onChange="{{ mp.on.invite }}" style="margin-top:2px">Invite them to CLIMS as hotspot manager — they get an SMS with an activation code</label>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ mp.s3 }}">
+          <div><div style="font-size:18px;font-weight:600">Review and activate</div><div style="font-size:14px;color:#62666d;margin-top:2px">Once active, the hotspot can request condoms from Wakiso district.</div></div>
+          <div style="display:flex;flex-direction:column;border:1px solid rgba(15,40,25,.09);border-radius:8px">
+            <sc-for list="{{ mp.summary }}" as="r" hint-placeholder-count="6">
+              <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px"><span style="color:#62666d">{{ r.k }}</span><span style="text-align:right">{{ r.v }}</span></div>
+            </sc-for>
+          </div>
+          <label style="display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" checked="{{ mp.f.visited }}" onChange="{{ mp.on.visited }}" style="width:16px;height:16px">I visited this hotspot and the details are correct</label>
+        </sc-if>
+      </div>
+      <div style="padding:10px 14px;display:flex;justify-content:space-between;gap:10px;background:rgba(246,248,247,.6);border-top:1px solid rgba(15,40,25,.06)">
+        <button onClick="{{ mp.back }}" disabled="{{ mp.first }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">Back</button>
+        <button onClick="{{ mp.next }}" disabled="{{ mp.cantNext }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">{{ mp.nextLabel }}</button>
+      </div>
+    </div>
+  </sc-if>
+</sc-if>
+
+<sc-if value="{{ pg.request }}">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 520px;min-width:0;display:flex;flex-direction:column;gap:1px;background:rgba(15,40,25,.08);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+      <div style="background:rgba(255,255,255,.95);border:none;border-radius:0;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">1</span>Which hotspot?</div>
+        <div ref="{{ rq.ref }}" style="position:relative">
+          <button onClick="{{ rq.toggle }}" aria-haspopup="listbox" aria-expanded="{{ rq.open }}" style="width:100%;min-height:52px;padding:8px 12px;border-radius:8px;border:1px solid {{ rq.trigBd }};background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;color:#0c0d0f">
+            <span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ rq.selName }}</span><span style="display:block;font-size:13px;color:#62666d;margin-top:2px">{{ rq.selSub }}</span></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#62666d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+          <sc-if value="{{ rq.open }}">
+            <div style="position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border-radius:8px;box-shadow:0 0 0 1px rgba(15,40,25,.1),0 12px 32px rgba(15,40,25,.16);overflow:hidden">
+              <div style="padding:8px;border-bottom:1px solid rgba(15,40,25,.08);position:relative">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#62666d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:18px;top:50%;transform:translateY(-50%);pointer-events:none"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                <input autoFocus="{{ true }}" value="{{ rq.q }}" onChange="{{ rq.onQ }}" onKeyDown="{{ rq.onKey }}" placeholder="Search by name, ID, village or contact" aria-label="Search hotspots" style="width:100%;height:36px;padding:0 10px 0 34px;border-radius:8px;border:1px solid #8b9097;font-size:14px;box-sizing:border-box">
+              </div>
+              <div role="listbox" style="max-height:264px;overflow-y:auto;padding:4px">
+                <sc-for list="{{ rq.opts }}" as="x" hint-placeholder-count="3">
+                  <button role="option" aria-selected="{{ x.on }}" onClick="{{ x.pick }}" style="width:100%;padding:8px 10px;border:none;border-radius:6px;background:{{ x.bg }};cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left;color:#0c0d0f" style-hover="background:#f2f6f3">
+                    <span style="width:16px;flex:none;color:#177534"><sc-if value="{{ x.on }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if></span>
+                    <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ x.name }}</span><span style="display:block;font-size:13px;color:#62666d;margin-top:1px">{{ x.sub }}</span></span>
+                    <span style="font-size:12px;color:#62666d;font-variant-numeric:tabular-nums;flex:none">{{ x.id }}</span>
+                  </button>
+                </sc-for>
+                <sc-if value="{{ rq.none }}"><div style="padding:16px 12px;text-align:center;font-size:14px;color:#62666d">No hotspots match “{{ rq.q }}”</div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ rq.openWarn }}"><div style="font-size:13px;color:#0a6a9b;background:rgba(10,106,155,.1);border-radius:8px;padding:10px 12px">{{ rq.openTxt }}</div></sc-if>
+      </div>
+      <div style="background:rgba(255,255,255,.95);border:none;border-radius:0;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">2</span>What's happening?</div>
+        <div role="radiogroup" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+          <sc-for list="{{ rq.reasons }}" as="x" hint-placeholder-count="2">
+            <button role="radio" aria-checked="{{ x.on }}" onClick="{{ x.pick }}" style="text-align:left;padding:12px 14px;border-radius:8px;border:{{ x.bd }};background:{{ x.bg }};cursor:pointer;display:flex;gap:12px;align-items:flex-start;color:#0c0d0f">
+              <span style="width:18px;height:18px;border-radius:50%;border:2px solid {{ x.ring }};flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center"><sc-if value="{{ x.on }}"><span style="width:8px;height:8px;border-radius:50%;background:#45ba50"></span></sc-if></span>
+              <span style="font-size:14px;font-weight:600">{{ x.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.95);border:none;border-radius:0;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#0c0d0f;color:#fafafb;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">3</span>Stock and quantities</div><div style="font-size:13px;color:#62666d;margin-top:4px;padding-left:34px">In pieces. Count with the contact person if you are at the hotspot.</div></div>
+        <sc-for list="{{ rq.rows }}" as="r" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end;padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.06)">
+            <div style="padding-bottom:10px;font-size:15px;font-weight:500">{{ r.name }}</div>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#62666d">Left now<input type="number" min="0" inputmode="numeric" value="{{ r.left }}" onChange="{{ r.onLeft }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;color:#0c0d0f;font-variant-numeric:tabular-nums"></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#62666d">Quantity needed<input type="number" min="0" step="100" inputmode="numeric" value="{{ r.need }}" onChange="{{ r.onNeed }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;color:#0c0d0f;font-variant-numeric:tabular-nums"></label>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="flex:1 1 280px;min-width:0;position:sticky;top:80px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:14px;font-weight:600">On behalf of</div>
+      <div style="font-size:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Hotspot</span><span style="text-align:right">{{ rq.selName }}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Contact person</span><span>{{ rq.selContact }}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#62666d;flex:none">Quantity needed</span><span style="font-variant-numeric:tabular-nums;text-align:right">{{ rq.sum }}</span></div>
+      </div>
+      <button onClick="{{ rq.send }}" disabled="{{ rq.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Send stockout notification</button>
+      <div style="font-size:13px;color:#62666d;text-wrap:pretty">{{ rq.selContact }} is notified too and confirms receipt when the rider arrives.</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.requests }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Order</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Hotspot</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Raised by</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Pieces</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+      <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ reqRows }}" as="r" hint-placeholder-count="2">
+          <tr>
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35"><div style="font-weight:600">{{ r.id }}</div><div style="font-size:12.5px;color:#62666d;line-height:1.3">{{ r.time }}</div></td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.hotspot }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.by }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.items }}</td>
+            <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);white-space:nowrap;background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+          <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+    <sc-if value="{{ noReq }}"><div style="padding:28px 16px;text-align:center;font-size:14px;color:#62666d">No orders for your hotspots yet.</div></sc-if>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    if (this.props.ready) this.props.ready();
+    this._doc = e => { const r = this.ddRef.current; if (r && !r.contains(e.target) && (this.state.d.req || {}).open) this.setD('req', 'open', false); };
+    document.addEventListener('mousedown', this._doc);
+  }
+  componentWillUnmount() { document.removeEventListener('mousedown', this._doc); }
+  ddRef = React.createRef();
+  state = { d: {} };
+  setD = (key, field, val) => this.setState(st => ({ d: { ...st.d, [key]: { ...(st.d[key] || {}), [field]: val } } }));
+  renderVals() {
+    const v = this._rv();
+    const L = this.props.lib;
+    if (L && L.menu && this.KEBAB) this.KEBAB.forEach(([path, fn]) => {
+      const arr = path.split('.').reduce((a, k) => (a ? a[k] : undefined), v);
+      if (Array.isArray(arr)) arr.forEach(r => { r.menu = e => { e.preventDefault(); e.stopPropagation(); L.menu(e, fn.call(this, r) || []); }; });
+    });
+    return v;
+  }
+  KEBAB = [
+    ['reqRows', function (r) { const { store: s, go, lib: L } = this.props; const o = s.orders.find(x => x.id === r.id); if (!o) return []; return [{ label: 'Request again for this hotspot', icon: 'megaphone', run: () => go('request', o.hotspotId) }, { label: 'View hotspot', icon: 'pin', run: () => go('hotspot', o.hotspotId) }, { label: 'Copy order ID', icon: 'copy', run: () => L.copy(o.id, 'order ID') }]; }],
+  ];
+  _rv() {
+    const { store: s, act, nav, go, lib: L } = this.props;
+    if (!s || !L || !nav) return { pg: {} };
+    const ME = 'Joseph Ssemwogerere';
+    const page = nav.page || 'hotspots';
+    const num = x => { const n = parseInt(String(x ?? '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; };
+    const ring = on => (on ? '#45ba50' : '#8b9097');
+    const opt = (on, pick) => ({ on, pick, bd: on ? '2px solid #45ba50' : '1px solid #e4e6e9', bg: on ? 'rgba(69,186,80,.06)' : '#fff', ring: ring(on) });
+    const mineHs = s.hotspots.filter(h => (h.vhts || []).includes(ME) || h.contact === ME);
+    const openOf = hid => s.orders.find(o => o.hotspotId === hid && o.status !== 'received');
+    const v = { pg: { [page]: true }, toMap: () => go('map') };
+
+    if (page === 'hotspots') {
+      v.hsCount = `${mineHs.length} hotspots in Katabi and Kajjansi`;
+      v.cards = mineHs.map(h => {
+        const o = openOf(h.id);
+        return {
+          id: h.id, name: h.name, kind: h.kind, loc: `${h.village}, ${h.subcounty}`, contact: h.contact, disp: h.dispenser ? (h.dispCond || 'Yes') : 'None',
+          chip: L.chip(h.status, h.status === 'Active' ? 'success' : 'neutral'),
+          stock: L.P.map(p => { const q = h.stock[p.k]; return { name: p.short, value: L.num(q), fg: q === 0 ? '#c62828' : q < L.low[p.k] ? '#a84c06' : '#0c0d0f' }; }),
+          order: o ? `${o.id} · ${L.oChip(o.status).label}` : 'None',
+          mine: h.contact === ME, active: h.status === 'Active', inactive: h.status !== 'Active',
+          request: () => go('request', h.id), open: () => go('hotspot', h.id),
+        };
+      });
+    }
+
+    if (page === 'hotspot') {
+      const h = s.hotspots.find(x => x.id === nav.id) || mineHs[0];
+      const o = openOf(h.id);
+      const ords = s.orders.filter(x => x.hotspotId === h.id).sort((a, b) => b.createdAt - a.createdAt);
+      const has = h.lat != null && h.lng != null;
+      const dx = 0.012, dy = 0.008;
+      const first = (h.contact || '').split(' ')[0];
+      v.hd = {
+        name: h.name, sub: `${h.id} · ${h.kind} · ${h.village}, ${h.subcounty}, ${h.district || 'Wakiso'}`,
+        chip: L.chip(h.status, h.status === 'Active' ? 'success' : 'neutral'), active: h.status === 'Active', inactive: h.status !== 'Active',
+        open: !!o, openId: o ? o.id : '', openChip: o ? L.oChip(o.status) : L.chip('', 'neutral'), openSub: o ? `Raised ${L.t(o.createdAt)} by ${o.by === ME ? 'you' : o.by} · ${L.items(o.approved || o.items)}` : '',
+        hasMap: has, noMap: !has,
+        mapSrc: has ? `https://www.openstreetmap.org/export/embed.html?bbox=${(h.lng - dx).toFixed(4)},${(h.lat - dy).toFixed(4)},${(h.lng + dx).toFixed(4)},${(h.lat + dy).toFixed(4)}&layer=mapnik&marker=${h.lat},${h.lng}` : '',
+        mapsUrl: has ? `https://www.openstreetmap.org/?mlat=${h.lat}&mlon=${h.lng}#map=16/${h.lat}/${h.lng}` : '',
+        gps: has ? `${h.lat.toFixed(5)}, ${h.lng.toFixed(5)}` : '—',
+        mapped: h.mappedAt != null ? L.t(h.mappedAt) : '—', mappedBy: h.enteredBy === ME ? 'you' : (h.enteredBy || '—'),
+        stock: L.P.map(p => { const q = h.stock[p.k]; return { name: p.short, value: L.num(q), fg: q === 0 ? '#c62828' : q < L.low[p.k] ? '#a84c06' : '#0c0d0f', note: q === 0 ? 'Out of stock' : q < L.low[p.k] ? 'Running low' : 'In stock' }; }),
+        last: h.lastDelivery != null ? L.t(h.lastDelivery) : 'none yet',
+        contact: h.contact, phone: h.phone || '—', tel: 'tel:' + String(h.phone || '').replace(/\s/g, ''), mine: h.contact === ME,
+        initials: (h.contact || '?').split(' ').map(w => w[0]).slice(0, 2).join(''), callLabel: h.contact === ME ? 'Call' : `Call ${first}`,
+        kind: h.kind, village: h.village, subcounty: h.subcounty, district: h.district || 'Wakiso',
+        disp: h.dispenser ? (h.dispCond || 'Yes') : 'None', vhts: (h.vhts || []).map(n => (n === ME ? `${n} (you)` : n)).join(', ') || '—',
+        comment: h.comment || '', hasComment: !!h.comment,
+        orders: ords.map(x => ({ id: x.id, time: L.t(x.createdAt), reason: x.reason || 'Stock request', by: x.by === ME ? 'You' : x.by, items: L.items(x.items), delivered: x.delivery && x.delivery.deliveredAt != null ? L.t(x.delivery.deliveredAt) : '—', chip: L.oChip(x.status) })),
+        noOrders: !ords.length, orderCount: `${ords.length} order${ords.length === 1 ? '' : 's'}`,
+        request: () => go('request', h.id), back: () => go('hotspots'),
+      };
+    }
+
+    if (page === 'map') {
+      const newH = nav.id && s.hotspots.find(h => h.id === nav.id);
+      if (newH) {
+        v.mp = { done: true, form: false, doneName: newH.name, doneBody: `${newH.id} is on the Wakiso hotspot register. ${newH.contact === ME ? 'You are its contact person.' : `${newH.contact} has been sent an SMS invitation to activate a CLIMS account.`}`, again: () => { this.setState(st => ({ d: { ...st.d, map: {} } })); go('map'); }, firstStock: () => go('request', newH.id) };
+      } else {
+        const key = 'map';
+        const d = this.state.d[key] || {};
+        const f = { step: d.step || 0, village: d.village ?? '', subcounty: d.subcounty ?? 'Katabi TC', name: d.name ?? '', kind: d.kind ?? 'Permanent', disp: d.disp ?? 'Working', comment: d.comment ?? '', who: d.who ?? 'other', cname: d.cname ?? '', cphone: d.cphone ?? '', invite: d.invite ?? true, visited: !!d.visited, lat: d.lat, lng: d.lng, acc: d.acc };
+        const on = {}; ['village', 'subcounty', 'name', 'disp', 'comment', 'cname', 'cphone'].forEach(k => { on[k] = e => this.setD(key, k, e.target.value); });
+        on.invite = e => this.setD(key, 'invite', e.target.checked);
+        on.visited = e => this.setD(key, 'visited', e.target.checked);
+        const phoneOk = /^\+?[0-9 ()-]{7,20}$/.test(f.cphone.trim());
+        const valid = [
+          f.lat != null && f.village.trim().length > 1,
+          f.name.trim().length > 2,
+          f.who === 'me' || (f.cname.trim().length > 2 && phoneOk),
+          f.visited,
+        ];
+        const LBL = ['Location', 'Details', 'Contact person', 'Review'];
+        const contact = f.who === 'me' ? ME : f.cname.trim();
+        v.mp = {
+          done: false, form: true, f, on,
+          tabs: LBL.map((label, i) => ({ n: i + 1, label, bar: i < f.step ? '#45ba50' : i === f.step ? '#0c0d0f' : '#e4e6e9', fg: i <= f.step ? '#0c0d0f' : '#62666d', fw: i === f.step ? 600 : 500 })),
+          s0: f.step === 0, s1: f.step === 1, s2: f.step === 2, s3: f.step === 3,
+          hasGps: f.lat != null, noGps: f.lat == null, gps: f.lat != null ? `${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}` : '', acc: f.acc,
+          captureLabel: f.lat != null ? 'Capture again' : 'Capture GPS location',
+          capture: () => { this.setD(key, 'lat', 0.0612 + Math.random() * 0.01); this.setD(key, 'lng', 32.4555 + Math.random() * 0.01); this.setD(key, 'acc', 4 + Math.floor(Math.random() * 8)); },
+          kinds: [['Permanent', 'Bars, lodges, landing sites, taxi parks'], ['Temporary', 'Markets, events, seasonal sites']].map(([label, desc]) => ({ label, desc, ...opt(f.kind === label, () => this.setD(key, 'kind', label)) })),
+          whos: [['other', 'Someone at the hotspot', 'Owner, manager or a peer educator'], ['me', 'I will be the contact', 'You receive deliveries and report stockouts']].map(([k, label, desc]) => ({ label, desc, ...opt(f.who === k, () => this.setD(key, 'who', k)) })),
+          other: f.who === 'other', phoneErr: f.cphone.trim() !== '' && !phoneOk, phoneBd: f.cphone.trim() !== '' && !phoneOk ? '#c62828' : '#8b9097',
+          summary: [
+            { k: 'Name', v: f.name || '—' }, { k: 'Type', v: f.kind }, { k: 'Location', v: `${f.village || '—'}, ${f.subcounty}, Wakiso` },
+            { k: 'GPS', v: f.lat != null ? `${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}` : '—' }, { k: 'Dispenser', v: f.disp === 'None' ? 'No dispenser' : f.disp },
+            { k: 'Contact person', v: f.who === 'me' ? `${ME} (you)` : `${contact || '—'} · ${f.cphone || '—'}` },
+            { k: 'CLIMS invitation', v: f.who === 'me' ? 'Not needed' : f.invite ? 'Send by SMS' : 'Don’t send' },
+          ],
+          first: f.step === 0, cantNext: !valid[f.step], nextLabel: f.step === 3 ? 'Activate hotspot' : 'Continue',
+          back: () => this.setD(key, 'step', Math.max(0, f.step - 1)),
+          next: () => {
+            if (f.step < 3) { this.setD(key, 'step', f.step + 1); return; }
+            act('mapHotspot', { hotspot: { name: f.name.trim(), kind: f.kind, village: f.village.trim(), subcounty: f.subcounty, contact, phone: f.who === 'me' ? '+256 776 902 331' : f.cphone.trim(), vhts: [ME], enteredBy: ME, dispenser: f.disp !== 'None', dispCond: f.disp === 'None' ? '' : f.disp, lat: f.lat, lng: f.lng, comment: f.comment.trim() }, go: { page: 'map', id: '$new' } });
+            this.setState(st => ({ d: { ...st.d, map: {} } }));
+          },
+        };
+      }
+    }
+
+    if (page === 'request') {
+      const active = mineHs.filter(h => h.status === 'Active');
+      const key = 'req';
+      const d = this.state.d[key] || {};
+      const from = nav.id || null;
+      const selId = d.hs && d.from === from && active.some(h => h.id === d.hs) ? d.hs : (nav.id && active.some(h => h.id === nav.id) ? nav.id : (active[0] && active[0].id));
+      const patch = o => this.setState(st => ({ d: { ...st.d, [key]: { ...(st.d[key] || {}), ...o } } }));
+      const qq = (d.q || '').trim().toLowerCase();
+      const matches = active.filter(h => !qq || [h.name, h.id, h.village, h.subcounty, h.contact].join(' ').toLowerCase().includes(qq));
+      const hsSub = h => `${h.contact} · ${h.village}, ${h.subcounty} · ${L.items(h.stock) === '—' ? 'out of stock' : L.items(h.stock) + ' left'}`;
+      const sel = active.find(h => h.id === selId) || {};
+      const reason = d.reason || 'Out of stock';
+      const left = {}, need = {};
+      const rows = L.P.map(p => { const l = d[selId + 'l_' + p.k] ?? String(sel.stock ? sel.stock[p.k] : 0); const n = d[selId + 'n_' + p.k] ?? (p.k === 'male' ? '1000' : '50'); left[p.k] = num(l); need[p.k] = num(n); return { name: p.name, left: l, need: n, onLeft: e => this.setD(key, selId + 'l_' + p.k, e.target.value), onNeed: e => this.setD(key, selId + 'n_' + p.k, e.target.value) }; });
+      const open = selId && openOf(selId);
+      v.rq = {
+        ref: this.ddRef, open: !!d.open, trigBd: d.open ? '#45ba50' : '#8b9097',
+        toggle: () => patch({ open: !d.open, q: '' }),
+        q: d.q || '', onQ: e => this.setD(key, 'q', e.target.value),
+        onKey: e => { if (e.key === 'Escape') patch({ open: false, q: '' }); if (e.key === 'Enter' && matches[0]) { e.preventDefault(); patch({ hs: matches[0].id, from, open: false, q: '' }); } },
+        opts: matches.map(h => ({ id: h.id, name: h.name, sub: hsSub(h), on: h.id === selId, bg: h.id === selId ? 'rgba(69,186,80,.08)' : 'transparent', pick: () => patch({ hs: h.id, from, open: false, q: '' }) })),
+        none: matches.length === 0,
+        selSub: sel.id ? hsSub(sel) : 'Choose a hotspot',
+        openWarn: !!open, openTxt: open ? `${sel.name} already has an open order (${open.id} · ${L.oChip(open.status).label.toLowerCase()}).` : '',
+        reasons: ['Out of stock', 'Running low'].map(label => ({ label, ...opt(reason === label, () => this.setD(key, 'reason', label)) })),
+        rows, selName: sel.name || '—', selContact: sel.contact || '—', sum: L.items(need),
+        cant: !selId || need.male + need.female === 0,
+        send: () => { act('notify', { hotspotId: selId, items: need, remaining: left, reason, note: `Raised by VHT on behalf of ${sel.contact}`, by: ME, byRole: 'VHT', go: { page: 'requests' } }); this.setState(st => ({ d: { ...st.d, req: {} } })); },
+      };
+    }
+
+    if (page === 'requests') {
+      const ids = mineHs.map(h => h.id);
+      const rows = s.orders.filter(o => ids.includes(o.hotspotId)).sort((a, b) => b.createdAt - a.createdAt);
+      v.reqRows = rows.map(o => ({ id: o.id, time: L.t(o.createdAt), hotspot: o.hotspot, by: o.by === ME ? 'You' : o.by, items: L.items(o.items), chip: L.oChip(o.status) }));
+      v.noReq = !rows.length;
+    }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

@@ -21,10 +21,14 @@ interface SampleDataNoticeProps {
   subject: string;
 }
 
-/** Page-level explanation for screens whose figures are all illustrative. */
+/**
+ * Page-level explanation for screens whose figures are all illustrative. It is
+ * a note, not an alert: it is there on arrival, so nothing is announced, and
+ * it does not print.
+ */
 export function SampleDataNotice({ subject }: SampleDataNoticeProps) {
   return (
-    <Alert>
+    <Alert role="note" data-print-hide>
       <FlaskConical aria-hidden="true" />
       <AlertTitle>Sample data</AlertTitle>
       <AlertDescription>

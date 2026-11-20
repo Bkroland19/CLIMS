@@ -11,7 +11,7 @@ import { RowActions, type RowAction } from '@/components/data-table/RowActions';
 import { ExportButton } from '@/components/ExportButton';
 import { FormDialog } from '@/components/form/FormDialog';
 import { TextField } from '@/components/form/TextField';
-import { PageHeader } from '@/components/PageHeader';
+import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { getErrorMessage } from '@/lib/api';
@@ -168,19 +168,10 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
 
   return (
     <>
-      <PageHeader
-        description={
-          isReview
-            ? 'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.'
-            : 'Hotspots you identified, and where each one is in district verification.'
-        }
-        actions={
-          <>
-            <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
-            {isReview ? null : submitButton}
-          </>
-        }
-      />
+      <PageActions>
+        <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
+        {isReview ? null : submitButton}
+      </PageActions>
 
       <RecentUpdates events={notifications.data ?? []} hotspots={hotspots.data ?? []} />
 

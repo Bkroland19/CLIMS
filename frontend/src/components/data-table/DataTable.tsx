@@ -65,8 +65,12 @@ const SKELETON_ROWS = 5;
  * a row never requires scrolling to find its controls.
  */
 const STICKY_ACTIONS_CLASS = 'sticky right-0 z-10';
-const HEAD_CLASS =
-  'text-muted-foreground h-auto px-4 py-3 text-xs font-semibold tracking-wider uppercase';
+/** Cells are 9 × 12px, with 16px at the table's outer edges. */
+const EDGE_CLASS = 'px-3 first:pl-4 last:pr-4';
+const HEAD_CLASS = cn(
+  EDGE_CLASS,
+  'text-muted-foreground h-auto py-2 text-xs font-semibold tracking-wider uppercase',
+);
 
 /**
  * A searchable, sortable, paginated table. Sorting, filtering and paging run in
@@ -134,7 +138,7 @@ export function DataTable<Row>({
         </div>
       ) : null}
 
-      <div className="bg-card overflow-hidden rounded-xl border">
+      <div className="bg-card rounded-card overflow-hidden border">
         {showError ? (
           <ErrorState
             title={`Could not load ${label.toLowerCase()}`}
@@ -171,7 +175,7 @@ export function DataTable<Row>({
                             setSort((current) => nextSort(current, column.id));
                           }}
                           className={cn(
-                            'hover:text-foreground focus-visible:ring-ring/50 -mx-1 inline-flex items-center gap-1 rounded-sm px-1 tracking-wider uppercase outline-none focus-visible:ring-3',
+                            'hover:text-foreground focus-visible:ring-ring -mx-1 inline-flex items-center gap-1 rounded-sm px-1 tracking-wider uppercase outline-none focus-visible:ring-2',
                             sorted && 'text-foreground',
                           )}
                         >
@@ -195,7 +199,7 @@ export function DataTable<Row>({
                 Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
                   <TableRow key={rowIndex} className="hover:bg-transparent">
                     {Array.from({ length: columnCount }, (_, cellIndex) => (
-                      <TableCell key={cellIndex} className="px-4 py-3.5">
+                      <TableCell key={cellIndex} className={cn(EDGE_CLASS, 'py-2.25')}>
                         <Skeleton className="h-4 w-full max-w-32" />
                       </TableCell>
                     ))}
@@ -237,7 +241,8 @@ export function DataTable<Row>({
                       <TableCell
                         key={column.id}
                         className={cn(
-                          'max-w-64 truncate px-4 py-3.5',
+                          EDGE_CLASS,
+                          'max-w-64 truncate py-2.25',
                           column.numeric && 'text-right tabular-nums',
                         )}
                       >
@@ -254,7 +259,7 @@ export function DataTable<Row>({
                     ))}
                     {rowActions ? (
                       <TableCell
-                        className={cn(STICKY_ACTIONS_CLASS, 'bg-card px-4 py-2 text-right')}
+                        className={cn(STICKY_ACTIONS_CLASS, EDGE_CLASS, 'bg-card py-1 text-right')}
                       >
                         {rowActions(row)}
                       </TableCell>

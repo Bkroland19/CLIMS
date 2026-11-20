@@ -23,6 +23,37 @@ export function formatDate(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? EMPTY_VALUE : dateFormat.format(date);
 }
 
+const timeFormat = new Intl.DateTimeFormat('en-UG', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+const dayMonthFormat = new Intl.DateTimeFormat('en-UG', { day: 'numeric', month: 'short' });
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Midnight at the start of `date`'s calendar day, in the display time zone. */
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * Formats a timestamp for an activity line or a list: "Today, 09:12",
+ * "Yesterday, 17:40", "12 Nov, 08:05", or a full date with the time for
+ * another year. Shown in the browser's time zone; unparseable input becomes
+ * the empty marker. `now` is for tests.
+ */
+export function formatTimestamp(value: string | null | undefined, now: Date = new Date()): string {
+  if (!value) return EMPTY_VALUE;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return EMPTY_VALUE;
+  const time = timeFormat.format(date);
+  const days = Math.round((startOfDay(now) - startOfDay(date)) / DAY_MS);
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  if (date.getFullYear() === now.getFullYear()) return `${dayMonthFormat.format(date)}, ${time}`;
+  return `${dateFormat.format(date)}, ${time}`;
+}
+
 /** Text for a possibly missing string. */
 export function formatText(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return EMPTY_VALUE;
@@ -53,4 +84,21 @@ export function initialsOf(name: string | null | undefined): string {
     .map(firstGrapheme)
     .join('')
     .toUpperCase();
+}
+
+const MINUTE_MS = 60_000;
+
+/** A length of time in words: "Under 1 min", "45 min", "3 h 20 min", "2 d 4 h". */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / MINUTE_MS));
+  if (minutes < 1) return 'Under 1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const rest = minutes % 60;
+    return rest > 0 ? `${hours} h ${rest} min` : `${hours} h`;
+  }
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  return rest > 0 ? `${days} d ${rest} h` : `${days} d`;
 }

@@ -1,36 +1,48 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import type { CSSProperties, ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { ThemeToggle } from '@/components/layout/ThemeToggle';
-import { UserMenu } from '@/components/layout/UserMenu';
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import type { AppNotification } from '@/components/layout/NotificationsBell';
+import { PageHeading } from '@/components/layout/PageHeading';
+import { TopBar } from '@/components/layout/TopBar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { useFocusWhenLost } from '@/hooks/useFocusWhenLost';
 import { useStoredBoolean } from '@/hooks/useStoredBoolean';
 import type { StorageLike } from '@/lib/storage/jsonStorage';
-import { findNavItem, type NavGroup } from '@/navigation/navigation';
+import { locate, type NavCounts, type Workspace } from '@/navigation/navigation';
 
 interface AppShellProps {
-  groups: readonly NavGroup[];
+  workspaces: readonly Workspace[];
   /** Where the sidebar's open/closed preference is remembered. */
   storage: StorageLike;
+  /** Badge counts by page path, for the sidebar and tabs. */
+  counts?: NavCounts;
+  /** The bell's list; leave out while there is no notification feed. */
+  notifications?: readonly AppNotification[];
   /** The routed page. */
   children: ReactNode;
 }
 
-/** The signed-in frame: sidebar, header and the routed page. */
-export function AppShell({ groups, storage, children }: AppShellProps) {
+/** The signed-in frame: top bar, sidebar, heading band and the routed page. */
+export function AppShell({ workspaces, storage, counts, notifications, children }: AppShellProps) {
   const pathname = usePathname();
-  const title = findNavItem(groups, pathname)?.title ?? 'Page not found';
+  const location = locate(workspaces, pathname);
   const [isSidebarOpen, setIsSidebarOpen] = useStoredBoolean(storage, 'clims.sidebar-open', true);
+  // Following a link inside the page removes the link, which drops focus to
+  // the body; start the new page at its main region instead. Next.js announces
+  // the new title. Focus left on the sidebar or a tab stays where it is.
+  const mainRef = useRef<HTMLElement>(null);
+  useFocusWhenLost(mainRef, pathname);
 
   return (
     <SidebarProvider
       open={isSidebarOpen}
       onOpenChange={setIsSidebarOpen}
-      style={{ '--sidebar-width-icon': '3.5rem' } as CSSProperties}
+      className="flex-col"
+      style={{ '--sidebar-width': '15.5rem', '--sidebar-width-icon': '3.5rem' } as CSSProperties}
     >
       <a
         href="#main"
@@ -38,24 +50,23 @@ export function AppShell({ groups, storage, children }: AppShellProps) {
       >
         Skip to content
       </a>
-      <AppSidebar groups={groups} />
-      <SidebarInset className="min-w-0">
-        <header className="bg-background/80 sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b px-4 backdrop-blur-sm md:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <SidebarTrigger className="text-muted-foreground hover:text-foreground md:hidden" />
-            <h1 className="truncate text-xl font-semibold">{title}</h1>
+      <TopBar notifications={notifications} />
+      <div className="flex flex-1">
+        <AppSidebar workspaces={workspaces} location={location} counts={counts} />
+        <SidebarInset
+          ref={mainRef}
+          id="main"
+          tabIndex={-1}
+          className="bg-canvas min-w-0 outline-none"
+        >
+          <PageHeading location={location} counts={counts} />
+          <div className="mx-auto w-full max-w-360 flex-1 px-4 pt-4 pb-10 md:px-5">
+            <ErrorBoundary resetKey={pathname}>
+              <div className="flex w-full flex-col gap-6">{children}</div>
+            </ErrorBoundary>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggle />
-            <UserMenu />
-          </div>
-        </header>
-        <main id="main" tabIndex={-1} className="flex-1 p-4 outline-none md:p-6">
-          <ErrorBoundary resetKey={pathname}>
-            <div className="flex w-full flex-col gap-6">{children}</div>
-          </ErrorBoundary>
-        </main>
-      </SidebarInset>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }

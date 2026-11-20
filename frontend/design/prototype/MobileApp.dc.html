@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+@keyframes mob-spin{to{transform:rotate(360deg)}}
+@keyframes mob-drop{from{transform:translateY(-140%)}to{transform:none}}
+@keyframes mob-up{from{transform:translateY(100%)}to{transform:none}}
+</style>
+</helmet>
+<div style="width:{{ F.w }};height:{{ F.h }};padding:{{ F.bz }};border-radius:{{ F.r1 }};background:#0f1113;box-shadow:0 40px 80px rgba(12,13,15,.25),0 0 0 1px #000,inset 0 0 0 2px #2b2e33;box-sizing:border-box">
+<div style="position:relative;width:100%;height:100%;border-radius:{{ F.r2 }};overflow:hidden;background:{{ T.bg }};color:{{ T.fg }};font-family:{{ T.font }};display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+
+  <sc-if value="{{ ios }}">
+    <div style="height:54px;flex:none;position:relative;display:flex;align-items:center;justify-content:space-between;padding:8px 30px 0 46px;background:{{ sb.bg }};color:{{ sb.fg }};z-index:5">
+      <span style="font-size:17px;font-weight:600">9:41</span>
+      <span style="position:absolute;left:50%;top:11px;width:124px;height:36px;margin-left:-62px;border-radius:20px;background:#000"></span>
+      <span style="display:flex;align-items:center;gap:6px"><svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"></rect><rect x="5" y="5.5" width="3" height="6.5" rx="1"></rect><rect x="10" y="3" width="3" height="9" rx="1"></rect><rect x="15" y="0" width="3" height="12" rx="1"></rect></svg><sc-if value="{{ sb.wifi }}"><svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.3c2.3 0 4.4.9 6 2.4l1.2-1.2A10 10 0 0 0 8 .6 10 10 0 0 0 .8 3.5L2 4.7a8.4 8.4 0 0 1 6-2.4Zm0 3.4c1.4 0 2.6.5 3.6 1.4l1.2-1.2A6.8 6.8 0 0 0 8 4a6.8 6.8 0 0 0-4.8 1.9l1.2 1.2c1-.9 2.2-1.4 3.6-1.4ZM8 9a1.6 1.6 0 0 1 1.3.6L8 11 6.7 9.6A1.6 1.6 0 0 1 8 9Z"></path></svg></sc-if><svg width="27" height="12" viewBox="0 0 27 12" fill="none"><rect x=".5" y=".5" width="23" height="11" rx="3.5" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="17" height="8" rx="2" fill="currentColor"></rect><path d="M25 4v4c.8-.3 1.5-1.1 1.5-2S25.8 4.3 25 4Z" fill="currentColor" opacity=".45"></path></svg></span>
+    </div>
+  </sc-if>
+  <sc-if value="{{ android }}">
+    <div style="height:32px;flex:none;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:{{ sb.bg }};color:{{ sb.fg }};font-size:14px;font-weight:500;z-index:5">
+      <span>9:41</span>
+      <span style="position:absolute;left:50%;top:8px;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:#0f1113"></span>
+      <span style="display:flex;align-items:center;gap:6px"><sc-if value="{{ sb.wifi }}"><svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.3c2.3 0 4.4.9 6 2.4l1.2-1.2A10 10 0 0 0 8 .6 10 10 0 0 0 .8 3.5L2 4.7a8.4 8.4 0 0 1 6-2.4Zm0 3.4c1.4 0 2.6.5 3.6 1.4l1.2-1.2A6.8 6.8 0 0 0 8 4a6.8 6.8 0 0 0-4.8 1.9l1.2 1.2c1-.9 2.2-1.4 3.6-1.4ZM8 9a1.6 1.6 0 0 1 1.3.6L8 11 6.7 9.6A1.6 1.6 0 0 1 8 9Z"></path></svg></sc-if><svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"></rect><rect x="5" y="5.5" width="3" height="6.5" rx="1"></rect><rect x="10" y="3" width="3" height="9" rx="1"></rect><rect x="15" y="0" width="3" height="12" rx="1"></rect></svg><svg width="22" height="12" viewBox="0 0 27 12" fill="none"><rect x=".5" y=".5" width="23" height="11" rx="3.5" stroke="currentColor" opacity=".4"></rect><rect x="2" y="2" width="17" height="8" rx="2" fill="currentColor"></rect><path d="M25 4v4c.8-.3 1.5-1.1 1.5-2S25.8 4.3 25 4Z" fill="currentColor" opacity=".45"></path></svg></span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hdr.iosBar }}">
+    <div style="flex:none;background:{{ T.hdrBg }};border-bottom:{{ hdr.bd }}">
+      <div style="height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+        <sc-if value="{{ hdr.hasBack }}"><button onClick="{{ hdr.onBack }}" style="display:flex;align-items:center;gap:0;background:none;border:none;color:{{ T.tint }};font-size:17px;padding:0 8px 0 0;height:44px;cursor:pointer;font-family:inherit;max-width:42%;position:relative;z-index:1"><span style="width:26px;height:26px;flex:none;background:currentColor;-webkit-mask:{{ I.chevL }};mask:{{ I.chevL }}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ hdr.backLabel }}</span></button></sc-if>
+        <sc-if value="{{ hdr.noBack }}"><span></span></sc-if>
+        <sc-if value="{{ hdr.inline }}"><div style="position:absolute;left:28%;right:28%;text-align:center;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">{{ hdr.title }}</div></sc-if>
+        <sc-if value="{{ hdr.hasAct }}"><button onClick="{{ hdr.act.go }}" aria-label="{{ hdr.act.label }}" style="height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:{{ T.tint }};font-size:17px;cursor:pointer;font-family:inherit;padding:0 8px;position:relative;z-index:1"><sc-if value="{{ hdr.act.hasIc }}"><span style="width:26px;height:26px;flex:none;background:currentColor;-webkit-mask:{{ hdr.act.mask }};mask:{{ hdr.act.mask }}"></span></sc-if><sc-if value="{{ hdr.act.noIc }}">{{ hdr.act.label }}</sc-if></button></sc-if>
+      </div>
+      <sc-if value="{{ hdr.large }}"><div style="padding:0 16px 8px;font-size:34px;font-weight:700;letter-spacing:.01em;line-height:1.15">{{ hdr.title }}</div></sc-if>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hdr.mdBar }}">
+    <div style="flex:none;height:64px;display:flex;align-items:center;gap:4px;padding:0 4px;background:{{ T.hdrBg }}">
+      <sc-if value="{{ hdr.hasBack }}"><button onClick="{{ hdr.onBack }}" aria-label="Back" style="width:48px;height:48px;border-radius:50%;border:none;background:none;color:{{ T.fg }};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none"><span style="width:24px;height:24px;flex:none;background:currentColor;-webkit-mask:{{ I.arrowL }};mask:{{ I.arrowL }}"></span></button></sc-if>
+      <div style="flex:1;min-width:0;font-size:22px;padding-left:{{ hdr.tPad }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ hdr.title }}</div>
+      <sc-if value="{{ hdr.hasAct }}"><button onClick="{{ hdr.act.go }}" aria-label="{{ hdr.act.label }}" style="height:48px;min-width:48px;border-radius:24px;border:none;background:none;color:{{ T.fg2 }};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;font-family:inherit;font-size:14px;font-weight:500;padding:0 12px"><sc-if value="{{ hdr.act.hasIc }}"><span style="width:24px;height:24px;flex:none;background:currentColor;-webkit-mask:{{ hdr.act.mask }};mask:{{ hdr.act.mask }}"></span></sc-if><sc-if value="{{ hdr.act.noIc }}">{{ hdr.act.label }}</sc-if></button></sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ off.show }}"><div style="flex:none;display:flex;align-items:center;gap:8px;padding:8px 16px;background:#3a3e44;color:#fff;font-size:13px;line-height:1.35"><span style="width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:{{ I.wifiOff }};mask:{{ I.wifiOff }}"></span><span style="flex:1;min-width:0">{{ off.text }}</span></div></sc-if>
+
+  <div ref="{{ scRef }}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;position:relative">
+    <div style="display:flex;flex-direction:column;gap:{{ T.secGap }};padding:{{ T.padT }} 0 {{ padB }}">
+      <sc-for list="{{ secs }}" as="x" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;min-width:0">
+          <sc-if value="{{ x.hasH }}"><div style="padding:0 {{ T.shPx }} {{ T.shPb }};font-size:{{ T.shFs }};font-weight:{{ T.shFw }};text-transform:{{ T.shTT }};letter-spacing:{{ T.shLs }};color:{{ T.shFg }}">{{ x.h }}</div></sc-if>
+
+          <sc-if value="{{ x.isBrand }}"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:44px 24px 4px"><span style="width:76px;height:76px;border-radius:{{ x.r }};background:#45ba50;display:flex;align-items:center;justify-content:center;margin-bottom:10px;box-shadow:0 8px 20px rgba(23,117,52,.25)"><span style="width:40px;height:40px;flex:none;background:#062b0f;-webkit-mask:{{ I.pkg }};mask:{{ I.pkg }}"></span></span><div style="font-size:30px;font-weight:700;letter-spacing:-.01em">{{ x.title }}</div><div style="font-size:15px;color:{{ T.fg2 }}">{{ x.sub }}</div><div style="font-size:15px;line-height:1.45;color:{{ T.fg2 }};margin-top:14px;text-wrap:pretty;max-width:300px">{{ x.body }}</div></div></sc-if>
+
+          <sc-if value="{{ x.isProfile }}"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:8px 16px 0"><div style="width:76px;height:76px;border-radius:50%;background:#45ba50;color:#062b0f;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600;margin-bottom:8px">{{ x.ini }}</div><div style="font-size:22px;font-weight:600">{{ x.name }}</div><div style="font-size:15px;color:{{ T.fg2 }}">{{ x.sub }}</div></div></sc-if>
+
+          <sc-if value="{{ x.isSearch }}"><div style="margin:0 16px"><div style="position:relative"><span style="position:absolute;left:{{ T.srIcL }};top:50%;margin-top:-9px;width:18px;height:18px;background:{{ T.fg2 }};-webkit-mask:{{ I.search }};mask:{{ I.search }}"></span><input type="search" value="{{ x.q }}" onChange="{{ x.on }}" placeholder="{{ x.ph }}" aria-label="{{ x.ph }}" style="width:100%;box-sizing:border-box;height:{{ T.srH }};border-radius:{{ T.srR }};border:none;background:{{ T.srBg }};padding:0 12px 0 {{ T.srPl }};font-size:{{ T.inFs }};color:{{ T.fg }};font-family:inherit;outline:none"></div></div></sc-if>
+
+          <sc-if value="{{ x.isProg }}"><div style="margin:0 16px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:6px"><sc-for list="{{ x.bars }}" as="pb" hint-placeholder-count="4"><span style="flex:1;height:4px;border-radius:2px;background:{{ pb.bg }}"></span></sc-for></div><div style="font-size:13px;color:{{ T.fg2 }}">{{ x.label }}</div></div></sc-if>
+
+          <sc-if value="{{ x.isDone }}"><div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:28px 28px 4px"><span style="width:68px;height:68px;border-radius:50%;background:{{ x.bg }};display:flex;align-items:center;justify-content:center"><span style="width:34px;height:34px;flex:none;background:{{ x.fg }};-webkit-mask:{{ x.mask }};mask:{{ x.mask }}"></span></span><div style="font-size:22px;font-weight:600;line-height:1.25;margin-top:4px">{{ x.title }}</div><div style="font-size:15px;line-height:1.45;color:{{ T.fg2 }};text-wrap:pretty">{{ x.body }}</div></div></sc-if>
+
+          <sc-if value="{{ x.isHero }}">
+            <div style="margin:0 16px;background:{{ T.cardBg }};border-radius:{{ T.cardR }};border:{{ T.cardBd }};padding:16px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="min-width:0"><div style="font-size:20px;font-weight:600;line-height:1.25">{{ x.title }}</div><sc-if value="{{ x.hasSub }}"><div style="font-size:14px;color:{{ T.fg2 }};margin-top:3px;line-height:1.35">{{ x.sub }}</div></sc-if></div>
+                <sc-if value="{{ x.hasChip }}"><span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:{{ T.chipR }};font-size:12.5px;font-weight:600;white-space:nowrap;flex:none;background:{{ x.chip.bg }};color:{{ x.chip.fg }}">{{ x.chip.label }}</span></sc-if>
+              </div>
+              <sc-if value="{{ x.hasStats }}"><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px"><sc-for list="{{ x.stats }}" as="st" hint-placeholder-count="2"><div style="background:{{ T.tileBg }};border-radius:{{ T.tileR }};padding:10px 12px;min-width:0"><div style="font-size:13px;color:{{ T.fg2 }}">{{ st.label }}</div><div style="font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ st.fg }};line-height:1.2;margin-top:2px">{{ st.value }}</div><div style="font-size:12.5px;color:{{ st.fg }};margin-top:1px">{{ st.note }}</div></div></sc-for></div></sc-if>
+              <sc-if value="{{ x.hasSteps }}"><div style="display:flex;flex-direction:column"><sc-for list="{{ x.steps }}" as="sp" hint-placeholder-count="4"><div style="display:flex;gap:12px;min-height:40px">
+            <div style="display:flex;flex-direction:column;align-items:center;width:24px;flex:none"><span style="width:24px;height:24px;border-radius:50%;background:{{ sp.bg }};border:{{ sp.bd }};color:{{ sp.mc }};font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:none">{{ sp.mark }}</span><sc-if value="{{ sp.line }}"><span style="flex:1;width:2px;min-height:12px;background:{{ sp.lc }};margin:3px 0"></span></sc-if></div>
+            <div style="padding-bottom:12px;min-width:0"><div style="font-size:15px;font-weight:{{ sp.fw }};color:{{ sp.fg }};line-height:24px">{{ sp.label }}</div><sc-if value="{{ sp.hasSub }}"><div style="font-size:13px;color:{{ T.fg2 }};line-height:1.35">{{ sp.sub }}</div></sc-if></div>
+          </div></sc-for></div></sc-if>
+              <sc-if value="{{ x.hasMsg }}"><div style="font-size:14px;line-height:1.45;color:{{ T.fg2 }};text-wrap:pretty">{{ x.msg }}</div></sc-if>
+              <sc-if value="{{ x.hasBtns }}"><div style="display:flex;flex-direction:column;gap:8px"><sc-for list="{{ x.btns }}" as="b" hint-placeholder-count="1"><button onClick="{{ b.go }}" disabled="{{ b.dis }}" style="flex:1 1 auto;min-height:{{ b.h }};padding:0 18px;border-radius:{{ T.btnR }};border:{{ b.bd }};background:{{ b.bg }};color:{{ b.fg }};font-size:{{ b.fs }};font-weight:{{ T.btnFw }};letter-spacing:{{ T.btnLs }};cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box"><sc-if value="{{ b.hasIc }}"><span style="width:20px;height:20px;flex:none;background:currentColor;-webkit-mask:{{ b.mask }};mask:{{ b.mask }}"></span></sc-if>{{ b.label }}</button></sc-for></div></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isSteps }}"><div style="margin:0 16px;background:{{ T.cardBg }};border-radius:{{ T.cardR }};border:{{ T.cardBd }};padding:16px 16px 4px"><div style="display:flex;flex-direction:column"><sc-for list="{{ x.steps }}" as="sp" hint-placeholder-count="4"><div style="display:flex;gap:12px;min-height:40px">
+            <div style="display:flex;flex-direction:column;align-items:center;width:24px;flex:none"><span style="width:24px;height:24px;border-radius:50%;background:{{ sp.bg }};border:{{ sp.bd }};color:{{ sp.mc }};font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:none">{{ sp.mark }}</span><sc-if value="{{ sp.line }}"><span style="flex:1;width:2px;min-height:12px;background:{{ sp.lc }};margin:3px 0"></span></sc-if></div>
+            <div style="padding-bottom:12px;min-width:0"><div style="font-size:15px;font-weight:{{ sp.fw }};color:{{ sp.fg }};line-height:24px">{{ sp.label }}</div><sc-if value="{{ sp.hasSub }}"><div style="font-size:13px;color:{{ T.fg2 }};line-height:1.35">{{ sp.sub }}</div></sc-if></div>
+          </div></sc-for></div></div></sc-if>
+
+          <sc-if value="{{ x.isBanner }}">
+            <div style="margin:0 16px;padding:12px 14px;border-radius:{{ T.cardR }};background:{{ x.bg }};display:flex;gap:12px;align-items:flex-start">
+              <span style="margin-top:1px;display:flex"><span style="width:20px;height:20px;flex:none;background:{{ x.fg }};-webkit-mask:{{ x.mask }};mask:{{ x.mask }}"></span></span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:15px;font-weight:600;color:{{ x.fg }};line-height:1.3">{{ x.title }}</div>
+                <sc-if value="{{ x.hasBody }}"><div style="font-size:14px;line-height:1.45;color:{{ T.fg }};text-wrap:pretty">{{ x.body }}</div></sc-if>
+                <sc-if value="{{ x.hasItems }}"><div style="display:flex;flex-direction:column;gap:6px;margin-top:4px"><sc-for list="{{ x.items }}" as="it" hint-placeholder-count="2"><div onClick="{{ it.go }}" style="font-size:13.5px;line-height:1.4;cursor:pointer"><span style="font-weight:600">{{ it.where }}</span> — {{ it.msg }}</div></sc-for></div></sc-if>
+                <sc-if value="{{ x.hasAct }}"><button onClick="{{ x.act.go }}" style="align-self:flex-start;margin-top:4px;background:none;border:none;padding:0;color:{{ x.fg }};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline">{{ x.act.label }}</button></sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isList }}">
+            <div style="margin:0 {{ T.listMx }};border-radius:{{ T.listR }};overflow:hidden;background:{{ T.listBg }};display:flex;flex-direction:column;gap:{{ T.listGap }}">
+              <sc-for list="{{ x.rows }}" as="r" hint-placeholder-count="3">
+        <div onClick="{{ r.go }}" style="background:{{ T.rowBg }};min-height:{{ T.rowMin }};padding:{{ T.rowPy }} 16px;display:flex;align-items:center;gap:12px;cursor:{{ r.cur }};box-sizing:border-box">
+          <sc-if value="{{ r.hasIc }}"><span style="width:{{ T.icBox }};height:{{ T.icBox }};border-radius:{{ T.icR }};background:{{ r.icBg }};flex:none;display:flex;align-items:center;justify-content:center"><span style="width:18px;height:18px;flex:none;background:{{ r.icFg }};-webkit-mask:{{ r.mask }};mask:{{ r.mask }}"></span></span></sc-if>
+          <div style="flex:1;min-width:0"><div style="font-size:{{ T.rowFs }};line-height:1.3;color:{{ r.fg }};font-weight:{{ r.fw }};overflow-wrap:anywhere">{{ r.t }}</div><sc-if value="{{ r.hasS }}"><div style="font-size:14px;line-height:1.35;color:{{ T.fg2 }};margin-top:2px;text-wrap:pretty">{{ r.s }}</div></sc-if></div>
+          <sc-if value="{{ r.hasV }}"><span style="font-size:{{ T.rowFs }};color:{{ r.vfg }};text-align:right;max-width:55%;font-variant-numeric:tabular-nums;line-height:1.3">{{ r.v }}</span></sc-if>
+          <sc-if value="{{ r.hasImg }}"><img src="{{ r.img }}" alt="{{ r.t }}" style="height:52px;width:120px;object-fit:contain;flex:none;background:#fff;border-radius:6px"></sc-if>
+          <sc-if value="{{ r.hasChip }}"><span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:{{ T.chipR }};font-size:12.5px;font-weight:600;white-space:nowrap;flex:none;background:{{ r.chip.bg }};color:{{ r.chip.fg }}">{{ r.chip.label }}</span></sc-if>
+          <sc-if value="{{ r.hasBadge }}"><span style="min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:{{ T.danger }};color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:none">{{ r.badge }}</span></sc-if>
+          <sc-if value="{{ r.dot }}"><span style="width:9px;height:9px;border-radius:50%;background:{{ T.tint }};flex:none"></span></sc-if>
+          <sc-if value="{{ r.chev }}"><span style="width:16px;height:16px;flex:none;background:{{ T.fg3 }};-webkit-mask:{{ I.chevR }};mask:{{ I.chevR }}"></span></sc-if>
+        </div>
+              </sc-for>
+              <sc-if value="{{ x.isEmpty }}"><div style="background:{{ T.rowBg }};padding:28px 20px;text-align:center;font-size:14px;line-height:1.45;color:{{ T.fg2 }}">{{ x.empty }}</div></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isFields }}">
+            <div style="margin:0 {{ T.listMx }};border-radius:{{ T.listR }};overflow:hidden;background:{{ T.fListBg }};display:flex;flex-direction:column;gap:{{ T.fGap }}">
+              <sc-for list="{{ x.fields }}" as="f" hint-placeholder-count="2">
+                <div style="background:{{ T.fRowBg }};padding:{{ T.fPy }};display:flex;flex-direction:column;gap:6px">
+                  <sc-if value="{{ f.isInput }}"><label style="display:flex;flex-direction:column;gap:{{ T.fLblGap }}"><span style="font-size:13px;color:{{ f.lc }};font-weight:500">{{ f.label }}</span><input id="{{ f.fid }}" type="{{ f.type }}" inputMode="{{ f.im }}" value="{{ f.val }}" onChange="{{ f.on }}" placeholder="{{ f.ph }}" disabled="{{ f.dis }}" aria-label="{{ f.label }}" style="height:{{ T.inH }};border-radius:{{ T.inR }};border:{{ f.bd }};background:{{ T.inBg }};padding:0 {{ T.inPx }};font-size:{{ T.inFs }};color:{{ T.fg }};font-family:inherit;outline:none;box-sizing:border-box;width:100%"></label></sc-if>
+                  <sc-if value="{{ f.isArea }}"><label style="display:flex;flex-direction:column;gap:{{ T.fLblGap }}"><span style="font-size:13px;color:{{ f.lc }};font-weight:500">{{ f.label }}</span><textarea id="{{ f.fid }}" rows="3" value="{{ f.val }}" onChange="{{ f.on }}" placeholder="{{ f.ph }}" aria-label="{{ f.label }}" style="border-radius:{{ T.inR }};border:{{ f.bd }};background:{{ T.inBg }};padding:{{ T.areaP }};font-size:{{ T.inFs }};color:{{ T.fg }};font-family:inherit;outline:none;box-sizing:border-box;width:100%;resize:none;line-height:1.4"></textarea></label></sc-if>
+                  <sc-if value="{{ f.isSel }}"><label style="display:flex;flex-direction:column;gap:{{ T.fLblGap }}"><span style="font-size:13px;color:{{ f.lc }};font-weight:500">{{ f.label }}</span><select id="{{ f.fid }}" value="{{ f.val }}" onChange="{{ f.on }}" aria-label="{{ f.label }}" style="height:{{ T.inH }};border-radius:{{ T.inR }};border:{{ f.bd }};background:{{ T.inBg }};padding:0 {{ T.inPx }};font-size:{{ T.inFs }};color:{{ T.fg }};font-family:inherit;outline:none;box-sizing:border-box;width:100%"><sc-for list="{{ f.opts }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select></label></sc-if>
+                  <sc-if value="{{ f.isSeg }}"><span style="font-size:13px;color:{{ T.fg2 }};font-weight:500">{{ f.label }}</span><div role="radiogroup" aria-label="{{ f.label }}" style="display:flex;gap:{{ T.segGap }};padding:{{ T.segP }};background:{{ T.segBg }};border:{{ T.segBd }};border-radius:{{ T.segR }};overflow:hidden"><sc-for list="{{ f.segs }}" as="o" hint-placeholder-count="2"><button role="radio" aria-checked="{{ o.on }}" onClick="{{ o.pick }}" style="flex:1;min-width:0;height:{{ T.segH }};border:none;border-radius:{{ T.segItemR }};background:{{ o.bg }};color:{{ T.fg }};box-shadow:{{ o.sh }};font-size:{{ T.segFs }};font-weight:{{ o.fw }};cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px"><sc-if value="{{ o.ck }}"><span style="width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:{{ I.check }};mask:{{ I.check }}"></span></sc-if>{{ o.label }}</button></sc-for></div></sc-if>
+                  <sc-if value="{{ f.isStep }}"><div style="display:flex;align-items:center;gap:12px">
+                    <div style="flex:1;min-width:0"><div style="font-size:{{ T.rowFs }};line-height:1.3">{{ f.label }}</div><sc-if value="{{ f.hasSub }}"><div style="font-size:13px;color:{{ T.fg2 }};margin-top:2px;line-height:1.35">{{ f.sub }}</div></sc-if></div>
+                    <div style="display:flex;align-items:center;gap:6px;flex:none">
+                      <button onClick="{{ f.dec }}" aria-label="Less" style="width:{{ T.stW }};height:{{ T.stW }};border-radius:{{ T.stR }};border:{{ T.stBd }};background:{{ T.stBg }};color:{{ T.tint }};font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;padding:0">−</button>
+                      <input id="{{ f.fid }}" type="text" inputMode="numeric" value="{{ f.val }}" onChange="{{ f.on }}" aria-label="{{ f.label }}" style="width:78px;height:{{ T.stW }};text-align:center;border-radius:{{ T.stIR }};border:{{ f.bd }};background:{{ T.stInBg }};font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ T.fg }};font-family:inherit;outline:none;box-sizing:border-box;padding:0 4px">
+                      <button onClick="{{ f.inc }}" aria-label="More" style="width:{{ T.stW }};height:{{ T.stW }};border-radius:{{ T.stR }};border:{{ T.stBd }};background:{{ T.stBg }};color:{{ T.tint }};font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;padding:0">+</button>
+                    </div>
+                  </div></sc-if>
+                  <sc-if value="{{ f.isToggle }}"><div onClick="{{ f.flip }}" role="switch" aria-checked="{{ f.on2 }}" style="display:flex;align-items:center;gap:12px;cursor:pointer;min-height:32px">
+                    <div style="flex:1;min-width:0"><div style="font-size:{{ T.rowFs }};line-height:1.3">{{ f.label }}</div><sc-if value="{{ f.hasSub }}"><div style="font-size:13px;color:{{ T.fg2 }};margin-top:2px;line-height:1.35">{{ f.sub }}</div></sc-if></div>
+                    <span style="width:{{ T.swW }};height:{{ T.swH }};border-radius:999px;background:{{ f.trk }};border:{{ f.trkBd }};box-sizing:border-box;position:relative;flex:none;transition:background .2s"><span style="position:absolute;top:50%;left:{{ f.kx }};width:{{ f.kw }};height:{{ f.kw }};margin-top:{{ f.kmt }};border-radius:50%;background:{{ f.knob }};box-shadow:{{ T.swSh }};transition:left .2s,width .2s"></span></span>
+                  </div></sc-if>
+                  <sc-if value="{{ f.isCheck }}"><label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;min-height:28px"><input type="checkbox" checked="{{ f.on2 }}" onChange="{{ f.on }}" style="width:22px;height:22px;margin:0;flex:none;accent-color:{{ T.tint }}"><span style="flex:1;min-width:0"><span style="display:block;font-size:{{ T.rowFs }};line-height:1.35">{{ f.label }}</span><sc-if value="{{ f.hasSub }}"><span style="display:block;font-size:13px;color:{{ T.fg2 }};margin-top:2px">{{ f.sub }}</span></sc-if></span></label></sc-if>
+                  <sc-if value="{{ f.isPick }}"><div onClick="{{ f.open }}" role="button" style="display:flex;align-items:center;gap:12px;cursor:pointer;border:{{ T.pickBd }};border-radius:{{ T.inR }};padding:{{ T.pickP }}">
+                    <div style="flex:1;min-width:0"><div style="font-size:13px;color:{{ T.fg2 }};font-weight:500">{{ f.label }}</div><div style="font-size:{{ T.rowFs }};margin-top:2px;font-weight:500">{{ f.val }}</div><sc-if value="{{ f.hasSub }}"><div style="font-size:13px;color:{{ T.fg2 }};margin-top:2px;line-height:1.35">{{ f.sub }}</div></sc-if></div>
+                    <span style="width:18px;height:18px;flex:none;background:{{ T.fg2 }};-webkit-mask:{{ I.chevD }};mask:{{ I.chevD }}"></span>
+                  </div></sc-if>
+                  <sc-if value="{{ f.isRo }}"><div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><div style="min-width:0"><div style="font-size:{{ T.rowFs }};line-height:1.3">{{ f.label }}</div><sc-if value="{{ f.hasSub }}"><div style="font-size:13px;color:{{ T.fg2 }};margin-top:2px;line-height:1.35">{{ f.sub }}</div></sc-if></div><div style="font-size:{{ T.rowFs }};font-weight:600;font-variant-numeric:tabular-nums;flex:none">{{ f.val }}</div></div></sc-if>
+                  <sc-if value="{{ f.hasHint }}"><div style="font-size:12.5px;color:{{ T.fg2 }};line-height:1.35">{{ f.hint }}</div></sc-if>
+                  <sc-if value="{{ f.hasErr }}"><div style="font-size:12.5px;color:{{ T.danger }};line-height:1.35">{{ f.err }}</div></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isMap }}">
+            <div style="margin:0 16px;background:{{ T.cardBg }};border-radius:{{ T.cardR }};border:{{ T.cardBd }};overflow:hidden">
+              <div style="position:relative;height:{{ x.mh }};background:#e4e9e1">
+                <sc-if value="{{ x.hasSrc }}"><iframe title="{{ x.cap }}" src="{{ x.src }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe></sc-if>
+                <sc-if value="{{ x.wait }}"><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:{{ T.fg2 }};font-size:14px;background:repeating-linear-gradient(45deg,#eef1ec 0 12px,#e6eae3 12px 24px)"><span style="width:26px;height:26px;border-radius:50%;border:3px solid rgba(29,107,44,.2);border-top-color:{{ T.tint }};animation:mob-spin .8s linear infinite;box-sizing:border-box"></span>{{ x.waitTxt }}</div></sc-if>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 14px"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">{{ x.cap }}</div><sc-if value="{{ x.hasCap2 }}"><div style="font-size:12.5px;color:{{ T.fg2 }};font-variant-numeric:tabular-nums">{{ x.cap2 }}</div></sc-if></div><sc-if value="{{ x.hasLink }}"><a href="{{ x.link }}" target="_blank" rel="noopener" style="font-size:14px;font-weight:600;color:{{ T.tint }};text-decoration:none;flex:none">{{ x.linkLabel }}</a></sc-if><sc-if value="{{ x.hasAct }}"><button onClick="{{ x.act.go }}" style="background:none;border:none;color:{{ T.tint }};font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;flex:none;padding:4px 0">{{ x.act.label }}</button></sc-if></div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isPhoto }}">
+            <div style="margin:0 16px;background:{{ T.cardBg }};border-radius:{{ T.cardR }};border:{{ T.cardBd }};overflow:hidden">
+              <sc-if value="{{ x.hasImg }}"><img src="{{ x.src }}" alt="{{ x.alt }}" style="display:block;width:100%;height:190px;object-fit:cover"></sc-if>
+              <sc-if value="{{ x.isSample }}"><div style="height:190px;background:repeating-linear-gradient(135deg,#e3e8df 0 14px,#eef1eb 14px 28px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#3d4339;text-align:center;padding:0 20px"><span style="width:28px;height:28px;flex:none;background:currentColor;-webkit-mask:{{ I.image }};mask:{{ I.image }}"></span><span style="font-size:14px;font-weight:600">{{ x.alt }}</span><span style="font-size:12.5px">{{ x.when }}</span></div></sc-if>
+              <sc-if value="{{ x.none }}"><div style="height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:{{ T.fg2 }};text-align:center;padding:0 24px"><span style="width:30px;height:30px;flex:none;background:currentColor;-webkit-mask:{{ I.camera }};mask:{{ I.camera }}"></span><span style="font-size:14px;line-height:1.4">{{ x.hint }}</span></div></sc-if>
+              <sc-if value="{{ x.canEdit }}"><div style="display:flex;gap:8px;padding:10px;border-top:1px solid {{ T.sep }}"><button onClick="{{ x.take }}" style="flex:1;height:40px;border-radius:{{ T.btnR }};border:{{ T.b2Bd }};background:{{ T.b2Bg }};color:{{ T.b2Fg }};font-size:15px;font-weight:{{ T.btnFw }};cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px"><span style="width:18px;height:18px;flex:none;background:currentColor;-webkit-mask:{{ I.camera }};mask:{{ I.camera }}"></span>{{ x.takeLabel }}</button><sc-if value="{{ x.hasAny }}"><button onClick="{{ x.clear }}" style="height:40px;padding:0 14px;border-radius:{{ T.btnR }};border:none;background:none;color:{{ T.danger }};font-size:15px;font-weight:{{ T.btnFw }};cursor:pointer;font-family:inherit">Remove</button></sc-if></div></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isSig }}">
+            <div style="margin:0 16px;background:{{ T.cardBg }};border-radius:{{ T.cardR }};border:{{ T.cardBd }};overflow:hidden">
+              <div style="position:relative;height:160px;background:#fff">
+                <canvas ref="{{ sigRef }}" width="640" height="320" onPointerDown="{{ x.down }}" onPointerMove="{{ x.move }}" onPointerUp="{{ x.up }}" onPointerLeave="{{ x.up }}" aria-label="Signature pad" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair"></canvas>
+                <div style="position:absolute;left:20px;right:20px;bottom:38px;border-bottom:1.5px dashed #b9bdc3;pointer-events:none"></div>
+                <sc-if value="{{ x.empty }}"><div style="position:absolute;left:22px;bottom:46px;font-size:14px;color:#8b9097;pointer-events:none">Sign here</div></sc-if>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 14px;border-top:1px solid {{ T.sep }}"><span style="font-size:13px;color:{{ T.fg2 }}">{{ x.who }}</span><button onClick="{{ x.clear }}" style="background:none;border:none;color:{{ T.tint }};font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 0">Clear</button></div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ x.isBtns }}"><div style="margin:0 16px;display:flex;flex-direction:column;gap:10px"><sc-for list="{{ x.btns }}" as="b" hint-placeholder-count="1"><button onClick="{{ b.go }}" disabled="{{ b.dis }}" style="flex:1 1 auto;min-height:{{ b.h }};padding:0 18px;border-radius:{{ T.btnR }};border:{{ b.bd }};background:{{ b.bg }};color:{{ b.fg }};font-size:{{ b.fs }};font-weight:{{ T.btnFw }};letter-spacing:{{ T.btnLs }};cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box"><sc-if value="{{ b.hasIc }}"><span style="width:20px;height:20px;flex:none;background:currentColor;-webkit-mask:{{ b.mask }};mask:{{ b.mask }}"></span></sc-if>{{ b.label }}</button></sc-for></div></sc-if>
+
+          <sc-if value="{{ x.isNote }}"><div style="padding:0 {{ T.shPx }};font-size:13px;line-height:1.45;color:{{ T.fg2 }};text-align:{{ x.ta }};text-wrap:pretty">{{ x.text }}</div></sc-if>
+
+          <sc-if value="{{ x.hasF }}"><div style="padding:7px {{ T.shPx }} 0;font-size:13px;line-height:1.4;color:{{ T.fg2 }};text-wrap:pretty">{{ x.f }}</div></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ fab.show }}"><button onClick="{{ fab.go }}" style="position:absolute;right:16px;bottom:{{ fab.b }};height:56px;padding:0 20px 0 16px;border-radius:16px;border:none;background:#b7f1ae;color:#002106;font-size:15px;font-weight:500;display:flex;align-items:center;gap:12px;box-shadow:0 3px 6px rgba(0,0,0,.16),0 1px 2px rgba(0,0,0,.12);cursor:pointer;font-family:inherit;z-index:20"><span style="width:24px;height:24px;flex:none;background:currentColor;-webkit-mask:{{ fab.mask }};mask:{{ fab.mask }}"></span>{{ fab.label }}</button></sc-if>
+
+  <sc-if value="{{ tabs.ios }}"><div style="flex:none;background:{{ T.tabBg }};-webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8);border-top:{{ T.tabBd }};padding-bottom:34px"><div style="height:50px;display:flex">
+    <sc-for list="{{ tabs.items }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.pick }}" aria-current="{{ t.cur }}" style="flex:1;min-width:0;border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ t.fg }};cursor:pointer;font-family:inherit;position:relative;padding:4px 0 0"><span style="width:26px;height:26px;flex:none;background:currentColor;-webkit-mask:{{ t.mask }};mask:{{ t.mask }}"></span><span style="font-size:10px;font-weight:500">{{ t.label }}</span><sc-if value="{{ t.hasBadge }}"><span style="position:absolute;top:1px;left:calc(50% + 5px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff3b30;color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;box-sizing:border-box">{{ t.badge }}</span></sc-if></button></sc-for>
+  </div></div></sc-if>
+  <sc-if value="{{ tabs.md }}"><div style="flex:none;background:{{ T.tabBg }};height:80px;display:flex;padding:0 4px">
+    <sc-for list="{{ tabs.items }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.pick }}" aria-current="{{ t.cur }}" style="flex:1;min-width:0;border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:{{ t.fg }};cursor:pointer;font-family:inherit;padding:0"><span style="width:56px;height:32px;border-radius:16px;background:{{ t.pill }};display:flex;align-items:center;justify-content:center;position:relative"><span style="width:24px;height:24px;flex:none;background:{{ t.icFg }};-webkit-mask:{{ t.mask }};mask:{{ t.mask }}"></span><sc-if value="{{ t.hasBadge }}"><span style="position:absolute;top:1px;left:31px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ba1a1a;color:#fff;font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;box-sizing:border-box">{{ t.badge }}</span></sc-if></span><span style="font-size:12px;font-weight:{{ t.fw }};white-space:nowrap">{{ t.label }}</span></button></sc-for>
+  </div></sc-if>
+  <sc-if value="{{ android }}"><div style="flex:none;height:20px;background:{{ gest.bg }};display:flex;align-items:center;justify-content:center"><span style="width:108px;height:4px;border-radius:2px;background:#1f1f1f;opacity:.45"></span></div></sc-if>
+  <sc-if value="{{ ios }}"><span style="position:absolute;left:50%;bottom:8px;width:136px;height:5px;margin-left:-68px;border-radius:3px;background:{{ gest.ind }};z-index:95;pointer-events:none"></span></sc-if>
+
+  <sc-if value="{{ push.show }}"><div onClick="{{ push.go }}" role="alert" style="position:absolute;left:8px;right:8px;top:{{ push.top }};z-index:70;padding:12px 14px;border-radius:{{ push.r }};background:{{ push.bg }};-webkit-backdrop-filter:blur(24px) saturate(1.6);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 10px 30px rgba(0,0,0,.2);display:flex;gap:12px;align-items:flex-start;cursor:pointer;animation:mob-drop .4s cubic-bezier(.2,.9,.3,1.15)">
+    <span style="width:38px;height:38px;border-radius:{{ push.icR }};background:#45ba50;flex:none;display:flex;align-items:center;justify-content:center"><span style="width:22px;height:22px;flex:none;background:#062b0f;-webkit-mask:{{ I.pkg }};mask:{{ I.pkg }}"></span></span>
+    <div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;color:{{ T.fg2 }}"><span style="font-weight:600;color:{{ T.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ push.title }}</span><span style="flex:none">now</span></div><div style="font-size:14px;line-height:1.35;margin-top:2px;color:{{ T.fg }};display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ push.body }}</div></div>
+  </div></sc-if>
+
+  <sc-if value="{{ tst.show }}"><div role="status" style="position:absolute;left:{{ tst.x }};right:{{ tst.x }};top:{{ tst.top }};bottom:{{ tst.bot }};z-index:75;padding:12px 16px;border-radius:{{ tst.r }};background:{{ tst.bg }};color:#fff;font-size:14px;line-height:1.4;text-align:{{ tst.ta }};box-shadow:0 6px 20px rgba(0,0,0,.25)">{{ tst.text }}</div></sc-if>
+
+  <sc-if value="{{ sh.open }}">
+    <div onClick="{{ sh.close }}" style="position:absolute;inset:0;background:rgba(0,0,0,.32);z-index:80"></div>
+    <div role="dialog" aria-label="{{ sh.title }}" style="position:absolute;left:0;right:0;bottom:0;max-height:80%;z-index:81;background:{{ T.sheetBg }};border-radius:{{ T.sheetR }} {{ T.sheetR }} 0 0;display:flex;flex-direction:column;animation:mob-up .28s ease-out;padding-bottom:{{ T.homeH }}">
+      <div style="display:flex;justify-content:center;padding:8px 0 2px"><span style="width:36px;height:5px;border-radius:3px;background:{{ T.grab }};opacity:.6"></span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px 12px"><div style="font-size:19px;font-weight:600">{{ sh.title }}</div><button onClick="{{ sh.close }}" style="background:none;border:none;color:{{ T.tint }};font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;padding:4px 0">{{ sh.closeLbl }}</button></div>
+      <sc-if value="{{ sh.hasBody }}"><div style="padding:0 16px 14px;font-size:15px;line-height:1.45;color:{{ T.fg2 }};text-wrap:pretty">{{ sh.body }}</div></sc-if>
+      <sc-if value="{{ sh.hasSearch }}"><div style="padding:0 16px 12px"><div style="position:relative"><span style="position:absolute;left:{{ T.srIcL }};top:50%;margin-top:-9px;width:18px;height:18px;background:{{ T.fg2 }};-webkit-mask:{{ I.search }};mask:{{ I.search }}"></span><input type="search" value="{{ sh.q }}" onChange="{{ sh.onQ }}" placeholder="{{ sh.ph }}" aria-label="{{ sh.ph }}" style="width:100%;box-sizing:border-box;height:{{ T.srH }};border-radius:{{ T.srR }};border:none;background:{{ T.srBg }};padding:0 12px 0 {{ T.srPl }};font-size:{{ T.inFs }};color:{{ T.fg }};font-family:inherit;outline:none"></div></div></sc-if>
+      <div style="overflow-y:auto;scrollbar-width:none;padding-bottom:14px;display:flex;flex-direction:column;gap:12px">
+        <sc-if value="{{ sh.hasRows }}"><div style="margin:0 {{ T.listMx }};border-radius:{{ T.listR }};overflow:hidden;background:{{ T.listBg }};display:flex;flex-direction:column;gap:{{ T.listGap }}"><sc-for list="{{ sh.rows }}" as="r" hint-placeholder-count="3">
+        <div onClick="{{ r.go }}" style="background:{{ T.rowBg }};min-height:{{ T.rowMin }};padding:{{ T.rowPy }} 16px;display:flex;align-items:center;gap:12px;cursor:{{ r.cur }};box-sizing:border-box">
+          <sc-if value="{{ r.hasIc }}"><span style="width:{{ T.icBox }};height:{{ T.icBox }};border-radius:{{ T.icR }};background:{{ r.icBg }};flex:none;display:flex;align-items:center;justify-content:center"><span style="width:18px;height:18px;flex:none;background:{{ r.icFg }};-webkit-mask:{{ r.mask }};mask:{{ r.mask }}"></span></span></sc-if>
+          <div style="flex:1;min-width:0"><div style="font-size:{{ T.rowFs }};line-height:1.3;color:{{ r.fg }};font-weight:{{ r.fw }};overflow-wrap:anywhere">{{ r.t }}</div><sc-if value="{{ r.hasS }}"><div style="font-size:14px;line-height:1.35;color:{{ T.fg2 }};margin-top:2px;text-wrap:pretty">{{ r.s }}</div></sc-if></div>
+          <sc-if value="{{ r.hasV }}"><span style="font-size:{{ T.rowFs }};color:{{ r.vfg }};text-align:right;max-width:55%;font-variant-numeric:tabular-nums;line-height:1.3">{{ r.v }}</span></sc-if>
+          <sc-if value="{{ r.hasImg }}"><img src="{{ r.img }}" alt="{{ r.t }}" style="height:52px;width:120px;object-fit:contain;flex:none;background:#fff;border-radius:6px"></sc-if>
+          <sc-if value="{{ r.hasChip }}"><span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:{{ T.chipR }};font-size:12.5px;font-weight:600;white-space:nowrap;flex:none;background:{{ r.chip.bg }};color:{{ r.chip.fg }}">{{ r.chip.label }}</span></sc-if>
+          <sc-if value="{{ r.hasBadge }}"><span style="min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:{{ T.danger }};color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:none">{{ r.badge }}</span></sc-if>
+          <sc-if value="{{ r.dot }}"><span style="width:9px;height:9px;border-radius:50%;background:{{ T.tint }};flex:none"></span></sc-if>
+          <sc-if value="{{ r.chev }}"><span style="width:16px;height:16px;flex:none;background:{{ T.fg3 }};-webkit-mask:{{ I.chevR }};mask:{{ I.chevR }}"></span></sc-if>
+        </div>
+        </sc-for><sc-if value="{{ sh.isEmpty }}"><div style="background:{{ T.rowBg }};padding:24px 16px;text-align:center;font-size:14px;color:{{ T.fg2 }}">{{ sh.empty }}</div></sc-if></div></sc-if>
+        <sc-if value="{{ sh.hasBtns }}"><div style="padding:0 16px;display:flex;flex-direction:column;gap:10px"><sc-for list="{{ sh.btns }}" as="b" hint-placeholder-count="1"><button onClick="{{ b.go }}" disabled="{{ b.dis }}" style="flex:1 1 auto;min-height:{{ b.h }};padding:0 18px;border-radius:{{ T.btnR }};border:{{ b.bd }};background:{{ b.bg }};color:{{ b.fg }};font-size:{{ b.fs }};font-weight:{{ T.btnFw }};letter-spacing:{{ T.btnLs }};cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box"><sc-if value="{{ b.hasIc }}"><span style="width:20px;height:20px;flex:none;background:currentColor;-webkit-mask:{{ b.mask }};mask:{{ b.mask }}"></span></sc-if>{{ b.label }}</button></sc-for></div></sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ cam.open }}"><div style="position:absolute;left:0;right:0;bottom:0;top:{{ cam.top }};z-index:90;background:#000;color:#fff;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px"><button onClick="{{ cam.cancel }}" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;font-family:inherit;padding:4px 0">Cancel</button><span style="font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#ffd60a">Photo</span><span style="width:52px"></span></div>
+    <div style="flex:1;position:relative;background:radial-gradient(120% 80% at 50% 40%,#3b4139,#121412)">
+      <div style="position:absolute;left:28px;right:28px;top:12%;bottom:18%;border:2px solid rgba(255,255,255,.85);border-radius:14px"></div>
+      <div style="position:absolute;left:0;right:0;bottom:4%;text-align:center;font-size:14px;line-height:1.4;padding:0 28px">{{ cam.hint }}</div>
+      <sc-if value="{{ cam.flash }}"><div style="position:absolute;inset:0;background:#fff;opacity:.85"></div></sc-if>
+    </div>
+    <div style="height:128px;display:flex;align-items:center;justify-content:space-around;padding-bottom:{{ cam.bot }}">
+      <label style="width:48px;height:48px;border-radius:10px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:24px;height:24px;flex:none;background:#fff;-webkit-mask:{{ I.image }};mask:{{ I.image }}"></span><input type="file" accept="image/*" onChange="{{ cam.onFile }}" aria-label="Choose from gallery" style="display:none"></label>
+      <button onClick="{{ cam.shoot }}" aria-label="Take photo" style="width:76px;height:76px;border-radius:50%;border:4px solid #fff;background:transparent;padding:4px;cursor:pointer;box-sizing:border-box"><span style="display:block;width:100%;height:100%;border-radius:50%;background:#fff"></span></button>
+      <span style="width:48px"></span>
+    </div>
+  </div></sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;380px&quot;,&quot;height&quot;:&quot;800px&quot;}}">
+class Component extends DCLogic {
+  state = { d: {}, push: null, cam: null, sheet: null, busy: null, rErr: {} };
+  scRef = React.createRef();
+  sigRef = React.createRef();
+  ME = { vht: 'Joseph Ssemwogerere', hm: 'Grace Nakato', rider: 'Musa Kato' };
+  UN = { vht: 'joseph.ssemwogerere', hm: 'grace.nakato', rider: 'musa.kato' };
+  PROF = {
+    vht: { role: 'Village health team · Wakiso', phone: '+256 776 902 331', areaLbl: 'Area', area: 'Katabi TC & Kajjansi TC' },
+    hm: { role: 'Hotspot manager · Wakiso', phone: '+256 772 418 903', areaLbl: 'Hotspot', area: 'Kasenyi Landing Site' },
+    rider: { role: 'Delivery rider · Wakiso', phone: '+256 701 334 920', areaLbl: 'Motorbike', area: 'UFB 412K' },
+  };
+  HID = 'HS-0231';
+  DCFP = ['Sarah Namubiru', '+256 701 220 415'];
+  ROOT = { vht: 'hotspots', hm: 'dashboard', rider: 'deliveries' };
+  TABS = {
+    vht: [['hotspots', 'Hotspots', 'pin', ['hotspots', 'hotspot', 'map', 'request']], ['requests', 'Requests', 'list', ['requests', 'order']], ['reports', 'Reports', 'clipboard', ['reports', 'report']], ['inbox', 'Inbox', 'bell', ['inbox']], ['me', 'Me', 'user', ['me', 'help']]],
+    hm: [['dashboard', 'Home', 'home', ['dashboard', 'request']], ['orders', 'Orders', 'list', ['orders', 'order']], ['reports', 'Reports', 'clipboard', ['reports', 'report']], ['inbox', 'Inbox', 'bell', ['inbox']], ['me', 'Me', 'user', ['me', 'help']]],
+    rider: [['deliveries', 'Deliveries', 'truck', ['deliveries', 'delivery']], ['history', 'History', 'clock', ['history', 'receipt']], ['inbox', 'Inbox', 'bell', ['inbox']], ['me', 'Me', 'user', ['me', 'help']]],
+  };
+  PARENT = { vht: { hotspot: 'hotspots', map: 'hotspots', request: 'hotspots', order: 'requests', report: 'reports', help: 'me' }, hm: { request: 'dashboard', order: 'orders', report: 'reports', help: 'me' }, rider: { delivery: 'deliveries', receipt: 'history', help: 'me' } };
+  LBL = { hotspots: 'Hotspots', hotspot: 'Hotspot', requests: 'Requests', reports: 'Reports', dashboard: 'Home', orders: 'Orders', order: 'Order', deliveries: 'Deliveries', delivery: 'Delivery', history: 'History', me: 'Me', inbox: 'Inbox' };
+  ICONS = {
+    home: "<path d='M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8'/><path d='M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/>",
+    list: "<path d='M3 12h.01'/><path d='M3 18h.01'/><path d='M3 6h.01'/><path d='M8 12h13'/><path d='M8 18h13'/><path d='M8 6h13'/>",
+    clipboard: "<rect width='8' height='4' x='8' y='2' rx='1'/><path d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/><path d='M12 11h4'/><path d='M12 16h4'/><path d='M8 11h.01'/><path d='M8 16h.01'/>",
+    bell: "<path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/>",
+    user: "<circle cx='12' cy='8' r='5'/><path d='M20 21a8 8 0 0 0-16 0'/>",
+    pin: "<path d='M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0'/><circle cx='12' cy='10' r='3'/>",
+    truck: "<path d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/><path d='M15 18H9'/><path d='M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14'/><circle cx='17' cy='18' r='2'/><circle cx='7' cy='18' r='2'/>",
+    clock: "<circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/>",
+    plus: "<path d='M5 12h14'/><path d='M12 5v14'/>",
+    search: "<circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/>",
+    chevR: "<path d='m9 18 6-6-6-6'/>", chevL: "<path d='m15 18-6-6 6-6'/>", chevD: "<path d='m6 9 6 6 6-6'/>",
+    arrowL: "<path d='m12 19-7-7 7-7'/><path d='M19 12H5'/>",
+    phone: "<path d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'/>",
+    camera: "<path d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/><circle cx='12' cy='13' r='3'/>",
+    image: "<rect width='18' height='18' x='3' y='3' rx='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/>",
+    check: "<path d='M20 6 9 17l-5-5'/>",
+    checkC: "<circle cx='12' cy='12' r='10'/><path d='m9 12 2 2 4-4'/>",
+    wifiOff: "<path d='M12 20h.01'/><path d='M8.5 16.429a5 5 0 0 1 7 0'/><path d='M5 12.859a10 10 0 0 1 5.17-2.69'/><path d='M19 12.859a10 10 0 0 0-2.007-1.523'/><path d='M2 8.82a15 15 0 0 1 4.177-2.643'/><path d='M22 8.82a15 15 0 0 0-11.288-3.764'/><path d='m2 2 20 20'/>",
+    help: "<circle cx='12' cy='12' r='10'/><path d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3'/><path d='M12 17h.01'/>",
+    pkg: "<path d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/><path d='M12 22V12'/><path d='m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7'/>",
+    info: "<circle cx='12' cy='12' r='10'/><path d='M12 16v-4'/><path d='M12 8h.01'/>",
+    alert: "<path d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/><path d='M12 9v4'/><path d='M12 17h.01'/>",
+    upload: "<path d='M12 13v8'/><path d='M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242'/><path d='m8 17 4-4 4 4'/>",
+    building: "<rect width='16' height='20' x='4' y='2' rx='2'/><path d='M9 22v-4h6v4'/><path d='M8 6h.01'/><path d='M16 6h.01'/><path d='M12 6h.01'/><path d='M12 10h.01'/><path d='M12 14h.01'/><path d='M16 10h.01'/><path d='M16 14h.01'/><path d='M8 10h.01'/><path d='M8 14h.01'/>",
+    shield: "<path d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/>",
+    gps: "<line x1='2' x2='5' y1='12' y2='12'/><line x1='19' x2='22' y1='12' y2='12'/><line x1='12' x2='12' y1='2' y2='5'/><line x1='12' x2='12' y1='19' y2='22'/><circle cx='12' cy='12' r='7'/><circle cx='12' cy='12' r='3'/>",
+    receipt: "<path d='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z'/><path d='M8 8h8'/><path d='M8 12h8'/><path d='M8 16h5'/>",
+    megaphone: "<path d='m3 11 18-5v12L3 14v-3z'/><path d='M11.6 16.8a3 3 0 1 1-5.8-1.6'/>",
+    x: "<path d='M18 6 6 18'/><path d='m6 6 12 12'/>",
+    pen: "<path d='M12 20h9'/><path d='M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z'/>",
+  };
+  mk(n) {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>${this.ICONS[n] || this.ICONS.info}</svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") center / contain no-repeat`;
+  }
+  icons() { if (!this._I) { this._I = {}; Object.keys(this.ICONS).forEach(k => { this._I[k] = this.mk(k); }); } return this._I; }
+
+  componentDidMount() { if (this.props.ready) this.props.ready(); this.armPush(); }
+  componentDidUpdate(pp) {
+    const nv = this.props.nav || {}, pv = pp.nav || {};
+    if (nv.page !== pv.page || nv.id !== pv.id) { const el = this.scRef.current; if (el) el.scrollTop = 0; if (this.state.sheet || this.state.cam) this.setState({ sheet: null, cam: null }); }
+    if (pp.role !== this.props.role) { this.setState({ push: null, sheet: null, cam: null }); this.armPush(); }
+    const m = this.mob();
+    if (nv.page === 'inbox' && m.signed[this.props.role] && this.unreadN() > 0 && !this.mrT) {
+      this.mrT = setTimeout(() => { this.mrT = null; const m2 = this.mob(); const { act, store: s, role } = this.props; if (s) act('mob', { set: { read: { ...m2.read, [role]: s.clock } } }); }, 1600);
+    }
+  }
+  componentWillUnmount() { [this.pt, this.pt2, this.bt, this.gt, this.ft, this.mrT].forEach(t => clearTimeout(t)); }
+  setD = (k, f, v) => this.setState(st => ({ d: { ...st.d, [k]: { ...(st.d[k] || {}), [f]: v } } }));
+  patchD = (k, o) => this.setState(st => ({ d: { ...st.d, [k]: { ...(st.d[k] || {}), ...o } } }));
+  clrD = k => this.setState(st => { const d = { ...st.d }; delete d[k]; return { d }; });
+  mob() { const s = this.props.store; return { offline: false, outbox: [], signed: {}, read: {}, pushed: {}, ...((s && s.mob) || {}) }; }
+  num = x => { const n = parseInt(String(x ?? '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; };
+  go(page, id, back) { this.props.go(page, id ?? null, { extra: { back: back || null, backFor: page } }); }
+  send(type, p, label, offGo) {
+    const { act, role } = this.props;
+    if (this.mob().offline) { const { go, ...rest } = p; act('queue', { item: { type, p: rest, label, role }, go: offGo || undefined }); return; }
+    act(type, p);
+  }
+  pending(id) { return (this.mob().outbox || []).find(it => it.p && (it.p.id === id || it.p.hotspotId === id)); }
+
+  notes() {
+    const { store: s, role } = this.props; const ME = this.ME[role];
+    const ord = id => s.orders.find(o => o.id === id);
+    const rep = id => (s.reports || []).find(r => r.id === id);
+    const f = {
+      hm: e => { const o = ord(e.ref); if (o) return o.hotspotId === this.HID && e.role !== 'Hotspot manager' && e.role !== 'System'; const r = rep(e.ref); return !!r && r.own === 'hm' && e.role === 'MOH'; },
+      vht: e => { const o = ord(e.ref); if (o) { const h = s.hotspots.find(x => x.id === o.hotspotId); return !!h && (h.vhts || []).includes(ME) && e.actor !== ME && e.role !== 'System'; } const r = rep(e.ref); return !!r && r.own === 'vht' && e.role === 'MOH'; },
+      rider: e => /rider Musa Kato/.test(e.text) || (!!ord(e.ref) && !!ord(e.ref).delivery && ord(e.ref).delivery.riderId === 'R1' && e.role === 'Hotspot manager' && /Confirmed receipt/.test(e.text)),
+    }[role];
+    return f ? s.events.filter(f) : [];
+  }
+  unreadN() { const m = this.mob(); const rd = m.read[this.props.role] ?? 0; return this.notes().filter(e => e.t > rd).length; }
+  orgOf(e) { return ({ DCFP: 'Wakiso district', Rider: `${e.actor} · rider`, MOH: 'Ministry of Health', NMS: 'National Medical Stores', JMS: 'Joint Medical Store', System: 'CLIMS' })[e.role] || e.actor; }
+  openNote(e) {
+    const { role, store: s } = this.props; const back = { page: 'inbox' };
+    if ((s.reports || []).some(r => r.id === e.ref)) return this.go('report', e.ref, back);
+    if (role === 'rider') return this.go('delivery', e.ref, back);
+    return this.go('order', e.ref, back);
+  }
+  armPush() {
+    clearTimeout(this.pt);
+    this.pt = setTimeout(() => {
+      const { store: s, role, act } = this.props; if (!s || !this.ME[role]) return; const m = this.mob();
+      if (!m.signed[role]) return;
+      const last = Math.max(m.read[role] ?? 0, m.pushed[role] ?? -1e9);
+      const e = this.notes().find(x => x.t > last);
+      if (!e) return;
+      this.setState({ push: e }); act('mob', { set: { pushed: { ...m.pushed, [role]: e.t } } });
+      clearTimeout(this.pt2); this.pt2 = setTimeout(() => this.setState({ push: null }), 5500);
+    }, 900);
+  }
+
+  theme(ios) {
+    if (ios) return {
+      font: "-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',system-ui,sans-serif",
+      bg: '#f2f2f7', fg: '#000000', fg2: '#5f5f64', fg3: '#aeaeb2', tint: '#1c7c34', sep: 'rgba(60,60,67,.18)', hdrBg: '#f2f2f7', danger: '#d70015',
+      listBg: 'rgba(60,60,67,.18)', listGap: '0.5px', rowBg: '#ffffff', listR: '10px', listMx: '16px', rowPy: '11px', rowMin: '44px', rowFs: '17px', icBox: '30px', icR: '7px',
+      shTT: 'uppercase', shFs: '13px', shFg: '#5f5f64', shFw: '400', shLs: '0', shPx: '32px', shPb: '7px',
+      fListBg: 'rgba(60,60,67,.18)', fGap: '0.5px', fRowBg: '#ffffff', fPy: '10px 16px', fLblGap: '2px', inH: '34px', inR: '0', inBd: 'none', inBg: 'transparent', inPx: '0', inFs: '17px', areaP: '4px 0',
+      pickBd: 'none', pickP: '0',
+      cardBg: '#ffffff', cardR: '12px', cardBd: 'none', tileBg: '#f2f2f7', tileR: '10px', secGap: '22px', padT: '6px',
+      srH: '36px', srR: '10px', srBg: 'rgba(118,118,128,.12)', srPl: '34px', srIcL: '10px',
+      stW: '34px', stR: '8px', stIR: '8px', stBd: 'none', stBg: 'rgba(118,118,128,.12)', stInBg: 'rgba(118,118,128,.08)',
+      swW: '51px', swH: '31px', swSh: '0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16)',
+      btnH: '50px', btnR: '12px', btnFs: '17px', btnFw: '600', btnLs: '-.01em',
+      b1Bg: '#1c7c34', b1Fg: '#ffffff', b2Bg: 'rgba(28,124,52,.12)', b2Fg: '#1c7c34', b2Bd: 'none',
+      sheetBg: '#f2f2f7', sheetR: '12px', grab: '#8e8e93', tabBg: 'rgba(249,249,249,.94)', tabBd: '0.5px solid rgba(0,0,0,.2)', homeH: '34px',
+      chipR: '6px', segBg: 'rgba(118,118,128,.12)', segGap: '0', segR: '9px', segP: '2px', segBd: 'none', segH: '30px', segItemR: '7px', segFs: '14px',
+    };
+    return {
+      font: "Roboto,system-ui,sans-serif",
+      bg: '#f7faf3', fg: '#191c18', fg2: '#42493f', fg3: '#72796f', tint: '#1d6b2c', sep: '#c2c8bd', hdrBg: '#f7faf3', danger: '#ba1a1a',
+      listBg: 'transparent', listGap: '2px', rowBg: '#eaefe5', listR: '18px', listMx: '16px', rowPy: '12px', rowMin: '56px', rowFs: '16px', icBox: '40px', icR: '20px',
+      shTT: 'none', shFs: '14px', shFg: '#1d6b2c', shFw: '500', shLs: '.01em', shPx: '28px', shPb: '8px',
+      fListBg: 'transparent', fGap: '6px', fRowBg: 'transparent', fPy: '4px 0', fLblGap: '6px', inH: '52px', inR: '4px', inBd: '1px solid #72796f', inBg: 'transparent', inPx: '14px', inFs: '16px', areaP: '12px 14px',
+      pickBd: '1px solid #72796f', pickP: '8px 14px',
+      cardBg: '#eaefe5', cardR: '18px', cardBd: 'none', tileBg: '#f7faf3', tileR: '12px', secGap: '20px', padT: '4px',
+      srH: '52px', srR: '26px', srBg: '#e2e7dc', srPl: '48px', srIcL: '18px',
+      stW: '40px', stR: '20px', stIR: '4px', stBd: '1px solid #72796f', stBg: 'transparent', stInBg: 'transparent',
+      swW: '52px', swH: '32px', swSh: 'none',
+      btnH: '48px', btnR: '24px', btnFs: '15px', btnFw: '500', btnLs: '.01em',
+      b1Bg: '#1d6b2c', b1Fg: '#ffffff', b2Bg: 'transparent', b2Fg: '#1d6b2c', b2Bd: '1px solid #72796f',
+      sheetBg: '#f1f5ec', sheetR: '28px', grab: '#72796f', tabBg: '#e7ece2', tabBd: 'none', homeH: '0px',
+      chipR: '8px', segBg: '#72796f', segGap: '1px', segR: '20px', segP: '0', segBd: '1px solid #72796f', segH: '40px', segItemR: '0', segFs: '14px',
+    };
+  }
+
+  K = ['Brand', 'Profile', 'Search', 'Prog', 'Done', 'Hero', 'Steps', 'Banner', 'List', 'Fields', 'Map', 'Photo', 'Sig', 'Btns', 'Note'];
+  sec(kind, o = {}) { const b = {}; this.K.forEach(k => { b['is' + k] = false; }); return { ...b, ['is' + kind]: true, ...o, hasH: !!o.h, h: o.h || '', hasF: !!o.f, f: o.f || '' }; }
+  row(o) {
+    const T = this.c.T;
+    return { t: '', s: '', v: '', chip: {}, badge: '', img: '', mask: '', icBg: 'transparent', icFg: T.fg, ...o, hasS: !!o.s, hasV: o.v != null && o.v !== '', vfg: o.vfg || T.fg2, hasChip: !!o.chip, hasBadge: !!o.badge, hasImg: !!o.img, dot: !!o.dot, chev: !!o.chev, go: o.go || null, cur: o.go ? 'pointer' : 'default', hasIc: !!o.ic, ...(o.ic ? { mask: this.mk(o.ic), icBg: o.icBg || (this.c.ios ? T.tint : '#cfe9c9'), icFg: o.icFg || (this.c.ios ? '#fff' : '#062b0f') } : {}), fg: o.fg || T.fg, fw: o.fw || 400 };
+  }
+  list(h, rows, o = {}) { return this.sec('List', { h, rows, isEmpty: !rows.length && !!o.empty, empty: o.empty || '', ...o }); }
+  tone(t) { const M = { info: ['#0a5f8a', 'rgba(10,106,155,.1)', 'info'], success: ['#177534', 'rgba(23,117,52,.1)', 'checkC'], warning: ['#9a4505', 'rgba(168,76,6,.1)', 'alert'], danger: ['#b3261e', 'rgba(198,40,40,.09)', 'alert'], neutral: ['#42493f', 'rgba(66,73,63,.08)', 'info'] }[t] || ['#42493f', 'rgba(0,0,0,.05)', 'info']; return { fg: M[0], bg: M[1], mask: this.mk(M[2]) }; }
+  banner(t, title, body, o = {}) { return this.sec('Banner', { ...this.tone(t), title, body: body || '', hasBody: !!body, items: o.items || [], hasItems: !!(o.items && o.items.length), act: o.act || {}, hasAct: !!o.act, ...o, h: o.h }); }
+  hero(o) { return this.sec('Hero', { sub: '', chip: {}, stats: [], steps: [], msg: '', btns: [], ...o, hasSub: !!o.sub, hasChip: !!o.chip, hasStats: !!(o.stats && o.stats.length), hasSteps: !!(o.steps && o.steps.length), hasMsg: !!o.msg, hasBtns: !!(o.btns && o.btns.length) }); }
+  note(text, o = {}) { return this.sec('Note', { text, ta: o.center ? 'center' : 'left', ...o }); }
+  btns(arr, o = {}) { return this.sec('Btns', { btns: arr.filter(Boolean), ...o }); }
+  btn(label, go, kind = 'primary', o = {}) {
+    const T = this.c.T;
+    const K = { primary: [T.b1Bg, T.b1Fg, 'none'], secondary: [T.b2Bg, T.b2Fg, T.b2Bd], danger: ['transparent', T.danger, this.c.ios ? 'none' : `1px solid ${T.danger}`], text: ['transparent', T.tint, 'none'] }[kind];
+    return { label, go, dis: !!o.dis, bg: K[0], fg: K[1], bd: K[2], h: o.small ? '40px' : T.btnH, fs: o.small ? '15px' : T.btnFs, hasIc: !!o.icon, mask: o.icon ? this.mk(o.icon) : '' };
+  }
+  steps(arr) {
+    const T = this.c.T;
+    const items = arr.map(([label, st, sub], i) => {
+      const S = { done: [T.tint, 'none', '#fff', '✓', T.fg, 500, T.tint], cur: ['#fff', `2px solid ${T.tint}`, T.tint, String(i + 1), T.fg, 600, T.sep], warn: ['#fdeee2', '2px solid #a84c06', '#a84c06', '!', '#9a4505', 600, T.sep], todo: ['transparent', `1.5px solid ${T.sep}`, T.fg3, String(i + 1), T.fg2, 400, T.sep], skip: ['transparent', `1.5px dashed ${T.sep}`, T.fg3, '–', T.fg3, 400, T.sep] }[st] || [];
+      return { label, sub: sub || '', hasSub: !!sub, bg: S[0], bd: S[1], mc: S[2], mark: S[3], fg: S[4], fw: S[5], lc: S[6], line: i < arr.length - 1 };
+    });
+    return items;
+  }
+  fld(kind, o = {}) {
+    const T = this.c.T; const F = ['Input', 'Area', 'Sel', 'Seg', 'Step', 'Toggle', 'Check', 'Pick', 'Ro']; const b = {}; F.forEach(k => { b['is' + k] = false; });
+    return { ...b, ['is' + kind]: true, label: '', val: '', ph: '', type: 'text', im: 'text', dis: false, fid: '', opts: [], segs: [], sub: '', hint: '', err: '', on: null, ...o, hasSub: !!o.sub, hasHint: !!o.hint && !o.err, hasErr: !!o.err, bd: o.err ? `1.5px solid ${T.danger}` : (kind === 'Step' ? (this.c.ios ? '1px solid transparent' : T.inBd) : T.inBd), lc: o.err ? T.danger : T.fg2 };
+  }
+  fields(h, fs, o = {}) { return this.sec('Fields', { h, fields: fs.filter(Boolean), ...o }); }
+  inp(label, val, on, o = {}) { return this.fld('Input', { label, val, on, ...o }); }
+  stp(key, k, label, val, step, o = {}) {
+    const n = this.num(val);
+    return this.fld('Step', { label, val, fid: o.fid || '', on: e => this.setD(key, k, e.target.value), dec: () => this.setD(key, k, String(Math.max(0, n - step))), inc: () => this.setD(key, k, String(n + step)), ...o });
+  }
+  tgl(label, sub, on, flip) {
+    const T = this.c.T; const ios = this.c.ios;
+    const knob = ios ? { kw: '27px', kmt: '-13.5px', kx: on ? '22px' : '2px', knob: '#fff', trk: on ? '#34c759' : 'rgba(120,120,128,.16)', trkBd: 'none' } : { kw: on ? '24px' : '16px', kmt: on ? '-12px' : '-8px', kx: on ? '24px' : '6px', knob: on ? '#fff' : '#72796f', trk: on ? T.tint : '#e0e4da', trkBd: on ? 'none' : '2px solid #72796f' };
+    return this.fld('Toggle', { label, sub, on2: !!on, flip, ...knob });
+  }
+  seg(label, opts, cur, pick) {
+    const ios = this.c.ios; const T = this.c.T;
+    return this.fld('Seg', { label, segs: opts.map(([k, l]) => { const on = k === cur; return { label: l, on, pick: () => pick(k), ck: !ios && on, bg: ios ? (on ? '#fff' : 'transparent') : (on ? '#cfe9c9' : T.bg), sh: ios && on ? '0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)' : 'none', fw: on ? 600 : 500 }; }) });
+  }
+  chk(label, on, set, sub) { return this.fld('Check', { label, on2: !!on, on: e => set(e.target.checked), sub }); }
+  pick(label, val, sub, open) { return this.fld('Pick', { label, val, sub, open }); }
+  ro(label, val, sub) { return this.fld('Ro', { label, val, sub }); }
+  mapSec(lat, lng, cap, o = {}) {
+    const dx = 0.01, dy = 0.007; const has = lat != null && lng != null;
+    return this.sec('Map', { cap, cap2: o.cap2 || '', hasCap2: !!o.cap2, mh: o.mh || '180px', hasSrc: has && !o.wait, wait: !!o.wait, waitTxt: o.waitTxt || 'Finding your location…', src: has ? `https://www.openstreetmap.org/export/embed.html?bbox=${(lng - dx).toFixed(4)},${(lat - dy).toFixed(4)},${(lng + dx).toFixed(4)},${(lat + dy).toFixed(4)}&layer=mapnik&marker=${lat},${lng}` : '', hasLink: has && !!o.link, link: has ? (this.c.ios ? `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent(cap)}` : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`) : '', linkLabel: o.link || '', act: o.act || {}, hasAct: !!o.act, h: o.h });
+  }
+  photoSec(key, field, o = {}) {
+    const d = this.state.d[key] || {}; const ph = d[field] || o.value || null; const edit = o.edit !== false;
+    return this.sec('Photo', { h: o.h, f: o.f, alt: o.alt || 'Photo', when: d[field + 'At'] || o.when || 'Taken just now', hint: o.hint || 'Take a clear photo.', hasImg: !!ph && ph !== 'sample', isSample: ph === 'sample', none: !ph, hasAny: !!ph, src: ph && ph !== 'sample' ? ph : '', canEdit: edit, takeLabel: ph ? 'Retake' : 'Take photo', take: () => this.setState({ cam: { key, field, hint: o.camHint || o.hint || '' } }), clear: () => this.patchD(key, { [field]: null }) });
+  }
+  sigSec(key, who) {
+    const d = this.state.d[key] || {};
+    return this.sec('Sig', { h: 'Signature', who, empty: !d.sig, down: e => this.sigDown(e), move: e => this.sigMove(e), up: () => this.sigUp(key), clear: () => { const cv = this.sigRef.current; if (cv) cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); this.patchD(key, { sig: null }); }, f: 'Ask the person receiving the stock to sign with a finger.' });
+  }
+  sigPt(e) { const cv = this.sigRef.current; const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; }
+  sigDown(e) { const cv = this.sigRef.current; if (!cv) return; this._draw = true; const ctx = cv.getContext('2d'); ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111'; const [x, y] = this.sigPt(e); ctx.beginPath(); ctx.moveTo(x, y); try { cv.setPointerCapture(e.pointerId); } catch (er) {} }
+  sigMove(e) { if (!this._draw) return; const cv = this.sigRef.current; if (!cv) return; const ctx = cv.getContext('2d'); const [x, y] = this.sigPt(e); ctx.lineTo(x, y); ctx.stroke(); this._inked = true; }
+  sigUp(key) { if (!this._draw) return; this._draw = false; const cv = this.sigRef.current; if (cv && this._inked) this.patchD(key, { sig: cv.toDataURL('image/png') }); }
+  shoot() {
+    const c = this.state.cam; if (!c) return;
+    this.setState({ cam: { ...c, flash: true } });
+    clearTimeout(this.ft); this.ft = setTimeout(() => { this.patchD(c.key, { [c.field]: 'sample', [c.field + 'At']: 'Taken just now on this phone' }); this.setState({ cam: null }); }, 220);
+  }
+  readPhoto(e) {
+    const c = this.state.cam; const f = e.target.files && e.target.files[0]; if (!f || !c) return;
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => { const sc = Math.min(1, 900 / Math.max(img.width, img.height)); const cv = document.createElement('canvas'); cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); this.patchD(c.key, { [c.field]: cv.toDataURL('image/jpeg', 0.7), [c.field + 'At']: 'From gallery' }); this.setState({ cam: null }); }; img.src = r.result; };
+    r.readAsDataURL(f);
+  }
+
+  signin(c) {
+    const { role, m, act } = this.props.store ? { ...c, act: this.props.act } : c;
+    const key = 'signin:' + role; const d = this.state.d[key] || {};
+    const user = d.user ?? this.UN[role]; const pw = d.pw ?? 'Kasenyi#2026';
+    const enter = () => { act('mob', { set: { signed: { ...m.signed, [role]: true } } }); this.clrD(key); this.armPush(); };
+    const sheet = this.state.sheet === 'forgot' ? { title: 'Forgot password', body: `Only your district focal person can reset your password. Call ${this.DCFP[0]} and she will send you a new one by SMS.`, btns: [this.btn(`Call ${this.DCFP[0].split(' ')[0]}`, () => { this.setState({ sheet: null }); c.L.call(this.DCFP[0], this.DCFP[1]); }, 'primary', { icon: 'phone' })] } : null;
+    return { noHdr: true, noTabs: true, back: false, sheet, secs: [
+      this.sec('Brand', { title: 'CLIMS', sub: 'Ministry of Health · Uganda', body: 'Sign in with the username and password your district focal person gave you.', r: c.ios ? '18px' : '24px' }),
+      this.fields('', [this.inp('Username', user, e => this.setD(key, 'user', e.target.value), { im: 'email' }), this.inp('Password', pw, e => this.setD(key, 'pw', e.target.value), { type: d.show ? 'text' : 'password' }), this.chk('Show password', !!d.show, v => this.setD(key, 'show', v))]),
+      this.btns([this.btn('Sign in', enter, 'primary', { dis: !user.trim() || !pw }), this.btn('Forgot password?', () => this.setState({ sheet: 'forgot' }), 'text')]),
+      this.note('You stay signed in on this phone. CLIMS keeps working when there is no network.', { center: true }),
+    ] };
+  }
+  inbox(c) {
+    const { L, m, role } = c; const rd = m.read[role] ?? 0;
+    const all = this.notes().slice(0, 30);
+    const IC = { DCFP: 'building', Rider: 'truck', MOH: 'shield', 'Hotspot manager': 'pin', VHT: 'user', System: 'info' };
+    const r = e => this.row({ t: e.text, s: `${this.orgOf(e)} · ${e.ref} · ${L.t(e.t)}`, dot: e.t > rd, go: () => this.openNote(e), ic: IC[e.role] || 'bell' });
+    const fresh = all.filter(e => e.t > rd), old = all.filter(e => e.t <= rd);
+    return { title: 'Notifications', back: false, secs: [fresh.length ? this.list('New', fresh.map(r)) : null, this.list(fresh.length ? 'Earlier' : '', old.map(r), { empty: fresh.length ? '' : 'No notifications yet. You will be notified here when something needs you.' })].filter(Boolean) };
+  }
+  me(c) {
+    const { L, m, role, ME, T, ios } = c; const P = this.PROF[role]; const act = this.props.act;
+    const key = 'me'; const d = this.state.d[key] || {};
+    const pushOn = d.push ?? true; const remOn = d.rem ?? true;
+    const nq = (m.outbox || []).length;
+    const sheet = this.state.sheet === 'outbox' ? { title: 'Waiting to send', rows: (m.outbox || []).map(it => this.row({ t: it.label || it.type, s: `Saved ${L.t(it.at)}`, ic: 'upload' })), empty: 'Nothing waiting.', body: m.offline ? 'These will send automatically when the phone is back online.' : '' } : null;
+    return { title: 'Me', back: false, sheet, secs: [
+      this.sec('Profile', { ini: ME.split(' ').map(w => w[0]).join('').slice(0, 2), name: ME, sub: P.role }),
+      this.list('Account', [this.row({ t: 'Username', v: this.UN[role] }), this.row({ t: 'Phone', v: P.phone }), this.row({ t: P.areaLbl, v: P.area })]),
+      this.fields('Notifications', [this.tgl('Push notifications', 'Order and delivery updates', pushOn, () => this.setD(key, 'push', !pushOn)), role !== 'rider' ? this.tgl('Report reminders', 'Before the 20th of each month', remOn, () => this.setD(key, 'rem', !remOn)) : null]),
+      this.list('Offline', [this.row({ t: 'Connection', v: m.offline ? 'Offline' : 'Online', vfg: m.offline ? '#9a4505' : T.fg2 }), this.row({ t: 'Waiting to send', v: String(nq), chev: nq > 0, go: nq ? () => this.setState({ sheet: 'outbox' }) : null })], { f: 'Anything you do without network is saved on this phone and sent automatically when you are back online.' }),
+      this.list('Support', [this.row({ t: 'Help & guides', ic: 'help', chev: true, go: () => this.go('help', null, { page: 'me' }) }), this.row({ t: 'Call district focal person', s: `${this.DCFP[0]} · ${this.DCFP[1]}`, ic: 'phone', go: () => L.call(this.DCFP[0], this.DCFP[1]) })]),
+      this.list('', [this.row({ t: 'Sign out', fg: T.danger, go: () => { act('mob', { set: { signed: { ...m.signed, [role]: false } } }); this.go(this.ROOT[role]); } })], { f: `CLIMS mobile 1.0 · ${ios ? 'iOS' : 'Android'}` }),
+    ] };
+  }
+  help(c) {
+    const { L, role } = c;
+    const G = {
+      vht: [['Mapping a hotspot', 'Stand at the entrance and capture GPS. Add the contact person and a photo of the dispenser.'], ['Requesting stock for a hotspot', 'Count what is left with the contact person, then send. The district reviews it within a day.'], ['Monthly outreach report', 'Due on the 20th. The app checks your figures before they reach MOH.']],
+      hm: [['Reporting a stockout', 'Tap Report stockout on Home. Count what is left and say how much you need.'], ['When the rider arrives', 'Count the condoms with the rider, sign the delivery note, then confirm receipt in the app.'], ['Monthly report', 'Due on the 20th. The app checks your figures before they reach MOH.']],
+      rider: [['Collecting stock', 'Check the delivery note and batch numbers against what you load at the district store.'], ['At the hotspot', 'Count with the contact person, get their signature and photograph the signed delivery note.'], ['No network at the hotspot', 'Finish the handover anyway. It sends when you have network again.']],
+    }[role];
+    return { title: 'Help', secs: [
+      this.list('Guides', G.map(([t, s]) => this.row({ t, s, fw: 500 }))),
+      this.list('Contact', [this.row({ t: `Call ${this.DCFP[0]}`, s: 'District focal person · Wakiso', ic: 'phone', go: () => L.call(this.DCFP[0], this.DCFP[1]) })], { f: 'Working without network? Keep going — the app saves your work and sends it later.' }),
+    ] };
+  }
+  tabBadge(c, k) {
+    const { s, role, ME } = c;
+    const mineH = s.hotspots.filter(h => (h.vhts || []).includes(ME) || h.contact === ME).map(h => h.id);
+    if (k === 'requests' && role === 'vht') return s.orders.filter(o => mineH.includes(o.hotspotId) && o.status === 'delivered').length;
+    if (k === 'orders' && role === 'hm') return s.orders.filter(o => o.hotspotId === this.HID && o.status === 'delivered').length;
+    if (k === 'deliveries') return s.orders.filter(o => o.delivery && o.delivery.riderId === 'R1' && (o.status === 'dispatched' || o.status === 'in_transit')).length;
+    if (k === 'reports') return (s.reports || []).filter(r => r.own === role && r.status !== 'sent').length;
+    return 0;
+  }
+  stockTone(q, k) { const L = this.c.L, T = this.c.T; return q === 0 ? [T.danger, 'Out of stock'] : q < L.low[k] ? ['#9a4505', 'Running low'] : [T.fg, 'In stock']; }
+  stats(h) { const L = this.c.L; return L.P.map(p => { const q = h.stock[p.k]; const [fg, note] = this.stockTone(q, p.k); return { label: `${p.short} condoms`, value: L.num(q), fg, note }; }); }
+
+  vhtS(c) {
+    const { s, L, page, ME } = c;
+    const mine = s.hotspots.filter(h => (h.vhts || []).includes(ME) || h.contact === ME);
+    const openOf = hid => s.orders.find(o => o.hotspotId === hid && o.status !== 'received');
+    if (page === 'hotspot') return this.vhtHotspot(c, mine, openOf);
+    if (page === 'map') return this.vhtMap(c);
+    if (page === 'request') return this.vhtRequest(c, mine, openOf);
+    if (page === 'order') return this.orderS(c);
+    if (page === 'requests') {
+      const ids = mine.map(h => h.id);
+      const rows = s.orders.filter(o => ids.includes(o.hotspotId)).sort((a, b) => b.createdAt - a.createdAt);
+      const q0 = (c.m.outbox || []).filter(it => it.type === 'notify' && ids.includes(it.p.hotspotId));
+      return { title: 'Requests', back: false, fab: { label: 'New request', icon: 'plus', go: () => this.go('request', null, { page: 'requests' }) }, secs: [
+        q0.length ? this.list('Waiting to send', q0.map(it => this.row({ t: (s.hotspots.find(h => h.id === it.p.hotspotId) || {}).name || it.p.hotspotId, s: `${L.items(it.p.items)} · saved ${L.t(it.at)}`, chip: L.chip('Offline', 'warning'), ic: 'upload' }))) : null,
+        this.list(q0.length ? 'Sent' : '', rows.map(o => this.row({ t: o.hotspot, s: `${o.id} · ${L.items(o.items)} · ${L.t(o.createdAt)}`, chip: L.oChip(o.status), chev: true, go: () => this.go('order', o.id) })), { empty: 'No stock requests yet.' }),
+      ] };
+    }
+    const key = 'hs'; const d = this.state.d[key] || {}; const q = (d.q || '').trim().toLowerCase();
+    const list = mine.filter(h => !q || [h.name, h.id, h.village, h.subcounty, h.contact].join(' ').toLowerCase().includes(q));
+    return { title: 'Hotspots', back: false, fab: { label: 'Map hotspot', icon: 'plus', go: () => this.go('map', null, { page: 'hotspots' }) }, secs: [
+      this.sec('Search', { q: d.q || '', on: e => this.setD(key, 'q', e.target.value), ph: 'Search hotspots' }),
+      this.list('', list.map(h => {
+        const o = openOf(h.id); const out = h.stock.male === 0 || h.stock.female === 0;
+        return this.row({ t: h.name, s: `${h.village} · ${L.items(h.stock) === '—' ? 'out of stock' : L.items(h.stock) + ' left'}`, ic: 'pin', icBg: h.status !== 'Active' ? '#c7c7cc' : out ? (c.ios ? '#d70015' : '#ffdad6') : undefined, icFg: !c.ios && out ? '#410002' : undefined, chip: h.status !== 'Active' ? L.chip('Inactive', 'neutral') : o ? L.oChip(o.status) : null, chev: true, go: () => this.go('hotspot', h.id) });
+      }), { empty: `No hotspots match “${d.q || ''}”.`, f: q ? '' : `${mine.length} hotspots in Katabi and Kajjansi` }),
+    ] };
+  }
+  vhtHotspot(c, mine, openOf) {
+    const { s, L, id, ME, ios } = c;
+    const h = s.hotspots.find(x => x.id === id) || mine[0];
+    const o = openOf(h.id); const act = h.status === 'Active'; const first = (h.contact || '').split(' ')[0];
+    const ords = s.orders.filter(x => x.hotspotId === h.id).sort((a, b) => b.createdAt - a.createdAt);
+    const here = { page: 'hotspot', id: h.id };
+    return { title: h.name, backLabel: 'Hotspots', secs: [
+      h.lat != null ? this.mapSec(h.lat, h.lng, `${h.village}, ${h.subcounty}`, { cap2: `GPS ${(+h.lat).toFixed(5)}, ${(+h.lng).toFixed(5)}`, link: ios ? 'Open in Maps' : 'Directions' }) : null,
+      this.hero({ title: h.name, sub: `${h.id} · ${h.kind} · ${h.subcounty}`, chip: L.chip(h.status, act ? 'success' : 'neutral'), stats: this.stats(h), msg: `Last delivery ${h.lastDelivery != null ? L.t(h.lastDelivery) : 'none yet'}`, btns: [act ? this.btn('Request stock', () => this.go('request', h.id, here), 'primary', { icon: 'megaphone' }) : null, h.contact !== ME ? this.btn(`Call ${first}`, () => L.call(h.contact, h.phone), 'secondary', { icon: 'phone' }) : null].filter(Boolean) }),
+      o ? this.banner('info', `Open order ${o.id}`, `${L.oChip(o.status).label} · ${L.items(o.approved || o.items)} · raised ${L.t(o.createdAt)}`, { act: { label: 'View order', go: () => this.go('order', o.id, here) } }) : null,
+      !act ? this.banner('neutral', 'Inactive', "Can't request stock until the district reactivates this hotspot.") : null,
+      this.list('Contact person', [this.row({ t: h.contact, s: h.phone, ic: 'phone', v: h.contact === ME ? 'You' : '', go: () => L.call(h.contact, h.phone) })]),
+      this.list('Details', [this.row({ t: 'Type', v: h.kind }), this.row({ t: 'Dispenser', v: h.dispenser ? (h.dispCond || 'Yes') : 'None' }), this.row({ t: 'VHTs', v: (h.vhts || []).map(n => (n === ME ? 'You' : n)).join(', ') || '—' }), this.row({ t: 'Mapped', v: h.mappedAt != null ? L.t(h.mappedAt) : '—' })], { f: h.comment || '' }),
+      this.list('Past orders', ords.map(x => this.row({ t: x.id, s: `${L.t(x.createdAt)} · ${L.items(x.items)}`, chip: L.oChip(x.status), chev: true, go: () => this.go('order', x.id, here) })), { empty: 'No orders yet.' }),
+    ] };
+  }
+  vhtRequest(c, mine, openOf) {
+    const { s, L, ME, id } = c;
+    const active = mine.filter(h => h.status === 'Active');
+    const key = 'req'; const d = this.state.d[key] || {}; const from = id || null;
+    const selId = d.hs && d.from === from && active.some(h => h.id === d.hs) ? d.hs : (id && active.some(h => h.id === id) ? id : (active[0] && active[0].id));
+    const sel = active.find(h => h.id === selId) || {};
+    const reason = d.reason || 'Out of stock';
+    const left = {}, need = {}, fl = [], fn = [];
+    L.P.forEach(p => {
+      const lk = selId + 'l_' + p.k, nk = selId + 'n_' + p.k;
+      const l = d[lk] ?? String(sel.stock ? sel.stock[p.k] : 0); const n = d[nk] ?? (p.k === 'male' ? '1000' : '50');
+      left[p.k] = this.num(l); need[p.k] = this.num(n);
+      fl.push(this.stp(key, lk, `${p.short} condoms`, l, p.k === 'male' ? 50 : 10, { sub: p.brand }));
+      fn.push(this.stp(key, nk, `${p.short} condoms`, n, p.k === 'male' ? 100 : 10, { sub: 'Pieces' }));
+    });
+    const open = selId && openOf(selId);
+    const qq = (d.q || '').trim().toLowerCase();
+    const matches = active.filter(h => !qq || [h.name, h.id, h.village, h.subcounty, h.contact].join(' ').toLowerCase().includes(qq));
+    const sheet = this.state.sheet === 'hspick' ? { title: 'Choose hotspot', search: { q: d.q || '', on: e => this.setD(key, 'q', e.target.value), ph: 'Name, village or contact' }, rows: matches.map(h => this.row({ t: h.name, s: `${h.contact} · ${h.village}, ${h.subcounty}`, ic: h.id === selId ? 'check' : 'pin', fw: h.id === selId ? 600 : 400, go: () => { this.patchD(key, { hs: h.id, from, q: '' }); this.setState({ sheet: null }); } })), empty: `No hotspots match “${d.q || ''}”.` } : null;
+    const send = () => { this.send('notify', { hotspotId: selId, items: need, remaining: left, reason, note: `Raised by VHT on behalf of ${sel.contact}`, by: ME, byRole: 'VHT', go: { page: 'requests' } }, `Stock request · ${sel.name}`, { page: 'requests' }); this.clrD(key); };
+    return { title: 'Request stock', sheet, secs: [
+      this.fields('Hotspot', [this.pick('Hotspot', sel.name || 'Choose a hotspot', sel.id ? `${sel.contact} · ${sel.village}, ${sel.subcounty}` : '', () => this.setState({ sheet: 'hspick' })), this.seg("What's happening?", [['Out of stock', 'Out of stock'], ['Running low', 'Running low']], reason, k => this.setD(key, 'reason', k))]),
+      open ? this.banner('info', `${sel.name} already has an open order`, `${open.id} is ${L.oChip(open.status).label.toLowerCase()}. Only send another if more stock is needed.`) : null,
+      this.fields('Left at the hotspot', fl, { f: 'Count with the contact person if you are at the hotspot.' }),
+      this.fields('Quantity needed', fn),
+      this.btns([this.btn('Send stockout notification', send, 'primary', { dis: !selId || need.male + need.female === 0 })]),
+      this.note(`${sel.contact || 'The contact person'} is notified too and confirms receipt when the rider arrives.`, { center: true }),
+    ] };
+  }
+  vhtMap(c) {
+    const { s, L, ME, id } = c;
+    const key = 'map'; const d = this.state.d[key] || {};
+    if (id) {
+      const nh = s.hotspots.find(h => h.id === id);
+      if (nh) return { title: 'Hotspot mapped', backLabel: 'Hotspots', secs: [
+        this.sec('Done', { ...this.tone('success'), bg: 'rgba(23,117,52,.12)', mask: this.mk('check'), title: `${nh.name} is active`, body: `${nh.id} is on the Wakiso hotspot register. ${nh.contact === ME ? 'You are its contact person.' : `${nh.contact} gets an SMS with their CLIMS username.`}` }),
+        this.btns([this.btn('Request first stock', () => this.go('request', nh.id, { page: 'hotspot', id: nh.id }), 'primary'), this.btn('Map another hotspot', () => { this.clrD(key); this.go('map', null, { page: 'hotspots' }); }, 'secondary'), this.btn('Back to hotspots', () => this.go('hotspots'), 'text')]),
+      ] };
+    }
+    const step = d.step || 0;
+    const f = { village: d.village ?? '', subcounty: d.subcounty ?? 'Katabi TC', name: d.name ?? '', kind: d.kind ?? 'Permanent', disp: d.disp ?? 'Working', comment: d.comment ?? '', who: d.who ?? 'other', cname: d.cname ?? '', cphone: d.cphone ?? '', invite: d.invite ?? true, visited: !!d.visited };
+    const on = k => e => this.setD(key, k, e.target.value);
+    const phoneOk = /^\+?[0-9 ()-]{7,20}$/.test(f.cphone.trim());
+    const valid = [d.lat != null && f.village.trim().length > 1, f.name.trim().length > 2, f.who === 'me' || (f.cname.trim().length > 2 && phoneOk), f.visited];
+    const LB = ['Location', 'Details', 'Contact person', 'Review'];
+    const contact = f.who === 'me' ? ME : f.cname.trim();
+    const capture = () => { this.patchD(key, { gpsWait: true }); clearTimeout(this.gt); this.gt = setTimeout(() => this.patchD(key, { gpsWait: false, lat: 0.0612 + Math.random() * 0.01, lng: 32.4555 + Math.random() * 0.01, acc: 4 + Math.floor(Math.random() * 8) }), 1400); };
+    const SC = ['Katabi TC', 'Kajjansi TC', 'Nansana Municipality', 'Kira Municipality', 'Ssisa', 'Busukuma'];
+    let body = [];
+    if (step === 0) body = [
+      d.gpsWait ? this.mapSec(0.0612, 32.4555, 'Capturing GPS…', { wait: true, h: 'Where is the hotspot?' }) : d.lat != null ? this.mapSec(d.lat, d.lng, 'Location captured', { h: 'Where is the hotspot?', cap2: `${d.lat.toFixed(5)}, ${d.lng.toFixed(5)} · accuracy ±${d.acc} m`, act: { label: 'Capture again', go: capture } }) : null,
+      d.lat == null && !d.gpsWait ? this.banner('info', 'Stand at the hotspot entrance', 'Then capture the GPS location. It works without network.', { h: 'Where is the hotspot?' }) : null,
+      d.lat == null && !d.gpsWait ? this.btns([this.btn('Capture GPS location', capture, 'secondary', { icon: 'gps' })]) : null,
+      this.fields('Address', [this.inp('Village', f.village, on('village'), { ph: 'e.g. Kigungu' }), this.fld('Sel', { label: 'Sub-county', val: f.subcounty, on: on('subcounty'), opts: SC.map(x => ({ v: x, l: x })) }), this.ro('District', 'Wakiso')]),
+    ];
+    if (step === 1) body = [
+      this.fields('About the hotspot', [this.inp('Hotspot name', f.name, on('name'), { ph: 'Name people in the area use' }), this.seg('Type', [['Permanent', 'Permanent'], ['Temporary', 'Temporary']], f.kind, k => this.setD(key, 'kind', k)), this.fld('Sel', { label: 'Condom dispenser', val: f.disp, on: on('disp'), opts: [['Working', 'Yes — working'], ['Needs repair', 'Yes — needs repair'], ['Broken', 'Yes — broken'], ['None', 'No dispenser']].map(([v, l]) => ({ v, l })) })], { f: f.kind === 'Permanent' ? 'Bars, lodges, landing sites, taxi parks.' : 'Markets, events and seasonal sites.' }),
+      f.disp !== 'None' ? this.photoSec(key, 'dphoto', { h: 'Dispenser photo', alt: 'Dispenser photo', hint: 'Photograph the dispenser so the district can see its condition.', camHint: 'Fit the whole dispenser in the frame' }) : null,
+      this.fields('', [this.fld('Area', { label: 'Comment (optional)', val: f.comment, on: on('comment'), ph: 'e.g. Busy on weekends' })]),
+    ];
+    if (step === 2) body = [
+      this.fields('Contact person', [this.seg('Who receives deliveries?', [['other', 'Someone there'], ['me', 'Me']], f.who, k => this.setD(key, 'who', k))].concat(f.who === 'other' ? [this.inp('Full name', f.cname, on('cname'), { ph: 'e.g. Sarah Nakirya' }), this.inp('Phone number', f.cphone, on('cphone'), { type: 'tel', im: 'tel', ph: '+256 7XX XXX XXX', err: f.cphone.trim() && !phoneOk ? 'Enter a phone number, e.g. +256 700 000000.' : '' }), this.tgl('Invite as hotspot manager', 'They get an SMS with their username and password', f.invite, () => this.setD(key, 'invite', !f.invite))] : []), { f: f.who === 'me' ? 'You receive deliveries and report stockouts for this hotspot.' : 'The contact person receives deliveries and reports stockouts.' }),
+    ];
+    if (step === 3) body = [
+      this.list('Review', [['Name', f.name], ['Type', f.kind], ['Location', `${f.village}, ${f.subcounty}`], ['GPS', d.lat != null ? `${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}` : '—'], ['Dispenser', f.disp === 'None' ? 'None' : `${f.disp}${d.dphoto ? ' · photo' : ''}`], ['Contact', f.who === 'me' ? 'You' : `${contact} · ${f.cphone}`]].map(([t, v]) => this.row({ t, v }))),
+      this.fields('', [this.chk('I visited this hotspot and the details are correct', f.visited, v => this.setD(key, 'visited', v))]),
+    ];
+    const next = () => {
+      if (step < 3) { this.setD(key, 'step', step + 1); const el = this.scRef.current; if (el) el.scrollTop = 0; return; }
+      this.send('mapHotspot', { hotspot: { name: f.name.trim(), kind: f.kind, village: f.village.trim(), subcounty: f.subcounty, contact, phone: f.who === 'me' ? '+256 776 902 331' : f.cphone.trim(), vhts: [ME], enteredBy: ME, dispenser: f.disp !== 'None', dispCond: f.disp === 'None' ? '' : f.disp, lat: d.lat, lng: d.lng, comment: f.comment.trim(), dispPhoto: !!d.dphoto }, go: { page: 'map', id: '$new' } }, `Map hotspot · ${f.name.trim()}`, { page: 'hotspots' });
+      this.clrD(key);
+    };
+    return { title: 'Map a hotspot', backLabel: 'Hotspots', secs: [
+      this.sec('Prog', { bars: LB.map((x, i) => ({ bg: i <= step ? c.T.tint : c.T.sep })), label: `Step ${step + 1} of 4 · ${LB[step]}` }),
+      ...body,
+      this.btns([this.btn(step === 3 ? 'Activate hotspot' : 'Continue', next, 'primary', { dis: !valid[step] }), step > 0 ? this.btn('Back', () => this.setD(key, 'step', step - 1), 'text') : null]),
+    ] };
+  }
+  orderS(c) {
+    const { s, L, id, role, ME } = c;
+    const o = s.orders.find(x => x.id === id);
+    if (!o) return { title: 'Order', secs: [this.banner('neutral', "That order isn't available", 'It may belong to another hotspot.')] };
+    const dl = o.delivery || {}; const st = o.status;
+    const rank = { queued: 0, review: 1, on_hold: 1, confirmed: 2, dispatched: 3, in_transit: 3, delivered: 4, received: 5 }[st];
+    const you = role === 'hm';
+    const msg = { queued: 'The district has the notification and will review it shortly.', review: 'The district is checking stock for this order.', on_hold: 'The district store is restocking from the warehouse. This order is first in line when stock arrives.', confirmed: 'Confirmed. The district is assigning a rider.', dispatched: `${dl.rider} will collect the condoms from the district store.`, in_transit: `${dl.rider} is on the way with delivery note ${dl.dn}.${you ? ' Sign the note when you receive the stock.' : ''}`, delivered: you ? 'The rider has delivered. Count the stock and confirm what you received.' : `Delivered. ${(s.hotspots.find(h => h.id === o.hotspotId) || {}).contact} needs to confirm receipt.`, received: `Closed ${o.receipt ? L.t(o.receipt.at) : ''}.` }[st];
+    const steps = this.steps([
+      ['Sent to district', 'done', L.t(o.createdAt)],
+      st === 'on_hold' ? ['Waiting for stock', 'warn', 'District is restocking'] : ['Confirmed by district', rank >= 2 ? 'done' : 'cur', o.confirmedAt != null ? L.t(o.confirmedAt) : ''],
+      ['On the way', rank >= 4 ? 'done' : rank >= 2 ? 'cur' : 'todo', dl.pickedAt != null ? L.t(dl.pickedAt) : (dl.rider || '')],
+      ['Delivered', rank >= 4 ? 'done' : 'todo', dl.deliveredAt != null ? L.t(dl.deliveredAt) : ''],
+      [you ? 'You confirmed' : 'Receipt confirmed', rank === 5 ? 'done' : rank === 4 ? 'cur' : 'todo', o.receipt ? L.t(o.receipt.at) : ''],
+    ]);
+    const pend = this.pending(o.id);
+    let form = [];
+    if (you && st === 'delivered' && !pend) {
+      const key = 'cf:' + o.id; const d = this.state.d[key] || {}; const noted = dl.qty || o.approved; const got = { male: 0, female: 0 };
+      const rows = L.P.filter(p => +noted[p.k] > 0).map(p => { const v = d[p.k] ?? String(noted[p.k]); got[p.k] = this.num(v); return this.stp(key, p.k, p.name, v, 10, { sub: `Delivery note: ${L.num(noted[p.k])}` }); });
+      const mismatch = L.P.some(p => got[p.k] !== (+noted[p.k] || 0));
+      form = [
+        this.fields('Count what you received', rows),
+        mismatch ? this.banner('warning', "Counts don't match the delivery note", 'Say what happened so the district can follow up.') : null,
+        mismatch ? this.fields('', [this.fld('Area', { label: 'What happened?', val: d.issue ?? '', on: e => this.setD(key, 'issue', e.target.value), ph: 'e.g. One carton was damaged' })]) : null,
+        this.fields('', [this.chk('I signed the delivery note', !!d.signed, v => this.setD(key, 'signed', v))]),
+        this.btns([this.btn('Confirm receipt', () => { this.send('confirmReceipt', { id: o.id, qty: got, issue: mismatch ? (d.issue || '').trim() : '', by: ME }, `Confirm receipt · ${o.id}`); this.clrD(key); }, 'primary', { dis: !d.signed || (mismatch && !(d.issue || '').trim()) })]),
+      ];
+    }
+    const lines = L.lineRows(dl.lines || o.alloc || []);
+    return { title: o.id, secs: [
+      this.hero({ title: o.hotspot, sub: `${o.id} · ${L.items(o.approved)}`, chip: L.oChip(st), steps, msg }),
+      pend ? this.banner('warning', 'Saved on this phone', `${pend.label} sends when you are back online.`) : null,
+      ...form,
+      o.delivery ? this.list('Delivery', [this.row({ t: dl.rider, s: `Rider · ${dl.plate}`, ic: 'phone', go: () => L.call(dl.rider, dl.phone) }), this.row({ t: 'Delivery note', v: dl.dn }), dl.recipient ? this.row({ t: 'Received by', v: dl.recipient }) : null].filter(Boolean)) : null,
+      lines.length ? this.list('Batches', lines.map(l => this.row({ t: `${l.short} · ${l.batch}`, s: `Expires ${l.exp} · ${l.left}`, v: l.qty }))) : null,
+      dl.photo ? this.photoSec('ro:' + o.id, 'p', { h: 'Signed delivery note', value: dl.photo, alt: `Delivery note ${dl.dn}`, when: `Photographed by ${dl.rider}`, edit: false }) : null,
+      this.list('Request', [this.row({ t: 'Requested', v: L.items(o.items) }), this.row({ t: 'Reason', v: o.reason || '—' }), this.row({ t: 'Raised by', v: o.by === ME ? 'You' : o.by })]),
+    ] };
+  }
+  hmS(c) {
+    const { s, L, page, ME } = c;
+    const h = s.hotspots.find(x => x.id === this.HID);
+    const mine = s.orders.filter(o => o.hotspotId === this.HID).sort((a, b) => b.createdAt - a.createdAt);
+    const q0 = (c.m.outbox || []).filter(it => it.type === 'notify' && it.p.hotspotId === this.HID);
+    if (page === 'order') return this.orderS(c);
+    if (page === 'request') {
+      const key = 'req'; const d = this.state.d[key] || {};
+      const reason = d.reason || 'Out of stock';
+      const left = {}, need = {}, fl = [], fn = [];
+      L.P.forEach(p => {
+        const l = d['l_' + p.k] ?? String(h.stock[p.k]); const n = d['n_' + p.k] ?? (p.k === 'male' ? '2000' : '100');
+        left[p.k] = this.num(l); need[p.k] = this.num(n);
+        fl.push(this.stp(key, 'l_' + p.k, `${p.short} condoms`, l, p.k === 'male' ? 50 : 10, { sub: p.brand }));
+        fn.push(this.stp(key, 'n_' + p.k, `${p.short} condoms`, n, p.k === 'male' ? 100 : 10, { sub: 'Pieces' }));
+      });
+      const open = mine.find(x => x.status !== 'received');
+      const send = () => { this.send('notify', { hotspotId: this.HID, items: need, remaining: left, reason, note: d.note || '', by: ME, byRole: 'Hotspot manager', go: { page: 'order', id: '$new' } }, 'Stockout notification', { page: 'orders' }); this.clrD(key); };
+      return { title: 'Report stockout', backLabel: 'Home', secs: [
+        this.fields('', [this.seg("What's happening?", [['Out of stock', 'Out of stock'], ['Running low', 'Running low']], reason, k => this.setD(key, 'reason', k))], { f: reason === 'Out of stock' ? 'Nothing left in the dispenser or store.' : 'You will run out within a few days.' }),
+        open ? this.banner('info', `You already have an open order`, `${open.id} is ${L.oChip(open.status).label.toLowerCase()}.`, { act: { label: 'View order', go: () => this.go('order', open.id, { page: 'request' }) } }) : null,
+        this.fields('Left now', fl),
+        this.fields('Quantity needed', fn),
+        this.fields('', [this.fld('Area', { label: 'Note for the district (optional)', val: d.note ?? '', on: e => this.setD(key, 'note', e.target.value), ph: 'e.g. Busy weekend coming' })]),
+        this.btns([this.btn('Send to Wakiso district', send, 'primary', { dis: need.male + need.female === 0 })]),
+        this.note('The district reviews your notification and assigns a rider. You get a notification at each step.', { center: true }),
+      ] };
+    }
+    if (page === 'orders') return { title: 'Orders', back: false, fab: { label: 'Report stockout', icon: 'megaphone', go: () => this.go('request', null, { page: 'orders' }) }, secs: [
+      q0.length ? this.list('Waiting to send', q0.map(it => this.row({ t: 'Stockout notification', s: `${L.items(it.p.items)} · saved ${L.t(it.at)}`, chip: L.chip('Offline', 'warning'), ic: 'upload' }))) : null,
+      this.list(q0.length ? 'Sent' : '', mine.map(o => this.row({ t: o.id, s: `${L.items(o.items)} · ${L.t(o.createdAt)}`, chip: L.oChip(o.status), chev: true, fw: o.status === 'delivered' ? 600 : 400, go: () => this.go('order', o.id) })), { empty: 'No orders yet.' }),
+    ] };
+    const o = mine.find(x => x.status !== 'received');
+    const rpt = (s.reports || []).find(r => r.own === 'hm' && r.period === '2026-10');
+    let cur = null;
+    if (o) { const oh = this.orderS({ ...c, id: o.id }).secs[0]; cur = { ...oh, title: o.id, sub: `${L.items(o.approved)} · sent ${L.t(o.createdAt)}`, hasH: true, h: 'Current order', btns: [o.status === 'delivered' ? this.btn('Confirm receipt', () => this.go('order', o.id, { page: 'dashboard' }), 'primary') : this.btn('View order', () => this.go('order', o.id, { page: 'dashboard' }), 'secondary')], hasBtns: true }; }
+    const RS = { draft: ['Draft', 'info'], errors: ['Errors to fix', 'danger'], validated: ['Ready to send', 'success'], sent: ['Sent', 'success'] };
+    return { title: 'Home', back: false, secs: [
+      this.hero({ title: h.name, sub: `${h.id} · ${h.village}, ${h.subcounty}`, chip: L.chip(h.status, 'success'), stats: this.stats(h), msg: `Last delivery ${h.lastDelivery != null ? L.t(h.lastDelivery) : 'none yet'}`, btns: o ? [] : [this.btn('Report stockout', () => this.go('request', null, { page: 'dashboard' }), 'primary', { icon: 'megaphone' })] }),
+      q0.length ? this.banner('warning', 'Stockout saved on this phone', 'It sends to the district when you are back online.') : null,
+      cur,
+      rpt ? this.list('Monthly report', [this.row({ t: 'October 2026', s: rpt.status === 'sent' ? `Sent ${L.t(rpt.sentAt)}` : 'Due 20 Nov 2026', chip: L.chip(...RS[rpt.status]), ic: 'clipboard', chev: true, go: () => this.go('report', rpt.id, { page: 'dashboard' }) })]) : null,
+    ] };
+  }
+
+  riderS(c) {
+    const { s, L, page } = c;
+    const mine = s.orders.filter(o => o.delivery && o.delivery.riderId === 'R1');
+    const H = hid => s.hotspots.find(h => h.id === hid) || {};
+    const RC = { dispatched: L.chip('To collect', 'info'), in_transit: L.chip('On the way', 'info'), delivered: L.chip('Awaiting confirmation', 'success'), received: L.chip('Confirmed', 'neutral') };
+    if (page === 'delivery') return this.riderDelivery(c, mine, H, RC);
+    if (page === 'receipt') return this.riderReceipt(c, mine, H, RC);
+    if (page === 'history') {
+      const done = mine.filter(o => o.status === 'delivered' || o.status === 'received').sort((a, b) => b.delivery.deliveredAt - a.delivery.deliveredAt);
+      return { title: 'History', back: false, secs: [this.list('Receipts', done.map(o => this.row({ t: o.hotspot, s: `${o.delivery.dn} · ${L.items(o.delivery.qty || o.approved)} · ${L.t(o.delivery.deliveredAt)}`, chip: RC[o.status], ic: 'receipt', chev: true, go: () => this.go('receipt', o.id) })), { empty: 'Deliveries you hand over appear here with their receipts.' })] };
+    }
+    const actv = mine.filter(o => o.status === 'dispatched' || o.status === 'in_transit').sort((a, b) => b.delivery.at - a.delivery.at);
+    const first = actv[0];
+    const hero = first ? this.hero({ h: 'Next delivery', title: first.hotspot, sub: `${first.delivery.dn} · ${L.items(first.approved)} · ${H(first.hotspotId).village}`, chip: RC[first.status], msg: first.status === 'dispatched' ? 'Collect the stock and delivery note at the Wakiso district store.' : `Ride to ${H(first.hotspotId).village} and hand over to ${H(first.hotspotId).contact}.`, btns: [this.btn(first.status === 'dispatched' ? 'Start collection' : 'Continue delivery', () => this.go('delivery', first.id), 'primary')] }) : null;
+    return { title: 'Deliveries', back: false, secs: [
+      hero,
+      actv.length > 1 ? this.list('Also assigned', actv.slice(1).map(o => this.row({ t: o.hotspot, s: `${o.delivery.dn} · ${L.items(o.approved)}`, chip: RC[o.status], ic: 'truck', chev: true, go: () => this.go('delivery', o.id) }))) : null,
+      !actv.length ? this.sec('Done', { ...this.tone('neutral'), bg: 'rgba(66,73,63,.08)', mask: this.mk('truck'), title: 'No deliveries right now', body: 'You get a notification when the district assigns you a delivery.' }) : null,
+    ] };
+  }
+  riderDelivery(c, mine, H, RC) {
+    const { L, ios } = c;
+    const o = mine.find(x => x.id === c.id);
+    if (!o) return { title: 'Delivery', secs: [this.banner('neutral', "That delivery isn't available", 'It may have been reassigned.')] };
+    const h = H(o.hotspotId); const st = o.status; const dl = o.delivery;
+    const alloc = L.lineRows(dl.lines || o.alloc || []);
+    const lines = L.P.filter(p => +o.approved[p.k] > 0);
+    const steps = this.steps([['Collect stock', st === 'dispatched' ? 'cur' : 'done', dl.pickedAt != null ? L.t(dl.pickedAt) : 'Wakiso district store'], ['Ride to hotspot', st === 'in_transit' ? 'cur' : st === 'dispatched' ? 'todo' : 'done', h.village], ['Hand over', st === 'in_transit' ? 'cur' : st === 'dispatched' ? 'todo' : 'done', dl.deliveredAt != null ? L.t(dl.deliveredAt) : 'Signature and photo'], ['Hotspot confirms', st === 'received' ? 'done' : st === 'delivered' ? 'cur' : 'todo', o.receipt ? L.t(o.receipt.at) : '']]);
+    const pend = this.pending(o.id);
+    let body = [];
+    if (st === 'dispatched' && !pend) {
+      const key = 'ck:' + o.id; const d = this.state.d[key] || {};
+      const items = [['dn', `Delivery note ${dl.dn}`, 'Two copies — one stays signed at the hotspot'], ...lines.map(p => [p.k, `${p.name} · ${L.num(o.approved[p.k])}`, alloc.filter(a => a.k === p.k).map(a => `${a.batch} (exp ${a.exp})`).join(', ') || p.brand])];
+      body = [this.fields('Before you leave the store', items.map(([k, t, sub]) => this.chk(t, !!d[k], v => this.setD(key, k, v), sub)), { f: 'Tick each item as you load it.' }), this.btns([this.btn('Start trip', () => { this.send('pickup', { id: o.id }, `Start trip · ${dl.dn}`); this.clrD(key); }, 'primary', { dis: !items.every(([k]) => d[k]), icon: 'truck' })])];
+    }
+    if (st === 'in_transit' && !pend) {
+      const key = 'ho:' + o.id; const d = this.state.d[key] || {};
+      const qty = { male: 0, female: 0 }, found = { male: 0, female: 0 }; let missing = false;
+      const fq = [], ff = [];
+      lines.forEach(p => {
+        const q = d['q_' + p.k] ?? String(o.approved[p.k]); const f = d['f_' + p.k] ?? '';
+        qty[p.k] = this.num(q); found[p.k] = this.num(f); if (String(f).trim() === '') missing = true;
+        fq.push(this.stp(key, 'q_' + p.k, p.name, q, 10, { sub: `Note says ${L.num(o.approved[p.k])}` }));
+        ff.push(this.stp(key, 'f_' + p.k, p.name, f, 10, { sub: 'Count before you hand over' }));
+      });
+      const recipient = d.recipient ?? h.contact;
+      body = [
+        this.fields('Handed over', fq),
+        this.fields('Already at the hotspot', ff, { f: 'Enter 0 if there was nothing left.' }),
+        this.fields('Received by', [this.inp('Name', recipient, e => this.setD(key, 'recipient', e.target.value))]),
+        this.sigSec(key, `Signed by ${recipient || '…'}`),
+        this.photoSec(key, 'photo', { h: 'Signed delivery note', alt: `Delivery note ${dl.dn}`, hint: 'Photograph the delivery note after it is signed.', camHint: 'Fit the whole signed delivery note in the frame' }),
+        this.btns([this.btn('Confirm handover', () => { this.send('deliver', { id: o.id, qty, found, recipient: recipient.trim(), photo: d.photo, sig: d.sig }, `Delivery · ${dl.dn}`); this.clrD(key); }, 'primary', { dis: !d.photo || !d.sig || !recipient.trim() || missing })]),
+      ];
+    }
+    const done = st === 'delivered' || st === 'received';
+    return { title: dl.dn, backLabel: 'Deliveries', secs: [
+      this.hero({ title: o.hotspot, sub: `${dl.dn} · ${L.items(o.approved)}`, chip: RC[st], steps }),
+      pend ? this.banner('warning', 'Saved on this phone', `${pend.label} sends when you are back online.`) : null,
+      done ? this.banner(st === 'received' ? 'success' : 'info', st === 'received' ? `Confirmed by ${h.contact}` : `Delivered ${L.t(dl.deliveredAt)}`, st === 'received' ? 'This delivery is closed.' : `${h.contact} has been asked to confirm receipt.`, { act: { label: 'View receipt', go: () => this.go('receipt', o.id, { page: 'delivery', id: o.id }) } }) : null,
+      !done && h.lat != null ? this.mapSec(h.lat, h.lng, h.name, { h: 'Drop-off', cap2: `${h.village}, ${h.subcounty}`, link: ios ? 'Open in Maps' : 'Directions' }) : null,
+      !done ? this.list('', [this.row({ t: h.contact, s: `Contact person · ${h.phone}`, ic: 'phone', go: () => L.call(h.contact, h.phone) })]) : null,
+      ...body,
+      this.list('Load', alloc.map(a => this.row({ t: `${a.short} · ${a.batch}`, s: `Expires ${a.exp}`, v: a.qty }))),
+    ] };
+  }
+  riderReceipt(c, mine, H, RC) {
+    const { L } = c;
+    const o = mine.find(x => x.id === c.id);
+    if (!o || !o.delivery.deliveredAt) return { title: 'Receipt', secs: [this.banner('neutral', 'No receipt yet', 'Receipts appear after the handover.')] };
+    const h = H(o.hotspotId); const dl = o.delivery; const st = o.status;
+    return { title: 'Receipt', backLabel: 'History', secs: [
+      this.hero({ title: `Delivery note ${dl.dn}`, sub: `${o.hotspot} · ${L.t(dl.deliveredAt)}`, chip: RC[st] }),
+      this.list('Handed over', L.P.filter(p => +(dl.qty || o.approved)[p.k] > 0).map(p => this.row({ t: p.name, v: L.num((dl.qty || o.approved)[p.k]) })).concat(dl.found ? [this.row({ t: 'Already at the hotspot', v: L.items(dl.found) === '—' ? 'None' : L.items(dl.found) })] : [])),
+      this.list('Batches', L.lineRows(dl.lines || o.alloc || []).map(a => this.row({ t: `${a.short} · ${a.batch}`, s: `Expires ${a.exp}`, v: a.qty }))),
+      this.list('Handover', [this.row({ t: 'Received by', v: dl.recipient || '—' }), dl.sig ? this.row({ t: 'Signature', img: dl.sig }) : this.row({ t: 'Signature', v: 'On the paper note' })]),
+      dl.photo ? this.photoSec('ro:' + o.id, 'p', { h: 'Signed delivery note', value: dl.photo, alt: `Delivery note ${dl.dn}`, when: 'Photographed at handover', edit: false }) : null,
+      this.banner(st === 'received' ? 'success' : 'info', st === 'received' ? `Confirmed by ${h.contact} ${L.t(o.receipt.at)}` : `Waiting for ${h.contact} to confirm`, st === 'received' ? (o.receipt.issue ? `Reported: ${o.receipt.issue}` : 'Counts matched.') : 'You will be notified when the hotspot confirms.'),
+      this.btns([this.btn('Share receipt', () => L.toast(`Sharing receipt for ${dl.dn}…`), 'secondary', { icon: 'receipt' })]),
+    ] };
+  }
+  PER = { '2026-10': { label: 'October 2026', month: 'October', days: 31, due: '20 Nov 2026' }, '2026-09': { label: 'September 2026', month: 'September', days: 30, due: '20 Oct 2026' }, '2026-08': { label: 'August 2026', month: 'August', days: 31, due: '20 Sep 2026' } };
+  FORMS = {
+    hotspot: { name: 'Hotspot monthly report', otherTitle: 'Service at the hotspot', stock: [
+      { k: 'open', label: 'Opening balance', hint: "Last month's closing balance", sys: true }, { k: 'recv', label: 'Received', hint: 'Deliveries confirmed in CLIMS', sys: true },
+      { k: 'dist', label: 'Distributed to clients', hint: 'Taken from the dispenser or handed out' }, { k: 'loss', label: 'Losses & adjustments', hint: 'Expired, damaged or missing' }, { k: 'close', label: 'Closing balance', hint: 'Physical count at month end' }],
+      other: [{ k: 'daysOut', label: 'Days out of stock', hint: 'Days with nothing in the dispenser', type: 'num', req: true, max: 'days' }, { k: 'dispenser', label: 'Dispenser condition', type: 'sel', opts: ['Working', 'Broken', 'No dispenser'], req: true }] },
+    vht: { name: 'VHT outreach report', otherTitle: 'Outreach', stock: [
+      { k: 'open', label: 'Opening balance', hint: "Last month's closing balance", sys: true }, { k: 'recv', label: 'Received', hint: 'Issued to you in CLIMS', sys: true },
+      { k: 'dist', label: 'Distributed during outreach', hint: 'At hotspots and in the community' }, { k: 'loss', label: 'Losses & adjustments', hint: 'Expired, damaged or missing' }, { k: 'close', label: 'Closing balance', hint: 'Condoms you hold at month end' }],
+      other: [{ k: 'visited', label: 'Hotspots visited', type: 'num', req: true, max: 'cover' }, { k: 'sessions', label: 'Outreach sessions held', type: 'num', req: true }, { k: 'reached', label: 'People reached', type: 'num', req: true }] },
+  };
+  LOSS = { k: 'lossReason', label: 'Reason for losses & adjustments', type: 'sel', opts: ['Expired', 'Damaged', 'Stolen or missing', 'Count correction', 'Other'] };
+  CHECKS = [['req', 'Required fields complete'], ['num', 'Whole numbers, none negative'], ['bal', 'Stock balances for each product'], ['range', 'Values within range']];
+  validate(F, v, ctx) {
+    const L = this.c.L; const E = [];
+    const blank = x => x == null || String(x).trim() === ''; const whole = x => /^\d+$/.test(String(x).trim());
+    const lbl = k => (F.stock.find(f => f.k === k) || {}).label;
+    L.P.forEach(p => {
+      const row = v[p.k] || {}; let bad = false;
+      F.stock.forEach(f => { if (f.sys) return; const x = row[f.k]; const field = p.k + '.' + f.k; const where = `${p.short} · ${f.label}`; if (blank(x)) { E.push({ type: 'req', field, where, msg: 'Required. Enter 0 if none.' }); bad = true; } else if (!whole(x)) { E.push({ type: 'num', field, where, msg: 'Enter a whole number, 0 or more.' }); bad = true; } });
+      if (bad) return;
+      const g = k => +row[k] || 0; const had = g('open') + g('recv'), out = g('dist') + g('loss'), exp = had - out;
+      if (out > had) E.push({ type: 'bal', field: p.k + '.dist', where: `${p.short} · ${lbl('dist')}`, msg: `Distributed plus losses (${L.num(out)}) is more than you had (${L.num(had)}).` });
+      else if (g('close') !== exp) E.push({ type: 'bal', field: p.k + '.close', where: `${p.short} · ${lbl('close')}`, msg: `Doesn't balance — should be ${L.num(exp)}. Recount, or record the difference as a loss.` });
+    });
+    F.other.forEach(f => {
+      const x = v[f.k]; const field = f.k; const where = f.label;
+      if (blank(x)) { if (f.req) E.push({ type: 'req', field, where, msg: f.type === 'sel' ? 'Choose one.' : 'Required. Enter 0 if none.' }); return; }
+      if (f.type === 'num' && !whole(x)) { E.push({ type: 'num', field, where, msg: 'Enter a whole number, 0 or more.' }); return; }
+      const mx = f.max === 'days' ? ctx.days : f.max === 'cover' ? ctx.cover : null;
+      if (mx != null && +x > mx) E.push({ type: 'range', field, where, msg: f.max === 'days' ? `${ctx.month} has ${mx} days. Enter 0–${mx}.` : `You cover ${mx} hotspots. Enter 0–${mx}.` });
+    });
+    if (L.P.some(p => whole((v[p.k] || {}).loss) && +v[p.k].loss > 0) && blank(v.lossReason)) E.push({ type: 'req', field: 'lossReason', where: 'Reason for losses', msg: 'Say why stock was lost or adjusted.' });
+    return E;
+  }
+  runRep(r, F, vals, ctx) {
+    const { act, role } = this.props; const L = this.c.L;
+    const errs = this.validate(F, vals, ctx); const id = r.id;
+    if (this.mob().offline) {
+      if (errs.length) { this.setState(st => ({ rErr: { ...st.rErr, [id]: errs } })); L.toast(`${errs.length} error${errs.length === 1 ? '' : 's'} to fix before this report can be sent.`); return; }
+      act('queue', { item: { type: 'rptValidate', p: { id, values: vals, errors: [] }, label: `${this.PER[r.period].label} report`, role } });
+      act('queue', { item: { type: 'rptSend', p: { id }, label: `Send report to MOH`, role } });
+      this.setState(st => { const d = { ...st.d }; delete d['rp:' + id]; const rErr = { ...st.rErr }; delete rErr[id]; return { d, rErr }; });
+      return;
+    }
+    const types = [...new Set(errs.map(e => e.type))];
+    clearTimeout(this.bt);
+    const step = i => {
+      if (i < this.CHECKS.length) { this.setState({ busy: { id, phase: 'validating', i, types, errs } }); this.bt = setTimeout(() => step(i + 1), 380); return; }
+      act('rptValidate', { id, values: vals, errors: errs });
+      this.setState(st => { const d = { ...st.d }; delete d['rp:' + id]; const rErr = { ...st.rErr }; delete rErr[id]; return { d, rErr, busy: errs.length ? null : { id, phase: 'sending', i, types, errs } }; });
+      if (errs.length) { const el = this.scRef.current; if (el) el.scrollTop = 0; return; }
+      this.bt = setTimeout(() => { act('rptSend', { id }); this.setState({ busy: null }); }, 1200);
+    };
+    step(0);
+  }
+  rep(c) {
+    const { s, L, page, id, role, ME, T } = c;
+    const mine = (s.reports || []).filter(r => r.own === role).sort((a, b) => b.period.localeCompare(a.period));
+    const chipOf = r => ({ draft: L.chip('Draft', 'info'), errors: L.chip('Errors to fix', 'danger'), validated: L.chip('Ready to send', 'success'), sent: L.chip('Sent to MOH', 'success') })[r.status];
+    const pl = n => (n === 1 ? '' : 's');
+    const stepsOf = (r, B) => { const st = r.status, runs = r.runs || 0, b = B ? B.phase : null; const clean = (st === 'sent' || st === 'validated' || b === 'sending') && runs <= 1 && !(B && B.errs.length); return this.steps([['Data entry', runs || b ? 'done' : 'cur', r.savedAt != null ? `Saved ${L.t(r.savedAt)}` : 'Not started'], ['Validation', b === 'validating' ? 'cur' : runs || b ? 'done' : 'todo', b === 'validating' ? 'Checking…' : st === 'errors' ? `${r.errors.length} error${pl(r.errors.length)} found` : runs ? 'Passed' : 'Runs when you send'], clean ? ['Rectify errors', 'skip', 'No errors found'] : ['Rectify errors', st === 'errors' && !b ? 'warn' : runs > 1 ? 'done' : 'todo', st === 'errors' && !b ? `${r.errors.length} to fix` : runs > 1 ? 'Fixed' : 'Only if validation fails'], ['Sent to MOH', st === 'sent' ? 'done' : b === 'sending' ? 'cur' : 'todo', st === 'sent' ? L.t(r.sentAt) : b === 'sending' ? 'Sending…' : '']]); };
+    if (page === 'reports') {
+      const cur = mine.find(r => r.period === '2026-10');
+      let hero = null;
+      if (cur) { const F = this.FORMS[cur.form] || this.FORMS.hotspot; const P0 = this.PER[cur.period]; const n = cur.errors.length; hero = this.hero({ h: 'Due now', title: P0.label, sub: `${F.name} · due ${P0.due}`, chip: chipOf(cur), steps: stepsOf(cur, null), msg: { draft: cur.savedAt != null ? `Draft saved ${L.t(cur.savedAt)}.` : 'Opening balance and received are filled in from CLIMS. Add the rest.', errors: `Validation found ${n} error${pl(n)}. Fix ${n === 1 ? 'it' : 'them'} and send again.`, validated: 'Validation passed. Send the report to MOH.', sent: `Sent ${L.t(cur.sentAt)} · receipt ${cur.receipt}.` }[cur.status], btns: [this.btn({ draft: cur.savedAt != null ? 'Continue report' : 'Start report', errors: 'Fix errors', validated: 'Review and send', sent: 'View report' }[cur.status], () => this.go('report', cur.id), cur.status === 'sent' ? 'secondary' : 'primary')] }); }
+      return { title: 'Reports', back: false, secs: [hero, this.list('All reports', mine.map(r => this.row({ t: this.PER[r.period] ? this.PER[r.period].label : r.period, s: (this.FORMS[r.form] || {}).name || 'Monthly report', chip: chipOf(r), chev: true, go: () => this.go('report', r.id) })), { empty: 'No reports yet.', f: 'Reports are due on the 20th of the following month.' })] };
+    }
+    const r = mine.find(x => x.id === id);
+    if (!r) return { title: 'Report', secs: [this.banner('neutral', "That report isn't available", '')] };
+    const F = this.FORMS[r.form] || this.FORMS.hotspot; const P0 = this.PER[r.period];
+    const B = this.state.busy && this.state.busy.id === r.id ? this.state.busy : null;
+    const key = 'rp:' + r.id; const ed = this.state.d[key] || {}; const dirty = Object.keys(ed).length > 0;
+    const pend = (c.m.outbox || []).some(it => it.p && it.p.id === r.id && /^rpt/.test(it.type));
+    const canEdit = r.status !== 'sent' && !B && !pend;
+    const get = path => { const [a, b] = path.split('.'); return b ? ((r.values[a] || {})[b] ?? '') : (r.values[a] ?? ''); };
+    const val = path => (ed[path] !== undefined ? ed[path] : get(path));
+    const loc = this.state.rErr[r.id];
+    const errList = loc || (r.status === 'errors' && !B ? r.errors : []);
+    const errOf = path => (ed[path] === undefined ? errList.find(e => e.field === path) : null);
+    const set = path => e => this.setD(key, path, e.target.value);
+    const merged = () => { const m = JSON.parse(JSON.stringify(r.values)); Object.entries(ed).forEach(([k, x]) => { const [a, b] = k.split('.'); if (b) { m[a] = m[a] || {}; m[a][b] = x; } else m[a] = x; }); return m; };
+    const mv = merged();
+    const fmtV = x => (x === '' || x == null ? '—' : /^\d+$/.test(String(x)) ? L.num(+x) : String(x));
+    const fid = p => 'mf-' + r.id + '-' + p.replace('.', '-');
+    const cover = role === 'vht' ? s.hotspots.filter(h => (h.vhts || []).includes(ME)).length : 3;
+    const ctx = { days: P0.days, month: P0.month, cover };
+    const anyLoss = L.P.some(p => +((mv[p.k] || {}).loss) > 0) || !!String(mv.lossReason || '').trim();
+    const others = [...F.other, ...(anyLoss ? [this.LOSS] : [])];
+    const live = errList.filter(e => ed[e.field] === undefined);
+    let bn;
+    if (B) bn = ['info', B.phase === 'validating' ? 'Checking your figures…' : 'Sending to the MOH server…', 'Keep the app open until it is sent.'];
+    else if (pend) bn = ['warning', 'Saved on this phone', 'The report is checked and sends to MOH when you are back online.'];
+    else if (r.status === 'sent') bn = ['success', `Sent to MOH ${L.t(r.sentAt)}`, `Server receipt ${r.receipt}. Sent reports can't be edited.`];
+    else if (errList.length && !live.length) bn = ['info', 'All flagged fields changed', 'Send again — CLIMS re-checks the whole report.'];
+    else if (errList.length) bn = ['danger', `${live.length} error${pl(live.length)} to fix`, 'Tap an error to jump to the field.'];
+    else if (r.status === 'validated') bn = ['success', 'Validation passed', 'Nothing to fix. Send the report to MOH.'];
+    else bn = ['info', `Enter your ${P0.month} figures`, 'Opening balance and received are filled in from CLIMS. The app checks everything before it reaches MOH.'];
+    const checks = this.CHECKS.map(([k, label], j) => {
+      let st;
+      if (B && B.phase === 'validating') st = j < B.i ? (B.types.includes(k) ? 'fail' : 'pass') : j === B.i ? 'run' : 'pend';
+      else if (B || r.status === 'sent' || r.status === 'validated') st = 'pass';
+      else if (errList.length) st = errList.some(e => e.type === k) ? 'fail' : 'pass';
+      else st = 'pend';
+      const I = { pass: ['checkC', '#177534'], fail: ['alert', T.danger], run: ['clock', T.tint], pend: ['clock', T.fg3] }[st];
+      return this.row({ t: label, ic: I[0], icBg: 'transparent', icFg: I[1], v: st === 'fail' ? 'Fix' : st === 'run' ? 'Checking…' : '', vfg: st === 'fail' ? T.danger : T.fg2 });
+    });
+    const stockSecs = L.P.map(p => this.fields(`${p.name} · ${p.brand}`, F.stock.map(f => {
+      const path = p.k + '.' + f.k; const e = errOf(path);
+      if (f.sys || !canEdit) return this.ro(f.label, fmtV(val(path)), f.sys ? `${f.hint} · from CLIMS` : '');
+      return this.inp(f.label, val(path), set(path), { fid: fid(path), im: 'numeric', hint: f.hint, err: e ? e.msg : '' });
+    })));
+    const otherSec = others.length ? this.fields(F.otherTitle, others.map(f => {
+      const e = errOf(f.k); const hint = f.max === 'cover' ? `You cover ${cover} hotspots` : f.max === 'days' ? `0–${P0.days}` : (f.hint || '');
+      if (!canEdit) return this.ro(f.label, fmtV(val(f.k)));
+      if (f.type === 'sel') return this.fld('Sel', { label: f.label, val: val(f.k), on: set(f.k), fid: fid(f.k), opts: [{ v: '', l: 'Choose…' }, ...f.opts.map(o => ({ v: o, l: o }))], err: e ? e.msg : '' });
+      return this.inp(f.label, val(f.k), set(f.k), { fid: fid(f.k), im: 'numeric', hint, err: e ? e.msg : '' });
+    })) : null;
+    const cmt = String(val('comment') || '');
+    const primary = B ? (B.phase === 'validating' ? 'Checking…' : 'Sending…') : errList.length ? 'Re-check and send' : r.status === 'validated' ? 'Send to MOH' : 'Validate and send';
+    return { title: P0.label, backLabel: 'Reports', secs: [
+      this.banner(bn[0], bn[1], bn[2], { items: bn[0] === 'danger' ? live.map(e => ({ where: e.where, msg: e.msg, go: () => { const el = document.getElementById(fid(e.field)); if (el) el.focus(); } })) : [] }),
+      ...stockSecs,
+      otherSec,
+      canEdit ? this.fields('Comment', [this.fld('Area', { label: 'Anything MOH should know (optional)', val: cmt, on: set('comment') })]) : (cmt.trim() ? this.list('Comment', [this.row({ t: cmt })]) : null),
+      this.list('Validation', checks, { f: r.runs ? `Run ${r.runs} time${pl(r.runs)}` : 'Runs when you send' }),
+      r.status === 'sent' ? this.list('Submission', [this.row({ t: 'Reported by', v: r.reporter }), this.row({ t: 'Sent', v: L.t(r.sentAt) }), this.row({ t: 'Server receipt', v: r.receipt })]) : null,
+      canEdit ? this.btns([this.btn(primary, () => this.runRep(r, F, merged(), ctx), 'primary'), this.btn('Save draft', () => { this.send('rptSave', { id: r.id, values: merged() }, 'Report draft'); this.clrD(key); }, 'secondary', { dis: !dirty })]) : null,
+      r.status === 'sent' ? this.btns([this.btn('Download PDF', () => L.toast(`Downloading ${r.id} as PDF…`), 'secondary', { icon: 'receipt' })]) : null,
+    ] };
+  }
+
+  renderVals() {
+    const { store: s, lib: L, role, device, nav: nv0, toast } = this.props;
+    const I = this.icons();
+    const empty = { F: { w: '380px', h: '800px', bz: '10px', r1: '42px', r2: '32px' }, T: this.theme(false), I, secs: [], tabs: {}, hdr: {}, sb: {}, push: {}, tst: {}, sh: {}, cam: {}, fab: {}, off: {}, gest: {}, ios: false, android: true, padB: '24px' };
+    if (!s || !L || !this.ME[role]) {
+      this.c = { T: empty.T, ios: false };
+      return { ...empty, secs: [this.sec('Brand', { title: 'CLIMS', sub: 'Mobile app', body: 'This screen runs inside the live prototype. Open CLIMS Prototype and choose VHT, Hotspot manager or Rider in the prototype bar.', r: '24px' }), this.btns([this.btn('Open the prototype', () => { window.location.href = './CLIMS Prototype.dc.html'; }, 'primary')])] };
+    }
+    const ios = device === 'ios'; const T = this.theme(ios);
+    const nav = nv0 || {}; const m = this.mob(); const signed = !!m.signed[role];
+    const page = nav.page || this.ROOT[role];
+    const c = { s, L, T, ios, nav, page, id: nav.id, m, role, ME: this.ME[role], I };
+    this.c = c;
+    let scr;
+    try {
+      if (!signed) scr = this.signin(c);
+      else if (page === 'inbox') scr = this.inbox(c);
+      else if (page === 'me') scr = this.me(c);
+      else if (page === 'help') scr = this.help(c);
+      else if ((page === 'reports' || page === 'report') && this.rep) scr = this.rep(c);
+      else if (this[role + 'S']) scr = this[role + 'S'](c);
+      else scr = { title: 'CLIMS', secs: [] };
+    } catch (err) { console.error(err); scr = { title: 'CLIMS', secs: [this.banner('danger', 'Something went wrong', String(err && err.message || err))] }; }
+    const tabsOn = signed && !scr.noTabs;
+    const defs = this.TABS[role];
+    const curTab = (defs.find(t => t[3].includes(page)) || defs[0])[0];
+    const unread = signed ? this.unreadN() : 0;
+    const items = defs.map(([k, label, ic]) => { const on = k === curTab; const b = k === 'inbox' ? unread : (this.tabBadge ? this.tabBadge(c, k) : 0); return { label, mask: I[ic], cur: on ? 'page' : undefined, pick: () => this.go(k), fg: ios ? (on ? T.tint : '#8e8e93') : (on ? T.fg : T.fg2), icFg: on ? '#062b0f' : T.fg2, pill: on ? '#c3ecbd' : 'transparent', fw: on ? 700 : 500, hasBadge: b > 0, badge: b > 99 ? '99+' : String(b) }; });
+    let back = null;
+    if (signed && scr.back !== false) {
+      const nb = nav.back && nav.backFor === page ? nav.back : null;
+      const pp = (this.PARENT[role] || {})[page];
+      const par = nb || (pp ? { page: pp } : null);
+      if (par) back = { label: scr.backLabel || this.LBL[par.page] || 'Back', go: () => this.go(par.page, par.id, par.back) };
+    }
+    const fabDef = scr.fab && tabsOn ? scr.fab : null;
+    const actDef = scr.action || (ios && fabDef ? { label: fabDef.label, icon: 'plus', go: fabDef.go } : null);
+    const hdr = { iosBar: ios && !scr.noHdr, mdBar: !ios && !scr.noHdr, large: ios && !back, inline: ios && !!back, hasBack: !!back, noBack: !back, backLabel: back ? back.label : '', onBack: back ? back.go : null, title: scr.title || '', hasAct: !!actDef, act: actDef ? { label: actDef.label, go: actDef.go, hasIc: !!actDef.icon, noIc: !actDef.icon, mask: actDef.icon ? I[actDef.icon] : '' } : {}, bd: ios && back ? '0.5px solid rgba(0,0,0,.14)' : 'none', tPad: back ? '0' : '12px' };
+    const nq = (m.outbox || []).length;
+    const cam = this.state.cam;
+    const pe = this.state.push;
+    const sh = scr.sheet;
+    return {
+      ios, android: !ios, T, I,
+      F: ios ? { w: '414px', h: '868px', bz: '12px', r1: '58px', r2: '46px' } : { w: '380px', h: '800px', bz: '10px', r1: '42px', r2: '32px' },
+      sb: { bg: cam ? '#000' : (scr.noHdr ? T.bg : T.hdrBg), fg: cam ? '#fff' : T.fg, wifi: !m.offline },
+      hdr, scRef: this.scRef, sigRef: this.sigRef,
+      off: { show: signed && m.offline, text: nq ? `Offline · ${nq} action${nq > 1 ? 's' : ''} saved on this phone` : 'Offline · your work is saved on this phone' },
+      secs: (scr.secs || []).filter(Boolean),
+      padB: (fabDef && !ios ? '96px' : '28px'),
+      fab: { show: !ios && !!fabDef, label: fabDef ? fabDef.label : '', mask: I[(fabDef && fabDef.icon) || 'plus'], go: fabDef ? fabDef.go : null, b: '116px' },
+      tabs: { ios: ios && tabsOn, md: !ios && tabsOn, items },
+      gest: { bg: tabsOn ? T.tabBg : T.bg, ind: cam ? '#fff' : '#000' },
+      push: pe ? { show: true, title: `${this.orgOf(pe)} · ${pe.ref}`, body: pe.text, go: () => { this.setState({ push: null }); this.openNote(pe); }, top: ios ? '10px' : '36px', r: ios ? '22px' : '18px', icR: ios ? '9px' : '19px', bg: ios ? 'rgba(246,246,246,.88)' : '#eef2e9' } : { show: false },
+      tst: toast && toast.text ? { show: true, text: toast.text, x: ios ? '20px' : '12px', top: ios ? '60px' : 'auto', bot: ios ? 'auto' : (tabsOn ? '112px' : '36px'), r: ios ? '14px' : '4px', bg: ios ? 'rgba(28,28,30,.92)' : '#2e312d', ta: ios ? 'center' : 'left' } : { show: false },
+      sh: sh && this.state.sheet ? { open: true, title: sh.title, closeLbl: ios ? 'Done' : 'Close', close: () => this.setState({ sheet: null }), hasBody: !!sh.body, body: sh.body || '', hasSearch: !!sh.search, q: sh.search ? sh.search.q : '', onQ: sh.search ? sh.search.on : null, ph: sh.search ? sh.search.ph : '', hasRows: !!sh.rows, rows: sh.rows || [], isEmpty: !!sh.rows && !sh.rows.length, empty: sh.empty || '', hasBtns: !!(sh.btns && sh.btns.length), btns: sh.btns || [] } : { open: false },
+      cam: cam ? { open: true, top: ios ? '54px' : '32px', bot: ios ? '20px' : '0px', hint: cam.hint, flash: !!cam.flash, cancel: () => this.setState({ cam: null }), shoot: () => this.shoot(), onFile: e => this.readPhoto(e) } : { open: false },
+    };
+  }
+}
+</script>
+</body>
+</html>

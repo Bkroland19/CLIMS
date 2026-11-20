@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
+import { optionalUgandanMobile } from '@/lib/phone';
 import { decimalNumber } from '@/lib/validation';
 
 import type { Hotspot, HotspotSubmission } from './api';
-
-const PHONE_PATTERN = /^\+?[0-9 ()-]{7,15}$/;
 
 export const DISPENSER_CONDITIONS = ['Good', 'Poor', 'Broken'] as const;
 
@@ -37,13 +36,8 @@ export const submissionSchema = z
     type: optional(40),
     village: optional(20),
     contact_person_name: optional(40),
-    contact_person_telephone: z
-      .string()
-      .trim()
-      .refine((value) => value === '' || PHONE_PATTERN.test(value), {
-        message: 'Enter a phone number, e.g. +256 700000000.',
-      })
-      .transform((value) => value || null),
+    // Sent as `+256XXXXXXXXX` (13 characters): the column holds at most 15.
+    contact_person_telephone: optionalUgandanMobile().transform((value) => value || null),
     has_condom_dispenser: z.enum(['', 'yes', 'no']),
     dispenser_condition: z.string(),
     latitude: optionalCoordinate('a latitude', { min: -90, max: 90 }),

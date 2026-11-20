@@ -3,7 +3,6 @@
 import { Boxes, PackageCheck, Percent } from 'lucide-react';
 
 import { PendingTable } from '@/components/data-table/PendingTable';
-import { PageHeader } from '@/components/PageHeader';
 import { SampleDataNotice } from '@/components/SampleData';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { SAMPLE_DISTRIBUTION_SUMMARY } from '@/features/dashboards/sampleData';
@@ -13,7 +12,6 @@ import { formatNumber } from '@/lib/format';
 export default function DistributionPage() {
   return (
     <>
-      <PageHeader description="Condoms distributed to hotspots, by type, location and distributor." />
       <SampleDataNotice subject="The distribution figures" />
       <StatCardGrid>
         <StatCard

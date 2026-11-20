@@ -2,15 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { createTestHttp } from '@/test/testHttp';
 
-import { listOrganizationUnits, listRoles, listUnitsOfMeasure } from './api';
+import { listOrganizationUnits } from './api';
 import { lookupName } from './queries';
 
 describe('reference lists', () => {
-  it.each([
-    { name: 'roles', list: listRoles, url: '/roles' },
-    { name: 'organisation units', list: listOrganizationUnits, url: '/organizationUnits' },
-    { name: 'units of measure', list: listUnitsOfMeasure, url: '/unitOfMeasures' },
-  ])('reads $name from $url', async ({ list, url }) => {
+  it('reads organisation units from /organizationUnits', async () => {
     const { http, requests } = createTestHttp({
       status: 200,
       body: [
@@ -19,16 +15,18 @@ describe('reference lists', () => {
       ],
     });
 
-    await expect(list(http)).resolves.toEqual([
+    await expect(listOrganizationUnits(http)).resolves.toEqual([
       { id: 1, name: 'First' },
       { id: 2, name: null },
     ]);
-    expect(requests[0]).toMatchObject({ method: 'GET', url });
+    expect(requests[0]).toMatchObject({ method: 'GET', url: '/organizationUnits' });
   });
 
   it('rejects a record without an id', async () => {
     const { http } = createTestHttp({ status: 200, body: [{ name: 'Orphan' }] });
-    await expect(listRoles(http)).rejects.toMatchObject({ kind: 'unexpected_response' });
+    await expect(listOrganizationUnits(http)).rejects.toMatchObject({
+      kind: 'unexpected_response',
+    });
   });
 });
 

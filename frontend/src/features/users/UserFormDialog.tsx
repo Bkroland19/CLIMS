@@ -3,66 +3,59 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
 import { FormDialog } from '@/components/form/FormDialog';
-import { SelectField } from '@/components/form/SelectField';
 import { formLevelError } from '@/components/form/serverErrors';
 import { TextField } from '@/components/form/TextField';
-import type { Lookup } from '@/features/reference/api';
 
-import type { User } from './api';
-import { useSaveUser } from './queries';
+import type { Role } from './api';
+import { useCreateUser } from './queries';
+import { RoleChecklist } from './RoleChecklist';
 import {
-  createUserSchema,
-  editUserSchema,
-  toUserInput,
-  USER_FORM_FIELDS,
-  userDisplayName,
-  userFormDefaults,
-  type UserFormValues,
+  NEW_USER_DEFAULTS,
+  NEW_USER_FIELDS,
+  newUserSchema,
+  toNewUserInput,
+  type NewUserFormInput,
+  type NewUserFormOutput,
 } from './userForm';
 
 interface UserFormDialogProps {
-  /** The user being edited, or `null` to create one. */
-  user: User | null;
-  roles: readonly Lookup[] | undefined;
+  roles: readonly Role[] | undefined;
   isLoadingRoles: boolean;
-  organizationUnits: readonly Lookup[] | undefined;
-  isLoadingOrganizationUnits: boolean;
+  rolesError: unknown;
   onClose: () => void;
 }
 
-const toOptions = (items: readonly Lookup[] | undefined) =>
-  (items ?? []).map((item) => ({ value: String(item.id), label: item.name ?? `#${item.id}` }));
-
-/** Create or edit a user. Mount it to open; `onClose` unmounts it. */
+/**
+ * Creates a user account (`POST /users`). Mount it to open; `onClose` unmounts it.
+ * The API has no endpoint for editing a user's details afterwards, so this
+ * dialog only creates; roles and status are changed from the row menu.
+ */
 export function UserFormDialog({
-  user,
   roles,
   isLoadingRoles,
-  organizationUnits,
-  isLoadingOrganizationUnits,
+  rolesError,
   onClose,
 }: UserFormDialogProps) {
-  const isEditing = user !== null;
-  const saveUser = useSaveUser(user);
+  const createUser = useCreateUser();
   const {
     control,
     register,
     handleSubmit,
     setError,
     formState: { errors, isDirty },
-  } = useForm<UserFormValues>({
-    resolver: zodResolver(isEditing ? editUserSchema : createUserSchema),
-    defaultValues: userFormDefaults(user, roles ?? []),
+  } = useForm<NewUserFormInput, unknown, NewUserFormOutput>({
+    resolver: zodResolver(newUserSchema),
+    defaultValues: NEW_USER_DEFAULTS,
   });
 
   const [formError, setFormError] = useState<string | null>(null);
 
   const onSubmit = handleSubmit((values) => {
     setFormError(null);
-    saveUser.mutate(toUserInput(values), {
+    createUser.mutate(toNewUserInput(values), {
       onSuccess: onClose,
       onError: (error) => {
-        setFormError(formLevelError(error, USER_FORM_FIELDS, setError));
+        setFormError(formLevelError(error, NEW_USER_FIELDS, setError));
       },
     });
   });
@@ -73,15 +66,11 @@ export function UserFormDialog({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title={isEditing ? `Edit ${userDisplayName(user)}` : 'Add user'}
-      description={
-        isEditing
-          ? 'Update this account. Leave the password blank to keep the current one.'
-          : 'Create an account. The person signs in with this username and password.'
-      }
-      submitLabel={isEditing ? 'Save changes' : 'Create user'}
-      pendingLabel={isEditing ? 'Saving…' : 'Creating…'}
-      isPending={saveUser.isPending}
+      title="Add user"
+      description="Create an account. The person signs in with this email address and password."
+      submitLabel="Create user"
+      pendingLabel="Creating…"
+      isPending={createUser.isPending}
       isDirty={isDirty}
       error={formError}
       onSubmit={onSubmit}
@@ -121,62 +110,35 @@ export function UserFormDialog({
       <TextField
         label="Phone number"
         type="tel"
-        required
         autoComplete="off"
+        placeholder="+256 7XX XXX XXX"
         error={errors.phone_number?.message}
         {...register('phone_number')}
       />
       <TextField
-        label="Location"
-        required
-        autoComplete="off"
-        error={errors.location?.message}
-        {...register('location')}
-      />
-      <Controller
-        control={control}
-        name="role"
-        render={({ field, fieldState }) => (
-          <SelectField
-            label="Role"
-            required
-            value={field.value}
-            onValueChange={field.onChange}
-            onBlur={field.onBlur}
-            triggerRef={field.ref}
-            options={toOptions(roles)}
-            placeholder="Choose a role…"
-            isLoading={isLoadingRoles}
-            error={fieldState.error?.message}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="organization_unit_id"
-        render={({ field, fieldState }) => (
-          <SelectField
-            label="Organisation unit"
-            required
-            value={field.value}
-            onValueChange={field.onChange}
-            onBlur={field.onBlur}
-            triggerRef={field.ref}
-            options={toOptions(organizationUnits)}
-            placeholder="Choose an organisation unit…"
-            isLoading={isLoadingOrganizationUnits}
-            error={fieldState.error?.message}
-          />
-        )}
-      />
-      <TextField
-        label={isEditing ? 'New password' : 'Password'}
+        label="Password"
         type="password"
-        required={!isEditing}
+        required
         autoComplete="new-password"
         description="At least 8 characters."
         error={errors.password?.message}
         {...register('password')}
+      />
+      <Controller
+        control={control}
+        name="role_ids"
+        render={({ field, fieldState }) => (
+          <RoleChecklist
+            roles={roles}
+            isLoading={isLoadingRoles}
+            loadError={rolesError}
+            value={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+            firstCheckboxRef={field.ref}
+            error={fieldState.error?.message}
+          />
+        )}
       />
     </FormDialog>
   );

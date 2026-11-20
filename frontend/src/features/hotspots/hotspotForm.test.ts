@@ -29,6 +29,13 @@ describe('submissionSchema', () => {
     });
   });
 
+  it('sends the contact phone in +256 form', () => {
+    expect(
+      submissionSchema.parse({ ...minimal, contact_person_telephone: '0772 000 000' })
+        .contact_person_telephone,
+    ).toBe('+256772000000');
+  });
+
   it('sends the dispenser answer and drops a condition without a dispenser', () => {
     const withDispenser = {
       ...minimal,
@@ -51,6 +58,8 @@ describe('submissionSchema', () => {
     [{ district_id: '' }, 'district_id'],
     [{ village: 'x'.repeat(21) }, 'village'],
     [{ contact_person_telephone: 'call me' }, 'contact_person_telephone'],
+    [{ contact_person_telephone: '+254 712 345 678' }, 'contact_person_telephone'],
+    [{ contact_person_telephone: '0414 123456' }, 'contact_person_telephone'],
     [{ has_condom_dispenser: 'yes' as const }, 'dispenser_condition'],
     [{ latitude: '0.31' }, 'longitude'],
     [{ latitude: '91', longitude: '32' }, 'latitude'],

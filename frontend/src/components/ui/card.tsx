@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from 'cn';
+import { Slot } from 'radix-ui';
 
 function Card({
   className,
@@ -11,7 +12,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        'group/card bg-card text-card-foreground border-border flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border py-(--card-spacing) text-sm [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',
+        'group/card bg-card text-card-foreground border-border rounded-card *:[img:first-child]:rounded-t-card *:[img:last-child]:rounded-b-card flex flex-col gap-(--card-spacing) overflow-hidden border py-(--card-spacing) text-sm [--card-spacing:--spacing(5)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0',
         className,
       )}
       {...props}
@@ -24,7 +25,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card-header"
       className={cn(
-        'group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)',
+        'group/card-header rounded-t-card @container/card-header grid auto-rows-min items-start gap-1 px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)',
         className,
       )}
       {...props}
@@ -32,9 +33,24 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+/**
+ * The card's heading. It is an `h2`, the level of a section under the page's
+ * `h1`; for a card nested inside another section, pass a heading of the right
+ * level as the only child with `asChild`.
+ *
+ * ```tsx
+ * <CardTitle>Quantities</CardTitle>
+ * <CardTitle asChild><h3>Batches</h3></CardTitle>
+ * ```
+ */
+function CardTitle({
+  className,
+  asChild = false,
+  ...props
+}: React.ComponentProps<'h2'> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : 'h2';
   return (
-    <div
+    <Comp
       data-slot="card-title"
       className={cn(
         'font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm',
@@ -76,7 +92,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card-footer"
       className={cn(
-        'bg-muted/50 flex items-center rounded-b-xl border-t p-(--card-spacing)',
+        'bg-muted/50 rounded-b-card flex items-center border-t p-(--card-spacing)',
         className,
       )}
       {...props}

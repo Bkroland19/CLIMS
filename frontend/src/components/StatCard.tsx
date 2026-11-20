@@ -1,36 +1,92 @@
 import type { LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import Link from 'next/link';
 
+import { Sparkline } from '@/components/charts/Sparkline';
 import { SampleBadge } from '@/components/SampleData';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatNumber } from '@/lib/format';
+import { trendChange, type GoodDirection, type TrendMeaning } from '@/lib/trend';
+import { cn } from '@/lib/utils';
+
+/** Colour of the icon and sparkline. It identifies the card, it does not judge the figure. */
+export type StatCardAccent = 'neutral' | 'info' | 'positive' | 'caution' | 'violet';
+
+const ACCENT_CLASSES: Record<StatCardAccent, string> = {
+  neutral: 'text-muted-foreground',
+  info: 'text-info',
+  positive: 'text-success',
+  caution: 'text-warning',
+  violet: 'text-chart-3',
+};
+
+const MEANING_CLASSES: Record<TrendMeaning, string> = {
+  good: 'bg-success/10 text-success',
+  bad: 'bg-warning/10 text-warning',
+  neutral: 'bg-secondary text-muted-foreground',
+};
+
+/** Read before the change by screen readers, since the arrow is hidden. */
+const DIRECTION_WORDS = { up: 'Up', down: 'Down', flat: 'No change' } as const;
+
+export interface StatCardTrend {
+  /** Recent values, oldest first; the last is the current figure. */
+  series: readonly number[];
+  /** Which way is good news. Leave out when neither is. */
+  goodDirection?: GoodDirection;
+  /** What the change is measured against, e.g. "vs last week". */
+  caption: string;
+}
 
 interface StatCardProps {
   label: string;
   /** Already formatted for display. */
   value: string;
   icon: LucideIcon;
+  /** Icon and sparkline colour. Defaults to neutral. */
+  accent?: StatCardAccent;
+  /** Adds the change since the previous point and a sparkline. */
+  trend?: StatCardTrend;
+  /** Makes the whole card a link, e.g. to the list behind the figure. */
+  href?: string;
   /** True while the figure is being fetched. */
   isLoading?: boolean;
   /** True when the figure is illustrative rather than read from the API. */
   isSample?: boolean;
+  /** Layout adjustments only. */
+  className?: string;
 }
 
-/** One headline figure. Layout follows the reference design's KPI card. */
+/**
+ * One headline figure, optionally with its latest change and a sparkline.
+ *
+ * ```tsx
+ * <StatCard label="Orders in queue" value="4" icon={Inbox} accent="info"
+ *   trend={{ series: [3, 5, 4, 4], goodDirection: 'down', caption: 'vs last week' }}
+ *   href="/dcfp/orders" />
+ * ```
+ */
 export function StatCard({
   label,
   value,
   icon: Icon,
+  accent = 'neutral',
+  trend,
+  href,
   isLoading = false,
   isSample = false,
+  className,
 }: StatCardProps) {
-  return (
-    <div className="bg-card rounded-xl border p-5">
-      <div className="mb-3 flex items-start justify-between gap-3">
+  const change = trend ? trendChange(trend.series, trend.goodDirection) : null;
+  const body = (
+    <>
+      <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-muted-foreground text-sm font-medium">{label}</span>
           {isSample ? <SampleBadge /> : null}
         </div>
         <div className="bg-secondary flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <Icon className="text-muted-foreground size-4" aria-hidden="true" />
+          <Icon className={cn('size-4', ACCENT_CLASSES[accent])} aria-hidden="true" />
         </div>
       </div>
       {isLoading ? (
@@ -39,12 +95,54 @@ export function StatCard({
           <span className="sr-only">Loading {label.toLowerCase()}…</span>
         </div>
       ) : (
-        <p className="text-foreground text-2xl font-bold tracking-tight break-words tabular-nums lg:text-3xl">
-          {value}
-        </p>
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-foreground text-2xl font-bold tracking-tight break-words tabular-nums lg:text-3xl">
+              {value}
+            </p>
+            {trend && change ? (
+              <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                <span
+                  data-meaning={change.meaning}
+                  className={cn(
+                    'inline-flex h-4.5 items-center gap-0.5 rounded-sm px-1.5 font-semibold tabular-nums',
+                    MEANING_CLASSES[change.meaning],
+                  )}
+                >
+                  <TrendIcon direction={change.direction} />
+                  <span className="sr-only">{DIRECTION_WORDS[change.direction]} </span>
+                  {change.direction === 'flat' ? '0' : formatNumber(Math.abs(change.delta))}
+                </span>
+                {trend.caption}
+              </p>
+            ) : null}
+          </div>
+          {trend ? <Sparkline series={trend.series} className={ACCENT_CLASSES[accent]} /> : null}
+        </div>
       )}
-    </div>
+    </>
   );
+
+  const cardClasses = cn('bg-card rounded-card flex flex-col gap-3 border p-5', className);
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={cn(
+          cardClasses,
+          'hover:bg-accent focus-visible:ring-ring outline-none focus-visible:ring-2',
+        )}
+      >
+        {body}
+      </Link>
+    );
+  }
+  return <div className={cardClasses}>{body}</div>;
+}
+
+function TrendIcon({ direction }: { direction: 'up' | 'down' | 'flat' }) {
+  const Icon = direction === 'up' ? ArrowUp : direction === 'down' ? ArrowDown : Minus;
+  return <Icon className="size-3" aria-hidden="true" />;
 }
 
 /**

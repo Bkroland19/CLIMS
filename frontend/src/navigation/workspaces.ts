@@ -1,0 +1,470 @@
+import {
+  ClipboardCheck,
+  ClipboardList,
+  HeartPulse,
+  Inbox,
+  Landmark,
+  LayoutDashboard,
+  MapPin,
+  Package,
+  ShieldCheck,
+  ShoppingCart,
+  Store,
+  Truck,
+  Users,
+  UsersRound,
+  Warehouse,
+} from 'lucide-react';
+
+import type { NavItem, Workspace } from './navigation';
+import { HOME_PATH } from './paths';
+
+/*
+ * Every signed-in screen, by workspace. This table drives the sidebar, the
+ * heading band (breadcrumb, title, description, tabs), the loading skeleton
+ * and each page's browser title. The screens themselves are the `page.tsx`
+ * files under `src/app/(app)`: a page missing from this table fails the
+ * build, and a test fails if the table names a path that has no page.
+ */
+
+const DESCRIPTIONS = {
+  hotspotMap: 'Where hotspots are. Select a marker to see its contact person and status.',
+} as const;
+
+function dashboard(path: string, title: string, description: string): NavItem {
+  return {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    pages: [{ path, tab: 'Dashboard', title, description, layout: 'dashboard' }],
+  };
+}
+
+/** A reporter's monthly reports (Phase 8): the list and one report. */
+function monthlyReports(path: string, description: string): NavItem {
+  return {
+    id: 'reports',
+    label: 'Monthly reports',
+    icon: ClipboardCheck,
+    pages: [{ path, tab: 'Reports', title: 'Monthly reports', description, layout: 'table' }],
+    details: [{ path: `${path}/[id]`, label: 'Monthly report', layout: 'form' }],
+  };
+}
+
+export const workspaces: readonly Workspace[] = [
+  {
+    id: 'moh',
+    label: 'Ministry of Health',
+    icon: Landmark,
+    basePath: HOME_PATH,
+    sections: [
+      {
+        label: 'Overview',
+        items: [
+          dashboard(
+            HOME_PATH,
+            'MOH dashboard',
+            'National view of condom stock, hotspot orders and deliveries.',
+          ),
+        ],
+      },
+      {
+        label: 'Oversight',
+        items: [
+          {
+            id: 'orders',
+            label: 'Orders',
+            icon: ClipboardList,
+            pages: [
+              {
+                path: '/moh/orders',
+                tab: 'Hotspot orders',
+                title: 'Orders',
+                description: 'Every hotspot order with its full audit trail.',
+                layout: 'table',
+              },
+              {
+                path: '/moh/orders/warehouse',
+                tab: 'Warehouse requests',
+                title: 'Orders',
+                description: 'District store orders to NMS and JMS.',
+                layout: 'table',
+              },
+            ],
+            details: [{ path: '/moh/orders/[id]', label: 'Order audit trail', layout: 'detail' }],
+          },
+          {
+            id: 'reports',
+            label: 'Reports',
+            icon: ClipboardCheck,
+            pages: [
+              {
+                path: '/moh/reports',
+                tab: 'Submissions',
+                title: 'Reports',
+                description:
+                  'Monthly reports sent to the MOH server by hotspots, VHTs, districts and warehouses.',
+                layout: 'table',
+              },
+            ],
+            details: [{ path: '/moh/reports/[id]', label: 'Report', layout: 'detail' }],
+          },
+          // Distribution, procurement and the hotspot map predate the prototype, which has no
+          // equivalent for them. They stay until it is decided whether MOH still needs them.
+          {
+            id: 'distribution',
+            label: 'Distribution',
+            icon: Truck,
+            pages: [
+              {
+                path: '/moh/distribution',
+                tab: 'Distribution',
+                title: 'Condom distribution',
+                description: 'Condoms distributed to hotspots, by type, location and distributor.',
+                layout: 'table',
+              },
+            ],
+          },
+          {
+            id: 'procurement',
+            label: 'Procurement',
+            icon: ShoppingCart,
+            pages: [
+              {
+                path: '/moh/procurement',
+                tab: 'Procurement',
+                title: 'Procurement',
+                description: 'Condom stock procured through each supply channel.',
+                layout: 'dashboard',
+              },
+            ],
+          },
+          {
+            id: 'hotspot-map',
+            label: 'Hotspot map',
+            icon: MapPin,
+            pages: [
+              {
+                path: '/moh/hotspot-map',
+                tab: 'Map',
+                title: 'Hotspot map',
+                description: DESCRIPTIONS.hotspotMap,
+                layout: 'dashboard',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: 'Administration',
+        items: [
+          {
+            id: 'users',
+            label: 'Users & access',
+            icon: Users,
+            pages: [
+              {
+                path: '/moh/users',
+                tab: 'Users',
+                title: 'User management',
+                description: 'Everyone who can sign in to CLIMS, and the roles they hold.',
+                layout: 'table',
+              },
+              {
+                path: '/moh/users/roles',
+                tab: 'Roles & permissions',
+                title: 'Roles & permissions',
+                description: 'What each role can see and do. A user can hold more than one role.',
+                layout: 'detail',
+              },
+            ],
+          },
+          {
+            id: 'catalogue',
+            label: 'Product catalogue',
+            icon: Package,
+            pages: [
+              {
+                path: '/moh/catalogue',
+                tab: 'Condoms',
+                title: 'Product catalogue',
+                description:
+                  'Condom products. Category, brand and type together identify a product.',
+                layout: 'table',
+              },
+              {
+                path: '/moh/catalogue/units',
+                tab: 'Units of measure',
+                title: 'Units of measure',
+                description: 'Units condoms are counted in, and how many pieces each holds.',
+                layout: 'table',
+              },
+            ],
+          },
+          {
+            id: 'locations',
+            label: 'Stores & locations',
+            icon: Store,
+            pages: [
+              {
+                path: '/moh/stores',
+                tab: 'Stores',
+                title: 'Stores',
+                description: 'Stock-holding points: national warehouses and district stores.',
+                layout: 'table',
+              },
+              {
+                path: '/moh/stores/geography',
+                tab: 'Geography',
+                title: 'Geography',
+                description: 'Regions, districts, sub-counties and facilities, synced from DHIS2.',
+                layout: 'detail',
+              },
+            ],
+          },
+          {
+            id: 'audit',
+            label: 'Audit log',
+            icon: ShieldCheck,
+            pages: [
+              {
+                path: '/moh/audit',
+                tab: 'Audit log',
+                title: 'Audit log',
+                description:
+                  'Every create, update and delete in CLIMS, with who did it and what changed.',
+                layout: 'table',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'dcfp',
+    label: 'District focal person',
+    icon: HeartPulse,
+    basePath: '/dcfp',
+    sections: [
+      {
+        label: 'Overview',
+        items: [
+          dashboard(
+            '/dcfp',
+            'District dashboard',
+            'What needs your attention in the district today, in the order it needs doing.',
+          ),
+        ],
+      },
+      {
+        label: 'Fulfilment',
+        items: [
+          {
+            id: 'orders',
+            label: 'Orders',
+            icon: Inbox,
+            pages: [
+              {
+                path: '/dcfp/orders',
+                tab: 'Queue',
+                title: 'Orders',
+                description:
+                  'Stockout notifications from hotspots. Review each one, check stock, then confirm or hold.',
+                layout: 'table',
+              },
+              {
+                path: '/dcfp/orders/held',
+                tab: 'Held for stock',
+                title: 'Orders',
+                description:
+                  'Orders waiting for stock, checked against what is in the district store now.',
+                layout: 'table',
+              },
+            ],
+            details: [{ path: '/dcfp/orders/[id]', label: 'Review order', layout: 'detail' }],
+          },
+          {
+            id: 'restock',
+            label: 'Restock',
+            icon: Warehouse,
+            pages: [
+              {
+                path: '/dcfp/restock',
+                tab: 'Warehouse requests',
+                title: 'Restock',
+                description:
+                  'Stock ordered from NMS or JMS, and consignments waiting to be received.',
+                layout: 'table',
+              },
+              {
+                path: '/dcfp/restock/store',
+                tab: 'District store',
+                title: 'Restock',
+                description:
+                  'Condoms in the district store, by batch, and every movement in and out.',
+                layout: 'table',
+              },
+            ],
+            // `new` is listed before `[id]`: a fixed segment wins, as it does in the router.
+            details: [
+              { path: '/dcfp/restock/new', label: 'New warehouse request', layout: 'form' },
+              { path: '/dcfp/restock/[id]', label: 'Warehouse request', layout: 'detail' },
+            ],
+          },
+          {
+            id: 'dispatch',
+            label: 'Dispatch',
+            icon: Truck,
+            pages: [
+              {
+                path: '/dcfp/dispatch',
+                tab: 'Dispatch',
+                title: 'Dispatch',
+                description:
+                  'Confirmed orders ready to go out with a rider, and deliveries in progress.',
+                layout: 'table',
+              },
+            ],
+            details: [{ path: '/dcfp/dispatch/[id]', label: 'Dispatch order', layout: 'form' }],
+          },
+        ],
+      },
+      {
+        label: 'Network',
+        items: [
+          {
+            id: 'hotspots',
+            label: 'Hotspots',
+            icon: MapPin,
+            pages: [
+              {
+                path: '/dcfp/hotspots',
+                tab: 'List',
+                title: 'Hotspots',
+                description:
+                  'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.',
+                layout: 'table',
+              },
+              {
+                path: '/dcfp/hotspot-map',
+                tab: 'Map',
+                title: 'Hotspot map',
+                description: DESCRIPTIONS.hotspotMap,
+                layout: 'dashboard',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: 'Reporting',
+        items: [
+          monthlyReports(
+            '/dcfp/reports',
+            'Send the monthly district stock report to MOH. CLIMS checks the figures before they are sent.',
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    // NMS and JMS are stores this one workspace switches between (`?store=`), not role areas.
+    id: 'warehouse',
+    label: 'Warehouse',
+    icon: Warehouse,
+    basePath: '/warehouse',
+    sections: [
+      {
+        label: 'Overview',
+        items: [
+          dashboard(
+            '/warehouse',
+            'Warehouse dashboard',
+            'District requests waiting on this warehouse, and stock against its minimum levels.',
+          ),
+        ],
+      },
+      {
+        label: 'Fulfilment',
+        items: [
+          {
+            id: 'requests',
+            label: 'District requests',
+            icon: Inbox,
+            pages: [
+              {
+                path: '/warehouse/requests',
+                tab: 'Requests',
+                title: 'District requests',
+                description:
+                  'Stock orders from district stores. Review, check stock, then dispatch or hold.',
+                layout: 'table',
+              },
+            ],
+            details: [
+              { path: '/warehouse/requests/[id]', label: 'District request', layout: 'detail' },
+            ],
+          },
+        ],
+      },
+      {
+        label: 'Inventory',
+        items: [
+          {
+            id: 'stock',
+            label: 'Stock',
+            icon: Package,
+            pages: [
+              {
+                path: '/warehouse/stock',
+                tab: 'Stock',
+                title: 'Warehouse stock',
+                description: 'Condom stock held at this warehouse, by batch, and every movement.',
+                layout: 'table',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        label: 'Reporting',
+        items: [
+          monthlyReports(
+            '/warehouse/reports',
+            'Send the monthly warehouse stock report to MOH. CLIMS checks the figures before they are sent.',
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    // The prototype puts VHTs in the mobile app only; this web page is their hotspot submissions.
+    id: 'vht',
+    label: 'Village health team',
+    icon: UsersRound,
+    basePath: '/vht',
+    sections: [
+      {
+        label: 'Network',
+        items: [
+          {
+            id: 'hotspots',
+            label: 'My hotspots',
+            icon: MapPin,
+            pages: [
+              {
+                path: '/vht',
+                tab: 'My hotspots',
+                title: 'My hotspots',
+                description:
+                  'Hotspots you identified, and where each one is in district verification.',
+                layout: 'table',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];

@@ -42,7 +42,7 @@ describe('signIn', () => {
     const session = await signIn(http, { login: 'okello@example.org', password: 'secret' });
 
     expect(session.token).toBe('tok_9');
-    expect(session.user).toMatchObject({ id: 2, username: 'okello', role: 'dfcp' });
+    expect(session.user).toMatchObject({ id: '2', username: 'okello', role: 'dfcp' });
     expect(requests[0]).toMatchObject({
       method: 'POST',
       url: '/auth/login',

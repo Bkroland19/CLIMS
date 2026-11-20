@@ -8,7 +8,14 @@ import { createAppStore, syncSessionAcrossTabs } from './store';
 
 const session: Session = {
   token: 'tok_1',
-  user: { id: 4, username: 'nakato', role: 'admin', firstname: null, lastname: null, email: null },
+  user: {
+    id: '4',
+    username: 'nakato',
+    role: 'admin',
+    firstname: null,
+    lastname: null,
+    email: null,
+  },
 };
 
 function setup(initial: Record<string, string> = {}) {

@@ -21,6 +21,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // The end-to-end tests (playwright.config.ts) build into `.next-e2e`, so their dev server can
+  // run while a developer's `next dev` holds the lock in `.next`.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // Do not advertise the framework in a response header.
   poweredByHeader: false,
   turbopack: {

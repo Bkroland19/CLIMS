@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const n=new URLSearchParams(location.search).get("theme");if(n==="light"||n==="dark"){document.documentElement.dataset.theme=n}}{if(new URLSearchParams(location.search).get("_omthumb")==="1"){const n=(f)=>{const g=f.focus;if(!g)return;f.focus=function(h){g.call(this,{...h,preventScroll:true})}};n(HTMLElement.prototype);n(SVGElement.prototype);if(typeof MathMLElement!=="undefined"){n(MathMLElement.prototype)}const d=(f)=>{f.removeAttribute("autofocus");f.inert=true;if(!(f instanceof HTMLElement))f.removeAttribute("tabindex")};const p=(f)=>{if(f.hasAttribute("autofocus"))d(f);for(const g of f.querySelectorAll("[autofocus]")){d(g)}};p(document.documentElement);new MutationObserver((f)=>{for(const g of f){for(const h of g.addedNodes){if(h.nodeType===1)p(h)}}}).observe(document,{childList:true,subtree:true})}}{const n=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const d=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(d&&d!=="normal")return;const p=(y)=>{if(!y)return null;const m=getComputedStyle(y).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!m)return null;const w=m[4]==null?1:parseFloat(m[4])/(m[4].endsWith("%")?100:1);if(w<0.99)return null;return[+m[1],+m[2],+m[3]]};const f=p(document.body)||p(document.documentElement);if(!f)return;const g=(y)=>{const m=y/255;return m<=0.04045?m/12.92:((m+0.055)/1.055)**2.4};const h=0.2126*g(f[0])+0.7152*g(f[1])+0.0722*g(f[2]);document.documentElement.style.setProperty("color-scheme",h<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")n();else window.addEventListener("load",n)}var I=[];var B=false;var K=false;var C=()=>{};if(K===true){try{const n=setTimeout.bind(window);const d=1e4;const p=15;const f=1e4;const g=120000;const h=200;const y=(o)=>{try{let r;if(typeof o==="string")r=o;else if(o instanceof URL)r=o.href;else if(typeof Request!=="undefined"&&o instanceof Request)r=o.url;else return null;if(!r)return null;const l=document.baseURI;const i=new URL(r,l);if(i.protocol!=="http:"&&i.protocol!=="https:")return null;if(i.origin!==new URL(l).origin)return null;return i.origin+i.pathname}catch{return null}};const m=new Map;const w=(o)=>{let r=m.get(o);if(!r){if(m.size>=h){const l=m.keys().next().value;if(l!==undefined)m.delete(l)}r={fails:[],until:0,cooldown:f,hard:false};m.set(o,r)}return r};const R=(o)=>{const r=m.get(o);return r!==undefined&&r.until>Date.now()};const O=(o,r)=>{const l=Date.now();const i=w(o);if(r)i.hard=true;if(i.until>l)return;i.fails.push(l);while(i.fails.length>0&&i.fails[0]<=l-d)i.fails.shift();if(i.fails.length>=p){i.until=l+i.cooldown;if(i.hard)i.cooldown=Math.min(i.cooldown*2,g);i.fails.length=0;try{n(()=>{try{S(true)}catch{}},i.until-l+100)}catch{}console.warn("[omelette] asset circuit breaker: pausing requests to "+o+" for "+Math.round((i.until-l)/1000)+"s after "+p+" failures in "+d/1000+"s")}};const e=(o)=>{m.delete(o)};const t=100;const a=new WeakMap;const u=new Set;let s=null;const S=(o)=>{for(const r of Array.from(u)){try{const l=a.get(r);if(l===undefined){u.delete(r);continue}if(o){const i=y(l);if(i!==null&&R(i))continue}a.delete(r);u.delete(r);if(s!==null)s.call(r,l)}catch{}}};C=()=>{try{m.clear();S(false)}catch{}};document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")C()});const _=window.fetch;if(typeof _==="function"){const o=function(...r){let l=null;try{l=y(r[0])}catch{}if(l!==null&&R(l)){let c;try{if(r[1]&&r[1].signal!==undefined){c=r[1].signal||undefined}else if(typeof Request!=="undefined"&&r[0]instanceof Request){c=r[0].signal||undefined}}catch{c=undefined}return new Promise((k,b)=>{const E=()=>{try{return c.reason!==undefined?c.reason:new DOMException("The operation was aborted.","AbortError")}catch{return new DOMException("The operation was aborted.","AbortError")}};try{if(c&&c.aborted){b(E());return}}catch{}let T=false;const j=()=>{if(T)return;T=true;b(E())};try{if(c)c.addEventListener("abort",j,{once:true})}catch{}n(()=>{if(T)return;T=true;try{if(c)c.removeEventListener("abort",j)}catch{}let L;try{L=new Response(null,{status:429,statusText:"Too Many Requests",headers:{"Retry-After":"10"}})}catch{L={ok:false,status:429}}k(L)},250)})}const i=_.apply(window,r);if(l!==null){const c=l;i.then((k)=>{try{if(k.ok)e(c);else if(k.status===401||k.status===403||k.status===404||k.status===429){O(c,k.status!==404)}}catch{}},()=>{})}return i};window.fetch=o}const v=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");if(v!==undefined&&v.set!==undefined&&v.get!==undefined){const o=v.set;s=o;Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,enumerable:v.enumerable,get:v.get,set(r){const l=`${r}`;try{const i=y(l);if(i!==null&&R(i)){a.set(this,l);if(u.size<t)u.add(this);return}}catch{}try{a.delete(this);u.delete(this)}catch{}o.call(this,l)}})}try{const o=HTMLImageElement.prototype.setAttribute;HTMLImageElement.prototype.setAttribute=function(r,l){if(arguments.length<2){o.apply(this,arguments);return}if(typeof r==="string"&&r.toLowerCase()==="src"){const i=`${l}`;try{const c=y(i);if(c!==null&&R(c)){a.set(this,i);if(u.size<t)u.add(this);return}a.delete(this);u.delete(this)}catch{}o.call(this,r,i);return}o.call(this,r,l)}}catch{}window.addEventListener("error",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)O(l,true)}}catch{}},true);window.addEventListener("load",(o)=>{try{const r=o.target;if(r instanceof HTMLImageElement){const l=y(r.currentSrc||r.src||"");if(l!==null)e(l);const i=a.get(r);if(i!==undefined){let c=false;try{c=new URL(i,document.baseURI).href===new URL(r.currentSrc||r.src||"",document.baseURI).href}catch{c=false}if(c){a.delete(r);u.delete(r)}}}}catch{}},true)}catch{}}var J=30000;var G=3000;document.addEventListener("DOMContentLoaded",()=>{const n=window.Babel;const d="om-src-id";if(n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[d])){n.registerPlugin(d,({types:h})=>({visitor:{JSXOpeningElement(y,m){const w=y.node;if(w.name&&w.name.type==="JSXMemberExpression")return;for(let t=0;t<w.attributes.length;t++){const a=w.attributes[t];if(a.type==="JSXAttribute"&&a.name&&a.name.name==="data-om-id")return}const R=m.file&&m.file.opts&&m.file.opts.filename||"?";const O=w.loc&&w.loc.start;const e=`jsx:${R}:${w.start??0}:${O?O.line:0}:${O?O.column+1:0}`;w.attributes.push(h.jsxAttribute(h.jsxIdentifier("data-om-id"),h.stringLiteral(e)))}}}))}const p="om-text-extract";let f=false;if(B&&n&&n.registerPlugin&&!(n.availablePlugins&&n.availablePlugins[p])){const h=window.React;if(h&&h.useSyncExternalStore&&h.createElement){f=true;const y={};const m=new Set;let w=0;window.__omTextO=y;window.__omTextSet=(e)=>{for(const t in e){const a=e[t];if(a==null)delete y[t];else y[t]=a}w++;m.forEach((t)=>t())};const R=(e)=>{m.add(e);return()=>m.delete(e)};const O=()=>w;window.__OmT=function e(t){h.useSyncExternalStore(R,O,O);return h.createElement("span",{"data-om-text":t.i,className:"__om-t"},t.i in y?y[t.i]:t.children)};n.registerPlugin(p,({types:e})=>{const t={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const a={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const u=(o,r)=>e.logicalExpression("??",e.memberExpression(e.logicalExpression("||",e.memberExpression(e.identifier("window"),e.identifier("__omTextO")),e.objectExpression([])),e.stringLiteral(o),true),r);const s=(o)=>o.file&&o.file.opts&&o.file.opts.filename||"?";const S=(o)=>o.file&&o.file.code||"";const _=(o,r)=>{const l=(c)=>c&&c.start!=null&&c.end!=null&&(c.type==="StringLiteral"||c.type==="TemplateLiteral"&&c.expressions.length===0)?[c.start,c.end]:null;const i=l(r);if(i)return i;if(r&&r.type==="Identifier"){const c=o.scope.getBinding(r.name);if(c&&c.constant&&c.path.node.type==="VariableDeclarator"){return l(c.path.node.init)}}return null};const v=(o,r,l)=>{const i=o.node;let c=false;const k=(E,T)=>{c=true;return e.jsxElement(e.jsxOpeningElement(e.jsxIdentifier("__OmT"),[e.jsxAttribute(e.jsxIdentifier("i"),e.stringLiteral(E))],false),e.jsxClosingElement(e.jsxIdentifier("__OmT")),[T],false)};const b=i.children.map((E)=>{if(E.type==="JSXText"){if(E.start==null||E.end==null)return E;const T=l.slice(E.start,E.end);const j=T.length-T.trimStart().length;const L=T.length-T.trimEnd().length;if(j+L>=T.length)return E;return k(`txt:${r}:${E.start+j}:${E.end-L}`,E)}if(E.type==="JSXExpressionContainer"){const T=_(o,E.expression);if(T)return k(`str:${r}:${T[0]}:${T[1]}`,E)}return E});if(c)i.children=b};return{visitor:{JSXOpeningElement(o,r){const l=o.node;const i=s(r);const c={};for(let k=0;k<l.attributes.length;k++){const b=l.attributes[k];if(b.type!=="JSXAttribute"||!b.name)continue;const E=b.name.name;if(!a[E])continue;if(!b.value||b.value.type!=="StringLiteral")continue;if(b.value.start==null||b.value.end==null)continue;const T=`txt:${i}:${b.value.start}:${b.value.end}`;c[E]=T;b.value=e.jsxExpressionContainer(u(T,e.stringLiteral(b.value.value)))}if(Object.keys(c).length){l.attributes.push(e.jsxAttribute(e.jsxIdentifier("data-om-text-attrs"),e.stringLiteral(JSON.stringify(c))))}},JSXElement(o,r){const l=o.node.openingElement;const i=l&&l.name&&l.name.name;if(i==="__OmT")return;if(typeof i==="string"&&t[i])return;v(o,s(r),S(r))},JSXFragment(o,r){v(o,s(r),S(r))}}}})}}const g=f?["transform-react-jsx-source",d,p]:["transform-react-jsx-source",d];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((h,y)=>{const m=h.getAttribute("data-plugins")||"";const w=g.filter((R)=>m.indexOf(R)<0);if(w.length){h.setAttribute("data-plugins",m?`${m},${w.join(",")}`:w.join(","))}if(!h.hasAttribute("data-filename")){h.setAttribute("data-filename",h.getAttribute("src")||`inline-${y}`)}})});var A=window.parent;var U="not editable here — open the project in the Claude Design editor to save";var W=()=>Promise.resolve({persisted:false,noHost:true,reason:U});var H=W;var M="data/storage.json";var z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.match(/\/projects\/([^/]+)\/serve\//);if(d)return d[1];return n.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var Z=()=>{try{const n=new URL(document.baseURI);const d=n.pathname.indexOf("/serve/");if(d>=0)return n.origin+n.pathname.slice(0,d+"/serve/".length)+M}catch{}return"./"+M};var x=null;var N=()=>{if(!x){x=fetch(Z(),{cache:"no-store"}).then((n)=>{if(n.ok)return n.text();return n.status===404?"":null}).catch(()=>null).then((n)=>{if(n===null){x=null;return null}const d=new Map;if(!n)return d;let p;try{p=JSON.parse(n)}catch{console.warn("[omelette.storage] "+M+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");x=null;return null}if(p===null||typeof p!=="object"||Array.isArray(p)){console.warn("[omelette.storage] "+M+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");x=null;return null}const f=p;if("data"in f){const g=f.data;if(g===null||typeof g!=="object"||Array.isArray(g)){console.warn("[omelette.storage] "+M+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');x=null;return null}const h=f._meta;const y=h!==null&&typeof h==="object"?h.project:undefined;if(typeof y==="string"&&y!==""&&y!==z())return d;for(const m of Object.keys(g))d.set(m,g[m]);return d}for(const g of Object.keys(f)){if(g!=="_meta")d.set(g,f[g])}return d})}return x};var F=(n)=>H(M,JSON.stringify({_meta:{project:z(),version:1},data:Object.fromEntries(n)},null,2));var D=Promise.resolve();var $=(n)=>{const d=D.then(n);D=d.then(()=>{return},()=>{return});return d};var V=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var Y=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var Q=(n,d,p)=>{if(V.test(d)||Y.test(n)&&typeof p==="string"&&p.length>=8){console.warn('[omelette.storage] the value for "'+n+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var q={persisted:false,reason:"could not load the existing store — not overwriting it"};var X={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var P=new Set;var ee={get:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return $(N).then((d)=>{if(d===null){P.add(n);return null}P.delete(n);if(!d.has(n))return null;const p=d.get(n);return p==null?null:JSON.parse(JSON.stringify(p))})},set:(n,d)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let p;try{p=JSON.stringify(d)}catch(g){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(g)+")"))}if(p===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}Q(n,p,d);const f=JSON.parse(p);return $(()=>N().then((g)=>{if(g===null)return q;if(P.has(n)){if(g.has(n))return X;P.delete(n)}g.set(n,f);return F(g)}))},delete:(n)=>{if(typeof n!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return $(()=>N().then((d)=>{if(d===null)return q;if(P.has(n)){if(d.has(n))return X;P.delete(n)}d.delete(n);return F(d)}))},keys:()=>$(N).then((n)=>n===null?[]:Array.from(n.keys()))};window.omelette={writeFile:(n,d)=>H(n,d).then((p)=>{if(!p.persisted&&!p.noHost){throw new Error(p.reason||"write failed")}}),storage:ee};if(A&&A!==window){const n=(e,t)=>{try{A.postMessage({__omelette_log:true,type:e,data:t},"*")}catch{}};["log","warn","error"].forEach((e)=>{const t=console[e];console[e]=(...a)=>{const u=a.map((s)=>{try{return typeof s==="object"?JSON.stringify(s):String(s)}catch{try{return String(s)}catch{return"[unstringifiable]"}}}).join(" ");n(e,u);t.apply(console,a)}});window.addEventListener("error",(e)=>{const t=e.target;if(t&&t!==window&&t.tagName){const a=t.src||t.href||"";n("resource_error",`${t.tagName} failed to load: ${a}`)}else{n("error",`${e.message||"Unknown error"} at ${e.filename||"?"}:${e.lineno||0}:${e.colno||0}`)}},true);window.addEventListener("unhandledrejection",(e)=>{const t=e.reason;const a=t instanceof Error?`${t.message} ${t.stack}`:String(t);n("error",`Unhandled rejection: ${a}`)});window.addEventListener("click",(e)=>{if(e.defaultPrevented||e.button!==0)return;if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;const t=e.composedPath?e.composedPath():[];const a=["button","input","select","textarea","summary","label"];let u=null;for(const v of t){if(!(v instanceof Element))continue;if(v.localName==="a"){if(!(v instanceof HTMLAnchorElement))return;u=v;break}if(a.indexOf(v.localName)!==-1)return}if(!u)return;if(u.isContentEditable)return;const s=u.closest("[contenteditable]");if(s&&s.getAttribute("contenteditable")!=="false")return;const S=(u.getAttribute("target")||"_self").toLowerCase();if(S!=="_self"&&S!=="_top"&&S!=="_parent")return;let _;try{_=new URL(u.href)}catch{return}if(_.protocol!=="http:"&&_.protocol!=="https:")return;if(location.origin==="null")return;if(_.origin===location.origin)return;e.preventDefault();window.open(_.href,"_blank","noopener,noreferrer")});const d=()=>{try{A.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(d).observe(document.documentElement);const p=()=>{d();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const e=()=>document.getElementById("root")||document.querySelector("body > div[id]");const t=e()?.firstElementChild??null;let a=0;const u=()=>{const s=e();if(s&&s.firstElementChild!==t||++a>30){d();return}setTimeout(u,100)};setTimeout(u,100)};if(document.readyState==="complete")p();else window.addEventListener("load",p);const f={};let g=0;const h=(e)=>new Promise((t,a)=>{if(!I.length){a(new Error("claude.complete: no parent origin"));return}const u=`c${++g}`;const s=()=>setTimeout(()=>{delete f[u];a(new Error(`claude.complete: no data for ${J/1000}s`))},J);const S=s();f[u]={resolve:t,reject:a,text:"",t:S,arm:s};try{for(const _ of I){A.postMessage({__om_api:true,id:u,body:e},_)}}catch(_){clearTimeout(S);delete f[u];a(_)}});const y=8;const m=async(e,t)=>{if(!Array.isArray(e.messages)){throw new Error("claude.complete: tools require a messages array")}const a=e.messages.slice();const u={...e,tools:e.tools.map((_)=>{if(_===null||typeof _!=="object")return _;const v={};for(const o of Object.keys(_)){if(typeof _[o]!=="function")v[o]=_[o]}return v})};const s=u.tool_choice;const S=s!=null&&(s.type==="any"||s.type==="tool")?{...u,tool_choice:s.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:s.disable_parallel_tool_use}:{type:"auto"}}:u;for(let _=0;_<y;_++){const v=await h({..._===0?u:S,messages:a});const o=v.message;const r=o&&Array.isArray(o.content)?o.content:null;const l=r?r.filter((c)=>c?.type==="tool_use"):[];if(o?.stop_reason!=="tool_use"||l.length===0){return v.text}const i=[];for(const c of l){const k=t.get(c.name);if(!k){i.push({type:"tool_result",tool_use_id:c.id,content:`no handler for tool "${c.name}"`,is_error:true});continue}try{const b=await k(c.input);const E=typeof b==="string"?b:O(b)??"";i.push({type:"tool_result",tool_use_id:c.id,content:E})}catch(b){i.push({type:"tool_result",tool_use_id:c.id,content:String(b?.message??b??"tool handler failed"),is_error:true})}}a.push({role:"assistant",content:r},{role:"user",content:i})}throw new Error(`claude.complete: exceeded ${y} tool turns`)};window.claude={complete(e){const t=e;if(t!==null&&typeof t==="object"&&Array.isArray(t.tools)&&t.tools.some((a)=>a!==null&&typeof a==="object"&&typeof a.run==="function")){const a=new Map;for(const u of t.tools){if(u!==null&&typeof u==="object"&&typeof u.run==="function"){a.set(String(u.name),u.run)}}return m(t,a)}return h(e).then((a)=>a.text)}};const w={};let R=0;H=(e,t)=>new Promise((a)=>{if(!I.length){a({persisted:false,noHost:true,reason:U});return}const u=`f${++R}`;const s=setTimeout(()=>{delete w[u];a({persisted:false,noHost:true,reason:U})},G);w[u]={settle:a,t:s};try{for(const S of I){A.postMessage({__om_file:true,id:u,op:"write",path:e,content:t},S)}}catch{clearTimeout(s);delete w[u];a({persisted:false,noHost:true,reason:U})}});const O=(e)=>{try{return JSON.stringify(e)}catch{return JSON.stringify(String(e))}};window.addEventListener("message",(e)=>{if(I.indexOf(e.origin)<0)return;if(e.source!==A)return;const t=e.data;if(!t)return;if(t.type==="omelette-preview-refresh"){if(typeof t.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(t.token))return;const s=Math.max(1,Math.floor((t.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+t.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+s;C();return}if(t.__om_file_r){const s=w[t.id];if(!s)return;clearTimeout(s.t);delete w[t.id];s.settle(t.ok?{persisted:true}:{persisted:false,reason:t.error||"write failed"});return}if(t.__om_api_r){const s=f[t.id];if(!s)return;if(t.error!=null){clearTimeout(s.t);delete f[t.id];s.reject(new Error(t.error));return}if(t.chunk!=null){clearTimeout(s.t);s.t=s.arm();s.text+=t.chunk;return}if(t.done){clearTimeout(s.t);delete f[t.id];s.resolve({text:t.text!=null?t.text:s.text,message:t.message});return}return}if(!t.__om_eval)return;const a=t;const u=(s)=>{e.source.postMessage({...s,__om_eval_r:1,id:a.id},e.origin)};try{const s=(0,eval)(a.code);if(s&&typeof s.then==="function"){s.then((S)=>u({ok:1,v:O(S)}),(S)=>u({ok:0,e:String(S)}))}else{u({ok:1,v:O(s)})}}catch(s){u({ok:0,e:String(s)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:14px">
+
+<sc-if value="{{ pg.missing }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:32px 16px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center">
+    <div style="font-size:14px;font-weight:600">That delivery isn't assigned to you</div>
+    <button onClick="{{ toList }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;font-size:14px;font-weight:500;cursor:pointer">Back to my deliveries</button>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.deliveries }}" hint-placeholder-val="{{ true }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px">
+    <sc-for list="{{ active }}" as="a" hint-placeholder-count="1">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:13px;color:#62666d;font-weight:500">{{ a.dn }}</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ a.chip.bg }};color:{{ a.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ a.chip.label }}</span>
+        </div>
+        <div><div style="font-size:18px;font-weight:600">{{ a.hotspot }}</div><div style="font-size:14px;color:#62666d;margin-top:2px">{{ a.loc }}</div></div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:14px;border-top:1px solid rgba(15,40,25,.06);padding-top:12px">
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">Carry</span><span style="font-variant-numeric:tabular-nums">{{ a.items }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">Hand to</span><span>{{ a.contact }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">Assigned</span><span>{{ a.time }}</span></div>
+        </div>
+        <button onClick="{{ a.open }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">{{ a.cta }}</button>
+      </div>
+    </sc-for>
+  </div>
+  <sc-if value="{{ noActive }}">
+    <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:32px 16px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center">
+      <div style="width:48px;height:48px;border-radius:12px;background:#f2f3f5;display:flex;align-items:center;justify-content:center;color:#62666d"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg></div>
+      <div style="font-size:14px;font-weight:600">No deliveries assigned</div>
+      <div style="font-size:14px;color:#62666d;max-width:420px">The district will assign you when an order is confirmed. You'll get a notification.</div>
+    </div>
+  </sc-if>
+</sc-if>
+
+<sc-if value="{{ pg.delivery }}">
+  <button onClick="{{ toList }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#62666d;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>My deliveries</button>
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden"><div style="padding:12px 14px 12px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center">
+    <h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em">{{ dv.hotspot }}</h2>
+    <span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ dv.chip.bg }};color:{{ dv.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ dv.chip.label }}</span>
+    <span style="color:#62666d;font-size:14px;flex-basis:100%">{{ dv.dn }} · {{ dv.orderId }}</span>
+  </div>
+  <div style="padding:10px 14px 16px;border-top:1px solid rgba(15,40,25,.06);background:rgba(246,248,247,.5);display:flex;flex-wrap:wrap;gap:12px 12px">
+    <sc-for list="{{ steps }}" as="st" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 104px;min-width:0">
+        <span style="height:4px;border-radius:2px;background:{{ st.bar }}"></span><span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ st.kc }};margin-top:4px">{{ st.kicker }}</span>
+        <div style="min-width:0"><div style="font-size:14px;font-weight:{{ st.fw }};color:{{ st.tc }}">{{ st.label }}</div><div style="font-size:12px;color:#62666d;margin-top:1px">{{ st.sub }}</div></div>
+      </div>
+    </sc-for>
+  </div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">
+    <div style="flex:2 1 480px;min-width:0;display:flex;flex-direction:column;gap:12px">
+
+      <sc-if value="{{ dv.collect }}">
+        <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">Collect from Wakiso district store</div><div style="font-size:13px;color:#62666d;margin-top:2px">Tick each item as it goes on the bike. Don't leave without the delivery note.</div></div>
+          <sc-for list="{{ ck.items }}" as="c" hint-placeholder-count="3">
+            <label style="display:flex;gap:14px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.06);cursor:pointer;min-height:56px">
+              <input type="checkbox" checked="{{ c.on }}" onChange="{{ c.toggle }}" style="width:16px;height:16px">
+              <span style="flex:1;min-width:0"><span style="display:block;font-size:15px;font-weight:500">{{ c.label }}</span><span style="display:block;font-size:13px;color:#62666d">{{ c.sub }}</span></span>
+              <span style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums">{{ c.qty }}</span>
+            </label>
+          </sc-for>
+          <div style="padding:10px 14px;display:flex;justify-content:flex-end;background:rgba(246,248,247,.6)">
+            <button onClick="{{ ck.go }}" disabled="{{ ck.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Confirm pickup and start trip</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ dv.handover }}">
+        <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow:hidden">
+          <div style="padding:10px 14px;border-bottom:1px solid rgba(15,40,25,.09)"><div style="font-size:14px;font-weight:600">Hand over at the hotspot</div><div style="font-size:13px;color:#62666d;margin-top:2px">Count the stock already there first, hand over, then have {{ dv.contact }} sign the delivery note.</div></div>
+          <div style="padding:12px 14px;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ hv.rows }}" as="r" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end;padding:12px;border:1px solid rgba(15,40,25,.06);border-radius:8px">
+                  <div style="font-size:15px;font-weight:500;padding-bottom:10px">{{ r.name }}</div>
+                  <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#62666d">Found on arrival<input type="number" min="0" inputmode="numeric" value="{{ r.found }}" onChange="{{ r.onFound }}" placeholder="Count" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;color:#0c0d0f;font-variant-numeric:tabular-nums"></label>
+                  <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#62666d">Handed over<input type="number" min="0" inputmode="numeric" value="{{ r.qty }}" onChange="{{ r.onQty }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;color:#0c0d0f;font-variant-numeric:tabular-nums"></label>
+                </div>
+              </sc-for>
+            </div>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:500;max-width:420px">Received by
+              <input value="{{ hv.recipient }}" onChange="{{ hv.onRecipient }}" style="height:32px;padding:0 10px;border-radius:8px;border:1px solid #8b9097;font-size:14px;font-weight:400">
+            </label>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:14px;font-weight:500">Signed delivery note</div>
+              <sc-if value="{{ hv.noPhoto }}">
+                <div style="border:1px dashed #8b9097;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+                  <span style="color:#62666d"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></span>
+                  <div style="font-size:14px;color:#62666d;max-width:360px">Photograph the whole note after it's signed. The name, signature and date must be readable.</div>
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+                    <label style="height:32px;padding:0 12px;border-radius:8px;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14);display:inline-flex;align-items:center">Take photo<input type="file" accept="image/*" capture="environment" onChange="{{ hv.onPhoto }}" style="display:none"></label>
+                    <button onClick="{{ hv.sample }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px dashed #8b9097;background:transparent;color:#62666d;font-size:13px;cursor:pointer">Prototype: use a sample photo</button>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ hv.hasImg }}"><img src="{{ hv.photo }}" alt="Signed delivery note" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid rgba(15,40,25,.09);align-self:flex-start"></sc-if>
+              <sc-if value="{{ hv.isSample }}">
+                <div style="align-self:flex-start;background:#f4f1ea;border-radius:8px;padding:12px 14px;border:1px solid #e4e0d6">
+                  <div style="background:#fff;width:280px;max-width:100%;padding:16px 18px;transform:rotate(-1.5deg);box-shadow:0 2px 8px rgba(12,13,15,.15);font-size:11px;color:#2a2c30">
+                    <div style="font-weight:700;letter-spacing:.04em">DELIVERY NOTE · {{ dv.dn }}</div>
+                    <div style="margin-top:6px;color:#62666d">To {{ dv.hotspot }}</div>
+                    <div style="margin-top:8px;border-top:1px solid #ccc;padding-top:6px">{{ dv.items }}</div>
+                    <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:flex-end"><span style="color:#62666d">Received by</span><span style="font-family:'Segoe Script','Bradley Hand',cursive;font-size:16px;color:#1d3f8a">{{ dv.contact }}</span></div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ hv.hasAny }}"><button onClick="{{ hv.clear }}" style="align-self:flex-start;background:none;border:none;padding:0;color:#177534;font-size:14px;font-weight:500;cursor:pointer">Retake photo</button></sc-if>
+            </div>
+          </div>
+          <div style="padding:10px 14px;display:flex;justify-content:flex-end;background:rgba(246,248,247,.6);border-top:1px solid rgba(15,40,25,.06)">
+            <button onClick="{{ hv.go }}" disabled="{{ hv.cant }}" style="height:32px;padding:0 12px;border-radius:8px;border:none;background:#45ba50;color:#020203;font-size:14px;font-weight:600;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(16,24,40,.14)">Mark as delivered</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ dv.done }}">
+        <div style="border-radius:12px;padding:10px 14px;background:rgba(23,117,52,.1)"><div style="font-size:14px;font-weight:600;color:#177534">{{ dv.doneTitle }}</div><div style="font-size:14px;margin-top:2px">{{ dv.doneBody }}</div></div>
+        <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+          <div><div style="font-size:12px;color:#62666d">Handed over</div><div style="font-size:14px;margin-top:2px;font-variant-numeric:tabular-nums">{{ dv.qty }}</div></div>
+          <div><div style="font-size:12px;color:#62666d">Found on arrival</div><div style="font-size:14px;margin-top:2px;font-variant-numeric:tabular-nums">{{ dv.found }}</div></div>
+          <div><div style="font-size:12px;color:#62666d">Received by</div><div style="font-size:14px;margin-top:2px">{{ dv.recipient }}</div></div>
+          <div><div style="font-size:12px;color:#62666d">Delivered</div><div style="font-size:14px;margin-top:2px">{{ dv.at }}</div></div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;color:#62666d;text-transform:uppercase;letter-spacing:.04em;font-weight:500">Destination</div>
+        <div><div style="font-size:14px;font-weight:600">{{ dv.hotspot }}</div><div style="font-size:14px;color:#62666d;margin-top:2px">{{ dv.loc }}</div></div>
+        <div style="font-size:14px;border-top:1px solid rgba(15,40,25,.06);padding-top:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">Contact person</span><span>{{ dv.contact }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#62666d">GPS</span><span style="font-variant-numeric:tabular-nums">{{ dv.gps }}</span></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a href="{{ dv.tel }}" style="flex:1;height:36px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.910a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.920z"></path></svg>Call</a>
+          <a href="{{ dv.map }}" target="_blank" rel="noopener" style="flex:1;height:36px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:#0c0d0f;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">Directions</a>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:12px;color:#62666d;text-transform:uppercase;letter-spacing:.04em;font-weight:500">Load</div>
+        <sc-for list="{{ dv.lines }}" as="l" hint-placeholder-count="2">
+          <div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:6px 0;border-bottom:1px solid rgba(15,40,25,.06)"><span>{{ l.name }} <span style="color:#62666d">· {{ l.batch }}</span></span><span style="font-weight:600;font-variant-numeric:tabular-nums">{{ l.qty }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pg.history }}">
+  <div style="background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(15,40,25,.08),0 1px 2px rgba(15,40,25,.04);border-radius:8px;overflow-x:auto;overflow-y:hidden">
+    <table style="width:100%;border-collapse:collapse;min-width:640px">
+      <thead><tr>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:7px 12px 7px 14px;border-bottom:1px solid rgba(15,40,25,.09)">Delivery note</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Hotspot</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Handed over</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Delivered</th>
+        <th style="text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#62666d;background:rgba(69,186,80,.07);padding:8px 16px 8px 12px;border-bottom:1px solid rgba(15,40,25,.09)">Status</th>
+      <th style="background:rgba(69,186,80,.07);padding:8px 8px 8px 0;border-bottom:1px solid rgba(15,40,25,.09);width:44px"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Actions</span></th>
+      </tr></thead>
+      <tbody>
+        <sc-for list="{{ hist }}" as="r" hint-placeholder-count="1">
+          <tr onClick="{{ r.open }}" style="cursor:pointer" style-hover="background:rgba(69,186,80,.06)">
+            <td style="padding:6px 12px 6px 14px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-weight:500;white-space:nowrap;line-height:1.35">{{ r.dn }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;white-space:nowrap;line-height:1.35">{{ r.hotspot }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.35">{{ r.items }}</td>
+            <td style="padding:6px 12px;border-bottom:1px solid rgba(15,40,25,.06);font-size:14px;color:#62666d;white-space:nowrap;line-height:1.35">{{ r.time }}</td>
+            <td style="padding:9px 16px 9px 12px;border-bottom:1px solid rgba(15,40,25,.06);white-space:nowrap;line-height:1.35"><span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 30%,transparent);background:{{ r.chip.bg }};color:{{ r.chip.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.chip.label }}</span></td>
+          <td style="padding:4px 8px 4px 0;border-bottom:1px solid rgba(15,40,25,.06);width:44px;text-align:right;white-space:nowrap"><button onClick="{{ r.menu }}" aria-label="Row actions" aria-haspopup="menu" title="Actions" style="width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:#62666d;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex:none" style-hover="background:#eef0f2;color:#0c0d0f"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.75"></circle><circle cx="12" cy="12" r="1.75"></circle><circle cx="12" cy="19" r="1.75"></circle></svg></button></td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+    <sc-if value="{{ noHist }}"><div style="padding:20px 16px;text-align:center;font-size:14px;color:#62666d">No completed deliveries yet.</div></sc-if>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() { if (this.props.ready) this.props.ready(); }
+  state = { d: {} };
+  setD = (key, field, val) => this.setState(st => ({ d: { ...st.d, [key]: { ...(st.d[key] || {}), [field]: val } } }));
+  readPhoto(key, e) {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const sc = Math.min(1, 640 / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        this.setD(key, 'photo', c.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(f);
+  }
+  renderVals() {
+    const v = this._rv();
+    const L = this.props.lib;
+    if (L && L.menu && this.KEBAB) this.KEBAB.forEach(([path, fn]) => {
+      const arr = path.split('.').reduce((a, k) => (a ? a[k] : undefined), v);
+      if (Array.isArray(arr)) arr.forEach(r => { r.menu = e => { e.preventDefault(); e.stopPropagation(); L.menu(e, fn.call(this, r) || []); }; });
+    });
+    return v;
+  }
+  KEBAB = [
+    ['hist', function (r) { const { lib: L } = this.props; return [{ label: 'Open delivery', icon: 'eye', run: r.open }, { label: 'Copy delivery note number', icon: 'copy', run: () => L.copy(r.dn, 'delivery note') }]; }],
+  ];
+  _rv() {
+    const { store: s, act, nav, go, lib: L } = this.props;
+    if (!s || !L || !nav) return { pg: {} };
+    const page = nav.page || 'deliveries';
+    const num = x => { const n = parseInt(String(x ?? '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; };
+    const H = hid => s.hotspots.find(h => h.id === hid) || {};
+    const mine = s.orders.filter(o => o.delivery && o.delivery.riderId === 'R1');
+    const RC = { dispatched: L.chip('To collect', 'info'), in_transit: L.chip('On the way', 'info'), delivered: L.chip('Awaiting confirmation', 'success'), received: L.chip('Confirmed by hotspot', 'neutral') };
+    const v = { pg: { [page]: true }, toList: () => go('deliveries') };
+
+    if (page === 'deliveries') {
+      const act_ = mine.filter(o => o.status === 'dispatched' || o.status === 'in_transit').sort((a, b) => b.delivery.at - a.delivery.at);
+      v.active = act_.map(o => { const h = H(o.hotspotId); return { dn: o.delivery.dn, hotspot: o.hotspot, loc: `${h.village}, ${h.subcounty}`, items: L.items(o.approved), contact: h.contact, time: L.t(o.delivery.at), chip: RC[o.status], cta: o.status === 'dispatched' ? 'Start collection' : 'Continue delivery', open: () => go('delivery', o.id) }; });
+      v.noActive = !act_.length;
+    }
+
+    if (page === 'delivery') {
+      const o = mine.find(x => x.id === nav.id);
+      if (!o) return { pg: { missing: true }, toList: v.toList };
+      const h = H(o.hotspotId);
+      const st = o.status;
+      const dl = o.delivery;
+      const lines = L.P.filter(p => +o.approved[p.k] > 0);
+      const alloc = L.lineRows(dl.lines || o.alloc || []);
+      v.dv = {
+        hotspot: o.hotspot, chip: RC[st], dn: dl.dn, orderId: o.id, contact: h.contact, loc: `${h.village}, ${h.subcounty}, Wakiso`,
+        gps: h.lat != null ? `${(+h.lat).toFixed(4)}, ${(+h.lng).toFixed(4)}` : '—', tel: 'tel:' + (h.phone || '').replace(/\s/g, ''), map: h.lat != null ? `https://maps.google.com/?q=${h.lat},${h.lng}` : '#',
+        items: L.items(o.approved),
+        lines: alloc.map(a => ({ name: a.name, batch: `${a.batch} · exp ${a.exp}`, qty: a.qty })),
+        collect: st === 'dispatched', handover: st === 'in_transit', done: st === 'delivered' || st === 'received',
+        doneTitle: st === 'received' ? `Confirmed by ${h.contact}` : `Delivered ${L.t(dl.deliveredAt)}`,
+        doneBody: st === 'received' ? 'The hotspot confirmed the stock in CLIMS. This delivery is closed.' : `${h.contact} has been asked to confirm receipt in CLIMS.`,
+        qty: dl.qty ? L.items(dl.qty) : '—', found: dl.found ? (L.items(dl.found) === '—' ? 'None' : L.items(dl.found)) : '—', recipient: dl.recipient || '—', at: L.t(dl.deliveredAt),
+      };
+      v.steps = [
+        L.step('Collect stock', st === 'dispatched' ? 'cur' : 'done', dl.pickedAt != null ? L.t(dl.pickedAt) : 'District store', 0),
+        L.step('Ride to hotspot', st === 'in_transit' ? 'cur' : st === 'dispatched' ? 'todo' : 'done', h.village, 1),
+        L.step('Hand over and photograph', st === 'in_transit' ? 'cur' : st === 'dispatched' ? 'todo' : 'done', dl.deliveredAt != null ? L.t(dl.deliveredAt) : 'Signed note', 2),
+        L.step('Hotspot confirms', st === 'received' ? 'done' : st === 'delivered' ? 'cur' : 'todo', o.receipt ? L.t(o.receipt.at) : '', 3),
+      ];
+      const ckey = 'ck:' + o.id;
+      const cd = this.state.d[ckey] || {};
+      const cItems = [{ k: 'dn', label: `Delivery note ${dl.dn}`, sub: 'Two copies — one stays signed at the hotspot', qty: '' }, ...lines.map(p => ({ k: p.k, label: p.name, sub: `${p.brand} · batch ${(alloc.filter(a => a.k === p.k).map(a => `${a.batch} (exp ${a.exp})`).join(', ') || '—')}`, qty: L.num(o.approved[p.k]) }))];
+      v.ck = {
+        items: cItems.map(c => ({ ...c, on: !!cd[c.k], toggle: e => this.setD(ckey, c.k, e.target.checked) })),
+        cant: !cItems.every(c => cd[c.k]),
+        go: () => act('pickup', { id: o.id }),
+      };
+      const hkey = 'ho:' + o.id;
+      const hd = this.state.d[hkey] || {};
+      const qty = {}, found = {};
+      const rows = lines.map(p => { const q = hd['q_' + p.k] ?? String(o.approved[p.k]); const f = hd['f_' + p.k] ?? ''; qty[p.k] = num(q); found[p.k] = num(f); return { name: p.name, qty: q, found: f, onQty: e => this.setD(hkey, 'q_' + p.k, e.target.value), onFound: e => this.setD(hkey, 'f_' + p.k, e.target.value), _f: f }; });
+      L.P.forEach(p => { if (qty[p.k] == null) { qty[p.k] = 0; found[p.k] = 0; } });
+      const recipient = hd.recipient ?? h.contact;
+      const photo = hd.photo || null;
+      v.hv = {
+        rows, recipient, onRecipient: e => this.setD(hkey, 'recipient', e.target.value),
+        noPhoto: !photo, hasImg: !!photo && photo !== 'sample', isSample: photo === 'sample', hasAny: !!photo, photo: photo && photo !== 'sample' ? photo : '',
+        onPhoto: e => this.readPhoto(hkey, e), sample: () => this.setD(hkey, 'photo', 'sample'), clear: () => this.setD(hkey, 'photo', null),
+        cant: !photo || !recipient.trim() || rows.some(r => String(r._f).trim() === ''),
+        go: () => act('deliver', { id: o.id, qty, found, recipient: recipient.trim(), photo }),
+      };
+    }
+
+    if (page === 'history') {
+      const done = mine.filter(o => o.status === 'delivered' || o.status === 'received').sort((a, b) => b.delivery.deliveredAt - a.delivery.deliveredAt);
+      v.hist = done.map(o => ({ dn: o.delivery.dn, hotspot: o.hotspot, items: L.items(o.delivery.qty || o.approved), time: L.t(o.delivery.deliveredAt), chip: RC[o.status], open: () => go('delivery', o.id) }));
+      v.noHist = !done.length;
+    }
+    return v;
+  }
+}
+</script>
+</body>
+</html>

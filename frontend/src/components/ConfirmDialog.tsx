@@ -60,7 +60,7 @@ export function ConfirmDialog({
               onConfirm();
             }}
           >
-            {isPending ? <Spinner data-icon="inline-start" /> : null}
+            {isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

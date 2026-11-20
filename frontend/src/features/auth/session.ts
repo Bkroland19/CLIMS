@@ -8,8 +8,8 @@ import { readJson, removeKey, writeJson, type StorageLike } from '@/lib/storage/
  * practice on the legacy API, so they are nullable rather than assumed.
  */
 export const authUserSchema = z.object({
-  // The Go API identifies users by UUID; older APIs by number.
-  id: z.union([z.string().min(1), z.number().int()]),
+  // The Go API's user IDs are UUID strings; the legacy API sent numbers.
+  id: z.union([z.string().min(1), z.number().int()]).transform(String),
   username: z.string().min(1),
   // The Go API sends `{ id, name, permissions }`; older APIs a name or an id.
   role: roleSchema,

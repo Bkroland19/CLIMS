@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { EMPTY_VALUE, formatDate, formatNumber, formatText, initialsOf } from './format';
+import {
+  EMPTY_VALUE,
+  formatDate,
+  formatDuration,
+  formatNumber,
+  formatText,
+  formatTimestamp,
+  initialsOf,
+} from './format';
 
 describe('formatNumber', () => {
   it('adds thousands separators', () => {
@@ -72,5 +80,46 @@ describe('initialsOf', () => {
     { name: undefined, expected: '?' },
   ])('gives "$expected" for $name', ({ name, expected }) => {
     expect(initialsOf(name)).toBe(expected);
+  });
+});
+
+describe('formatTimestamp', () => {
+  // Built in local time, so the expectations hold in any time zone.
+  const now = new Date(2026, 10, 19, 15, 30);
+  const at = (day: number, hour: number, minute: number, year = 2026) =>
+    new Date(year, 10, day, hour, minute).toISOString();
+
+  it('names today and yesterday, with a 24-hour time', () => {
+    expect(formatTimestamp(at(19, 9, 5), now)).toBe('Today, 09:05');
+    expect(formatTimestamp(at(18, 17, 40), now)).toBe('Yesterday, 17:40');
+  });
+
+  it('gives the day and month for earlier this year', () => {
+    expect(formatTimestamp(at(12, 8, 5), now)).toMatch(/^12 Nov, 08:05$/);
+  });
+
+  it('adds the year for another year', () => {
+    expect(formatTimestamp(at(12, 8, 5, 2025), now)).toMatch(/2025, 08:05$/);
+  });
+
+  it.each([null, undefined, '', 'not a date'])('shows the empty marker for %s', (value) => {
+    expect(formatTimestamp(value, now)).toBe(EMPTY_VALUE);
+  });
+});
+
+const MINUTE = 60_000;
+
+describe('formatDuration', () => {
+  it.each([
+    [0, 'Under 1 min'],
+    [20_000, 'Under 1 min'],
+    [45 * MINUTE, '45 min'],
+    [60 * MINUTE, '1 h'],
+    [200 * MINUTE, '3 h 20 min'],
+    [24 * 60 * MINUTE, '1 d'],
+    [(2 * 24 + 4) * 60 * MINUTE, '2 d 4 h'],
+    [-5 * MINUTE, 'Under 1 min'],
+  ])('writes %i ms as "%s"', (ms, expected) => {
+    expect(formatDuration(ms)).toBe(expected);
   });
 });

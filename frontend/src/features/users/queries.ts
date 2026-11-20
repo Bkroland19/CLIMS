@@ -3,40 +3,97 @@ import { toast } from 'sonner';
 
 import { useApiQuery, useHttp } from '@/lib/api';
 
-import { createUser, deleteUser, listUsers, updateUser, type User, type UserInput } from './api';
+import {
+  createUser,
+  listPermissions,
+  listRoles,
+  listUsers,
+  setRolePermissions,
+  setUserRoles,
+  setUserStatus,
+  type NewUserInput,
+  type UserStatus,
+} from './api';
 
-const usersKey = ['users'] as const;
+export const accessKeys = {
+  users: ['users'] as const,
+  roles: ['access', 'roles'] as const,
+  permissions: ['access', 'permissions'] as const,
+};
+
+/** Roles and permissions change rarely; keep them for a few minutes rather than refetching per page. */
+const ROLES_STALE_TIME = 5 * 60_000;
 
 export function useUsers() {
-  return useApiQuery(usersKey, listUsers);
+  return useApiQuery(accessKeys.users, listUsers);
 }
 
-/** Creates a user, or updates `user` when one is given. */
-export function useSaveUser(user: User | null) {
+export function useAccessRoles() {
+  return useApiQuery(accessKeys.roles, listRoles, { staleTime: ROLES_STALE_TIME });
+}
+
+export function usePermissions() {
+  return useApiQuery(accessKeys.permissions, listPermissions, { staleTime: ROLES_STALE_TIME });
+}
+
+export function useCreateUser() {
   const http = useHttp();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: UserInput) =>
-      user ? updateUser(http, user.id, input) : createUser(http, input),
+    mutationFn: (input: NewUserInput) => createUser(http, input),
     onSuccess: async () => {
-      toast.success(user ? 'User updated' : 'User created');
-      await queryClient.invalidateQueries({ queryKey: usersKey });
+      toast.success('User created');
+      await queryClient.invalidateQueries({ queryKey: accessKeys.users });
     },
-    // The form places field-level messages itself; see UserFormDialog.
+    // The form places field-level messages itself; see NewUserDialog.
     meta: { handlesOwnErrors: true },
   });
 }
 
-export function useDeleteUser() {
+export function useSetUserRoles(userId: string) {
   const http = useHttp();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => deleteUser(http, id),
+    mutationFn: (roleIds: string[]) => setUserRoles(http, userId, roleIds),
     onSuccess: async () => {
-      toast.success('User deleted');
-      await queryClient.invalidateQueries({ queryKey: usersKey });
+      toast.success('Roles updated');
+      await queryClient.invalidateQueries({ queryKey: accessKeys.users });
     },
-    // The confirmation dialog shows the failure itself.
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+/**
+ * Deactivates or reactivates a user. `handlesOwnErrors` is set by the caller's
+ * screen: the deactivate confirmation shows the failure itself.
+ */
+export function useSetUserStatus() {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: UserStatus }) =>
+      setUserStatus(http, id, status),
+    onSuccess: async (_data, { status }) => {
+      toast.success(status === 'active' ? 'User reactivated' : 'User deactivated');
+      await queryClient.invalidateQueries({ queryKey: accessKeys.users });
+    },
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+export function useSetRolePermissions() {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, permissions }: { roleId: string; permissions: string[] }) =>
+      setRolePermissions(http, roleId, permissions),
+    onSuccess: async () => {
+      toast.success('Permissions updated');
+      await queryClient.invalidateQueries({ queryKey: accessKeys.roles });
+      // A user's role objects carry the role's permissions too.
+      await queryClient.invalidateQueries({ queryKey: accessKeys.users });
+    },
+    // The roles page shows the failure next to the switches.
     meta: { handlesOwnErrors: true },
   });
 }

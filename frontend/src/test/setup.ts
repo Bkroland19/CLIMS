@@ -4,6 +4,9 @@ import { cleanup, configure } from '@testing-library/react';
 import { useSyncExternalStore } from 'react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
+import { allPaths, routeParams } from '@/navigation/navigation';
+import { workspaces } from '@/navigation/workspaces';
+
 import { appRouter, TestLink, testRouter } from './navigation';
 
 // A route change is a redirect effect plus a render of a whole screen. The 1s
@@ -21,6 +24,11 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => {
     const search = useSyncExternalStore(testRouter.subscribe, () => testRouter.search);
     return new URLSearchParams(search);
+  },
+  // The params of the route the address resolves to, e.g. `{ id: 'ORD-1' }` at `/dcfp/orders/ORD-1`.
+  useParams: () => {
+    const pathname = useSyncExternalStore(testRouter.subscribe, () => testRouter.pathname);
+    return routeParams(allPaths(workspaces), pathname);
   },
   redirect: (href: string) => {
     throw new Error(`redirect("${href}") runs on the server and cannot be rendered in a test.`);
