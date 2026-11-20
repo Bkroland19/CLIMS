@@ -1,107 +1,107 @@
 import { z } from 'zod';
 
-import type { Lookup } from '@/features/reference/api';
+import { optionalUgandanMobile } from '@/lib/phone';
 
-import type { User, UserInput } from './api';
+import type { NewUserInput, User } from './api';
+
+/*
+ * Mirrors the Go API's `AccountInput` and `CreateUserRequest` rules
+ * (`backend/internal/features/users/dto.go`): username 3–50, email required
+ * and at most 255, password 8–72 bytes, first and last name at most 20,
+ * phone at most 15, and at least one role. The form also asks for both names,
+ * as the design does, and checks the phone number is a Ugandan mobile one
+ * (sent as `+256XXXXXXXXX`, 13 characters).
+ */
 
 const PASSWORD_MIN_LENGTH = 8;
-/** Digits with optional leading +, spaces, dashes and brackets. */
-const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/;
+const PASSWORD_MAX_BYTES = 72;
+const NAME_MAX_LENGTH = 20;
 
-const baseSchema = z.object({
-  firstname: z.string().trim().min(1, 'Enter a first name.').max(100),
-  lastname: z.string().trim().min(1, 'Enter a last name.').max(100),
+const name = (noun: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `Enter a ${noun}.`)
+    .max(NAME_MAX_LENGTH, `Use at most ${NAME_MAX_LENGTH} characters.`);
+
+const roleIds = z
+  .array(z.string())
+  .min(1, 'Choose at least one role.')
+  .max(100, 'Choose at most 100 roles.');
+
+export const newUserSchema = z.object({
+  firstname: name('first name'),
+  lastname: name('last name'),
   username: z
     .string()
     .trim()
     .min(1, 'Enter a username.')
     .min(3, 'Use at least 3 characters.')
-    .max(50)
+    .max(50, 'Use at most 50 characters.')
     .regex(/^\S+$/, 'A username cannot contain spaces.'),
   email: z
     .string()
     .trim()
     .min(1, 'Enter an email address.')
-    .max(254)
+    .max(255, 'Use at most 255 characters.')
     .pipe(z.email('Enter a valid email address, e.g. name@example.org.')),
-  phone_number: z
+  phone_number: optionalUgandanMobile(),
+  role_ids: roleIds,
+  // Never trimmed: spaces in a password are part of it.
+  password: z
     .string()
-    .trim()
-    .min(1, 'Enter a phone number.')
-    .regex(PHONE_PATTERN, 'Enter a phone number, e.g. +256 700 000000.'),
-  location: z.string().trim().min(1, 'Enter a location.').max(150),
-  role: z.string().min(1, 'Choose a role.'),
-  organization_unit_id: z.string().min(1, 'Choose an organisation unit.'),
+    .min(1, 'Enter a password.')
+    .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)
+    .refine(
+      (value) => new TextEncoder().encode(value).length <= PASSWORD_MAX_BYTES,
+      `Use at most ${PASSWORD_MAX_BYTES} characters.`,
+    ),
 });
 
-const newPassword = z
-  .string()
-  .min(1, 'Enter a password.')
-  .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)
-  .max(200);
+export type NewUserFormInput = z.input<typeof newUserSchema>;
+export type NewUserFormOutput = z.output<typeof newUserSchema>;
 
-/** A new user must be given a password. */
-export const createUserSchema = baseSchema.extend({ password: newPassword });
-
-/** On edit, a blank password means "keep the current one". */
-export const editUserSchema = baseSchema.extend({
-  password: z.union([z.literal(''), newPassword]),
-});
-
-export type UserFormValues = z.infer<typeof createUserSchema>;
-
-export const USER_FORM_FIELDS = [
+export const NEW_USER_FIELDS = [
   'firstname',
   'lastname',
   'username',
   'email',
   'phone_number',
-  'location',
-  'role',
-  'organization_unit_id',
+  'role_ids',
   'password',
-] as const satisfies readonly (keyof UserFormValues)[];
+] as const satisfies readonly (keyof NewUserFormInput)[];
 
-/**
- * The role id to preselect when editing. The API returns a user's role as an id
- * on some deployments and as a role name on others; either resolves here.
- */
-export function resolveRoleId(role: string | null, roles: readonly Lookup[]): string {
-  if (!role) return '';
-  const match = roles.find(
-    (candidate) =>
-      String(candidate.id) === role || candidate.name?.toLowerCase() === role.toLowerCase(),
-  );
-  return match ? String(match.id) : '';
-}
+export const NEW_USER_DEFAULTS: NewUserFormInput = {
+  firstname: '',
+  lastname: '',
+  username: '',
+  email: '',
+  phone_number: '',
+  role_ids: [],
+  password: '',
+};
 
-/** Initial form values: blank for a new user, the record's values when editing. */
-export function userFormDefaults(user: User | null, roles: readonly Lookup[]): UserFormValues {
+/** The request body for the validated form: the email lower-cased; the phone is already in `+256` form. */
+export function toNewUserInput(values: NewUserFormOutput): NewUserInput {
   return {
-    firstname: user?.firstname ?? '',
-    lastname: user?.lastname ?? '',
-    username: user?.username ?? '',
-    email: user?.email ?? '',
-    phone_number: user?.phone_number ?? '',
-    location: user?.location ?? '',
-    role: resolveRoleId(user?.role ?? null, roles),
-    organization_unit_id:
-      user?.organization_unit_id === null || user?.organization_unit_id === undefined
-        ? ''
-        : String(user.organization_unit_id),
-    // Never prefilled: the form must not echo a credential back to the screen.
-    password: '',
+    username: values.username,
+    email: values.email.toLowerCase(),
+    password: values.password,
+    firstname: values.firstname,
+    lastname: values.lastname,
+    phone_number: values.phone_number,
+    role_ids: values.role_ids,
   };
 }
 
-export function toUserInput(values: UserFormValues): UserInput {
-  return values;
-}
+export const userRolesSchema = z.object({ role_ids: roleIds });
+export type UserRolesForm = z.infer<typeof userRolesSchema>;
+export const USER_ROLES_FIELDS = ['role_ids'] as const satisfies readonly (keyof UserRolesForm)[];
 
 /** A user's display name, falling back to the username, then the id. */
 export function userDisplayName(
   user: Pick<User, 'id' | 'firstname' | 'lastname' | 'username'>,
 ): string {
   const fullName = [user.firstname, user.lastname].filter(Boolean).join(' ');
-  return fullName || user.username || `User #${user.id}`;
+  return fullName || user.username || `User ${user.id}`;
 }

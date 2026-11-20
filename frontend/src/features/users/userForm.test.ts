@@ -1,139 +1,115 @@
 import { describe, expect, it } from 'vitest';
 
-import type { User } from './api';
 import {
-  createUserSchema,
-  editUserSchema,
-  resolveRoleId,
+  newUserSchema,
+  toNewUserInput,
   userDisplayName,
-  userFormDefaults,
-  type UserFormValues,
+  userRolesSchema,
+  type NewUserFormInput,
 } from './userForm';
 
-const valid: UserFormValues = {
+const valid: NewUserFormInput = {
   firstname: 'Sarah',
   lastname: 'Nakato',
   username: 'snakato',
-  email: 'sarah@example.org',
-  phone_number: '+256 700 000001',
-  location: 'Kampala',
-  role: '2',
-  organization_unit_id: '5',
+  email: 'Sarah@Example.org',
+  phone_number: '+256 772 100 201',
+  role_ids: ['role-1'],
   password: 'correct horse',
 };
 
-const roles = [
-  { id: 1, name: 'Admin' },
-  { id: 2, name: 'DCFP' },
-];
+const firstIssue = (values: unknown) => newUserSchema.safeParse(values).error?.issues[0]?.path[0];
 
-const user: User = {
-  id: 7,
-  username: 'okello',
-  firstname: 'James',
-  lastname: 'Okello',
-  email: 'james@example.org',
-  role: 'dcfp',
-  status: 'active',
-  location: 'Gulu',
-  phone_number: '0772000000',
-  organization_unit_id: 12,
-  created_at: null,
-};
-
-const firstIssue = (schema: typeof createUserSchema, values: unknown) =>
-  schema.safeParse(values).error?.issues[0]?.path[0];
-
-describe('createUserSchema', () => {
+describe('newUserSchema', () => {
   it('accepts a complete form', () => {
-    expect(createUserSchema.safeParse(valid).success).toBe(true);
+    expect(newUserSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('accepts a blank phone number, which the API treats as optional', () => {
+    expect(newUserSchema.safeParse({ ...valid, phone_number: '' }).success).toBe(true);
   });
 
   it('trims surrounding whitespace from text fields', () => {
-    const parsed = createUserSchema.parse({
-      ...valid,
-      firstname: '  Sarah ',
-      username: ' snakato ',
-    });
+    const parsed = newUserSchema.parse({ ...valid, firstname: '  Sarah ', username: ' snakato ' });
     expect(parsed).toMatchObject({ firstname: 'Sarah', username: 'snakato' });
   });
 
   it.each([
     { field: 'firstname', value: '   ' },
+    { field: 'firstname', value: 'A'.repeat(21) },
     { field: 'lastname', value: '' },
     { field: 'username', value: 'ab' },
+    { field: 'username', value: 'a'.repeat(51) },
     { field: 'username', value: 'sarah nakato' },
     { field: 'email', value: 'sarah@' },
-    { field: 'email', value: 'not an email' },
+    { field: 'email', value: '' },
     { field: 'phone_number', value: '12345' },
-    { field: 'phone_number', value: 'call me' },
+    { field: 'phone_number', value: '+254 712 345 678' },
     { field: 'phone_number', value: '+256700000001; DROP TABLE users' },
-    { field: 'location', value: '' },
-    { field: 'role', value: '' },
-    { field: 'organization_unit_id', value: '' },
+    { field: 'role_ids', value: [] },
     { field: 'password', value: '' },
     { field: 'password', value: 'short' },
+    { field: 'password', value: 'x'.repeat(73) },
   ])('rejects $field = "$value"', ({ field, value }) => {
-    expect(firstIssue(createUserSchema, { ...valid, [field]: value })).toBe(field);
+    expect(firstIssue({ ...valid, [field]: value })).toBe(field);
   });
 
-  it.each(['0772000000', '+256700000001', '(041) 123-4567'])(
-    'accepts the phone number %s',
-    (phone) => {
-      expect(createUserSchema.safeParse({ ...valid, phone_number: phone }).success).toBe(true);
-    },
-  );
+  it('counts the password limit in bytes, as the server does', () => {
+    // 24 three-byte characters are 72 bytes; one more is over.
+    expect(firstIssue({ ...valid, password: '€'.repeat(24) })).toBeUndefined();
+    expect(firstIssue({ ...valid, password: '€'.repeat(25) })).toBe('password');
+  });
 
   it('does not trim the password', () => {
-    expect(createUserSchema.parse({ ...valid, password: ' spaced out ' }).password).toBe(
+    expect(newUserSchema.parse({ ...valid, password: ' spaced out ' }).password).toBe(
       ' spaced out ',
     );
   });
 });
 
-describe('editUserSchema', () => {
-  it('accepts a blank password, meaning "unchanged"', () => {
-    expect(editUserSchema.safeParse({ ...valid, password: '' }).success).toBe(true);
-  });
-
-  it('still enforces the minimum length when a new password is entered', () => {
-    expect(editUserSchema.safeParse({ ...valid, password: 'short' }).success).toBe(false);
-  });
-});
-
-describe('resolveRoleId', () => {
+describe('phone number', () => {
   it.each([
-    { name: 'a role id', role: '2', expected: '2' },
-    { name: 'a role name', role: 'DCFP', expected: '2' },
-    { name: 'a role name in another case', role: 'dcfp', expected: '2' },
-    { name: 'an unknown role', role: 'auditor', expected: '' },
-    { name: 'no role', role: null, expected: '' },
-  ])('resolves $name', ({ role, expected }) => {
-    expect(resolveRoleId(role, roles)).toBe(expected);
+    ['+256 772 100 201', '+256772100201'],
+    ['256772100201', '+256772100201'],
+    ['0772-100-201', '+256772100201'],
+  ])('reads %s as %s', (input, expected) => {
+    expect(newUserSchema.parse({ ...valid, phone_number: input }).phone_number).toBe(expected);
   });
 
-  it('resolves nothing while the role list is still empty', () => {
-    expect(resolveRoleId('2', [])).toBe('');
+  it.each(['0772 100 20', '+256 872 100 201', '+1 202 555 0100', '(0414) 123456'])(
+    'rejects %s',
+    (input) => {
+      expect(firstIssue({ ...valid, phone_number: input })).toBe('phone_number');
+    },
+  );
+});
+
+describe('toNewUserInput', () => {
+  it('sends the phone in +256 form, short enough for the 15-character limit, and the email lower-cased', () => {
+    const body = toNewUserInput(newUserSchema.parse(valid));
+    expect(body).toEqual({
+      username: 'snakato',
+      email: 'sarah@example.org',
+      password: 'correct horse',
+      firstname: 'Sarah',
+      lastname: 'Nakato',
+      phone_number: '+256772100201',
+      role_ids: ['role-1'],
+    });
+    expect(body.phone_number.length).toBeLessThanOrEqual(15);
+  });
+
+  it('sends a blank phone as blank', () => {
+    expect(toNewUserInput(newUserSchema.parse({ ...valid, phone_number: '' })).phone_number).toBe(
+      '',
+    );
   });
 });
 
-describe('userFormDefaults', () => {
-  it('is blank for a new user', () => {
-    expect(Object.values(userFormDefaults(null, roles)).every((value) => value === '')).toBe(true);
-  });
-
-  it('fills the form from the record being edited', () => {
-    expect(userFormDefaults(user, roles)).toMatchObject({
-      firstname: 'James',
-      username: 'okello',
-      role: '2',
-      organization_unit_id: '12',
-    });
-  });
-
-  it('never prefills the password, even if the record carried one', () => {
-    const leaky = { ...user, password: 'hunter2' } as User;
-    expect(userFormDefaults(leaky, roles).password).toBe('');
+describe('userRolesSchema', () => {
+  it('needs at least one role', () => {
+    expect(userRolesSchema.safeParse({ role_ids: [] }).success).toBe(false);
+    expect(userRolesSchema.safeParse({ role_ids: ['role-1'] }).success).toBe(true);
   });
 });
 
@@ -141,25 +117,25 @@ describe('userDisplayName', () => {
   it.each([
     {
       name: 'both names',
-      user: { id: 1, firstname: 'A', lastname: 'B', username: 'ab' },
+      user: { id: '1', firstname: 'A', lastname: 'B', username: 'ab' },
       expected: 'A B',
     },
     {
       name: 'one name',
-      user: { id: 1, firstname: null, lastname: 'B', username: 'ab' },
+      user: { id: '1', firstname: null, lastname: 'B', username: 'ab' },
       expected: 'B',
     },
     {
       name: 'only a username',
-      user: { id: 1, firstname: null, lastname: null, username: 'ab' },
+      user: { id: '1', firstname: null, lastname: null, username: 'ab' },
       expected: 'ab',
     },
     {
       name: 'nothing but an id',
-      user: { id: 9, firstname: null, lastname: null, username: null },
-      expected: 'User #9',
+      user: { id: '9', firstname: null, lastname: null, username: null },
+      expected: 'User 9',
     },
-  ])('uses $name', ({ user: subject, expected }) => {
-    expect(userDisplayName(subject)).toBe(expected);
+  ])('uses $name', ({ user, expected }) => {
+    expect(userDisplayName(user)).toBe(expected);
   });
 });
