@@ -3926,7 +3926,6 @@
         "description": "Converted legacy hotspots can lack fields that the API requires for new submissions.",
         "required": [
           "id",
-          "legacy_id",
           "name",
           "type",
           "village",
@@ -3948,10 +3947,6 @@
           "id": {
             "type": "string",
             "format": "uuid"
-          },
-          "legacy_id": {
-            "type": "string",
-            "nullable": true
           },
           "name": {
             "type": "string",

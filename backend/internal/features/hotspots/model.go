@@ -42,7 +42,6 @@ type ContactPerson struct {
 // hotspots submitted through the API always have the required ones.
 type HotSpot struct {
 	ID                 string         `json:"id"`
-	LegacyID           *string        `json:"legacy_id"`
 	Name               *string        `json:"name"`
 	Type               *string        `json:"type"`
 	Village            *string        `json:"village"`

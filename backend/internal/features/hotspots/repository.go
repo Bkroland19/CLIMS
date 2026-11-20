@@ -63,7 +63,7 @@ func visibleArgs(access scope, args ...any) []any {
 	return append([]any{access.userID, access.submit, access.activate, access.allDistricts}, args...)
 }
 
-const hotSpotColumns = `h.id, h.legacy_id, h.name, h.type, h.village,
+const hotSpotColumns = `h.id, h.name, h.type, h.village,
 	r.id, r.name, d.id, d.name, sc.id, sc.name,
 	h.latitude::float8, h.longitude::float8, h.has_condom_dispenser, h.dispenser_condition,
 	h.status, h.review_status, h.submitted_by_id, cp.id, cp.name, cp.phone_number, h.created_at, h.updated_at`
@@ -86,7 +86,7 @@ func scanHotSpot(row pgx.Row) (HotSpot, error) {
 	var h HotSpot
 	var regionID, regionName, districtID, districtName, subcountyID, subcountyName *string
 	var contactID, contactName, contactPhone *string
-	if err := row.Scan(&h.ID, &h.LegacyID, &h.Name, &h.Type, &h.Village,
+	if err := row.Scan(&h.ID, &h.Name, &h.Type, &h.Village,
 		&regionID, &regionName, &districtID, &districtName, &subcountyID, &subcountyName,
 		&h.Latitude, &h.Longitude, &h.HasCondomDispenser, &h.DispenserCondition,
 		&h.Status, &h.ReviewStatus, &h.SubmittedByID, &contactID, &contactName, &contactPhone,
