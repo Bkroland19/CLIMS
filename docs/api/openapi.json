@@ -3,7 +3,7 @@
   "info": {
     "title": "CLIMS API",
     "version": "2.1.0",
-    "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
+    "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, inventory reporting, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
   },
   "servers": [
     {
@@ -26,6 +26,9 @@
     },
     {
       "name": "Hotspots"
+    },
+    {
+      "name": "Inventory"
     },
     {
       "name": "Health"
@@ -1659,6 +1662,346 @@
           }
         }
       }
+    },
+    "/api/v1/inventory/stock": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listStock",
+        "summary": "Stock at stores",
+        "description": "Requires inventory:read. Balances at the national warehouse and district stores per product and unit: on hand, reserved for confirmed orders, available, and incoming on dispatched replenishments. Users see their assigned store (a hotspot manager, their hotspot); orders:all_stores sees every store.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "store_type",
+            "in": "query",
+            "description": "Warehouse or district stores.",
+            "schema": {
+              "type": "string",
+              "enum": ["national", "district"]
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/hotspots": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listHotspotStock",
+        "summary": "Stock supplied to hotspots",
+        "description": "Requires inventory:read. Per hotspot and product: quantity delivered and deliveries in the period, last delivery, quantity in transit, quantity still requested, held requests and the last stockout. Hotspot consumption is not recorded, so this reports supply rather than a count at the hotspot. District users see hotspots their store supplies. Users see their assigned store (a hotspot manager, their hotspot); orders:all_stores sees every store.",
+        "parameters": [
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "description": "One hotspot.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotStockListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/movements": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listStockMovements",
+        "summary": "Stock movement ledger",
+        "description": "Requires inventory:read. Every change to a store's on-hand stock, newest first, with the balance after it. Order dispatch and receipt are recorded automatically and link their order. Users see their assigned store (a hotspot manager, their hotspot); orders:all_stores sees every store.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "One kind of movement.",
+            "schema": {
+              "type": "string",
+              "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "operationId": "recordStockMovement",
+        "summary": "Record stock received or an adjustment",
+        "description": "Requires inventory:manage and the store as your assigned store, or orders:all_stores. A receipt adds a positive quantity, for example a delivery from a supplier to the warehouse. An adjustment corrects stock after a count in either direction and needs a note. Stock cannot fall below what open orders have reserved (409).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockMovementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/summary": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "getInventorySummary",
+        "summary": "National stock summary",
+        "description": "Requires inventory:read and orders:all_stores. Per product and unit: warehouse and district stock on hand and available, stock in transit, quantity delivered to hotspots in the period, and open and held hotspot requests.",
+        "parameters": [
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventorySummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3112,6 +3455,363 @@
           },
           "data": {
             "$ref": "#/components/schemas/TokenPair"
+          }
+        }
+      },
+      "StockBalance": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reserved": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "incoming": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dispatched to this store by the warehouse and not yet received."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotStock": {
+        "type": "object",
+        "properties": {
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "delivered": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deliveries": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_delivered_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "in_transit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requested": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "on_hold_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_stockout_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockMovement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Positive adds stock, negative removes it."
+          },
+          "on_hand_after": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null for system entries such as opening balances."
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockMovementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["store_id", "condom_id", "unit_of_measure_id", "reason", "quantity"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["receipt", "adjustment"]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": -1000000000,
+            "maximum": 1000000000,
+            "description": "Positive for a receipt; nonzero for an adjustment."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "Required for an adjustment."
+          }
+        }
+      },
+      "InventorySummary": {
+        "type": "object",
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "warehouse_on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warehouse_available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "district_on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "district_available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "in_transit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered_to_hotspots": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "open_hotspot_requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "on_hold_requests": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StockListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockBalance"
+            }
+          }
+        }
+      },
+      "HotspotStockListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotStock"
+            }
+          }
+        }
+      },
+      "StockMovementListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockMovement"
+            }
+          }
+        }
+      },
+      "InventorySummaryResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventorySummary"
+            }
+          }
+        }
+      },
+      "StockMovementResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockMovement"
           }
         }
       }

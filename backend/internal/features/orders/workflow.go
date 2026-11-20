@@ -154,15 +154,20 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 			}
 			quantity = *input.QuantityIssued
 		}
-		issued, err := tx.Exec(ctx, `UPDATE order_store_stock
+		var onHand int64
+		err := tx.QueryRow(ctx, `UPDATE order_store_stock
 			SET on_hand = on_hand - $5, reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
-			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4`,
-			order.OrderedFromStoreID, order.CondomID, order.UnitOfMeasureID, order.QuantityNeeded, quantity)
+			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4
+			RETURNING on_hand`,
+			order.OrderedFromStoreID, order.CondomID, order.UnitOfMeasureID, order.QuantityNeeded, quantity).Scan(&onHand)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Order{}, errWorkflowConflict
+		}
 		if err != nil {
 			return Order{}, err
 		}
-		if issued.RowsAffected() != 1 {
-			return Order{}, errWorkflowConflict
+		if err = recordMovement(ctx, tx, order, order.OrderedFromStoreID, "dispatch", -int64(quantity), onHand, actorID); err != nil {
+			return Order{}, err
 		}
 		order.QuantityIssued = &quantity
 		order.HandledByID = &actorID
@@ -174,13 +179,21 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		if *input.QuantityReceived != *order.QuantityIssued && input.DiscrepancyNote == nil {
 			return Order{}, errWorkflowInput
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
+		var onHand int64
+		err := tx.QueryRow(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
 			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (store_id, condom_id, unit_of_measure_id)
-			DO UPDATE SET on_hand = order_store_stock.on_hand + EXCLUDED.on_hand, updated_at = CURRENT_TIMESTAMP`,
-			order.OrderedForStoreID, order.CondomID, order.UnitOfMeasureID, *input.QuantityReceived)
+			DO UPDATE SET on_hand = order_store_stock.on_hand + EXCLUDED.on_hand, updated_at = CURRENT_TIMESTAMP
+			RETURNING on_hand`,
+			order.OrderedForStoreID, order.CondomID, order.UnitOfMeasureID, *input.QuantityReceived).Scan(&onHand)
 		if err != nil {
 			return Order{}, err
+		}
+		if *input.QuantityReceived > 0 {
+			if err = recordMovement(ctx, tx, order, order.OrderedForStoreID, "order_receipt",
+				int64(*input.QuantityReceived), onHand, actorID); err != nil {
+				return Order{}, err
+			}
 		}
 		if err = confirmHeldOrder(ctx, tx, *order.ParentOrderID, actorID); err != nil {
 			return Order{}, err
@@ -205,6 +218,15 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		return Order{}, err
 	}
 	return result, addEvent(ctx, tx, result, actorID, action, notifyStore, notifyUser)
+}
+
+// recordMovement adds an order's stock change at a store to the inventory ledger.
+func recordMovement(ctx context.Context, tx pgx.Tx, order Order, storeID, reason string, quantity, onHandAfter int64, actorID string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO inventory_movements
+		(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, order_id, actor_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		storeID, order.CondomID, order.UnitOfMeasureID, reason, quantity, onHandAfter, order.ID, actorID)
+	return err
 }
 
 // reserve holds the order's full quantity at the supplying store when enough unreserved stock is on hand.

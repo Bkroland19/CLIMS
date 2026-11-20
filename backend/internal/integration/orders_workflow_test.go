@@ -89,7 +89,9 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	act(childPath, "check-stock", warehouseToken, nil, 409, "")
 	act(childPath, "review", warehouseToken, nil, 200, "reviewed")
 	act(childPath, "check-stock", warehouseToken, nil, 200, "on_hold")
-	exec(`INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand) VALUES ($1, $2, $3, 100)`, warehouse, product, unit)
+	// Warehouse stock arrives through the inventory API, so the ledger accounts for every unit.
+	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": product,
+		"unit_of_measure_id": unit, "reason": "receipt", "quantity": 100, "note": "Delivery from supplier"}, admin, 201)
 	act(childPath, "check-stock", warehouseToken, nil, 200, "confirmed")
 	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 51}, 422, "")
 	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 0}, 422, "")
@@ -127,4 +129,5 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	}
 	balance(district, 10) // 55 received, 45 issued
 	balance(warehouse, 50)
+	testInventoryReports(t, pool, request, admin, districtToken, warehouse, district, hotSpot)
 }
