@@ -96,7 +96,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM roles),(SELECT count(*) FROM users)`).Scan(&roleCount, &userCount); err != nil {
 		t.Fatal(err)
 	}
-	if roleCount != 11 || userCount != 455 {
+	if roleCount != 12 || userCount != 455 {
 		t.Fatalf("legacy import: roles=%d users=%d", roleCount, userCount)
 	}
 	// Importing after migrations resolves the backup's shared usernames and phone numbers.
@@ -214,7 +214,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 
 	registration := map[string]any{"username": "newuser", "email": " NewUser@example.test ", "password": "test-password-123", "first_name": "New", "lastname": "User", "location": "Kampala"}
-	for _, field := range []string{"role_id", "role", "status", "organisation_unit_id", "hot_spot_id", "remember_token"} {
+	for _, field := range []string{"role_id", "role_ids", "role", "status", "organisation_unit_id", "hot_spot_id", "remember_token"} {
 		bad := map[string]any{"username": "bad", "email": "bad@example.test", "password": "test-password-123", field: 1}
 		request("POST", "/auth/register", bad, "", 400)
 	}
@@ -240,9 +240,14 @@ func TestAuthRBACIntegration(t *testing.T) {
 		if _, present := profile["remember_token"]; present {
 			t.Fatal("profile exposed a remember token")
 		}
-	}
-	if me["role"] != nil {
-		t.Fatal("public registration assigned a role")
+		roles := profile["roles"].([]any)
+		if len(roles) != 1 {
+			t.Fatalf("expected one registration role, got %v", roles)
+		}
+		role := roles[0].(map[string]any)
+		if role["id"] != rbac.RegisteredUserRoleID || role["name"] != "registered user" || len(role["permissions"].([]any)) != 0 {
+			t.Fatalf("unexpected registration role: %v", role)
+		}
 	}
 	request("GET", "/users", nil, userToken, 403)
 	request("PATCH", fmt.Sprintf("/users/%s/role", id), map[string]any{"role_id": adminRole}, userToken, 403)

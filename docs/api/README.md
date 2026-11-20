@@ -8,7 +8,7 @@ All routes use `/api/v1`. Login and registration are public; all other endpoints
 
 | Method | Path                       | Access                                                                            |
 | ------ | -------------------------- | --------------------------------------------------------------------------------- |
-| POST   | `/auth/register`           | Public, creates an active account with no assigned role                           |
+| POST   | `/auth/register`           | Public, creates an active account with the `registered user` role                 |
 | POST   | `/auth/login`              | Public, returns a 15-minute access token, a refresh token and the account profile |
 | GET    | `/auth/me`                 | Any active account, including unassigned accounts                                 |
 | POST   | `/auth/refresh`            | Public; exchanges a single-use refresh token for new tokens                       |
@@ -40,7 +40,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 
 Admin-created accounts use the registration fields plus `role_id`. Assign a role with `{"role_id":7}` and change account status with `{"status":"active"}` or `{"status":"disabled"}`. Replace a role's permissions with `{"permissions":["users:read"]}`; an empty array revokes all its management permissions. Unknown permission codes are rejected atomically.
 
-The catalog preserves the 11 original roles: `admin` (1), `moh` (2), `nms` (3), `jms` (4), `dfcp` (5), `store incharge` (6), `hotspot manager` (7), `delivery agent` (8), `other supplier` (9), `healthy facility` (10), and `vht` (11). The legacy spelling `healthy facility` is intentional.
+The catalog preserves the 11 original roles: `admin` (1), `moh` (2), `nms` (3), `jms` (4), `dfcp` (5), `store incharge` (6), `hotspot manager` (7), `delivery agent` (8), `other supplier` (9), `healthy facility` (10), and `vht` (11). The legacy spelling `healthy facility` is intentional. The `registered user` role is used for public signup and starts with no permissions.
 
 Admin initially has all six management permissions. Other roles initially have access to their own profile; an admin can grant them management permissions. Inventory, ordering, and organization-scoped access will need policies alongside their feature APIs. Permissions such as `roles:assign` and `roles:manage` delegate authority to grant access, including admin-level access; assign them only to trusted account administrators.
 

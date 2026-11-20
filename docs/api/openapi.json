@@ -509,8 +509,8 @@
       "post": {
         "tags": ["Auth"],
         "operationId": "register",
-        "summary": "Register an unassigned account",
-        "description": "Creates an active account with no assigned role. Role and status fields are rejected. Limited to 10 requests per IP per minute. Email addresses, usernames and phone numbers must each be unused: a taken value returns 409 naming the field. Emails and usernames are compared case-insensitively and phone numbers by their digits, so 0772 123456 and +256772123456 conflict.",
+        "summary": "Register an account",
+        "description": "Creates an active account with the default registered user role, which starts with no permissions. Role and status fields are rejected. Limited to 10 requests per IP per minute. Email addresses, usernames and phone numbers must each be unused: a taken value returns 409 naming the field. Emails and usernames are compared case-insensitively and phone numbers by their digits, so 0772 123456 and +256772123456 conflict.",
         "responses": {
           "201": {
             "description": "Success",
