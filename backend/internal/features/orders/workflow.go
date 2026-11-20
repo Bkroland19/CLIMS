@@ -19,6 +19,7 @@ type ActionInput struct {
 	WarehouseID      *string `json:"warehouse_store_id"`
 	RiderID          *string `json:"rider_id"`
 	QuantityReceived *int32  `json:"quantity_received"`
+	QuantityIssued   *int32  `json:"quantity_issued"`
 	DiscrepancyNote  *string `json:"discrepancy_note"`
 	DeliveryNote     *string `json:"delivery_note"`
 }
@@ -52,6 +53,14 @@ func assigned(id *string, expected string) bool {
 func (r *Repository) act(ctx context.Context, access scope, id, action string, input ActionInput) (Order, error) {
 	var result Order
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		if action == "receive" {
+			// Receipt also confirms the held hotspot order. Lock it before its replenishment, the same
+			// order request-replenishment takes, so the two cannot deadlock.
+			if _, err := tx.Exec(ctx, `SELECT FROM orders WHERE id =
+				(SELECT parent_order_id FROM orders WHERE id = $1) FOR UPDATE`, id); err != nil {
+				return err
+			}
+		}
 		order, err := scanOrder(tx.QueryRow(ctx, `SELECT `+columns+` FROM orders WHERE `+visibleOrders+
 			` AND id = $5 FOR UPDATE`, access.allStores, access.storeID, access.hotSpotID, access.userID, id))
 		if err != nil {
@@ -87,19 +96,17 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		}
 		next = "reviewed"
 	case "check-stock":
-		if order.Status != "reviewed" {
+		// Hotspot orders are reviewed automatically on queueing; a held order is rechecked directly.
+		if order.Status != "reviewed" && order.Status != "on_hold" &&
+			(order.Status != "queued" || order.HotSpotID == nil) {
 			return Order{}, errWorkflowConflict
 		}
-		reserved, err := tx.Exec(ctx, `UPDATE order_store_stock
-			SET reserved = reserved + $4, updated_at = CURRENT_TIMESTAMP
-			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3
-				AND on_hand - reserved >= $4`, order.OrderedFromStoreID, order.CondomID,
-			order.UnitOfMeasureID, order.QuantityNeeded)
+		reserved, err := reserve(ctx, tx, order)
 		if err != nil {
 			return Order{}, err
 		}
 		next = "on_hold"
-		if reserved.RowsAffected() == 1 {
+		if reserved {
 			next = "confirmed"
 			if order.HotSpotID != nil {
 				notifyUser = &order.OrderedByID
@@ -139,17 +146,30 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 			}
 			notifyStore = &order.OrderedForStoreID
 		}
-		issued, err := tx.Exec(ctx, `UPDATE order_store_stock
-			SET on_hand = on_hand - $4, reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
-			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4`,
-			order.OrderedFromStoreID, order.CondomID, order.UnitOfMeasureID, order.QuantityNeeded)
+		// A partial dispatch issues less than requested and releases the rest of the reservation.
+		quantity := order.QuantityNeeded
+		if input.QuantityIssued != nil {
+			if *input.QuantityIssued > order.QuantityNeeded {
+				return Order{}, errWorkflowInput
+			}
+			quantity = *input.QuantityIssued
+		}
+		var onHand int64
+		err := tx.QueryRow(ctx, `UPDATE order_store_stock
+			SET on_hand = on_hand - $5, reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
+			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4
+			RETURNING on_hand`,
+			order.OrderedFromStoreID, order.CondomID, order.UnitOfMeasureID, order.QuantityNeeded, quantity).Scan(&onHand)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Order{}, errWorkflowConflict
+		}
 		if err != nil {
 			return Order{}, err
 		}
-		if issued.RowsAffected() != 1 {
-			return Order{}, errWorkflowConflict
+		if err = recordMovement(ctx, tx, order, order.OrderedFromStoreID, "dispatch", -int64(quantity), onHand, actorID); err != nil {
+			return Order{}, err
 		}
-		order.QuantityIssued = &order.QuantityNeeded
+		order.QuantityIssued = &quantity
 		order.HandledByID = &actorID
 		next = "dispatched"
 	case "receive":
@@ -159,12 +179,23 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		if *input.QuantityReceived != *order.QuantityIssued && input.DiscrepancyNote == nil {
 			return Order{}, errWorkflowInput
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
+		var onHand int64
+		err := tx.QueryRow(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
 			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (store_id, condom_id, unit_of_measure_id)
-			DO UPDATE SET on_hand = order_store_stock.on_hand + EXCLUDED.on_hand, updated_at = CURRENT_TIMESTAMP`,
-			order.OrderedForStoreID, order.CondomID, order.UnitOfMeasureID, *input.QuantityReceived)
+			DO UPDATE SET on_hand = order_store_stock.on_hand + EXCLUDED.on_hand, updated_at = CURRENT_TIMESTAMP
+			RETURNING on_hand`,
+			order.OrderedForStoreID, order.CondomID, order.UnitOfMeasureID, *input.QuantityReceived).Scan(&onHand)
 		if err != nil {
+			return Order{}, err
+		}
+		if *input.QuantityReceived > 0 {
+			if err = recordMovement(ctx, tx, order, order.OrderedForStoreID, "order_receipt",
+				int64(*input.QuantityReceived), onHand, actorID); err != nil {
+				return Order{}, err
+			}
+		}
+		if err = confirmHeldOrder(ctx, tx, *order.ParentOrderID, actorID); err != nil {
 			return Order{}, err
 		}
 		order.QuantityReceived = input.QuantityReceived
@@ -187,6 +218,47 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		return Order{}, err
 	}
 	return result, addEvent(ctx, tx, result, actorID, action, notifyStore, notifyUser)
+}
+
+// recordMovement adds an order's stock change at a store to the inventory ledger.
+func recordMovement(ctx context.Context, tx pgx.Tx, order Order, storeID, reason string, quantity, onHandAfter int64, actorID string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO inventory_movements
+		(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, order_id, actor_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		storeID, order.CondomID, order.UnitOfMeasureID, reason, quantity, onHandAfter, order.ID, actorID)
+	return err
+}
+
+// reserve holds the order's full quantity at the supplying store when enough unreserved stock is on hand.
+func reserve(ctx context.Context, tx pgx.Tx, order Order) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE order_store_stock
+		SET reserved = reserved + $4, updated_at = CURRENT_TIMESTAMP
+		WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3
+			AND on_hand - reserved >= $4`, order.OrderedFromStoreID, order.CondomID,
+		order.UnitOfMeasureID, order.QuantityNeeded)
+	return tag.RowsAffected() == 1, err
+}
+
+// confirmHeldOrder reserves just-received stock for the hotspot order that requested it, before any
+// other order can take it, and sends the hotspot manager the order confirmation. The caller holds the lock.
+func confirmHeldOrder(ctx context.Context, tx pgx.Tx, id, actorID string) error {
+	held, err := scanOrder(tx.QueryRow(ctx, `SELECT `+columns+` FROM orders WHERE id = $1`, id))
+	if err != nil {
+		return err
+	}
+	if held.Status != "queued" && held.Status != "reviewed" && held.Status != "on_hold" {
+		return nil
+	}
+	reserved, err := reserve(ctx, tx, held)
+	if err != nil || !reserved {
+		return err
+	}
+	confirmed, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = 'confirmed',
+		updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, id))
+	if err != nil {
+		return err
+	}
+	return addEvent(ctx, tx, confirmed, actorID, "check-stock", nil, &confirmed.OrderedByID)
 }
 
 func requestReplenishment(ctx context.Context, tx pgx.Tx, order Order, actorID, warehouseID string) (Order, error) {

@@ -3,198 +3,196 @@ package hotspots
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
+	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/request"
 	"clims-backend/internal/pkg/response"
-	"clims-backend/internal/pkg/validator"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// Submission holds the hotspot details a VHT submits; text limits match the legacy columns.
+type Submission struct {
+	Name                   string   `json:"name"`
+	DistrictID             string   `json:"district_id"`
+	Type                   *string  `json:"type"`
+	Village                *string  `json:"village"`
+	ContactPersonName      *string  `json:"contact_person_name"`
+	ContactPersonTelephone *string  `json:"contact_person_telephone"`
+	HasCondomDispenser     *bool    `json:"has_condom_dispenser"`
+	DispenserCondition     *string  `json:"dispenser_condition"`
+	Latitude               *float64 `json:"latitude"`
+	Longitude              *float64 `json:"longitude"`
+	Comment                *string  `json:"comment"`
+}
+
+// dispenserConditions are the conditions recorded for legacy dispensers.
+var dispenserConditions = []string{"Good", "Poor", "Broken"}
+
 type Handler struct {
 	repo *Repository
 }
 
-func NewHandler(repo *Repository) *Handler {
-	return &Handler{repo: repo}
+func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber.Handler) {
+	h := &Handler{repo: repo}
+	group := router.Group("/hotspots", jwt, activeUser)
+	group.Get("/", rbac.RequirePermission("hotspots:read"), h.list)
+	group.Post("/", rbac.RequirePermission("hotspots:submit"), h.submit)
+	group.Get("/notifications", rbac.RequirePermission("hotspots:read"), h.notifications)
+	group.Get("/districts", rbac.RequirePermission("hotspots:submit"), h.districts)
+	group.Post("/:id/actions/:action", rbac.RequirePermission("hotspots:activate"), h.act)
 }
 
 func scopeFor(user *users.User) scope {
-	return scope{
-		userID:  user.ID,
-		storeID: user.StoreID,
-		submit:  user.HasPermission("hotspots:submit"),
-		verify:  user.HasPermission("hotspots:verify"),
-	}
-}
-
-func pagination(c fiber.Ctx) (int32, int32, bool) {
-	limit, limitErr := strconv.ParseInt(c.Query("limit", "50"), 10, 32)
-	offset, offsetErr := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
-	if limitErr != nil || offsetErr != nil || limit < 1 || limit > 100 || offset < 0 {
-		return 0, 0, false
-	}
-	return int32(limit), int32(offset), true
+	return scope{userID: user.ID, storeID: user.StoreID, allDistricts: user.HasPermission("hotspots:all_districts")}
 }
 
 func (h *Handler) list(c fiber.Ctx) error {
-	limit, offset, ok := pagination(c)
-	if !ok {
+	limit, limitErr := strconv.ParseInt(c.Query("limit", "50"), 10, 32)
+	offset, offsetErr := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
+	if limitErr != nil || offsetErr != nil || limit < 1 || limit > 100 || offset < 0 {
 		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
 	}
-	status := c.Query("status")
-	if status != "" && status != StatusActive && status != StatusInactive {
-		return response.Error(c, 400, "status must be active or inactive", nil)
-	}
-	hotSpots, total, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), status, limit, offset)
+	result, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), c.Query("status"), int32(limit), int32(offset))
 	if err != nil {
 		return hotSpotError(c, err)
 	}
-	return response.Success(c, 200, "hotspots retrieved", fiber.Map{
-		"hot_spots": hotSpots, "total": total, "limit": limit, "offset": offset,
-	})
-}
-
-func (h *Handler) get(c fiber.Ctx) error {
-	id, err := request.UUIDParam(c)
-	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
-	}
-	return h.respondWithDetail(c, 200, "hotspot retrieved", id)
+	return response.Success(c, 200, "", result)
 }
 
 func (h *Handler) submit(c fiber.Ctx) error {
-	var input SubmitRequest
+	var input Submission
 	if err := request.DecodeJSON(c, &input); err != nil {
-		return response.Error(c, 400, "invalid request body", err.Error())
+		return response.Error(c, 400, "invalid request body", nil)
 	}
-	input.Normalize()
-	if err := validator.Validate.Struct(input); err != nil {
-		return response.Error(c, 422, "validation failed", validator.FormatErrors(err))
+	if message := validate(&input); message != "" {
+		return response.Error(c, 422, message, nil)
 	}
-	id, err := h.repo.submit(c.Context(), users.CurrentUser(c).ID, input)
+	result, err := h.repo.submit(c.Context(), users.CurrentUser(c).ID, input)
 	if err != nil {
 		return hotSpotError(c, err)
 	}
-	return h.respondWithDetail(c, 201, "hotspot submitted for verification", id)
+	return response.Success(c, 201, "hotspot submitted for district verification", result)
 }
 
-func (h *Handler) update(c fiber.Ctx) error {
+func (h *Handler) act(c fiber.Ctx) error {
 	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
-	var input Details
-	if err = request.DecodeJSON(c, &input); err != nil {
-		return response.Error(c, 400, "invalid request body", err.Error())
+	action := c.Params("action")
+	if _, exists := transitions[action]; !exists {
+		return response.Error(c, 404, "unknown hotspot action", nil)
 	}
-	input.Normalize()
-	if err = validator.Validate.Struct(input); err != nil {
-		return response.Error(c, 422, "validation failed", validator.FormatErrors(err))
+	var input struct {
+		Reason *string `json:"reason"`
 	}
-	if err = h.repo.update(c.Context(), users.CurrentUser(c).ID, id, input); err != nil {
-		return hotSpotError(c, err)
+	if len(c.Body()) != 0 {
+		if err = request.DecodeJSON(c, &input); err != nil {
+			return response.Error(c, 400, "invalid request body", nil)
+		}
 	}
-	return h.respondWithDetail(c, 200, "hotspot updated", id)
-}
-
-// decodeComment reads the hotspot ID and comment body. On invalid input it writes
-// the error response and returns a nil request with that write's result.
-func decodeComment(c fiber.Ctx) (string, *CommentRequest, error) {
-	id, err := request.UUIDParam(c)
-	if err != nil {
-		return "", nil, response.Error(c, 400, err.Error(), nil)
+	if input.Reason != nil {
+		trimmed := strings.TrimSpace(*input.Reason)
+		input.Reason = &trimmed
 	}
-	var input CommentRequest
-	if err = request.DecodeJSON(c, &input); err != nil {
-		return "", nil, response.Error(c, 400, "invalid request body", err.Error())
+	if (action == "reject") != (input.Reason != nil && *input.Reason != "") ||
+		input.Reason != nil && utf8.RuneCountInString(*input.Reason) > 1000 {
+		return response.Error(c, 422, "reject requires a reason of at most 1000 characters; other actions take no body", nil)
 	}
-	input.Normalize()
-	if err = validator.Validate.Struct(input); err != nil {
-		return "", nil, response.Error(c, 422, "validation failed", validator.FormatErrors(err))
-	}
-	return id, &input, nil
-}
-
-func (h *Handler) comment(c fiber.Ctx) error {
-	id, input, err := decodeComment(c)
-	if input == nil {
-		return err
-	}
-	if err = h.repo.comment(c.Context(), scopeFor(users.CurrentUser(c)), id, input.Comment); err != nil {
-		return hotSpotError(c, err)
-	}
-	return h.respondWithDetail(c, 201, "comment added", id)
-}
-
-func (h *Handler) activate(c fiber.Ctx) error {
-	return h.setStatus(c, StatusActive, "hotspot activated")
-}
-
-func (h *Handler) deactivate(c fiber.Ctx) error {
-	return h.setStatus(c, StatusInactive, "hotspot deactivated")
-}
-
-func (h *Handler) setStatus(c fiber.Ctx, status, message string) error {
-	id, input, err := decodeComment(c)
-	if input == nil {
-		return err
-	}
-	if err = h.repo.setStatus(c.Context(), users.CurrentUser(c).ID, id, status, input.Comment); err != nil {
-		return hotSpotError(c, err)
-	}
-	return h.respondWithDetail(c, 200, message, id)
-}
-
-func (h *Handler) events(c fiber.Ctx) error {
-	id, err := request.UUIDParam(c)
-	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
-	}
-	events, err := h.repo.events(c.Context(), scopeFor(users.CurrentUser(c)), id)
+	result, err := h.repo.act(c.Context(), scopeFor(users.CurrentUser(c)), id, action, input.Reason)
 	if err != nil {
 		return hotSpotError(c, err)
 	}
-	return response.Success(c, 200, "hotspot events retrieved", events)
+	return response.Success(c, 200, "", result)
 }
 
 func (h *Handler) notifications(c fiber.Ctx) error {
-	limit, offset, ok := pagination(c)
-	if !ok {
-		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
+	offset, err := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
+	if err != nil || offset < 0 {
+		return response.Error(c, 400, "offset must be nonnegative", nil)
 	}
-	events, err := h.repo.notifications(c.Context(), scopeFor(users.CurrentUser(c)), limit, offset)
+	events, err := h.repo.notifications(c.Context(), scopeFor(users.CurrentUser(c)), int32(offset))
 	if err != nil {
 		return hotSpotError(c, err)
 	}
-	return response.Success(c, 200, "hotspot notifications retrieved", events)
+	return response.Success(c, 200, "", events)
 }
 
-func (h *Handler) respondWithDetail(c fiber.Ctx, status int, message, id string) error {
-	detail, err := h.repo.get(c.Context(), scopeFor(users.CurrentUser(c)), id)
+func (h *Handler) districts(c fiber.Ctx) error {
+	result, err := h.repo.districts(c.Context())
 	if err != nil {
 		return hotSpotError(c, err)
 	}
-	return response.Success(c, status, message, detail)
+	return response.Success(c, 200, "", result)
+}
+
+// validate normalizes the submission in place and returns a client message when it is invalid.
+func validate(in *Submission) string {
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" || utf8.RuneCountInString(in.Name) > 40 {
+		return "name is required and must be at most 40 characters"
+	}
+	district, err := request.ParseUUID(in.DistrictID)
+	if err != nil {
+		return "district_id must be a nonzero UUID"
+	}
+	in.DistrictID = district
+	for _, field := range []struct {
+		name  string
+		value **string
+		max   int
+	}{
+		{"type", &in.Type, 40},
+		{"village", &in.Village, 20},
+		{"contact_person_name", &in.ContactPersonName, 40},
+		{"contact_person_telephone", &in.ContactPersonTelephone, 15},
+		{"comment", &in.Comment, 100},
+		{"dispenser_condition", &in.DispenserCondition, 60},
+	} {
+		if *field.value == nil {
+			continue
+		}
+		trimmed := strings.TrimSpace(**field.value)
+		if utf8.RuneCountInString(trimmed) > field.max {
+			return field.name + " must be at most " + strconv.Itoa(field.max) + " characters"
+		}
+		*field.value = &trimmed
+		if trimmed == "" {
+			*field.value = nil
+		}
+	}
+	hasDispenser := in.HasCondomDispenser != nil && *in.HasCondomDispenser
+	if hasDispenser != (in.DispenserCondition != nil) ||
+		in.DispenserCondition != nil && !slices.Contains(dispenserConditions, *in.DispenserCondition) {
+		return "dispenser_condition is required with a condom dispenser and must be Good, Poor or Broken"
+	}
+	if (in.Latitude == nil) != (in.Longitude == nil) ||
+		in.Latitude != nil && (*in.Latitude < -90 || *in.Latitude > 90 || *in.Longitude < -180 || *in.Longitude > 180) {
+		return "latitude and longitude must be given together, within -90..90 and -180..180"
+	}
+	return ""
 }
 
 func hotSpotError(c fiber.Ctx, err error) error {
+	var dbError *pgconn.PgError
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return response.Error(c, 404, "hotspot not found", nil)
-	case errors.Is(err, ErrInvalidLocation), errors.Is(err, ErrUnknownManager):
-		return response.Error(c, 422, err.Error(), nil)
-	case errors.Is(err, ErrDuplicateName), errors.Is(err, ErrNotEditable), errors.Is(err, ErrStatusUnchanged):
+	case errors.Is(err, errForbidden):
+		return response.Error(c, 403, err.Error(), nil)
+	case errors.Is(err, errConflict):
 		return response.Error(c, 409, err.Error(), nil)
+	case errors.As(err, &dbError) && dbError.Code == "23503":
+		return response.Error(c, 422, "district_id does not reference a district", nil)
 	}
-	var dbError *pgconn.PgError
-	if errors.As(err, &dbError) && dbError.Code == "23503" {
-		return response.Error(c, 422, "a referenced region, district, subcounty or user does not exist", nil)
-	}
-	slog.Error("hotspot operation failed", "error", err)
-	return response.Error(c, 500, "hotspot operation failed", nil)
+	slog.Error("hotspots operation failed", "error", err)
+	return response.Error(c, 500, "hotspots operation failed", nil)
 }

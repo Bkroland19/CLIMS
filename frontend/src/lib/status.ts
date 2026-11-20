@@ -1,7 +1,13 @@
 export type StatusTone = 'positive' | 'caution' | 'negative' | 'neutral';
 
 const POSITIVE = new Set(['active', 'approved', 'verified', 'delivered', 'completed']);
-const CAUTION = new Set(['pending', 'pending verification', 'in progress', 'processing']);
+const CAUTION = new Set([
+  'pending',
+  'submitted',
+  'pending verification',
+  'in progress',
+  'processing',
+]);
 const NEGATIVE = new Set(['inactive', 'suspended', 'rejected', 'declined', 'cancelled', 'blocked']);
 
 /** The tone a status word is shown in. Unrecognised words are neutral, never guessed at. */

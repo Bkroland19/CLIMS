@@ -1,5 +1,22 @@
 .PHONY: help build-backend run-backend build-frontend run-frontend install-frontend docker-up docker-down docker-build clean test
 
+# Recipes are POSIX sh. On Windows outside Git Bash/WSL, make falls back to cmd.exe; use Git's sh.
+ifeq ($(OS),Windows_NT)
+ifeq ($(SHELL),sh.exe)
+GIT_SH := $(subst \,/,$(or $(ProgramW6432),$(ProgramFiles)))/Git/usr/bin/sh.exe
+ifeq ($(shell if exist "$(GIT_SH)" echo yes),yes)
+SHELL := $(GIT_SH)
+export PATH := $(GIT_SH:/sh.exe=);$(PATH)
+else
+$(error Install Git for Windows, or run make from Git Bash or WSL)
+endif
+endif
+PYTHON ?= python
+# Scripts read/write UTF-8 (seed SQL, docs); Windows Python defaults to cp1252.
+export PYTHONUTF8 := 1
+endif
+PYTHON ?= python3
+
 ENVIRONMENT ?= dev
 ifeq ($(filter $(ENVIRONMENT),dev prod),)
 $(error ENVIRONMENT must be dev or prod)
@@ -8,7 +25,7 @@ ENV_FILE ?= infra/env/$(ENVIRONMENT).env
 COMPOSE = docker compose --env-file $(ENV_FILE) -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.$(ENVIRONMENT).yml
 
 # Project variables
-VERSION ?= $(shell cat VERSION)
+VERSION ?= $(shell tr -d '\r\n' < VERSION)
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -64,7 +81,7 @@ build-backend:
 
 run-backend:
 	@echo "Starting backend server locally..."
-	set -a; . ./$(ENV_FILE); set +a; cd backend && go run ./cmd/server
+	set -a; eval "$$(tr -d '\r' < $(ENV_FILE))"; set +a; cd backend && go run ./cmd/server
 
 # --- Frontend Targets ---
 install-frontend:
@@ -114,20 +131,20 @@ db-up:
 
 db-seed:
 	@seed_file=$$(mktemp) && trap 'rm -f "$$seed_file"' EXIT && \
-		python3 scripts/prepare_legacy_seed.py > "$$seed_file" && \
+		$(PYTHON) scripts/prepare_legacy_seed.py > "$$seed_file" && \
 		$(COMPOSE) exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$$seed_file"
 
 sql-convert:
-	python3 scripts/convert_mysql_dump.py
+	$(PYTHON) scripts/convert_mysql_dump.py
 
 .PHONY: migrate-create
 migrate-create: export MIGRATION_NAME = $(NAME)
 migrate-create:
-	python3 scripts/create_migration.py
+	$(PYTHON) scripts/create_migration.py
 
 .PHONY: create-admin test-integration
 create-admin:
-	set -a; . ./$(ENV_FILE); set +a; cd backend && go run ./cmd/create-admin
+	set -a; eval "$$(tr -d '\r' < $(ENV_FILE))"; set +a; cd backend && go run ./cmd/create-admin
 
 test-integration:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "Set TEST_DATABASE_URL to an isolated PostgreSQL server with CREATE DATABASE permission"; exit 1)
@@ -135,7 +152,7 @@ test-integration:
 
 .PHONY: docs-check
 docs-check:
-	python3 scripts/check_docs.py
+	$(PYTHON) scripts/check_docs.py
 	docker run --rm -v "$(CURDIR)/docs:/docs:ro" python:3.13-alpine sh -c 'pip install --disable-pip-version-check --quiet openapi-spec-validator==0.7.2 && python -m openapi_spec_validator /docs/api/openapi.json'
 
 .PHONY: install-mobile run-mobile check-mobile check-stack
@@ -152,7 +169,7 @@ check-mobile:
 	cd mobile && npm run lint && npm run typecheck
 
 check-stack:
-	STACK_ENV=$(ENVIRONMENT) python3 scripts/check_stack.py
+	STACK_ENV=$(ENVIRONMENT) $(PYTHON) scripts/check_stack.py
 
 .PHONY: dev-up prod-up dev-down prod-down compose-config mobile-export
 dev-up:
@@ -180,30 +197,30 @@ mobile-export-run:
 
 .PHONY: check-environments
 check-environments:
-	python3 scripts/check_environments.py
+	$(PYTHON) scripts/check_environments.py
 
 .PHONY: lint format format-check
 lint:
 	cd backend && go vet ./...
 	cd frontend && npm run lint -- --max-warnings=0
 	cd mobile && npm run lint -- --max-warnings=0
-	python3 -m ruff check scripts
+	$(PYTHON) -m ruff check scripts
 
 format:
 	npm run format
 	cd frontend && npm run format
-	python3 -m ruff format scripts
+	$(PYTHON) -m ruff format scripts
 	gofmt -w backend
 
 format-check:
 	npm run format:check
 	cd frontend && npm run format:check
-	python3 -m ruff format --check scripts
+	$(PYTHON) -m ruff format --check scripts
 	@test -z "$$(gofmt -l backend)" || (gofmt -l backend; exit 1)
 
 .PHONY: version-check version-set
 version-check:
-	python3 scripts/project_version.py check
+	$(PYTHON) scripts/project_version.py check
 
 version-set:
-	python3 scripts/project_version.py set "$(VERSION)"
+	$(PYTHON) scripts/project_version.py set "$(VERSION)"

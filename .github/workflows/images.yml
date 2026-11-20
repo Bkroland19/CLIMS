@@ -162,8 +162,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.version }}
           PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+          APP_VERSION: ${{ needs.prepare.outputs.app_version }}
         run: |
-          args=(--verify-tag --title "$RELEASE_TAG" --notes-file release/images.md)
+          notes_file=release/images.md
+          if [ -f "docs/releases/$APP_VERSION.md" ]; then
+            cat "docs/releases/$APP_VERSION.md" > release/notes.md
+            printf '\n## Published images\n\n' >> release/notes.md
+            cat release/images.md >> release/notes.md
+            notes_file=release/notes.md
+          fi
+          args=(--verify-tag --title "$RELEASE_TAG" --notes-file "$notes_file")
           if [ "$PRERELEASE" = true ]; then
             args+=(--prerelease)
           fi

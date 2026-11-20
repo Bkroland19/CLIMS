@@ -1,88 +1,188 @@
 'use client';
 
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { BadgeCheck, CircleCheck, Plus, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { RowActions } from '@/components/data-table/RowActions';
+import { RowActions, type RowAction } from '@/components/data-table/RowActions';
 import { ExportButton } from '@/components/ExportButton';
+import { FormDialog } from '@/components/form/FormDialog';
+import { TextField } from '@/components/form/TextField';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { lookupName, useOrganizationUnits } from '@/features/reference/queries';
+import { getErrorMessage } from '@/lib/api';
 
-import type { Hotspot } from './api';
-import { hotspotLabel } from './hotspotForm';
+import type { Hotspot, HotspotEvent } from './api';
+import { dispenserSummary, hotspotLabel } from './hotspotForm';
 import { HotspotFormDialog } from './HotspotFormDialog';
-import { useDeleteHotspot, useHotspots } from './queries';
+import { useHotspotAction, useHotspotNotifications, useHotspots } from './queries';
 
-type DialogState = { hotspot: Hotspot | null } | null;
+/** `review` is the DCFP's verification queue; `submit` is a VHT's own submissions. */
+type Workspace = 'review' | 'submit';
 
-export default function HotspotsPage() {
+const UPDATE_TEXT: Record<string, string> = {
+  submitted: 'was submitted for verification',
+  verify: 'was verified',
+  activate: 'was activated',
+  reject: 'was rejected',
+};
+
+function RecentUpdates({ events, hotspots }: { events: HotspotEvent[]; hotspots: Hotspot[] }) {
+  if (events.length === 0) return null;
+  const names = new Map(hotspots.map((hotspot) => [hotspot.id, hotspotLabel(hotspot)]));
+  return (
+    <section aria-labelledby="hotspot-updates" className="bg-card rounded-xl border p-4">
+      <h2 id="hotspot-updates" className="text-sm font-semibold">
+        Recent updates
+      </h2>
+      <ul className="text-muted-foreground mt-2 flex flex-col gap-1 text-sm">
+        {events.slice(0, 5).map((event) => (
+          <li key={event.id}>
+            <span className="text-foreground font-medium">
+              {names.get(event.hot_spot_id) ?? 'A hotspot'}
+            </span>{' '}
+            {UPDATE_TEXT[event.action] ?? event.action}{' '}
+            <time dateTime={event.created_at}>
+              {new Date(event.created_at).toLocaleDateString('en-GB')}
+            </time>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const rejectSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, 'Say why the hotspot is rejected.')
+    .max(1000, 'Use at most 1000 characters.'),
+});
+
+function RejectDialog({ hotspot, onClose }: { hotspot: Hotspot; onClose: () => void }) {
+  const action = useHotspotAction();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+  } = useForm<z.input<typeof rejectSchema>, unknown, z.output<typeof rejectSchema>>({
+    resolver: zodResolver(rejectSchema),
+    defaultValues: { reason: '' },
+  });
+  return (
+    <FormDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={`Reject ${hotspotLabel(hotspot)}?`}
+      description="The VHT who submitted it is notified and sees your reason."
+      submitLabel="Reject hotspot"
+      pendingLabel="Rejecting…"
+      isPending={action.isPending}
+      isDirty={isDirty}
+      error={action.error ? getErrorMessage(action.error) : null}
+      onSubmit={handleSubmit(({ reason }) => {
+        action.mutate({ id: hotspot.id, action: 'reject', reason }, { onSuccess: onClose });
+      })}
+    >
+      <TextField
+        label="Reason"
+        required
+        autoComplete="off"
+        error={errors.reason?.message}
+        {...register('reason')}
+      />
+    </FormDialog>
+  );
+}
+
+export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
   const hotspots = useHotspots();
-  const organizationUnits = useOrganizationUnits();
-  const deleteHotspot = useDeleteHotspot();
-  const [dialog, setDialog] = useState<DialogState>(null);
-  const [hotspotToDelete, setHotspotToDelete] = useState<Hotspot | null>(null);
+  const notifications = useHotspotNotifications();
+  const action = useHotspotAction();
+  const [submitting, setSubmitting] = useState(false);
+  const [rejecting, setRejecting] = useState<Hotspot | null>(null);
 
   const columns = useMemo<DataTableColumn<Hotspot>[]>(
     () => [
-      { id: 'name', header: 'Hotspot', value: (hotspot) => hotspot.hotspot_name },
+      { id: 'name', header: 'Hotspot', value: (hotspot) => hotspot.name },
+      { id: 'type', header: 'Type', value: (hotspot) => hotspot.type },
+      { id: 'village', header: 'Village', value: (hotspot) => hotspot.village },
       { id: 'contact', header: 'Contact person', value: (hotspot) => hotspot.contact_person_name },
       {
         id: 'phone',
         header: 'Contact phone',
         value: (hotspot) => hotspot.contact_person_telephone,
       },
-      {
-        id: 'organization',
-        header: 'Organisation unit',
-        value: (hotspot) => lookupName(organizationUnits.data, hotspot.organization_unit_id),
-      },
+      { id: 'dispenser', header: 'Dispenser', value: dispenserSummary },
       {
         id: 'status',
         header: 'Status',
-        value: (hotspot) => hotspot.hotspot_status,
-        cell: (hotspot) => <StatusBadge status={hotspot.hotspot_status} />,
+        value: (hotspot) => hotspot.status,
+        cell: (hotspot) => <StatusBadge status={hotspot.status} />,
       },
+      { id: 'reason', header: 'Rejection reason', value: (hotspot) => hotspot.rejection_reason },
     ],
-    [organizationUnits.data],
+    [],
   );
 
-  const organizationOptions = useMemo(
-    () => ({
-      options: (organizationUnits.data ?? []).map((unit) => ({
-        value: String(unit.id),
-        label: unit.name ?? `#${unit.id}`,
-      })),
-      isLoading: organizationUnits.isPending,
-    }),
-    [organizationUnits.data, organizationUnits.isPending],
-  );
+  const reviewActions = (hotspot: Hotspot): RowAction[] => {
+    const act = (name: 'verify' | 'activate') => () => {
+      action.mutate({ id: hotspot.id, action: name });
+    };
+    const actions: RowAction[] = [];
+    if (hotspot.status === 'submitted')
+      actions.push({ label: 'Verify', icon: BadgeCheck, onSelect: act('verify') });
+    if (hotspot.status === 'verified')
+      actions.push({ label: 'Activate', icon: CircleCheck, onSelect: act('activate') });
+    if (hotspot.status === 'submitted' || hotspot.status === 'verified') {
+      actions.push({
+        label: 'Reject',
+        icon: XCircle,
+        destructive: true,
+        onSelect: () => {
+          setRejecting(hotspot);
+        },
+      });
+    }
+    return actions;
+  };
 
-  const addButton = (
+  const submitButton = (
     <Button
       onClick={() => {
-        setDialog({ hotspot: null });
+        setSubmitting(true);
       }}
     >
       <Plus data-icon="inline-start" />
-      Add hotspot
+      Submit hotspot
     </Button>
   );
+  const isReview = workspace === 'review';
 
   return (
     <>
       <PageHeader
-        description="Places where condoms are distributed, and who to contact at each."
+        description={
+          isReview
+            ? 'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.'
+            : 'Hotspots you identified, and where each one is in district verification.'
+        }
         actions={
           <>
             <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
-            {addButton}
+            {isReview ? null : submitButton}
           </>
         }
       />
+
+      <RecentUpdates events={notifications.data ?? []} hotspots={hotspots.data ?? []} />
 
       <DataTable
         label="Hotspots"
@@ -94,65 +194,40 @@ export default function HotspotsPage() {
         onRetry={() => void hotspots.refetch()}
         isRetrying={hotspots.isRefetching}
         searchPlaceholder="Search hotspots…"
-        emptyTitle="No hotspots yet"
-        emptyDescription="Add a hotspot so stock can be sent to it and it appears on the map."
-        emptyAction={addButton}
-        rowActions={(hotspot) => (
-          <RowActions
-            label={`Actions for ${hotspotLabel(hotspot)}`}
-            actions={[
-              {
-                label: 'Edit',
-                icon: Pencil,
-                onSelect: () => {
-                  setDialog({ hotspot });
-                },
-              },
-              {
-                label: 'Delete',
-                icon: Trash2,
-                destructive: true,
-                onSelect: () => {
-                  setHotspotToDelete(hotspot);
-                },
-              },
-            ]}
-          />
-        )}
+        emptyTitle={isReview ? 'No hotspots to review' : 'No hotspots yet'}
+        emptyDescription={
+          isReview
+            ? 'Hotspots that VHTs submit in your district appear here.'
+            : 'Submit a hotspot you identified so the district can activate it.'
+        }
+        emptyAction={isReview ? undefined : submitButton}
+        rowActions={
+          isReview
+            ? (hotspot) => {
+                const actions = reviewActions(hotspot);
+                return actions.length ? (
+                  <RowActions label={`Actions for ${hotspotLabel(hotspot)}`} actions={actions} />
+                ) : null;
+              }
+            : undefined
+        }
       />
 
-      {dialog ? (
+      {submitting ? (
         <HotspotFormDialog
-          key={dialog.hotspot?.id ?? 'new'}
-          hotspot={dialog.hotspot}
-          organizationUnits={organizationOptions}
           onClose={() => {
-            setDialog(null);
+            setSubmitting(false);
           }}
         />
       ) : null}
-
-      <ConfirmDialog
-        open={hotspotToDelete !== null}
-        onOpenChange={(open) => {
-          if (open) return;
-          setHotspotToDelete(null);
-          deleteHotspot.reset();
-        }}
-        title={hotspotToDelete ? `Delete ${hotspotLabel(hotspotToDelete)}?` : 'Delete hotspot?'}
-        description="This hotspot will be removed from the list and the map. This cannot be undone."
-        confirmLabel="Delete hotspot"
-        isPending={deleteHotspot.isPending}
-        error={deleteHotspot.error}
-        onConfirm={() => {
-          if (!hotspotToDelete) return;
-          deleteHotspot.mutate(hotspotToDelete.id, {
-            onSuccess: () => {
-              setHotspotToDelete(null);
-            },
-          });
-        }}
-      />
+      {rejecting ? (
+        <RejectDialog
+          hotspot={rejecting}
+          onClose={() => {
+            setRejecting(null);
+          }}
+        />
+      ) : null}
     </>
   );
 }

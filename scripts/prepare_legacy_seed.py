@@ -40,14 +40,15 @@ for match in re.finditer(r'^CREATE TABLE "(\w+)" \(\n(.*?)\n\);', schema, re.M |
         if table == "notifications" and column == "id":
             value += "::uuid"
         values.append(value)
-    # Archived source tables; migrations 6 and 8 replaced the originals.
-    target_table = {"orders": "legacy_orders", "hot_spots": "legacy_hot_spots"}.get(table, table)
+    target_table = "legacy_orders" if table == "orders" else table
     target_list = ", ".join(targets)
     value_list = ", ".join(values)
     conflict = " ON CONFLICT (legacy_id) DO NOTHING" if table == "roles" else ""
+    # Oldest first, so the oldest account keeps a username or phone number others share.
+    order = " ORDER BY source.id" if table == "users" else ""
     print(
         f'INSERT INTO public."{target_table}" ({target_list}) '
-        f'SELECT {value_list} FROM pg_temp."{table}" source{conflict};'
+        f'SELECT {value_list} FROM pg_temp."{table}" source{order}{conflict};'
     )
 
 print(
@@ -55,6 +56,5 @@ print(
 SELECT u.id, r.id FROM pg_temp.users source
 JOIN public.users u ON u.legacy_id = source.id::text
 JOIN public.roles r ON r.legacy_id = source.role;
-SELECT public.import_legacy_hot_spots();
 COMMIT;"""
 )

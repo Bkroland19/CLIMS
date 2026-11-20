@@ -18,7 +18,8 @@ See [creating PostgreSQL migrations](migrations.md) for pinned CLI scaffolding, 
 | [Auth](modules/auth.md)                  | Registration, login, JWTs, and rate limits                                       |
 | [Users](modules/users.md)                | Accounts, creation service, administration, and account status                   |
 | [RBAC](modules/rbac.md)                  | Legacy roles, permissions, and administrator protections                         |
-| [Hotspots](modules/hotspots.md)          | Hotspot submission, verification, activation, and notifications                  |
+| [Hotspots](modules/hotspots.md)          | Hotspot activation workflow: VHT submission, DCFP verification and activation    |
+| [Inventory](modules/inventory.md)        | Stock reports for the warehouse, districts and hotspots, and recording stock     |
 | [API / Swagger](api/README.md)           | Endpoint reference, authentication examples, OpenAPI maintenance, and validation |
 
 Run `make setup` and `make docker-up` from the repository root. Swagger UI is available at <http://localhost:8080/docs/> and its OpenAPI document at <http://localhost:8080/docs/openapi.json>.

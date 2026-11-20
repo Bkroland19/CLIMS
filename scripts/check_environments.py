@@ -9,7 +9,8 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 base = root / "infra/compose/docker-compose.yml"
-with tempfile.NamedTemporaryFile(mode="w", suffix=".env") as environment:
+# delete_on_close=False lets docker reopen the file on Windows.
+with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete_on_close=False) as environment:
     environment.write(
         "DB_PASSWORD=validation-only\nJWT_SECRET=validation-only\nEXPO_PUBLIC_API_URL=https://example.invalid/api/v1\n"
         "S3_ACCESS_KEY=validation-only\nS3_SECRET_KEY=validation-only\n"

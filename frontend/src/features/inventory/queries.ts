@@ -19,7 +19,7 @@ export function useInventory() {
 }
 
 /** Records a delivery, attributed to the signed-in user. */
-export function useCreateInventory(userId: number) {
+export function useCreateInventory(userId: number | string) {
   const http = useHttp();
   const queryClient = useQueryClient();
   return useMutation({

@@ -110,7 +110,8 @@ describe('signing in', () => {
       ],
     });
 
-    await user.type(await screen.findByLabelText('Email'), 'okello@example.org');
+    // A phone number is accepted as well as an email address or username.
+    await user.type(await screen.findByLabelText('Email, username or phone'), ' 0772 123456 ');
     await user.type(screen.getByLabelText('Password'), 'a-test-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
@@ -119,7 +120,7 @@ describe('signing in', () => {
     expect(requests[0]).toMatchObject({
       url: '/auth/login',
       authorization: null,
-      body: { email: 'okello@example.org', password: 'a-test-password' },
+      body: { login: '0772 123456', password: 'a-test-password' },
     });
   });
 
@@ -130,14 +131,14 @@ describe('signing in', () => {
       replies: [{ status: 401, body: { success: false, message: 'invalid credentials' } }],
     });
 
-    await user.type(await screen.findByLabelText('Email'), 'okello@example.org');
+    await user.type(await screen.findByLabelText('Email, username or phone'), 'okello@example.org');
     await user.type(screen.getByLabelText('Password'), 'not-the-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('invalid credentials');
     expect(store.getState().auth.session).toBeNull();
     // What was typed is kept so the user can correct it.
-    expect(screen.getByLabelText('Email')).toHaveValue('okello@example.org');
+    expect(screen.getByLabelText('Email, username or phone')).toHaveValue('okello@example.org');
   });
 
   it('does not call the API until both fields are filled in', async () => {
@@ -146,7 +147,9 @@ describe('signing in', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByText('Enter your email address.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter your email, username or phone number.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Enter your password.')).toBeInTheDocument();
     expect(requests).toHaveLength(0);
   });
@@ -172,7 +175,10 @@ describe('theme', () => {
 describe('signing out', () => {
   it('ends the session, clears storage and returns to sign-in', async () => {
     const user = userEvent.setup();
-    const { store, storage } = renderApp(routes, { route: '/moh/users', signedIn: true });
+    const { store, storage, requests } = renderApp(routes, {
+      route: '/moh/users',
+      signedIn: true,
+    });
     await screen.findByRole('heading', { name: 'User management' });
 
     await user.click(screen.getByRole('button', { name: /Account menu/ }));
@@ -181,6 +187,11 @@ describe('signing out', () => {
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
     expect(store.getState().auth.session).toBeNull();
     expect(storage.getItem('clims.session')).toBeNull();
+    // The server session ends too, using the token from before sign-out.
+    expect(requests.find((request) => request.url === '/auth/logout')).toMatchObject({
+      method: 'POST',
+      authorization: 'Bearer test-token',
+    });
   });
 
   it('still signs out locally when the server cannot be reached', async () => {

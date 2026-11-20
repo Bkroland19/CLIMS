@@ -12,6 +12,7 @@ import (
 	"clims-backend/internal/features/auth"
 	"clims-backend/internal/features/health"
 	"clims-backend/internal/features/hotspots"
+	"clims-backend/internal/features/inventory"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -26,7 +27,7 @@ import (
 
 // Version variables injected at build time via -ldflags
 var (
-	Version    = "2.0.1"
+	Version    = "2.1.0"
 	CommitHash = "none"
 	BuildTime  = "unknown"
 )
@@ -82,7 +83,8 @@ func main() {
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
 	orders.RegisterRoutes(v1, orders.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewHandler(hotspots.NewRepository(dbPool)), jwtAuthMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {
