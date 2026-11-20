@@ -89,7 +89,7 @@ export function FormDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? <Spinner data-icon="inline-start" /> : null}
+              {isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
               {isPending ? pendingLabel : submitLabel}
             </Button>
           </DialogFooter>
