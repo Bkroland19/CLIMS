@@ -28,21 +28,20 @@ A hotspot's `status` is only ever `active` or `inactive`. Its `review_status` re
 
 ## Endpoints
 
-| Method | Route                              | Permission          | Who                                |
-| ------ | ---------------------------------- | ------------------- | ---------------------------------- |
-| GET    | `/api/v1/hotspots`                 | `hotspots:read`     | VHT, DCFP, national users          |
-| POST   | `/api/v1/hotspots`                 | `hotspots:submit`   | VHT                                |
-| GET    | `/api/v1/hotspots/notifications`   | `hotspots:read`     | VHT, DCFP                          |
-| GET    | `/api/v1/hotspots/regions`         | `hotspots:submit`   | VHT (form lookup)                  |
-| GET    | `/api/v1/hotspots/districts`       | `hotspots:submit`   | VHT (form lookup, `?region_id=`)   |
-| GET    | `/api/v1/hotspots/subcounties`     | `hotspots:submit`   | VHT (form lookup, `?district_id=`) |
-| GET    | `/api/v1/hotspots/{id}`            | `hotspots:read`     | VHT, DCFP, national users          |
-| PUT    | `/api/v1/hotspots/{id}`            | `hotspots:submit`   | Submitting VHT                     |
-| GET    | `/api/v1/hotspots/{id}/events`     | `hotspots:read`     | VHT, DCFP, national users          |
-| POST   | `/api/v1/hotspots/{id}/comments`   | `hotspots:read`     | Submitting VHT, DCFP               |
-| POST   | `/api/v1/hotspots/{id}/activate`   | `hotspots:activate` | DCFP of the district               |
-| POST   | `/api/v1/hotspots/{id}/deactivate` | `hotspots:activate` | DCFP of the district               |
-| POST   | `/api/v1/hotspots/{id}/reject`     | `hotspots:activate` | DCFP of the district               |
+| Method | Route                              | Permission          | Who                       |
+| ------ | ---------------------------------- | ------------------- | ------------------------- |
+| GET    | `/api/v1/hotspots`                 | `hotspots:read`     | VHT, DCFP, national users |
+| POST   | `/api/v1/hotspots`                 | `hotspots:submit`   | VHT                       |
+| GET    | `/api/v1/hotspots/notifications`   | `hotspots:read`     | VHT, DCFP                 |
+| GET    | `/api/v1/hotspots/{id}`            | `hotspots:read`     | VHT, DCFP, national users |
+| PUT    | `/api/v1/hotspots/{id}`            | `hotspots:submit`   | Submitting VHT            |
+| GET    | `/api/v1/hotspots/{id}/events`     | `hotspots:read`     | VHT, DCFP, national users |
+| POST   | `/api/v1/hotspots/{id}/comments`   | `hotspots:read`     | Submitting VHT, DCFP      |
+| POST   | `/api/v1/hotspots/{id}/activate`   | `hotspots:activate` | DCFP of the district      |
+| POST   | `/api/v1/hotspots/{id}/deactivate` | `hotspots:activate` | DCFP of the district      |
+| POST   | `/api/v1/hotspots/{id}/reject`     | `hotspots:activate` | DCFP of the district      |
+
+The submission form gets its region, district and subcounty IDs from the shared [locations](locations.md) endpoints.
 
 Lists return the hotspots directly as `data`, most recently updated first; a comment counts as an update. They accept `limit` (default 50, maximum 100), `offset` and these filters, which only narrow what the caller can already see:
 

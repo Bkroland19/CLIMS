@@ -274,7 +274,7 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/hotspots?review_status=verified", nil, dcfp, 400)
 	request("GET", "/hotspots?district_id=kampala", nil, national, 400)
 
-	// Location lookups chain region, district and subcounty for the submission form.
+	// The shared location lookups feed the submission form: region, district, subcounty.
 	includes := func(path, id string) bool {
 		t.Helper()
 		for _, item := range request("GET", path, nil, vht, 200)["data"].([]any) {
@@ -284,14 +284,14 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 		}
 		return false
 	}
-	if len(request("GET", "/hotspots/districts", nil, vht, 200)["data"].([]any)) < 146 ||
-		!includes("/hotspots/regions", region) || !includes("/hotspots/districts?region_id="+region, district) ||
-		includes("/hotspots/districts?region_id="+region, otherDistrict) && otherRegion != region ||
-		!includes("/hotspots/subcounties?district_id="+district, subcounty) ||
-		includes("/hotspots/subcounties?district_id="+district, otherSubcounty) {
+	if len(request("GET", "/locations/districts", nil, vht, 200)["data"].([]any)) < 146 ||
+		!includes("/locations/regions", region) || !includes("/locations/districts?region_id="+region, district) ||
+		includes("/locations/districts?region_id="+region, otherDistrict) && otherRegion != region ||
+		!includes("/locations/subcounties?district_id="+district, subcounty) ||
+		includes("/locations/subcounties?district_id="+district, otherSubcounty) {
 		t.Fatal("location lookups do not chain region, district and subcounty")
 	}
-	request("GET", "/hotspots/subcounties", nil, vht, 400)
-	request("GET", "/hotspots/districts?region_id=nope", nil, vht, 400)
-	request("GET", "/hotspots/regions", nil, dcfp, 403)
+	request("GET", "/locations/subcounties", nil, vht, 400)
+	request("GET", "/locations/districts?region_id=nope", nil, vht, 400)
+	request("GET", "/locations/regions", nil, dcfp, 200) // Any signed-in user can read locations.
 }
