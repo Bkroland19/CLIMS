@@ -89,6 +89,8 @@ export interface Tokens {
   tabBd: string;
   tabActive: string;
   tabIdle: string;
+  /** Pill behind the selected tab's icon. */
+  tabPill: string;
   chipR: number;
   segBg: string;
   segOn: string;
@@ -222,6 +224,7 @@ export const iosLight: Tokens = {
   tabBd: "rgba(0,0,0,0.2)",
   tabActive: "#1c7c34",
   tabIdle: "#8e8e93",
+  tabPill: "rgba(29,107,44,0.13)",
   chipR: 6,
   segBg: "rgba(118,118,128,0.12)",
   segOn: "#ffffff",
@@ -287,6 +290,7 @@ export const iosDark: Tokens = {
   tabBd: "rgba(255,255,255,0.12)",
   tabActive: "#30d158",
   tabIdle: "#8e8e93",
+  tabPill: "rgba(48,209,88,0.18)",
   segBg: "rgba(118,118,128,0.24)",
   segOn: "#636366",
   stepWarnBg: "#3a2616",
@@ -382,6 +386,7 @@ export const mdLight: Tokens = {
   tabBd: "transparent",
   tabActive: "#1d6b2c",
   tabIdle: "#42493f",
+  tabPill: "#d3ecce",
   chipR: 8,
   segBg: "#ffffff",
   segOn: "#cfe9c9",
@@ -450,6 +455,7 @@ export const mdDark: Tokens = {
   tabBg: "#0f140f",
   tabActive: "#6fd08a",
   tabIdle: "#a9b3a5",
+  tabPill: "#1d3d26",
   segBg: "#0f150f",
   segOn: "#1d3d26",
   stepWarnBg: "#2b1d12",
