@@ -13,6 +13,31 @@ import { createAppStore } from '@/store/store';
 import { createFakeAdapter } from './fakeAdapter';
 import { testRouter } from './navigation';
 
+/** Every permission the Go API defines: what an administrator holds. */
+export const ADMIN_PERMISSIONS = [
+  'hotspots:activate',
+  'hotspots:all_districts',
+  'hotspots:read',
+  'hotspots:submit',
+  'inventory:manage',
+  'inventory:read',
+  'orders:all_stores',
+  'orders:create',
+  'orders:deliver',
+  'orders:fulfill',
+  'orders:process',
+  'orders:read',
+  'orders:receive',
+  'orders:replenish',
+  'orders:stockout',
+  'roles:assign',
+  'roles:manage',
+  'roles:read',
+  'users:create',
+  'users:read',
+  'users:update',
+];
+
 export const testSession: Session = {
   token: 'test-token',
   user: {
@@ -22,14 +47,27 @@ export const testSession: Session = {
     firstname: 'Sarah',
     lastname: 'Nakato',
     email: 'sarah@example.org',
+    permissions: ADMIN_PERMISSIONS,
+    roleNames: ['admin'],
   },
 };
+
+/**
+ * {@link testSession} holding only `permissions`, for screens that leave out
+ * what a user may not do, and optionally other roles, for screens that depend
+ * on the workspace a role opens.
+ */
+export function sessionWith(permissions: string[], roleNames: string[] = ['admin']): Session {
+  return { ...testSession, user: { ...testSession.user, permissions, roleNames } };
+}
 
 interface RenderAppOptions {
   /** Initial address, e.g. `/moh/users`. */
   route?: string;
   /** Start signed in as {@link testSession}. */
   signedIn?: boolean;
+  /** Start signed in with this session instead, e.g. {@link sessionWith}. Implies `signedIn`. */
+  session?: Session;
   /** Scripted API replies, consumed in order. */
   replies?: Parameters<typeof createFakeAdapter>;
 }
@@ -41,12 +79,16 @@ interface RenderAppOptions {
  */
 export function renderApp(
   ui: ReactNode,
-  { route = '/', signedIn = false, replies = [{ status: 200, body: [] }] }: RenderAppOptions = {},
+  {
+    route = '/',
+    signedIn = false,
+    session,
+    replies = [{ status: 200, body: [] }],
+  }: RenderAppOptions = {},
 ) {
   testRouter.reset(route);
-  const storage = createMemoryStorage(
-    signedIn ? { 'clims.session': JSON.stringify(testSession) } : {},
-  );
+  const initial = session ?? (signedIn ? testSession : null);
+  const storage = createMemoryStorage(initial ? { 'clims.session': JSON.stringify(initial) } : {});
   const store = createAppStore({ sessionStore: createSessionStore(storage) });
   const onMutationError = vi.fn();
   const queryClient = createQueryClient({ onMutationError });

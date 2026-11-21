@@ -102,3 +102,24 @@ export function formatDuration(ms: number): string {
   const rest = hours % 24;
   return rest > 0 ? `${days} d ${rest} h` : `${days} d`;
 }
+
+/**
+ * How long ago a timestamp was, as a person says it: "Today", "Yesterday",
+ * "4 days ago", "3 weeks ago", "5 months ago", "2 years ago". Calendar days in
+ * the browser's time zone; a future time reads as "Today". Unparseable or
+ * missing input becomes the empty marker. `now` is for tests.
+ */
+export function formatSince(value: string | null | undefined, now: Date = new Date()): string {
+  if (!value) return EMPTY_VALUE;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return EMPTY_VALUE;
+  const days = Math.max(0, Math.round((startOfDay(now) - startOfDay(date)) / DAY_MS));
+  const ago = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'} ago`;
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return ago(days, 'day');
+  if (days < 35) return ago(Math.floor(days / 7), 'week');
+  // Months to the nearest whole one, as people say them: 120 days is "4 months ago".
+  if (days < 365) return ago(Math.min(11, Math.max(1, Math.round(days / 30.44))), 'month');
+  return ago(Math.floor(days / 365.25), 'year');
+}

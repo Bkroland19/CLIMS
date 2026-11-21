@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError, getErrorMessage } from '@/lib/api';
 import { formatNumber, formatTimestamp } from '@/lib/format';
+import { WriteAction } from '@/components/WriteAction';
 
 import type { DistrictStore, HotspotOrder, WarehouseCode } from './api';
 import { ProductCell } from './BatchCells';
@@ -389,9 +390,11 @@ function RequestForm({ orders, store, forOrder }: RequestFormProps) {
                 <AlertDescription>{getErrorMessage(failure)}</AlertDescription>
               </Alert>
             ) : null}
-            <Button type="submit" disabled={isBusy} className="w-full">
-              {isBusy ? 'Sending…' : `Send request to ${warehouse}`}
-            </Button>
+            <WriteAction>
+              <Button type="submit" disabled={isBusy} className="w-full">
+                {isBusy ? 'Sending…' : `Send request to ${warehouse}`}
+              </Button>
+            </WriteAction>
           </CardContent>
         </Card>
       </div>

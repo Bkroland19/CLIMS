@@ -21,6 +21,7 @@ import type { BatchLine, HotspotOrder } from './api';
 import { productOf } from './products';
 import { useDispatchOrder, useOrder, useRiders } from './queries';
 import { RecordView } from '@/components/RecordView';
+import { WriteAction } from '@/components/WriteAction';
 import { ORDER_STATUS, placeOf, RIDER_STATUS } from './status';
 import { DCFP_PATHS } from './tasks';
 
@@ -176,9 +177,11 @@ function DispatchView({ order }: { order: HotspotOrder }) {
                   Print delivery note
                 </Button>
                 {canDispatch ? (
-                  <Button onClick={handOver} disabled={!riderId || dispatch.isPending}>
-                    {dispatch.isPending ? 'Handing over…' : `Hand over to ${firstName}`}
-                  </Button>
+                  <WriteAction>
+                    <Button onClick={handOver} disabled={!riderId || dispatch.isPending}>
+                      {dispatch.isPending ? 'Handing over…' : `Hand over to ${firstName}`}
+                    </Button>
+                  </WriteAction>
                 ) : null}
               </div>
             </CardContent>

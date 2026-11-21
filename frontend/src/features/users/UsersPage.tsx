@@ -1,8 +1,19 @@
 'use client';
 
-import { Ban, CircleCheck, Plus, ShieldCheck } from 'lucide-react';
+import {
+  Activity,
+  Ban,
+  CircleCheck,
+  MonitorSmartphone,
+  Plus,
+  ShieldCheck,
+  UserCheck,
+  UserRound,
+  UserRoundX,
+  Users,
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -16,19 +27,31 @@ import { ExportButton } from '@/components/ExportButton';
 import { FilterSelect } from '@/components/FilterSelect';
 import { FilterTabs } from '@/components/FilterTabs';
 import { PageActions } from '@/components/PageActions';
+import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/features/auth/hooks';
+import { useCan } from '@/features/auth/queries';
 import { getErrorMessage } from '@/lib/api';
-import { initialsOf } from '@/lib/format';
+import { formatDate, formatNumber, formatSince, formatTimestamp, initialsOf } from '@/lib/format';
 
 import type { User } from './api';
 import { isActive, roleLabel, userRoleLabels, userStatusLabel } from './access';
+import { BulkUserActions } from './BulkUserActions';
 import { EditRolesDialog } from './EditRolesDialog';
+import {
+  ACTIVITY_FILTERS,
+  activityFilterFrom,
+  matchesActivity,
+  userStats,
+  type ActivityFilter,
+} from './insights';
 import { useAccessRoles, useSetUserStatus, useUsers } from './queries';
+import { RoleBadge } from './RoleBadge';
 import { UserFormDialog } from './UserFormDialog';
 import { userDisplayName } from './userForm';
+import { UserProfileSheet } from './UserProfileSheet';
+import { UserSessionsDialog } from './UserSessionsDialog';
 
 export const USERS_PATH = '/moh/users';
 
@@ -45,30 +68,67 @@ function statusFilterFrom(param: string | null): (typeof STATUS_FILTERS)[number]
   return STATUS_FILTERS.find((filter) => filter.value === param) ?? STATUS_FILTERS[0];
 }
 
+interface UsersFilters {
+  status: StatusFilter;
+  role: string;
+  activity?: ActivityFilter;
+}
+
 /** The users list address for a set of filters, leaving out the defaults. */
-export function usersHref({ status, role }: { status: StatusFilter; role: string }): string {
+export function usersHref({ status, role, activity = 'all' }: UsersFilters): string {
   const params = new URLSearchParams();
   if (status !== 'all') params.set('status', status);
   if (role !== 'all') params.set('role', role);
+  if (activity !== 'all') params.set('activity', activity);
   const query = params.toString();
   return query ? `${USERS_PATH}?${query}` : USERS_PATH;
 }
 
-type Dialog = { kind: 'create' } | { kind: 'roles'; user: User } | null;
+type Dialog =
+  { kind: 'create' } | { kind: 'roles'; user: User } | { kind: 'sessions'; user: User } | null;
+
+/** "Today", "3 weeks ago" or "Never", with the exact time on hover. */
+function LastSignIn({ user, now }: { user: User; now: Date }) {
+  if (!user.last_login_at) return <span className="text-muted-foreground">Never</span>;
+  return (
+    <span title={formatTimestamp(user.last_login_at)}>{formatSince(user.last_login_at, now)}</span>
+  );
+}
 
 export default function UsersPage() {
   const users = useUsers();
   const roles = useAccessRoles();
   const currentUser = useCurrentUser();
+  const can = useCan();
   const setStatus = useSetUserStatus();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [now] = useState(() => new Date());
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  // Each row's actions button, so a dialog opened from its menu can hand focus back to it.
+  const actionButtons = useRef(new Map<string, HTMLButtonElement>());
+
+  /** Sends focus back to a row's actions button as a dialog closes, if the row is still shown. */
+  function focusRowActions(userId: string, event: Event) {
+    const button = actionButtons.current.get(userId);
+    if (!button?.isConnected) return;
+    event.preventDefault();
+    button.focus();
+  }
 
   const statusFilter = statusFilterFrom(searchParams.get('status'));
+  const activityFilter = activityFilterFrom(searchParams.get('activity'));
   const roleParam = searchParams.get('role') ?? 'all';
   const role = roles.data?.some((candidate) => candidate.id === roleParam) ? roleParam : 'all';
+  const filters = { status: statusFilter.value, role, activity: activityFilter.value };
+
+  // Actions the API would refuse are left out, matching each endpoint's permission.
+  const canCreate = can('users:create', 'roles:assign');
+  const canAssignRoles = can('roles:assign');
+  const canUpdate = can('users:update');
 
   const columns = useMemo<DataTableColumn<User>[]>(
     () => [
@@ -85,9 +145,16 @@ export default function UsersPage() {
               {initialsOf(userDisplayName(user))}
             </div>
             <div className="min-w-0">
-              <p className="truncate font-medium" title={userDisplayName(user)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileId(user.id);
+                }}
+                className="focus-visible:ring-ring block max-w-full truncate rounded-sm text-left font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+                title={userDisplayName(user)}
+              >
                 {userDisplayName(user)}
-              </p>
+              </button>
               <p className="text-muted-foreground truncate text-xs" title={user.email ?? undefined}>
                 {user.email ?? user.username}
               </p>
@@ -100,20 +167,19 @@ export default function UsersPage() {
         header: 'Roles',
         value: (user) => userRoleLabels(user).join(', '),
         cell: (user) => {
-          const labels = userRoleLabels(user);
-          if (labels.length === 0) return <span className="text-muted-foreground">—</span>;
+          if (user.roles.length === 0) return <span className="text-muted-foreground">—</span>;
           return (
             <ul className="flex flex-wrap gap-1">
-              {labels.map((label) => (
-                <li key={label}>
-                  <Badge variant="secondary">{label}</Badge>
+              {user.roles.map((held) => (
+                <li key={held.id}>
+                  <RoleBadge role={held} />
                 </li>
               ))}
             </ul>
           );
         },
       },
-      { id: 'phone', header: 'Phone', value: (user) => user.phone_number },
+      { id: 'phone', header: 'Phone', value: (user) => user.phone_number, hideable: true },
       {
         id: 'status',
         header: 'Status',
@@ -125,17 +191,52 @@ export default function UsersPage() {
           />
         ),
       },
+      {
+        id: 'last-sign-in',
+        header: 'Last sign-in',
+        // ISO timestamps sort in time order as text; "never" sorts with the missing values.
+        value: (user) => user.last_login_at,
+        cell: (user) => <LastSignIn user={user} now={now} />,
+        hideable: true,
+      },
+      {
+        id: 'devices',
+        header: 'Devices',
+        value: (user) => user.active_sessions ?? 0,
+        numeric: true,
+        hideable: true,
+      },
+      {
+        id: 'sign-ins',
+        header: 'Sign-ins',
+        value: (user) => user.login_count ?? 0,
+        numeric: true,
+        defaultHidden: true,
+      },
+      {
+        id: 'created',
+        header: 'Created',
+        value: (user) => user.created_at,
+        cell: (user) => formatDate(user.created_at),
+        defaultHidden: true,
+      },
     ],
-    [],
+    [now],
   );
 
-  const byRole = users.data?.filter(
+  const all = users.data;
+  const byRole = all?.filter(
     (user) => role === 'all' || user.roles.some((held) => held.id === role),
   );
-  const rows = byRole?.filter(statusFilter.keeps);
-  const isFiltered = statusFilter.value !== 'all' || role !== 'all';
+  const byActivity = byRole?.filter((user) => matchesActivity(user, activityFilter, now));
+  const rows = byActivity?.filter(statusFilter.keeps);
+  const isFiltered =
+    statusFilter.value !== 'all' || role !== 'all' || activityFilter.value !== 'all';
+  const stats = all ? userStats(all, now) : null;
+  const selectedUsers = rows?.filter((user) => selected.has(user.id)) ?? [];
+  const profileUser = profileId ? (all?.find((user) => user.id === profileId) ?? null) : null;
 
-  const addButton = (
+  const addButton = canCreate ? (
     <Button
       onClick={() => {
         setDialog({ kind: 'create' });
@@ -144,7 +245,7 @@ export default function UsersPage() {
       <Plus data-icon="inline-start" />
       Add user
     </Button>
-  );
+  ) : null;
 
   function reactivate(user: User) {
     setStatus.mutate(
@@ -157,6 +258,8 @@ export default function UsersPage() {
     );
   }
 
+  const statValue = (value: number | undefined) => formatNumber(value ?? 0);
+
   return (
     <div className="flex flex-col gap-4">
       <PageActions>
@@ -164,33 +267,51 @@ export default function UsersPage() {
         {addButton}
       </PageActions>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <FilterTabs
-          label="Filter users by status"
-          value={statusFilter.value}
-          hrefFor={(value) => usersHref({ status: value, role })}
-          tabs={STATUS_FILTERS.map((option) => ({
-            value: option.value,
-            label: option.label,
-            ...(byRole ? { count: byRole.filter(option.keeps).length } : {}),
-          }))}
+      {/* Each figure is also a shortcut to the list behind it. */}
+      <StatCardGrid>
+        <StatCard
+          label="Accounts"
+          value={statValue(stats?.total)}
+          icon={Users}
+          isLoading={users.isPending}
+          href={usersHref({ status: 'all', role: 'all' })}
         />
-        <FilterSelect
-          label="Role"
-          value={role}
-          disabled={!roles.data}
-          options={[
-            { value: 'all', label: 'All roles' },
-            ...(roles.data ?? []).map((option) => ({
-              value: option.id,
-              label: roleLabel(option),
-            })),
-          ]}
-          onValueChange={(next) => {
-            router.replace(usersHref({ status: statusFilter.value, role: next }));
-          }}
+        <StatCard
+          label="Can sign in"
+          value={statValue(stats?.active)}
+          icon={UserCheck}
+          accent="positive"
+          isLoading={users.isPending}
+          href={usersHref({ status: 'active', role: 'all' })}
         />
-      </div>
+        <StatCard
+          label="Signed in this month"
+          value={statValue(stats?.recent)}
+          icon={Activity}
+          accent="info"
+          isLoading={users.isPending}
+          href={usersHref({ status: 'all', role: 'all', activity: 'month' })}
+        />
+        <StatCard
+          label="Never signed in"
+          value={statValue(stats?.never)}
+          icon={UserRoundX}
+          accent="caution"
+          isLoading={users.isPending}
+          href={usersHref({ status: 'all', role: 'all', activity: 'never' })}
+        />
+      </StatCardGrid>
+
+      <FilterTabs
+        label="Filter users by status"
+        value={statusFilter.value}
+        hrefFor={(value) => usersHref({ ...filters, status: value })}
+        tabs={STATUS_FILTERS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          ...(byActivity ? { count: byActivity.filter(option.keeps).length } : {}),
+        }))}
+      />
 
       <DataTable
         label="Users"
@@ -202,11 +323,48 @@ export default function UsersPage() {
         onRetry={() => void users.refetch()}
         isRetrying={users.isRefetching}
         searchPlaceholder="Search name, email or phone…"
+        preferencesKey="users"
+        // Most legacy accounts have never signed in; the people actually using CLIMS come first.
+        defaultSort={{ columnId: 'last-sign-in', direction: 'desc' }}
+        selection={{
+          selected,
+          onChange: setSelected,
+          rowLabel: userDisplayName,
+        }}
+        toolbar={
+          <>
+            <FilterSelect
+              label="Role"
+              value={role}
+              disabled={!roles.data}
+              options={[
+                { value: 'all', label: 'All roles' },
+                ...(roles.data ?? []).map((option) => ({
+                  value: option.id,
+                  label: roleLabel(option),
+                })),
+              ]}
+              onValueChange={(next) => {
+                router.replace(usersHref({ ...filters, role: next }));
+              }}
+            />
+            <FilterSelect
+              label="Activity"
+              value={activityFilter.value}
+              options={ACTIVITY_FILTERS.map(({ value, label }) => ({ value, label }))}
+              onValueChange={(next) => {
+                router.replace(usersHref({ ...filters, activity: next }));
+              }}
+            />
+          </>
+        }
         emptyTitle={isFiltered ? 'No users match these filters' : 'No users yet'}
         emptyDescription={
           isFiltered
-            ? 'Choose another status or role to see the rest.'
-            : 'Add the first account so someone else can sign in.'
+            ? 'Choose another status, role or activity to see the rest.'
+            : canCreate
+              ? 'Add the first account so someone else can sign in.'
+              : 'Accounts appear here once an administrator adds them.'
         }
         emptyAction={isFiltered ? undefined : addButton}
         rowActions={(user) => {
@@ -215,15 +373,37 @@ export default function UsersPage() {
           return (
             <RowActions
               label={`Actions for ${userDisplayName(user)}`}
+              triggerRef={(button) => {
+                if (button) actionButtons.current.set(user.id, button);
+                else actionButtons.current.delete(user.id);
+              }}
               actions={[
                 {
-                  label: 'Edit roles',
-                  icon: ShieldCheck,
+                  label: 'View profile',
+                  icon: UserRound,
                   onSelect: () => {
-                    setDialog({ kind: 'roles', user });
+                    setProfileId(user.id);
                   },
                 },
-                ...(isSelf
+                ...(canAssignRoles
+                  ? ([
+                      {
+                        label: 'Edit roles',
+                        icon: ShieldCheck,
+                        onSelect: () => {
+                          setDialog({ kind: 'roles', user });
+                        },
+                      },
+                    ] satisfies RowActionItem[])
+                  : []),
+                {
+                  label: 'Signed-in devices',
+                  icon: MonitorSmartphone,
+                  onSelect: () => {
+                    setDialog({ kind: 'sessions', user });
+                  },
+                },
+                ...(isSelf || !canUpdate
                   ? []
                   : ([
                       ROW_ACTION_SEPARATOR,
@@ -250,6 +430,44 @@ export default function UsersPage() {
         }}
       />
 
+      <BulkUserActions
+        selected={selectedUsers}
+        selfId={currentUser?.id ?? null}
+        canUpdate={canUpdate}
+        exportColumns={columns}
+        onClear={() => {
+          setSelected(new Set());
+        }}
+      />
+
+      {profileUser ? (
+        <UserProfileSheet
+          key={profileUser.id}
+          user={profileUser}
+          isSelf={currentUser?.id === profileUser.id}
+          canAssignRoles={canAssignRoles}
+          canUpdate={canUpdate}
+          onClose={() => {
+            setProfileId(null);
+          }}
+          onEditRoles={() => {
+            setProfileId(null);
+            setDialog({ kind: 'roles', user: profileUser });
+          }}
+          onShowDevices={() => {
+            setProfileId(null);
+            setDialog({ kind: 'sessions', user: profileUser });
+          }}
+          onDeactivate={() => {
+            setProfileId(null);
+            setUserToDeactivate(profileUser);
+          }}
+          onReactivate={() => {
+            reactivate(profileUser);
+          }}
+        />
+      ) : null}
+
       {dialog?.kind === 'create' ? (
         <UserFormDialog
           roles={roles.data}
@@ -257,6 +475,20 @@ export default function UsersPage() {
           rolesError={roles.error}
           onClose={() => {
             setDialog(null);
+          }}
+        />
+      ) : null}
+      {dialog?.kind === 'sessions' ? (
+        <UserSessionsDialog
+          key={dialog.user.id}
+          user={dialog.user}
+          // Signing yourself out everywhere is done from your own account menu, one device at a time.
+          canSignOut={canUpdate && currentUser?.id !== dialog.user.id}
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowActions(dialog.user.id, event);
           }}
         />
       ) : null}
@@ -269,6 +501,9 @@ export default function UsersPage() {
           rolesError={roles.error}
           onClose={() => {
             setDialog(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowActions(dialog.user.id, event);
           }}
         />
       ) : null}

@@ -21,3 +21,8 @@ export function useAppStorage(): StorageLike {
   if (!storage) throw new Error('useAppStorage must be used inside <StorageProvider>.');
   return storage;
 }
+
+/** The preference store when there is one, else null: for components that work without remembering. */
+export function useOptionalAppStorage(): StorageLike | null {
+  return use(StorageContext);
+}

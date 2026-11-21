@@ -15,6 +15,8 @@ const session: Session = {
     firstname: null,
     lastname: null,
     email: null,
+    permissions: null,
+    roleNames: ['admin'],
   },
 };
 

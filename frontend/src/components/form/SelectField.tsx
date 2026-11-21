@@ -76,7 +76,12 @@ export function SelectField({
         >
           <SelectValue
             placeholder={
-              isLoading ? 'Loading…' : options.length === 0 ? 'No options available' : placeholder
+              // A field disabled for its own reason ("Choose a region first") says so, not "no options".
+              isLoading
+                ? 'Loading…'
+                : options.length === 0 && !disabled
+                  ? 'No options available'
+                  : placeholder
             }
           />
         </SelectTrigger>

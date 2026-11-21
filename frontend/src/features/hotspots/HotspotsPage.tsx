@@ -15,6 +15,7 @@ import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { getErrorMessage } from '@/lib/api';
+import { WriteAction } from '@/components/WriteAction';
 
 import type { Hotspot, HotspotEvent } from './api';
 import { dispenserSummary, hotspotLabel } from './hotspotForm';
@@ -170,7 +171,7 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
     <>
       <PageActions>
         <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
-        {isReview ? null : submitButton}
+        {isReview ? null : <WriteAction>{submitButton}</WriteAction>}
       </PageActions>
 
       <RecentUpdates events={notifications.data ?? []} hotspots={hotspots.data ?? []} />

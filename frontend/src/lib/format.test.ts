@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDuration,
   formatNumber,
+  formatSince,
   formatText,
   formatTimestamp,
   initialsOf,
@@ -121,5 +122,26 @@ describe('formatDuration', () => {
     [-5 * MINUTE, 'Under 1 min'],
   ])('writes %i ms as "%s"', (ms, expected) => {
     expect(formatDuration(ms)).toBe(expected);
+  });
+});
+
+describe('formatSince', () => {
+  const now = new Date(2026, 10, 20, 15, 0);
+  it.each([
+    [new Date(2026, 10, 20, 9, 0), 'Today'],
+    [new Date(2026, 10, 19, 23, 0), 'Yesterday'],
+    [new Date(2026, 10, 16, 9, 0), '4 days ago'],
+    [new Date(2026, 10, 6, 9, 0), '2 weeks ago'],
+    [new Date(2026, 9, 1, 9, 0), '2 months ago'],
+    [new Date(2026, 4, 20, 9, 0), '6 months ago'],
+    [new Date(2024, 4, 1, 9, 0), '2 years ago'],
+    [new Date(2026, 10, 21, 9, 0), 'Today'],
+  ])('reads %s as %s', (date, expected) => {
+    expect(formatSince(date.toISOString(), now)).toBe(expected);
+  });
+
+  it('marks missing or unreadable values', () => {
+    expect(formatSince(null, now)).toBe('—');
+    expect(formatSince('soon', now)).toBe('—');
   });
 });

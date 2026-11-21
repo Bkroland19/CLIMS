@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createMemoryStorage } from '@/lib/storage/jsonStorage';
 
-import { createSessionStore, sessionSchema, type Session } from './session';
+import { createSessionStore, hasPermissions, sessionSchema, type Session } from './session';
 
 const session: Session = {
   token: 'tok_1',
@@ -13,6 +13,8 @@ const session: Session = {
     firstname: 'Nakato',
     lastname: null,
     email: null,
+    permissions: null,
+    roleNames: ['admin'],
   },
 };
 
@@ -86,5 +88,76 @@ describe('createSessionStore', () => {
   ])('treats $name as signed out instead of crashing', ({ raw }) => {
     const store = createSessionStore(createMemoryStorage({ 'clims.session': raw }));
     expect(store.load()).toBeNull();
+  });
+});
+
+describe('permissions on the signed-in user', () => {
+  const role = (name: string, permissions: string[] | null) => ({ id: name, name, permissions });
+
+  it('joins the permissions of every role the Go API says the user holds', () => {
+    const parsed = sessionSchema.parse({
+      token: 't',
+      user: {
+        id: 'u-1',
+        username: 'u',
+        role: role('dfcp', ['orders:read']),
+        roles: [role('dfcp', ['orders:read']), role('vht', ['hotspots:submit', 'orders:read'])],
+      },
+    });
+    expect(parsed.user.permissions).toEqual(['hotspots:submit', 'orders:read']);
+    expect(parsed.user.role).toBe('dfcp');
+  });
+
+  it('reads them from the primary role when the reply has no role list', () => {
+    const parsed = sessionSchema.parse({
+      token: 't',
+      user: { id: 1, username: 'u', role: role('admin', ['users:read']) },
+    });
+    expect(parsed.user.permissions).toEqual(['users:read']);
+  });
+
+  it('names the user by the first role held when there is no primary role', () => {
+    const parsed = sessionSchema.parse({
+      token: 't',
+      user: { id: 1, username: 'u', roles: [role('moh', []), role('vht', [])] },
+    });
+    expect(parsed.user.role).toBe('moh');
+  });
+
+  it('knows a user with no roles holds nothing', () => {
+    const parsed = sessionSchema.parse({ token: 't', user: { id: 1, username: 'u', roles: null } });
+    expect(parsed.user.permissions).toEqual([]);
+  });
+
+  it('leaves them unknown when the reply does not say, as a legacy or older stored session', () => {
+    const parsed = sessionSchema.parse({
+      token: 't',
+      user: { id: 1, username: 'u', role: 'admin' },
+    });
+    expect(parsed.user.permissions).toBeNull();
+  });
+
+  it('reads back the stored shape unchanged', () => {
+    const first = sessionSchema.parse({
+      token: 't',
+      user: { id: 'u-1', username: 'u', roles: [role('moh', ['users:read', 'roles:read'])] },
+    });
+    expect(sessionSchema.parse(JSON.parse(JSON.stringify(first)))).toEqual(first);
+  });
+});
+
+describe('hasPermissions', () => {
+  const user = (permissions: string[] | null) => ({ permissions });
+
+  it('needs every code asked for', () => {
+    expect(
+      hasPermissions(user(['users:create', 'roles:assign']), ['users:create', 'roles:assign']),
+    ).toBe(true);
+    expect(hasPermissions(user(['users:create']), ['users:create', 'roles:assign'])).toBe(false);
+  });
+
+  it('allows while the permissions are unknown, and refuses a signed-out visitor', () => {
+    expect(hasPermissions(user(null), ['roles:manage'])).toBe(true);
+    expect(hasPermissions(null, ['roles:manage'])).toBe(false);
   });
 });
