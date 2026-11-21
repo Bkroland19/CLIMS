@@ -30,8 +30,8 @@ function deliverySince(order: HotspotOrder): string | null {
 function Loading({ label }: { label: string }) {
   return (
     <div className="flex flex-col gap-3 p-4" role="status">
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-10 w-full" />
       <span className="sr-only">{label}</span>
     </div>
   );
@@ -74,7 +74,7 @@ export default function DispatchPage() {
         {ready.map((order) => (
           <li
             key={order.id}
-            className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center md:gap-6"
+            className="flex flex-col gap-2 px-4 py-2.5 md:flex-row md:items-center md:gap-4"
           >
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium break-words">
@@ -99,11 +99,11 @@ export default function DispatchPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="The orders and riders" />
 
       <Card className="min-w-0 gap-0 py-0">
-        <CardHeader className="border-b py-4">
+        <CardHeader className="border-b py-3">
           <CardTitle>Ready to dispatch</CardTitle>
           <CardDescription>
             Confirmed orders with stock allocated. Assign a rider and print the delivery note.
@@ -112,7 +112,7 @@ export default function DispatchPage() {
         {readyBody}
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Card className="min-w-0">
           <CardHeader>
             <CardTitle>In delivery</CardTitle>

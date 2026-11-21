@@ -1,6 +1,6 @@
 import type { LookupKind } from './api';
 
-/** The words each brand-like list uses in its headings, buttons and messages. */
+/** The words each lookup list (types, brands, units) uses in its headings, buttons and messages. */
 export interface LookupText {
   /** The list's name, e.g. "Brands". */
   title: string;
@@ -18,6 +18,16 @@ export interface LookupText {
 }
 
 export const LOOKUP_TEXT: Record<LookupKind, LookupText> = {
+  types: {
+    title: 'Product types',
+    heading: 'Type',
+    singular: 'type',
+    plural: 'product types',
+    example: 'e.g. Socially marketed',
+    noteExample: 'e.g. Subsidised and sold through social marketing',
+    emptyDescription:
+      'Add the ways condom products reach people, such as free public-sector supply or commercial sale.',
+  },
   brands: {
     title: 'Brands',
     heading: 'Brand',

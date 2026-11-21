@@ -113,24 +113,3 @@ export async function listLocationDistricts(
 ): Promise<District[]> {
   return parseList(districtSchema, await http.get('/locations/districts', { signal }), 'districts');
 }
-
-export interface MappableHotspot extends Hotspot {
-  latitude: number;
-  longitude: number;
-}
-
-/**
- * The hotspots that can be drawn on a map. A record with missing or
- * out-of-range coordinates is left off rather than plotted at (0, 0), which is
- * a real place in the Gulf of Guinea.
- */
-export function mappableHotspots(hotspots: readonly Hotspot[]): MappableHotspot[] {
-  return hotspots.filter(
-    (hotspot): hotspot is MappableHotspot =>
-      hotspot.latitude !== null &&
-      hotspot.longitude !== null &&
-      Math.abs(hotspot.latitude) <= 90 &&
-      Math.abs(hotspot.longitude) <= 180 &&
-      !(hotspot.latitude === 0 && hotspot.longitude === 0),
-  );
-}

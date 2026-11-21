@@ -77,7 +77,8 @@ export function userRoleLabels(user: Pick<User, 'roles' | 'role'>): string[] {
  * means the one on the user's account; the `all_*` codes lift that limit.
  */
 const PERMISSION_LABELS: Readonly<Record<string, string>> = {
-  'catalogue:manage': 'Create, edit and retire condom products, brands and units of measure',
+  'catalogue:manage':
+    'Create, edit and retire condom products, product types, brands and units of measure',
   'users:read': 'List users and view user accounts',
   'users:create': 'Create user accounts',
   'users:update': 'Activate or disable user accounts',

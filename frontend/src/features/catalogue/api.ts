@@ -3,32 +3,29 @@ import { z } from 'zod';
 import { parseBody, parseList, type HttpClient } from '@/lib/api';
 
 /*
- * The condom catalogue: products, and the brands and units of measure they
- * reference (`backend/internal/features/catalogue`).
+ * The condom catalogue: products, and the product types, brands and units of
+ * measure they reference (`backend/internal/features/catalogue`).
  *
- *   GET    /catalogue/products[?active=true|false]  → Product[]
- *   POST   /catalogue/products                      ProductInput → Product
- *   PATCH  /catalogue/products/:id                  ProductPatch → Product
- *   DELETE /catalogue/products/:id                  only when not in use
- *   GET    /catalogue/{brands,units}[?active=…]     → Lookup[]
- *   POST   /catalogue/{brands,units}                LookupInput → Lookup
- *   PATCH  /catalogue/{brands,units}/:id            LookupPatch → Lookup
- *   DELETE /catalogue/{brands,units}/:id            only when not in use
+ *   GET    /catalogue/products[?active=true|false]     → Product[]
+ *   POST   /catalogue/products                         ProductInput → Product
+ *   PATCH  /catalogue/products/:id                     ProductPatch → Product
+ *   DELETE /catalogue/products/:id                     only when not in use
+ *   GET    /catalogue/{types,brands,units}[?active=…]  → Lookup[]
+ *   POST   /catalogue/{types,brands,units}             LookupInput → Lookup
+ *   PATCH  /catalogue/{types,brands,units}/:id         LookupPatch → Lookup
+ *   DELETE /catalogue/{types,brands,units}/:id         only when not in use
  *
- * Any signed-in user can read; writes need `catalogue:manage`. Failures use
- * the standard envelope: 422 `{ error: { field: message } }`, 409 for a
- * duplicate brand or unit name (also under `error.name`) or for deleting a
- * record that is in use, 404 when the record is gone.
+ * Any signed-in user can read; writes need `catalogue:manage`, which
+ * administrators grant per role under Users & access. Failures use the
+ * standard envelope: 422 `{ error: { field: message } }`, 409 for a duplicate
+ * type, brand or unit name (also under `error.name`) or for deleting a record
+ * that is in use, 404 when the record is gone.
  */
 
 export const CATALOGUE_PERMISSION = 'catalogue:manage';
 
 export const PRODUCT_CATEGORIES = ['male', 'female'] as const;
 export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
-
-/** Distribution channels, as in the national condom distribution guidelines. */
-export const PRODUCT_TYPES = ['free', 'socially_marketed', 'commercial'] as const;
-export type ProductType = (typeof PRODUCT_TYPES)[number];
 
 const count = z.number().int().nonnegative();
 const refSchema = z.object({ id: z.string(), name: z.string() });
@@ -39,7 +36,8 @@ const productSchema = z.object({
   id: z.string(),
   // Products converted from the legacy system may lack any of these; see isComplete.
   category: z.enum(PRODUCT_CATEGORIES).nullable(),
-  type: z.enum(PRODUCT_TYPES).nullable(),
+  /** How it reaches people, e.g. free public-sector supply. */
+  type: refSchema.nullable(),
   brand: refSchema.nullable(),
   unit: refSchema.nullable(),
   /** How many single condoms one unit holds. */
@@ -58,7 +56,7 @@ const lookupSchema = z.object({
   id: z.string(),
   name: z.string(),
   note: z.string().nullable(),
-  /** Inactive brands and units cannot be newly chosen for a product. */
+  /** Inactive types, brands and units cannot be newly chosen for a product. */
   active: z.boolean(),
   in_use: z.boolean(),
   /** Products that use it, active or not. */
@@ -67,13 +65,13 @@ const lookupSchema = z.object({
   updated_at: z.string(),
 });
 
-/** A brand or a unit of measure: both have the same shape and rules. */
+/** A product type, a brand or a unit of measure: all have the same shape and rules. */
 export type Lookup = z.infer<typeof lookupSchema>;
-export type LookupKind = 'brands' | 'units';
+export type LookupKind = 'types' | 'brands' | 'units';
 
 export interface ProductInput {
   category: ProductCategory;
-  type: ProductType;
+  type_id: string;
   brand_id: string;
   unit_id: string;
   pieces_per_unit: number;
@@ -147,26 +145,17 @@ export async function deleteLookup(http: HttpClient, kind: LookupKind, id: strin
 }
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = { male: 'Male', female: 'Female' };
-const TYPE_LABELS: Record<ProductType, string> = {
-  free: 'Free (public sector)',
-  socially_marketed: 'Socially marketed',
-  commercial: 'Commercial',
-};
 
 export function categoryLabel(category: ProductCategory): string {
   return CATEGORY_LABELS[category];
 }
 
-export function typeLabel(type: ProductType): string {
-  return TYPE_LABELS[type];
-}
-
-/** "Engabu · Male · Free (public sector)", leaving out what a legacy product lacks. */
+/** "Engabu · Male · Free", leaving out what a legacy product lacks. */
 export function productName(product: Pick<Product, 'brand' | 'category' | 'type'>): string {
   const parts = [
     product.brand?.name,
     product.category ? categoryLabel(product.category) : null,
-    product.type ? typeLabel(product.type) : null,
+    product.type?.name,
   ].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join(' · ') : 'Unnamed product';
 }

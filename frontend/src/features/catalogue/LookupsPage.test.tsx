@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import type { RecordedRequest } from '@/test/fakeAdapter';
-import { renderApp } from '@/test/renderApp';
+import { renderApp, sessionWith } from '@/test/renderApp';
 
 import BrandsPage from './BrandsPage';
+import TypesPage from './TypesPage';
 import UnitsPage from './UnitsPage';
 
 const STAMP = { created_at: '2026-01-05T08:00:00Z', updated_at: '2026-02-01T08:00:00Z' };
@@ -24,6 +25,15 @@ const brands = [
   lookup('b-kiss', 'Kiss', null, 0),
 ];
 const units = [lookup('u-piece', 'Piece', 'A single condom', 2), lookup('u-box', 'Box', null, 0)];
+const types = [
+  lookup('t-free', 'Free', 'Public sector, free to the user', 4),
+  lookup('t-donated', 'Donated', null, 0),
+];
+const DATA: Record<string, unknown[]> = {
+  '/catalogue/brands': brands,
+  '/catalogue/units': units,
+  '/catalogue/types': types,
+};
 
 interface Reply {
   status: number;
@@ -33,10 +43,7 @@ interface Reply {
 function api(write: (request: RecordedRequest) => Reply = () => ({ status: 200, body: {} })) {
   return (request: RecordedRequest): Reply => {
     if (request.method !== 'GET') return write(request);
-    return {
-      status: 200,
-      body: { success: true, data: request.url === '/catalogue/brands' ? brands : units },
-    };
+    return { status: 200, body: { success: true, data: DATA[request.url] ?? [] } };
   };
 }
 
@@ -167,5 +174,48 @@ describe('UnitsPage', () => {
 
     expect(await within(dialog).findByText('Use at least 2 characters.')).toBeInTheDocument();
     expect(writes(requests)).toEqual([]);
+  });
+});
+
+describe('TypesPage', () => {
+  it('lists product types and adds one', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderApp(<TypesPage />, {
+      signedIn: true,
+      replies: [
+        api(() => ({
+          status: 201,
+          body: { success: true, data: lookup('t-new', 'Workplace', 'Given out by employers', 0) },
+        })),
+      ],
+    });
+
+    const row = (await screen.findByText('Free')).closest('tr');
+    if (!row) throw new Error('Free has no table row');
+    expect(within(row).getByText('4 products')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add type' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add a type' });
+    await user.type(within(dialog).getByLabelText('Type name'), 'Workplace');
+    await user.type(within(dialog).getByLabelText(/^Note/), 'Given out by employers');
+    await user.click(within(dialog).getByRole('button', { name: 'Add type' }));
+
+    await waitFor(() => {
+      expect(writes(requests)).toEqual([
+        expect.objectContaining({
+          method: 'POST',
+          url: '/catalogue/types',
+          body: { name: 'Workplace', note: 'Given out by employers' },
+        }),
+      ]);
+    });
+  });
+
+  it('shows types without changes to people who cannot manage the catalogue', async () => {
+    renderApp(<TypesPage />, { session: sessionWith(['orders:read'], ['nms']), replies: [api()] });
+
+    await screen.findByText('Donated');
+    expect(screen.queryByRole('button', { name: 'Add type' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
   });
 });

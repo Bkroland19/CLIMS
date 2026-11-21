@@ -55,7 +55,7 @@ export function NotificationsBell({ notifications }: NotificationsBellProps) {
           className="text-muted-foreground hover:text-foreground relative"
           aria-label={count > 0 ? `Notifications, ${count} new` : 'Notifications'}
         >
-          <Bell className="size-4.5" aria-hidden="true" />
+          <Bell className="size-4" aria-hidden="true" />
           {count > 0 ? (
             <span
               aria-hidden="true"
@@ -71,7 +71,7 @@ export function NotificationsBell({ notifications }: NotificationsBellProps) {
         sideOffset={8}
         className="rounded-card w-95 max-w-[calc(100vw-2rem)] overflow-hidden p-0"
       >
-        <div className="flex items-center justify-between border-b px-3 py-3.5">
+        <div className="flex items-center justify-between border-b px-3 py-2.5">
           <h2 className="text-sm font-semibold">Notifications</h2>
           <span className="text-muted-foreground text-xs">In-app</span>
         </div>
@@ -86,7 +86,7 @@ export function NotificationsBell({ notifications }: NotificationsBellProps) {
         ) : (
           <ul className="max-h-[min(28rem,70vh)] overflow-y-auto">
             {notifications.map((notification) => (
-              <li key={notification.id} className="flex gap-3 border-b px-3 py-3 last:border-b-0">
+              <li key={notification.id} className="flex gap-3 border-b px-3 py-2.5 last:border-b-0">
                 <span
                   aria-hidden="true"
                   className={cn(
@@ -96,7 +96,7 @@ export function NotificationsBell({ notifications }: NotificationsBellProps) {
                 />
                 <div className="min-w-0">
                   <p className="text-sm leading-snug text-pretty">{notification.text}</p>
-                  <p className="text-muted-foreground mt-1 text-xs">{notification.meta}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{notification.meta}</p>
                 </div>
               </li>
             ))}

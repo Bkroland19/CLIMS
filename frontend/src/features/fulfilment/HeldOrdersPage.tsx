@@ -93,7 +93,7 @@ export default function HeldOrdersPage() {
           return (
             <li
               key={order.id}
-              className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:gap-6"
+              className="flex flex-col gap-2 px-4 py-2.5 md:flex-row md:items-center md:gap-4"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">

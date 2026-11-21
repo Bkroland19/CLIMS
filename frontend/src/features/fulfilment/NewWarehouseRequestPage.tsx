@@ -79,7 +79,7 @@ export default function NewWarehouseRequestPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="The stock figures and held orders" />
       {body}
     </div>
@@ -175,12 +175,12 @@ function RequestForm({ orders, store, forOrder }: RequestFormProps) {
       onSubmit={submit}
       noValidate
       aria-labelledby="new-request-heading"
-      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
+      className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]"
     >
       <h2 id="new-request-heading" className="sr-only">
         Request stock from a warehouse
       </h2>
-      <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section flex min-w-0 flex-col">
         <Card>
           <CardHeader>
             <CardTitle asChild>

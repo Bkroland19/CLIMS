@@ -82,22 +82,22 @@ export function StatCard({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-muted-foreground text-sm font-medium">{label}</span>
+          <span className="text-muted-foreground text-[0.8125rem] font-medium">{label}</span>
           {isSample ? <SampleBadge /> : null}
         </div>
-        <div className="bg-secondary flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <Icon className={cn('size-4', ACCENT_CLASSES[accent])} aria-hidden="true" />
+        <div className="bg-secondary flex size-7 shrink-0 items-center justify-center rounded-md">
+          <Icon className={cn('size-3.5', ACCENT_CLASSES[accent])} aria-hidden="true" />
         </div>
       </div>
       {isLoading ? (
         <div role="status">
-          <Skeleton className="h-8 w-24 lg:h-9" />
+          <Skeleton className="h-8 w-24" />
           <span className="sr-only">Loading {label.toLowerCase()}…</span>
         </div>
       ) : (
         <div className="flex items-end justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-foreground text-2xl font-bold tracking-tight break-words tabular-nums lg:text-3xl">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-foreground text-2xl leading-8 font-bold tracking-tight break-words tabular-nums">
               {value}
             </p>
             {trend && change ? (
@@ -123,7 +123,7 @@ export function StatCard({
     </>
   );
 
-  const cardClasses = cn('bg-card rounded-card flex flex-col gap-3 border p-5', className);
+  const cardClasses = cn('bg-card rounded-card flex flex-col gap-1.5 border px-4 py-3', className);
   if (href) {
     return (
       <Link
@@ -151,7 +151,7 @@ function TrendIcon({ direction }: { direction: 'up' | 'down' | 'flat' }) {
  */
 export function StatCardGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-4">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-3">
       {children}
     </div>
   );

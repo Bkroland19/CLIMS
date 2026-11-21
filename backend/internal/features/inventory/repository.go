@@ -31,11 +31,10 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-// productName labels a condom product as brand, distribution channel and category,
+// productName labels a condom product as brand, type and category,
 // e.g. "Engabu Free Male". Parts a legacy product lacks are left out.
 const productName = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id = c.brand_id),
-	CASE c.type WHEN 'free' THEN 'Free' WHEN 'socially_marketed' THEN 'Socially marketed'
-		WHEN 'commercial' THEN 'Commercial' END,
+	(SELECT pt.name FROM product_types pt WHERE pt.id = c.type_id),
 	CASE c.category WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female' END)`
 
 type StockBalance struct {
@@ -131,7 +130,7 @@ func (r *Repository) hotspots(ctx context.Context, access scope, f HotspotFilter
 		LEFT JOIN unit_of_measures um ON um.id = o.unit_of_measure_id
 		WHERE ($1::boolean OR o.hot_spot_id = $2::uuid OR o.ordered_from_store_id = $3::uuid)
 			AND ($4::uuid IS NULL OR o.hot_spot_id = $4) AND ($5::uuid IS NULL OR o.condom_id = $5)
-		GROUP BY h.id, h.name, h.district_id, o.condom_id, c.brand_id, c.type, c.category, o.unit_of_measure_id, um.name
+		GROUP BY h.id, h.name, h.district_id, o.condom_id, c.brand_id, c.type_id, c.category, o.unit_of_measure_id, um.name
 		ORDER BY h.name, 5, um.name NULLS FIRST`,
 		access.allStores, access.hotSpotID, access.storeID, f.HotSpotID, f.CondomID, f.Period.from, f.Period.to)
 	if err != nil {

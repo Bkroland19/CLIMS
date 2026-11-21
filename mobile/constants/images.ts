@@ -7,6 +7,6 @@ import logoSmall from "../assets/images/logo-small.png";
 import empty from "../assets/images/empty.png";
 import ug from "../assets/images/ug.png";
 import deliver from "../assets/images/deliver.png";
-import coatOfArms from "../assets/images/coat-of-arms.png";
+import mohSeal from "../assets/images/moh-seal.png";
 
-export default { profile, thumbnail, cards, path, logo, logoSmall, empty, ug, deliver, coatOfArms };
+export default { profile, thumbnail, cards, path, logo, logoSmall, empty, ug, deliver, mohSeal };

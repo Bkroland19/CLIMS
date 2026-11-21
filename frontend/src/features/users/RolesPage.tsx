@@ -164,7 +164,7 @@ function RolePermissions({ role, codes, memberCount }: RolePermissionsProps) {
           </Link>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="gap-section flex flex-col">
         <section aria-label="What this role opens" className="flex flex-col gap-2">
           <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
             What this role opens on the web

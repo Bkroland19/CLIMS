@@ -55,7 +55,7 @@ function TableSkeleton() {
         <Skeleton className="ml-auto h-8 w-28 rounded-lg" />
       </div>
       <Panel>
-        <div className="bg-table-head flex h-8.5 items-center gap-4 border-b px-4">
+        <div className="bg-table-head flex h-7.5 items-center gap-4 border-b px-4">
           {[0, 1, 2, 3].map((column) => (
             <Line key={column} className={cn('h-2 flex-1', width(SHORT_WIDTHS, column))} />
           ))}
@@ -63,7 +63,7 @@ function TableSkeleton() {
         {WIDTHS.map((_, row) => (
           <div
             key={row}
-            className="grid h-12.5 grid-cols-[1.1fr_1.6fr_minmax(0,1fr)_auto] items-center gap-4 border-b px-4 last:border-b-0 sm:grid-cols-[1.1fr_1.6fr_1.2fr_auto_0.8fr]"
+            className="grid h-12 grid-cols-[1.1fr_1.6fr_minmax(0,1fr)_auto] items-center gap-4 border-b px-4 last:border-b-0 sm:grid-cols-[1.1fr_1.6fr_1.2fr_auto_0.8fr]"
           >
             <Line className={width(WIDTHS, row + 2)} />
             <div className="flex flex-col gap-1.75">
@@ -85,12 +85,12 @@ function DashboardSkeleton() {
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((card) => (
-          <Panel key={card} className="flex flex-col gap-3 px-3.5 py-3">
+          <Panel key={card} className="flex flex-col gap-2 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <Line className={cn('h-2.5', width(WIDTHS, card))} />
-              <Skeleton className="size-8 shrink-0 rounded-lg" />
+              <Skeleton className="size-7 shrink-0 rounded-md" />
             </div>
-            <Skeleton className="h-5.5 w-1/3 rounded-md" />
+            <Skeleton className="h-7 w-1/3 rounded-md" />
             <Line className={cn('h-2.25', width(SHORT_WIDTHS, card))} />
           </Panel>
         ))}
@@ -189,8 +189,8 @@ function DetailSkeleton() {
               </div>
             ))}
             <div className="bg-table-head flex justify-end gap-2.5 px-3.5 py-2.5">
-              <Skeleton className="h-9 w-30 rounded-lg" />
-              <Skeleton className="h-9 w-50 max-w-[50%] rounded-lg" />
+              <Skeleton className="h-8 w-30 rounded-lg" />
+              <Skeleton className="h-8 w-50 max-w-[50%] rounded-lg" />
             </div>
           </Panel>
         </div>
@@ -214,7 +214,7 @@ function FormSkeleton() {
               {[0, 1].map((field) => (
                 <div key={field} className="flex flex-col gap-2">
                   <Line className={cn('h-2.25', width(SHORT_WIDTHS, section + field))} />
-                  <Skeleton className="h-9 w-full rounded-lg" />
+                  <Skeleton className="h-8 w-full rounded-lg" />
                 </div>
               ))}
             </div>
@@ -257,7 +257,7 @@ export function PageSkeleton({ layout, className }: PageSkeletonProps) {
       className={cn('motion-reduce:**:data-[slot=skeleton]:animate-none', className)}
     >
       <span className="sr-only">Loading page…</span>
-      <div aria-hidden="true" className="flex flex-col gap-3">
+      <div aria-hidden="true" className="gap-section flex flex-col">
         <Layout />
       </div>
     </div>

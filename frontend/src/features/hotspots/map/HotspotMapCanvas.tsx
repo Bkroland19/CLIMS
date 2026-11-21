@@ -1,0 +1,889 @@
+'use client';
+
+import 'maplibre-gl/dist/maplibre-gl.css';
+import './hotspotMap.css';
+
+import {
+  AttributionControl,
+  GeolocateControl,
+  Map as MapLibre,
+  Marker,
+  NavigationControl,
+  Popup,
+  ScaleControl,
+  setWorkerUrl,
+  type CircleLayerSpecification,
+  type ExpressionSpecification,
+  type GeoJSONSource,
+  type IControl,
+  type MapGeoJSONFeature,
+  type SymbolLayerSpecification,
+} from 'maplibre-gl';
+import type { Feature, FeatureCollection, Position } from 'geojson';
+import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
+
+import type { Basemap } from '@/config/env';
+import { cn } from '@/lib/utils';
+
+import { createClusterElement, type ClusterSlice } from './clusterMarker';
+import type { Bounds, ColourBy, MapView } from './filters';
+import {
+  DISPENSER_CATEGORIES,
+  REVIEW_CATEGORIES,
+  categoriesFor,
+  colourOf,
+  type Category,
+  type MapPalette,
+} from './palette';
+import { HOME_ICON_PATHS, PIN_TIP_SHIFT, drawPin, parsePinImageId } from './pins';
+import type { PlacedHotspot } from './records';
+import { UGANDA_BORDER, UGANDA_BOUNDS } from './uganda';
+
+/*
+ * The hotspot map itself: OpenStreetMap raster tiles under the hotspots, drawn
+ * with MapLibre GL (WebGL), so twelve thousand points pan smoothly.
+ *
+ *   clusters  nearby hotspots merge into rings split by category, with the count
+ *             inside; a single hotspot is a pin with its venue's glyph
+ *   heatmap   where hotspots are dense, turning into pins as you zoom in
+ *   points    every hotspot: dots across the country, pins from town level
+ *
+ * The map stays on Uganda: it cannot be panned far past the border, and
+ * everything outside the border is dimmed. The base map is desaturated so the
+ * hotspots carry the colour, and inverted in the dark theme. Everything this
+ * component knows comes in as props; the page owns the filters and selection.
+ */
+
+// MapLibre runs its tiling in a worker. Bundlers cannot follow the URL it builds
+// for that file by itself, so the file is named here and shipped as an asset.
+let workerConfigured = false;
+function configureWorker() {
+  if (workerConfigured) return;
+  setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
+  workerConfigured = true;
+}
+
+export interface HotspotMapHandle {
+  /** Frames `bounds`, not closer than `maxZoom`. */
+  fitTo: (bounds: Bounds, maxZoom?: number) => void;
+  /** Centres on a point, zooming in to at least `zoom`. */
+  flyTo: (point: { latitude: number; longitude: number }, zoom?: number) => void;
+}
+
+interface HotspotMapCanvasProps {
+  /** Not `ref`: `next/dynamic` wrappers may keep `ref` for themselves. */
+  handleRef?: Ref<HotspotMapHandle>;
+  /** `null` draws the hotspots on a plain background. */
+  basemap: Basemap | null;
+  dark: boolean;
+  palette: MapPalette;
+  view: MapView;
+  colourBy: ColourBy;
+  hotspots: readonly PlacedHotspot[];
+  selected: PlacedHotspot | null;
+  /** A hotspot pointed at in the list, raised on the map. */
+  highlightedId: string | null;
+  initialBounds: Bounds;
+  /** The words shown when the pointer rests on a hotspot. */
+  describe: (id: string) => { title: string; detail: string } | null;
+  onSelect: (id: string | null) => void;
+  onViewportChange: (bounds: Bounds) => void;
+  /** The map could not start, e.g. WebGL is off. */
+  onFailure: (error: unknown) => void;
+  /** Base map tiles are failing to load (offline, or blocked). */
+  onTilesFailing: () => void;
+  /** The map has loaded and can be moved. */
+  onReady?: () => void;
+  className?: string;
+}
+
+const SOURCE = 'hotspots';
+const FLAT_SOURCE = 'hotspots-flat';
+const FOCUS_SOURCE = 'focus';
+const UGANDA_SOURCE = 'uganda';
+const BASEMAP = 'basemap';
+const LAYERS = {
+  ugandaMask: 'uganda-mask',
+  ugandaBorder: 'uganda-border',
+  heat: 'hotspot-heat',
+  flatDots: 'hotspot-dots-flat',
+  flatPins: 'hotspot-pins-flat',
+  pins: 'hotspot-pins',
+  selectedSpot: 'hotspot-selected-spot',
+  highlight: 'hotspot-highlight',
+  selected: 'hotspot-selected',
+} as const;
+const POINT_LAYERS = [LAYERS.pins, LAYERS.flatPins, LAYERS.flatDots];
+const CLUSTER_MAX_ZOOM = 14;
+/** Below this zoom the points style draws dots; from it, pins. */
+const PIN_ZOOM = 11;
+
+/** Uganda with room around it: the map cannot be panned or zoomed out past this. */
+const MAX_BOUNDS: [[number, number], [number, number]] = [
+  [UGANDA_BOUNDS.west - 1.6, UGANDA_BOUNDS.south - 1.5],
+  [UGANDA_BOUNDS.east + 1.6, UGANDA_BOUNDS.north + 1.5],
+];
+
+const reviewKey = (key: string) => `r_${key}`;
+const dispenserKey = (key: string) => `d_${key}`;
+
+/** A cluster property per category: how many of its hotspots fall in it. */
+const CLUSTER_PROPERTIES = Object.fromEntries([
+  ...REVIEW_CATEGORIES.map(({ key }) => [
+    reviewKey(key),
+    ['+', ['case', ['==', ['get', 'r'], key], 1, 0]],
+  ]),
+  ...DISPENSER_CATEGORIES.map(({ key }) => [
+    dispenserKey(key),
+    ['+', ['case', ['==', ['get', 'd'], key], 1, 0]],
+  ]),
+]) as Record<string, unknown>;
+
+function properties(hotspot: PlacedHotspot) {
+  return { id: hotspot.id, r: hotspot.review, d: hotspot.dispenser, v: hotspot.venue };
+}
+
+function toFeatures(hotspots: readonly PlacedHotspot[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: hotspots.map((hotspot) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [hotspot.longitude, hotspot.latitude] },
+      properties: properties(hotspot),
+    })),
+  };
+}
+
+/** Twice the signed area of a ring: positive when it runs anticlockwise. */
+function signedArea(ring: readonly Position[]): number {
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi = 0, yi = 0] = ring[i] ?? [];
+    const [xj = 0, yj = 0] = ring[j] ?? [];
+    sum += (xj - xi) * (yj + yi);
+  }
+  return -sum;
+}
+
+/**
+ * The world with Uganda cut out of it, to dim everything outside the country,
+ * and the border itself. A hole must wind the other way from its outer ring.
+ */
+function ugandaShapes(): FeatureCollection {
+  const border: Position[] = UGANDA_BORDER.map(([x, y]) => [x, y]);
+  const [first] = border;
+  if (first) border.push(first);
+  const hole = signedArea(border) > 0 ? [...border].reverse() : border;
+  const world: Position[] = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
+  ];
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [world, hole] },
+        properties: { kind: 'mask' },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: border },
+        properties: { kind: 'border' },
+      },
+    ],
+  };
+}
+
+function colourExpression(colourBy: ColourBy, palette: MapPalette): ExpressionSpecification {
+  const property = colourBy === 'review' ? 'r' : 'd';
+  const pairs = categoriesFor(colourBy).flatMap((category) => [
+    category.key,
+    colourOf(palette, category),
+  ]);
+  return [
+    'match',
+    ['get', property],
+    ...pairs,
+    palette.mutedForeground,
+  ] as unknown as ExpressionSpecification;
+}
+
+/** `pin|<colour>|<venue>`: the name of the pin image each hotspot needs (see `pins.ts`). */
+function pinImage(colourBy: ColourBy, palette: MapPalette): ExpressionSpecification {
+  return ['concat', 'pin|', colourExpression(colourBy, palette), '|', ['get', 'v']];
+}
+
+function withAlpha(colour: string, alpha: number): string {
+  const hex = colour.replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return colour;
+  const [r, g, b] = [0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16));
+  return `rgba(${String(r)}, ${String(g)}, ${String(b)}, ${String(alpha)})`;
+}
+
+const DOT_RADIUS: ExpressionSpecification = [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  5,
+  3,
+  9,
+  4.5,
+  13,
+  6.5,
+];
+
+/** Pins grow a little as you zoom in, from country to street level. */
+const pinSize = (scale: number): ExpressionSpecification => [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  6,
+  0.72 * scale,
+  11,
+  0.85 * scale,
+  15,
+  1 * scale,
+];
+
+function pinLayout(image: ExpressionSpecification, scale = 1): SymbolLayerSpecification['layout'] {
+  return {
+    'icon-image': image,
+    'icon-size': pinSize(scale),
+    'icon-anchor': 'bottom',
+    'icon-offset': [0, PIN_TIP_SHIFT],
+    // Every hotspot is drawn: hiding pins that overlap would hide hotspots.
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true,
+  };
+}
+
+function basemapPaint(dark: boolean) {
+  // Dark: invert the light tiles and turn the hues back, so water stays blue.
+  return dark
+    ? {
+        'raster-brightness-min': 0.88,
+        'raster-brightness-max': 0.06,
+        'raster-hue-rotate': 180,
+        'raster-saturation': -0.55,
+        'raster-contrast': -0.1,
+      }
+    : {
+        'raster-brightness-min': 0.04,
+        'raster-brightness-max': 1,
+        'raster-hue-rotate': 0,
+        'raster-saturation': -0.6,
+        'raster-contrast': -0.08,
+      };
+}
+
+function applyBasemap(map: MapLibre, basemap: Basemap | null, dark: boolean) {
+  if (map.getLayer(BASEMAP)) map.removeLayer(BASEMAP);
+  if (map.getSource(BASEMAP)) map.removeSource(BASEMAP);
+  if (!basemap) return;
+  map.addSource(BASEMAP, {
+    type: 'raster',
+    tiles: [...basemap.tiles],
+    tileSize: 256,
+    maxzoom: basemap.maxZoom,
+    attribution: basemap.attribution,
+  });
+  map.addLayer(
+    { id: BASEMAP, type: 'raster', source: BASEMAP, paint: basemapPaint(dark) },
+    map.getLayer(LAYERS.ugandaMask) ? LAYERS.ugandaMask : undefined,
+  );
+}
+
+function sliceCounts(
+  properties: Record<string, unknown>,
+  colourBy: ColourBy,
+  palette: MapPalette,
+): ClusterSlice[] {
+  return categoriesFor(colourBy).map((category: Category<string>) => {
+    const name = colourBy === 'review' ? reviewKey(category.key) : dispenserKey(category.key);
+    const value = properties[name];
+    return {
+      category,
+      colour: colourOf(palette, category),
+      count: typeof value === 'number' ? value : 0,
+    };
+  });
+}
+
+/** A map button that brings the whole country back into view. */
+class UgandaControl implements IControl {
+  private container: HTMLDivElement | null = null;
+
+  constructor(private readonly onClick: () => void) {}
+
+  onAdd(): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'hotspot-map__home';
+    button.title = 'Show all of Uganda';
+    button.setAttribute('aria-label', 'Show all of Uganda');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of HOME_ICON_PATHS) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      svg.append(path);
+    }
+    button.append(svg);
+    button.addEventListener('click', this.onClick);
+    container.append(button);
+    this.container = container;
+    return container;
+  }
+
+  onRemove(): void {
+    this.container?.remove();
+    this.container = null;
+  }
+}
+
+function prefersCoarsePointer(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches;
+}
+
+/** Room left around a framed area, clear of the style card, the controls and the key. */
+const FRAME_PADDING = { top: 96, right: 56, bottom: 170, left: 40 };
+
+export default function HotspotMapCanvas({
+  handleRef,
+  basemap,
+  dark,
+  palette,
+  view,
+  colourBy,
+  hotspots,
+  selected,
+  highlightedId,
+  initialBounds,
+  describe,
+  onSelect,
+  onViewportChange,
+  onFailure,
+  onTilesFailing,
+  onReady,
+  className,
+}: HotspotMapCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibre | null>(null);
+  const [ready, setReady] = useState(false);
+  // Cluster rings are DOM elements, rebuilt when the data or colours change.
+  const clusters = useRef({
+    generation: 0,
+    cache: new Map<string, Marker>(),
+    onScreen: new Map<string, Marker>(),
+  });
+  const look = useRef({ view, colourBy, palette });
+
+  const select = useEffectEvent((id: string | null) => {
+    onSelect(id);
+  });
+  const viewportChanged = useEffectEvent((bounds: Bounds) => {
+    onViewportChange(bounds);
+  });
+  const failed = useEffectEvent((error: unknown) => {
+    onFailure(error);
+  });
+  const tilesFailing = useEffectEvent(() => {
+    onTilesFailing();
+  });
+  const loaded = useEffectEvent(() => {
+    onReady?.();
+  });
+  const label = useEffectEvent((id: string) => describe(id));
+  const startingView = useEffectEvent(() => ({ basemap, dark, palette, initialBounds }));
+
+  useImperativeHandle(
+    handleRef,
+    () => ({
+      fitTo: (bounds, maxZoom = 13) => {
+        const map = mapRef.current;
+        if (!map) return;
+        if (bounds.west === bounds.east && bounds.south === bounds.north) {
+          map.flyTo({ center: [bounds.west, bounds.south], zoom: Math.min(maxZoom, 15) });
+          return;
+        }
+        map.fitBounds(
+          [
+            [bounds.west, bounds.south],
+            [bounds.east, bounds.north],
+          ],
+          { padding: FRAME_PADDING, maxZoom },
+        );
+      },
+      flyTo: (point, zoom = 14) => {
+        const map = mapRef.current;
+        if (!map) return;
+        map.flyTo({
+          center: [point.longitude, point.latitude],
+          zoom: Math.max(map.getZoom(), zoom),
+        });
+      },
+    }),
+    [],
+  );
+
+  // Create the map once; everything else updates it in place.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const start = startingView();
+    let map: MapLibre;
+    try {
+      configureWorker();
+      map = new MapLibre({
+        container,
+        style: {
+          version: 8,
+          sources: {},
+          layers: [
+            {
+              id: 'background',
+              type: 'background',
+              paint: { 'background-color': start.palette.muted },
+            },
+          ],
+        },
+        bounds: [
+          [start.initialBounds.west, start.initialBounds.south],
+          [start.initialBounds.east, start.initialBounds.north],
+        ],
+        fitBoundsOptions: { padding: 24 },
+        maxBounds: MAX_BOUNDS,
+        maxZoom: 18,
+        attributionControl: false,
+        dragRotate: false,
+        pitchWithRotate: false,
+        touchPitch: false,
+        renderWorldCopies: false,
+        fadeDuration: 150,
+        locale: {
+          'CooperativeGesturesHandler.MobileHelpText': 'Use two fingers to move the map',
+        },
+      });
+    } catch (error) {
+      failed(error);
+      return;
+    }
+    mapRef.current = map;
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+    if (prefersCoarsePointer()) map.cooperativeGestures.enable();
+
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    map.addControl(
+      new UgandaControl(() => {
+        map.fitBounds(
+          [
+            [UGANDA_BOUNDS.west, UGANDA_BOUNDS.south],
+            [UGANDA_BOUNDS.east, UGANDA_BOUNDS.north],
+          ],
+          { padding: FRAME_PADDING },
+        );
+      }),
+      'top-right',
+    );
+    map.addControl(
+      new GeolocateControl({
+        positionOptions: { enableHighAccuracy: true, timeout: 10_000 },
+        fitBoundsOptions: { maxZoom: 14 },
+      }),
+      'top-right',
+    );
+    map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
+    map.addControl(new AttributionControl({ compact: true }), 'bottom-right');
+
+    let tileErrors = 0;
+    map.on('error', (event) => {
+      if ((event as { sourceId?: unknown }).sourceId !== BASEMAP) return;
+      tileErrors += 1;
+      if (tileErrors === 4) tilesFailing();
+    });
+
+    // Pins are drawn the first time a layer asks for one; the name says how.
+    map.setMissingStyleImageResolver((id) => {
+      const pin = parsePinImageId(id);
+      if (!pin || map.hasImage(id)) return;
+      const image = drawPin(pin.fill, pin.venue, 2);
+      if (image) map.addImage(id, image, { pixelRatio: 2 });
+    });
+
+    map.on('load', () => {
+      const { colourBy: initialColour, palette: initialPalette } = look.current;
+      map.addSource(UGANDA_SOURCE, { type: 'geojson', data: ugandaShapes() });
+      map.addLayer({
+        id: LAYERS.ugandaMask,
+        type: 'fill',
+        source: UGANDA_SOURCE,
+        filter: ['==', ['get', 'kind'], 'mask'],
+        paint: { 'fill-color': initialPalette.background, 'fill-opacity': 0.6 },
+      });
+      map.addLayer({
+        id: LAYERS.ugandaBorder,
+        type: 'line',
+        source: UGANDA_SOURCE,
+        filter: ['==', ['get', 'kind'], 'border'],
+        layout: { 'line-join': 'round' },
+        paint: {
+          'line-color': initialPalette.foreground,
+          'line-opacity': 0.4,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 10, 2.5],
+        },
+      });
+      applyBasemap(map, start.basemap, start.dark);
+
+      const empty = toFeatures([]);
+      map.addSource(SOURCE, {
+        type: 'geojson',
+        data: empty,
+        cluster: true,
+        clusterRadius: 52,
+        clusterMaxZoom: CLUSTER_MAX_ZOOM,
+        clusterProperties: CLUSTER_PROPERTIES,
+      });
+      map.addSource(FLAT_SOURCE, { type: 'geojson', data: empty });
+      map.addSource(FOCUS_SOURCE, { type: 'geojson', data: empty });
+
+      const image = pinImage(initialColour, initialPalette);
+      const dotPaint: CircleLayerSpecification['paint'] = {
+        'circle-radius': DOT_RADIUS,
+        'circle-color': colourExpression(initialColour, initialPalette),
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 10, 1.25],
+      };
+
+      map.addLayer({
+        id: LAYERS.heat,
+        type: 'heatmap',
+        source: FLAT_SOURCE,
+        maxzoom: 16,
+        layout: { visibility: 'none' },
+      });
+      map.addLayer({
+        id: LAYERS.flatDots,
+        type: 'circle',
+        source: FLAT_SOURCE,
+        maxzoom: PIN_ZOOM,
+        layout: { visibility: 'none' },
+        paint: dotPaint,
+      });
+      map.addLayer({
+        id: LAYERS.flatPins,
+        type: 'symbol',
+        source: FLAT_SOURCE,
+        minzoom: PIN_ZOOM,
+        layout: { ...pinLayout(image), visibility: 'none' },
+      });
+      map.addLayer({
+        id: LAYERS.pins,
+        type: 'symbol',
+        source: SOURCE,
+        filter: ['!', ['has', 'point_count']],
+        layout: pinLayout(image),
+      });
+      // The selected hotspot: a soft spot on its exact position under a larger pin.
+      map.addLayer({
+        id: LAYERS.selectedSpot,
+        type: 'circle',
+        source: FOCUS_SOURCE,
+        filter: ['==', ['get', 'kind'], 'selected'],
+        paint: {
+          'circle-radius': 9,
+          'circle-color': initialPalette.foreground,
+          'circle-opacity': 0.18,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': initialPalette.foreground,
+          'circle-stroke-opacity': 0.6,
+        },
+      });
+      map.addLayer({
+        id: LAYERS.highlight,
+        type: 'symbol',
+        source: FOCUS_SOURCE,
+        filter: ['==', ['get', 'kind'], 'highlight'],
+        layout: pinLayout(image, 1.2),
+      });
+      map.addLayer({
+        id: LAYERS.selected,
+        type: 'symbol',
+        source: FOCUS_SOURCE,
+        filter: ['==', ['get', 'kind'], 'selected'],
+        layout: pinLayout(image, 1.4),
+      });
+      setReady(true);
+      loaded();
+      const bounds = map.getBounds();
+      viewportChanged({
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth(),
+      });
+    });
+
+    map.on('moveend', () => {
+      const bounds = map.getBounds();
+      viewportChanged({
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth(),
+      });
+    });
+
+    // Hover: the hotspot's name and status, written as text (names are user input).
+    // It sits above the pin, whose tip is on the position.
+    const hover = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      anchor: 'bottom',
+      offset: [0, -34],
+      className: 'hotspot-hover',
+      maxWidth: '260px',
+    });
+    const showHover = (event: {
+      features?: MapGeoJSONFeature[];
+      lngLat: { lng: number; lat: number };
+    }) => {
+      const feature = event.features?.[0];
+      const id: unknown = feature?.properties.id;
+      const words = typeof id === 'string' ? label(id) : null;
+      if (!words || feature?.geometry.type !== 'Point') return;
+      map.getCanvas().style.cursor = 'pointer';
+      const body = document.createElement('div');
+      const title = document.createElement('p');
+      title.className = 'hotspot-hover__title';
+      title.textContent = words.title;
+      const detail = document.createElement('p');
+      detail.className = 'hotspot-hover__detail';
+      detail.textContent = words.detail;
+      body.append(title, detail);
+      const [lng = event.lngLat.lng, lat = event.lngLat.lat] = feature.geometry.coordinates;
+      hover.setLngLat([lng, lat]).setDOMContent(body).addTo(map);
+    };
+    const hideHover = () => {
+      map.getCanvas().style.cursor = '';
+      hover.remove();
+    };
+    for (const layer of POINT_LAYERS) {
+      map.on('mousemove', layer, showHover);
+      map.on('mouseleave', layer, hideHover);
+      map.on('click', layer, (event) => {
+        const id: unknown = event.features?.[0]?.properties.id;
+        if (typeof id === 'string') select(id);
+      });
+    }
+    map.on('click', (event) => {
+      const target = event.originalEvent.target;
+      if (target instanceof Element && target.closest('.hotspot-cluster')) return;
+      const visible = POINT_LAYERS.filter((layer) => map.getLayer(layer));
+      if (map.queryRenderedFeatures(event.point, { layers: visible }).length === 0) select(null);
+    });
+
+    // Cluster rings follow the clustered source as it re-tiles on every frame.
+    const state = clusters.current;
+    const renderClusters = () => {
+      if (!map.getSource(SOURCE) || !map.isSourceLoaded(SOURCE)) return;
+      const { view: currentView, colourBy: currentColour, palette: currentPalette } = look.current;
+      const next = new Map<string, Marker>();
+      if (currentView === 'clusters') {
+        for (const feature of map.querySourceFeatures(SOURCE)) {
+          const properties = feature.properties as Record<string, unknown>;
+          const clusterId = properties.cluster_id;
+          const total = properties.point_count;
+          if (typeof clusterId !== 'number' || typeof total !== 'number') continue;
+          const key = `${String(state.generation)}:${String(clusterId)}`;
+          if (next.has(key)) continue;
+          let marker = state.cache.get(key);
+          if (!marker && feature.geometry.type === 'Point') {
+            const [lng = 0, lat = 0] = feature.geometry.coordinates;
+            const element = createClusterElement(
+              total,
+              sliceCounts(properties, currentColour, currentPalette),
+              currentPalette,
+            );
+            element.addEventListener('click', (click) => {
+              click.stopPropagation();
+              const source = map.getSource<GeoJSONSource>(SOURCE);
+              void source?.getClusterExpansionZoom(clusterId).then((zoom) => {
+                map.easeTo({ center: [lng, lat], zoom: Math.min(zoom, CLUSTER_MAX_ZOOM + 1) });
+              });
+            });
+            marker = new Marker({ element }).setLngLat([lng, lat]);
+            state.cache.set(key, marker);
+          }
+          if (!marker) continue;
+          next.set(key, marker);
+          if (!state.onScreen.has(key)) marker.addTo(map);
+        }
+      }
+      for (const [key, marker] of state.onScreen) {
+        if (!next.has(key)) marker.remove();
+      }
+      state.onScreen = next;
+    };
+    map.on('render', renderClusters);
+
+    return () => {
+      for (const marker of state.onScreen.values()) marker.remove();
+      state.cache.clear();
+      state.onScreen.clear();
+      hover.remove();
+      map.remove();
+      mapRef.current = null;
+      setReady(false);
+    };
+  }, []);
+
+  /** Forgets every cluster ring, so the next frame draws them afresh. */
+  const resetClusters = useEffectEvent(() => {
+    const state = clusters.current;
+    for (const marker of state.onScreen.values()) marker.remove();
+    state.onScreen.clear();
+    state.cache.clear();
+    state.generation += 1;
+    mapRef.current?.triggerRepaint();
+  });
+
+  // Only the source the current style draws from is fed; the other catches up
+  // when the style changes. Each feed re-tiles in the worker.
+  const fed = useRef<{ clustered: unknown; flat: unknown }>({ clustered: null, flat: null });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const sourceId = view === 'clusters' ? SOURCE : FLAT_SOURCE;
+    const slot = view === 'clusters' ? 'clustered' : 'flat';
+    if (fed.current[slot] === hotspots) return;
+    fed.current[slot] = hotspots;
+    void map.getSource<GeoJSONSource>(sourceId)?.setData(toFeatures(hotspots));
+    if (view === 'clusters') resetClusters();
+  }, [ready, hotspots, view]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    look.current = { view, colourBy, palette };
+    if (!ready || !map) return;
+    const image = pinImage(colourBy, palette);
+    for (const layer of [LAYERS.pins, LAYERS.flatPins, LAYERS.highlight, LAYERS.selected]) {
+      map.setLayoutProperty(layer, 'icon-image', image);
+    }
+    map.setPaintProperty(LAYERS.flatDots, 'circle-color', colourExpression(colourBy, palette));
+    map.setPaintProperty(LAYERS.selectedSpot, 'circle-color', palette.foreground);
+    map.setPaintProperty(LAYERS.selectedSpot, 'circle-stroke-color', palette.foreground);
+    map.setPaintProperty('background', 'background-color', palette.muted);
+    map.setPaintProperty(LAYERS.ugandaMask, 'fill-color', palette.background);
+    map.setPaintProperty(LAYERS.ugandaBorder, 'line-color', palette.foreground);
+    map.setPaintProperty(LAYERS.heat, 'heatmap-color', [
+      'interpolate',
+      ['linear'],
+      ['heatmap-density'],
+      0,
+      'rgba(0, 0, 0, 0)',
+      0.12,
+      withAlpha(palette.heat1, 0.35),
+      0.35,
+      withAlpha(palette.heat1, 0.75),
+      0.6,
+      palette.heat2,
+      0.82,
+      palette.heat3,
+      1,
+      palette.heat4,
+    ]);
+    map.setPaintProperty(LAYERS.heat, 'heatmap-radius', [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      5,
+      7,
+      9,
+      14,
+      13,
+      26,
+    ]);
+    map.setPaintProperty(LAYERS.heat, 'heatmap-intensity', [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      5,
+      0.7,
+      13,
+      2.2,
+    ]);
+    map.setPaintProperty(LAYERS.heat, 'heatmap-opacity', [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      11,
+      0.85,
+      15,
+      0.25,
+    ]);
+
+    const show = (layer: string, visible: boolean) => {
+      map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+    };
+    show(LAYERS.pins, view === 'clusters');
+    show(LAYERS.heat, view === 'heatmap');
+    show(LAYERS.flatDots, view === 'points');
+    show(LAYERS.flatPins, view !== 'clusters');
+    // On the heatmap, pins fade in at town level as the heat fades out.
+    map.setPaintProperty(
+      LAYERS.flatPins,
+      'icon-opacity',
+      view === 'heatmap' ? ['interpolate', ['linear'], ['zoom'], PIN_ZOOM, 0, PIN_ZOOM + 2, 1] : 1,
+    );
+    resetClusters();
+  }, [ready, view, colourBy, palette]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    applyBasemap(map, basemap, dark);
+    // The dimmed world is lighter in the dark theme, where the background is near black.
+    map.setPaintProperty(LAYERS.ugandaMask, 'fill-opacity', dark ? 0.5 : 0.6);
+  }, [ready, basemap, dark]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const features: Feature[] = [];
+    const highlighted = highlightedId ? hotspots.find(({ id }) => id === highlightedId) : null;
+    if (highlighted && highlighted.id !== selected?.id) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [highlighted.longitude, highlighted.latitude] },
+        properties: { ...properties(highlighted), kind: 'highlight' },
+      });
+    }
+    if (selected) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [selected.longitude, selected.latitude] },
+        properties: { ...properties(selected), kind: 'selected' },
+      });
+    }
+    void map
+      .getSource<GeoJSONSource>(FOCUS_SOURCE)
+      ?.setData({ type: 'FeatureCollection', features });
+  }, [ready, selected, highlightedId, hotspots]);
+
+  return (
+    <div
+      ref={containerRef}
+      role="region"
+      aria-label="Hotspot map of Uganda. Use the list beside it to browse hotspots by keyboard."
+      className={cn('hotspot-map size-full', className)}
+    />
+  );
+}

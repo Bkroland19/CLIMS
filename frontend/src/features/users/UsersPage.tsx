@@ -140,7 +140,7 @@ export default function UsersPage() {
           <div className="flex min-w-0 items-center gap-3">
             <div
               aria-hidden="true"
-              className="bg-secondary text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold"
+              className="bg-secondary text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold"
             >
               {initialsOf(userDisplayName(user))}
             </div>

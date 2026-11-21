@@ -149,7 +149,7 @@ export function ComboboxField({
             data-placeholder={selected ? undefined : ''}
             disabled={disabled || isLoading || options.length === 0}
             onBlur={onBlur}
-            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 flex h-9 w-full items-center justify-between gap-1.5 rounded-lg border bg-transparent py-2 pr-2 pl-2.5 text-left text-sm transition-colors outline-none select-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-3"
+            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border bg-transparent py-2 pr-2 pl-2.5 text-left text-sm transition-colors outline-none select-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-3"
           >
             <span className="min-w-0 truncate">{triggerText}</span>
             <ChevronDownIcon
@@ -182,7 +182,7 @@ export function ComboboxField({
                 setActive(0);
               }}
               onKeyDown={onSearchKeyDown}
-              className="placeholder:text-muted-foreground h-10 w-full min-w-0 bg-transparent text-sm outline-none"
+              className="placeholder:text-muted-foreground h-9 w-full min-w-0 bg-transparent text-sm outline-none"
             />
           </div>
           <ul

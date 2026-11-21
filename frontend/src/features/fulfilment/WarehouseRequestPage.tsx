@@ -93,7 +93,7 @@ function RequestView({ request }: { request: WarehouseRequest }) {
   const receivedRef = useRef<HTMLDivElement>(null);
   useFocusWhenLost(receivedRef, request.status);
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <DetailHeader
         title={request.id}
         status={<StatusBadge status={status.label} tone={status.tone} />}
@@ -102,8 +102,8 @@ function RequestView({ request }: { request: WarehouseRequest }) {
         <StepTracker aria-label="Request progress" steps={requestSteps(request, now)} />
       </DetailHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="gap-section flex min-w-0 flex-col">
           <WaitingBanner request={request} />
           {request.status === 'dispatched' && request.dispatch ? (
             <ReceiveForm request={request} dispatch={request.dispatch} now={now} />
@@ -118,7 +118,7 @@ function RequestView({ request }: { request: WarehouseRequest }) {
           ) : null}
           <QuantitiesCard request={request} />
         </div>
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <LinkedOrdersCard request={request} />
           <HistoryCard references={[request.id]} now={now} />
         </div>
@@ -264,7 +264,7 @@ function ReceiveForm({ request, dispatch, now }: ReceiveFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
-        <form onSubmit={submit} noValidate className="flex flex-col gap-5">
+        <form onSubmit={submit} noValidate className="flex flex-col gap-3">
           <DetailList
             variant="grid"
             className="px-(--card-spacing)"

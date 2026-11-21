@@ -28,7 +28,7 @@ export function BatchPicker({ plan, description, onPick, now }: BatchPickerProps
         <CardTitle>Select batches</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-3">
         {plan.groups.map((group) => (
           <PickGroupTable key={group.product} group={group} onPick={onPick} now={now} />
         ))}

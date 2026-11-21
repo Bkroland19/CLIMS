@@ -1,11 +1,31 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { renderApp } from '@/test/renderApp';
+import type { Ref } from 'react';
+
+import { DistrictContextProvider } from '@/features/district/DistrictContext';
+import { renderApp, sessionWith } from '@/test/renderApp';
 
 import HotspotMapPage from './HotspotMapPage';
 import HotspotsPage from './HotspotsPage';
+import type { HotspotMapHandle } from './map/HotspotMapCanvas';
+
+// jsdom has no WebGL. The map itself is checked in a browser; these tests cover
+// what loads, the list beside the map and the detail panel.
+vi.mock('./map/HotspotMapCanvas', async () => {
+  const { useImperativeHandle } = await import('react');
+  return {
+    default: function MapStub({ handleRef }: { handleRef?: Ref<HotspotMapHandle> }) {
+      useImperativeHandle(
+        handleRef,
+        () => ({ fitTo: () => undefined, flyTo: () => undefined }),
+        [],
+      );
+      return <div data-testid="hotspot-map" />;
+    },
+  };
+});
 
 const id = '6f1e2c50-9d8a-4f3b-8c1e-2b7a9d0c4e11';
 const district = '7f2c3c5e-1d4b-4c1a-9a51-2a8f6f0b9e11';
@@ -146,38 +166,175 @@ describe('HotspotsPage for a VHT', () => {
 });
 
 describe('HotspotMapPage', () => {
-  it('requests hotspots for the selected district in the MoH map', async () => {
+  const gulu = '0d6c4b1e-5a3f-4e2b-8c7d-9f1a2b3c4d5e';
+  const goHotspot = (fields: object = {}) => ({
+    id,
+    name: 'Lake view bar',
+    type: 'Bar',
+    village: 'Seja',
+    region: { id: 'r1', name: 'Central' },
+    district: { id: district, name: 'Wakiso' },
+    subcounty: null,
+    latitude: 0.3295,
+    longitude: 32.6016,
+    has_condom_dispenser: true,
+    dispenser_condition: 'Good',
+    status: 'active',
+    review_status: 'active',
+    contact_person: { id: 'c1', name: 'Okello James', phone_number: '+256772000000' },
+    created_at: '2026-01-02T10:00:00Z',
+    updated_at: '2026-02-03T10:00:00Z',
+    ...fields,
+  });
+  const unplaced = goHotspot({
+    id: '9a9a9a9a-0000-4000-8000-000000000009',
+    name: 'Nowhere lodge',
+    latitude: null,
+    longitude: null,
+  });
+  const abroad = goHotspot({
+    id: '9b9b9b9b-0000-4000-8000-00000000000b',
+    name: 'Emulator bar',
+    latitude: 37.4221,
+    longitude: -122.0839,
+  });
+  const api =
+    (hotspots: object[] = [goHotspot()]) =>
+    (request: { url: string }) => {
+      if (request.url === '/locations/districts')
+        return list({ id: district, name: 'Wakiso' }, { id: gulu, name: 'Gulu' });
+      if (request.url === '/locations/regions') return list({ id: 'r1', name: 'Central' });
+      if (request.url.startsWith('/hotspots?')) {
+        const query = new URLSearchParams(request.url.split('?')[1]);
+        const inDistrict = query.get('district_id') !== gulu;
+        return list(...(query.get('offset') === '0' && inDistrict ? hotspots : []));
+      }
+      if (request.url.endsWith('/events')) return list(submittedEvent);
+      if (request.url.startsWith('/hotspots/'))
+        return { status: 200, body: { success: true, data: { ...goHotspot(), comments: [] } } };
+      return list();
+    };
+  const hotspotUrls = (requests: { url: string }[]) =>
+    requests.map(({ url }) => url).filter((url) => url.startsWith('/hotspots?'));
+
+  it('loads the whole country a district at a time for a national user', async () => {
+    const { requests } = renderApp(<HotspotMapPage canSwitchDistrict />, {
+      route: '/moh/hotspot-map',
+      signedIn: true,
+      replies: [api()],
+    });
+
+    expect(await screen.findByRole('button', { name: /Lake view bar/ })).toBeInTheDocument();
+    expect(hotspotUrls(requests)).toEqual(
+      expect.arrayContaining([
+        `/hotspots?limit=100&offset=0&district_id=${district}`,
+        `/hotspots?limit=100&offset=0&district_id=${gulu}`,
+      ]),
+    );
+    expect(screen.getByText('1 of 1 hotspot is on the map.')).toBeInTheDocument();
+  });
+
+  it('loads only the district chosen in the top bar', async () => {
+    const { requests } = renderApp(
+      <DistrictContextProvider>
+        <HotspotMapPage canSwitchDistrict />
+      </DistrictContextProvider>,
+      {
+        route: '/moh/hotspot-map?district=Wakiso',
+        signedIn: true,
+        replies: [api()],
+      },
+    );
+
+    expect(await screen.findByRole('button', { name: /Lake view bar/ })).toBeInTheDocument();
+    const urls = hotspotUrls(requests);
+    expect(urls).toContain(`/hotspots?limit=100&offset=0&district_id=${district}`);
+    expect(urls.some((url) => url.includes(gulu))).toBe(false);
+  });
+
+  it('shows a DCFP what the API scopes them to, without a district filter', async () => {
+    const { requests } = renderApp(<HotspotMapPage />, {
+      route: '/dcfp/hotspot-map',
+      session: sessionWith(['hotspots:read', 'hotspots:activate'], ['dfcp']),
+      replies: [api()],
+    });
+
+    expect(await screen.findByRole('button', { name: /Lake view bar/ })).toBeInTheDocument();
+    expect(hotspotUrls(requests)).toContain('/hotspots?limit=100&offset=0');
+    expect(hotspotUrls(requests).some((url) => url.includes('district_id'))).toBe(false);
+    expect(requests.some(({ url }) => url === '/locations/districts')).toBe(false);
+  });
+
+  it('opens a hotspot from the list with its contact and history', async () => {
     const user = userEvent.setup();
     const { requests } = renderApp(<HotspotMapPage canSwitchDistrict />, {
       route: '/moh/hotspot-map',
       signedIn: true,
-      replies: [
-        (request) =>
-          request.url === '/locations/districts'
-            ? list({ id: district, name: 'Wakiso' })
-            : list(hotspot('active')),
-      ],
+      replies: [api()],
     });
 
-    const select = screen.getByRole('combobox', { name: 'District' });
-    await waitFor(() => expect(select).toBeEnabled());
-    await user.click(select);
-    await user.click(await screen.findByRole('option', { name: 'Wakiso' }));
+    await user.click(await screen.findByRole('button', { name: /Lake view bar/ }));
 
-    await waitFor(() => {
-      expect(requests).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ url: '/hotspots?limit=100' }),
-          expect.objectContaining({ url: `/hotspots?limit=100&district_id=${district}` }),
-        ]),
-      );
-    });
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Lake view bar' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(screen.getByRole('link', { name: 'Call' })).toHaveAttribute('href', 'tel:+256772000000');
+    expect(await screen.findByText('Submitted for review')).toBeInTheDocument();
+    expect(requests.map(({ url }) => url)).toEqual(
+      expect.arrayContaining([`/hotspots/${id}`, `/hotspots/${id}/events`]),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'In view' })).toHaveFocus();
   });
 
-  it('explains what to configure when no maps key is set, instead of a broken map', async () => {
-    renderApp(<HotspotMapPage />, { signedIn: true, replies: [list(hotspot('active'))] });
+  it('lists the hotspots it leaves off the map, and why, so they can be fixed', async () => {
+    const user = userEvent.setup();
+    renderApp(<HotspotMapPage canSwitchDistrict />, {
+      route: '/moh/hotspot-map',
+      signedIn: true,
+      replies: [api([goHotspot(), unplaced, abroad])],
+    });
 
-    expect(await screen.findByText('The map is not set up')).toBeInTheDocument();
-    expect(screen.getByText(/NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        '1 of 3 hotspots are on the map. 1 has no position recorded and 1 has one outside Uganda.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'List the 2 not on the map' }));
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Not on the map' })).toBeInTheDocument();
+    const outside = screen.getByRole('button', { name: /Emulator bar/ });
+    expect(within(outside).getByText('Outside Uganda')).toBeInTheDocument();
+    expect(within(outside).getByText('Wakiso · 37.4221, -122.0839')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('button', { name: /Nowhere lodge/ })).getByText('No position'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Lake view bar/ })).not.toBeInTheDocument();
+  });
+
+  it('narrows the list by search and by status', async () => {
+    const user = userEvent.setup();
+    renderApp(<HotspotMapPage canSwitchDistrict />, {
+      route: '/moh/hotspot-map',
+      signedIn: true,
+      replies: [api([goHotspot(), unplaced])],
+    });
+
+    await user.type(
+      await screen.findByLabelText('Search hotspots by name, place or contact'),
+      'nowhere',
+    );
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Search results' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Nowhere lodge/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Lake view bar/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await user.click(screen.getByRole('button', { name: 'Status: all shown' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: /Active/ }));
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByText('No hotspots match')).toBeInTheDocument();
   });
 });

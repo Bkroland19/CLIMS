@@ -42,7 +42,7 @@ interface User {
   created_at: string;
 }
 
-/** A brand or a unit of measure (`catalogue.Lookup` in the Go API). */
+/** A product type, a brand or a unit of measure (`catalogue.Lookup` in the Go API). */
 interface Lookup {
   id: string;
   name: string;
@@ -53,13 +53,12 @@ interface Lookup {
 }
 
 type ProductCategory = 'male' | 'female';
-type ProductType = 'free' | 'socially_marketed' | 'commercial';
 
 /** A product as stored. Legacy products may lack any of the nullable fields. */
 interface Product {
   id: string;
   category: ProductCategory | null;
-  type: ProductType | null;
+  type_id: string | null;
   brand_id: string | null;
   unit_id: string | null;
   pieces_per_unit: number | null;
@@ -166,8 +165,8 @@ export const PERMISSIONS = [
 const ROLE_SEED: readonly [string, string[]][] = [
   ['admin', PERMISSIONS],
   ['moh', ['catalogue:manage', 'users:read', 'roles:read']],
-  ['nms', []],
-  ['jms', []],
+  ['nms', ['catalogue:manage']],
+  ['jms', ['catalogue:manage']],
   ['dfcp', ['users:read']],
   ['store incharge', []],
   ['hotspot manager', []],
@@ -284,9 +283,25 @@ function seedUsers(dataset: string): User[] {
 
 const BRAND = (n: number) => uuid(21, n);
 const UNIT = (n: number) => uuid(22, n);
+const TYPE = (n: number) => uuid(23, n);
 
 function lookup(id: string, name: string, note: string | null, active = true, age = 400): Lookup {
   return { id, name, note, active, created_at: daysAgo(age), updated_at: daysAgo(age / 2) };
+}
+
+/** The three distribution channels migration 23 seeds, and a retired one. */
+function seedTypes(dataset: string): Lookup[] {
+  if (dataset === 'empty') return [];
+  const rows = [
+    lookup(TYPE(1), 'Free', 'Public sector, free to the user'),
+    lookup(TYPE(2), 'Socially marketed', 'Subsidised and sold through social marketing'),
+    lookup(TYPE(3), 'Commercial', 'Sold at full price by the private sector'),
+    lookup(TYPE(4), 'Workplace', 'Given out by employers; no longer tracked', false),
+  ];
+  if (dataset === 'worst') {
+    rows.unshift(lookup(TYPE(99), 'Donated through implementing partners', 'x'.repeat(120)));
+  }
+  return rows;
 }
 
 function seedBrands(dataset: string): Lookup[] {
@@ -325,7 +340,7 @@ function seedProducts(dataset: string): Product[] {
   const product = (
     n: number,
     category: ProductCategory | null,
-    type: ProductType | null,
+    type: number | null,
     brand: number | null,
     unit: number | null,
     pieces_per_unit: number | null,
@@ -333,7 +348,7 @@ function seedProducts(dataset: string): Product[] {
   ): Product => ({
     id: uuid(20, n),
     category,
-    type,
+    type_id: type === null ? null : TYPE(type),
     brand_id: brand === null ? null : BRAND(brand),
     unit_id: unit === null ? null : UNIT(unit),
     pieces_per_unit,
@@ -343,19 +358,19 @@ function seedProducts(dataset: string): Product[] {
     updated_at: daysAgo(100 - n),
   });
   const rows = [
-    product(1, 'male', 'free', 1, 1, 1, { referenced: true }),
-    product(2, 'male', 'free', 1, 2, 144, { referenced: true }),
-    product(3, 'male', 'free', 1, 3, 4320),
-    product(4, 'female', 'free', 2, 1, 1, { referenced: true }),
-    product(5, 'female', 'free', 2, 2, 100),
-    product(6, 'male', 'socially_marketed', 3, 1, 1, { active: false }),
+    product(1, 'male', 1, 1, 1, 1, { referenced: true }),
+    product(2, 'male', 1, 1, 2, 144, { referenced: true }),
+    product(3, 'male', 1, 1, 3, 4320),
+    product(4, 'female', 1, 2, 1, 1, { referenced: true }),
+    product(5, 'female', 1, 2, 2, 100),
+    product(6, 'male', 2, 3, 1, 1, { active: false }),
     // Converted from the legacy system: no unit or pack size, so it must be completed.
-    product(7, 'male', 'commercial', 4, null, null, { referenced: true }),
+    product(7, 'male', 3, 4, null, null, { referenced: true }),
     // Legacy with an unrecognised category and type, so it was deactivated.
     product(8, null, null, 4, null, null, { active: false, referenced: true }),
   ];
   if (dataset === 'worst') {
-    rows.unshift(product(99, 'female', 'socially_marketed', 99, 3, 99_999));
+    rows.unshift(product(99, 'female', 99, 99, 3, 99_999));
   }
   return rows;
 }
@@ -741,6 +756,7 @@ const state = {
   users: [] as User[],
   mySessions: [] as DeviceSession[],
   userSessions: new Map<string, DeviceSession[]>(),
+  types: [] as Lookup[],
   brands: [] as Lookup[],
   units: [] as Lookup[],
   products: [] as Product[],
@@ -755,6 +771,7 @@ export function seedAdmin(dataset: string): void {
   state.users = seedUsers(dataset);
   state.mySessions = seedMySessions(dataset);
   state.userSessions = seedUserSessions(state.users, dataset);
+  state.types = seedTypes(dataset);
   state.brands = seedBrands(dataset);
   state.units = seedUnits(dataset);
   state.products = seedProducts(dataset);
@@ -1014,6 +1031,15 @@ function handleRoles(
 const done = (message: string): Reply => ({ status: 200, body: { success: true, message } });
 
 const LOOKUP_RULES = {
+  types: {
+    min: 2,
+    max: 40,
+    noun: 'type',
+    title: 'Product type',
+    inUse: 'This type is used by products. Deactivate it instead.',
+    missing: 'Choose an existing type.',
+    inactive: 'This type is inactive. Choose an active type.',
+  },
   brands: {
     min: 1,
     max: 60,
@@ -1036,15 +1062,19 @@ const LOOKUP_RULES = {
 
 type LookupKind = keyof typeof LOOKUP_RULES;
 
+/** The product field that names a row of each lookup. */
+const LOOKUP_COLUMNS = { types: 'type_id', brands: 'brand_id', units: 'unit_id' } as const;
+
 const ref = (list: readonly Lookup[], id: string | null) => {
   const found = id ? list.find((candidate) => candidate.id === id) : undefined;
   return found ? { id: found.id, name: found.name } : null;
 };
 
 function productView(product: Product) {
-  const { brand_id, unit_id, referenced, ...rest } = product;
+  const { type_id, brand_id, unit_id, referenced, ...rest } = product;
   return {
     ...rest,
+    type: ref(state.types, type_id),
     brand: ref(state.brands, brand_id),
     unit: ref(state.units, unit_id),
     in_use: referenced,
@@ -1052,7 +1082,7 @@ function productView(product: Product) {
 }
 
 function lookupView(kind: LookupKind, row: Lookup) {
-  const column = kind === 'brands' ? 'brand_id' : 'unit_id';
+  const column = LOOKUP_COLUMNS[kind];
   const product_count = state.products.filter((product) => product[column] === row.id).length;
   return { ...row, in_use: product_count > 0, product_count };
 }
@@ -1066,7 +1096,7 @@ function sortedProducts(rows: readonly Product[]) {
       (a, b) =>
         label(a.category).localeCompare(label(b.category)) ||
         label(a.brand?.name ?? null).localeCompare(label(b.brand?.name ?? null)) ||
-        label(a.type).localeCompare(label(b.type)),
+        label(a.type?.name ?? null).localeCompare(label(b.type?.name ?? null)),
     );
 }
 
@@ -1083,11 +1113,11 @@ function activeParam(query: URLSearchParams): boolean | null | undefined {
 const onlyFields = (body: Body, fields: readonly string[]) =>
   Object.keys(body).every((key) => fields.includes(key));
 
-const PRODUCT_FIELDS = ['category', 'type', 'brand_id', 'unit_id', 'pieces_per_unit'] as const;
+const PRODUCT_FIELDS = ['category', 'type_id', 'brand_id', 'unit_id', 'pieces_per_unit'] as const;
 
 interface ProductFields {
   category: unknown;
-  type: unknown;
+  type_id: unknown;
   brand_id: unknown;
   unit_id: unknown;
   pieces_per_unit: unknown;
@@ -1100,12 +1130,10 @@ function validateProduct(fields: ProductFields): Record<string, string> {
   const lower = (value: unknown) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value;
   const category = lower(fields.category);
-  const type = lower(fields.type);
   if (isBlank(category)) errors.category = 'Choose a category.';
   else if (category !== 'male' && category !== 'female') errors.category = 'Choose male or female.';
-  if (isBlank(type)) errors.type = 'Choose a type.';
-  else if (type !== 'free' && type !== 'socially_marketed' && type !== 'commercial')
-    errors.type = 'Choose free, socially marketed or commercial.';
+  if (isBlank(fields.type_id)) errors.type_id = 'Choose a type.';
+  else if (!isUuid(fields.type_id)) errors.type_id = 'Choose a type from the list.';
   if (isBlank(fields.brand_id)) errors.brand_id = 'Choose a brand.';
   else if (!isUuid(fields.brand_id)) errors.brand_id = 'Choose a brand from the list.';
   if (isBlank(fields.unit_id)) errors.unit_id = 'Choose a unit of measure.';
@@ -1119,7 +1147,7 @@ function validateProduct(fields: ProductFields): Record<string, string> {
   return errors;
 }
 
-/** Mirrors `checkReference`: a newly chosen brand or unit must exist and be active. */
+/** Mirrors `checkReference`: a newly chosen type, brand or unit must exist and be active. */
 function checkReference(
   kind: LookupKind,
   field: string,
@@ -1135,7 +1163,9 @@ function checkReference(
 
 function describeProduct(product: Product): string {
   const view = productView(product);
-  return [view.brand?.name, view.category, view.type].filter(Boolean).join(' · ') || product.id;
+  return (
+    [view.brand?.name, view.category, view.type?.name].filter(Boolean).join(' · ') || product.id
+  );
 }
 
 function handleProducts(
@@ -1156,6 +1186,7 @@ function handleProducts(
     if (!onlyFields(body, PRODUCT_FIELDS)) return fail(400, 'invalid request body');
     const errors = validateProduct(body as unknown as ProductFields);
     if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
+    checkReference('types', 'type_id', body.type_id, null, errors);
     checkReference('brands', 'brand_id', body.brand_id, null, errors);
     checkReference('units', 'unit_id', body.unit_id, null, errors);
     if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
@@ -1164,7 +1195,7 @@ function handleProducts(
     const product: Product = {
       id: uuid(20, state.nextId),
       category: text(body.category).trim().toLowerCase() as ProductCategory,
-      type: text(body.type).trim().toLowerCase() as ProductType,
+      type_id: text(body.type_id),
       brand_id: text(body.brand_id),
       unit_id: text(body.unit_id),
       pieces_per_unit: body.pieces_per_unit as number,
@@ -1197,7 +1228,7 @@ function handleProducts(
   const nextActive = typeof body.active === 'boolean' ? body.active : product.active;
   const merged: ProductFields = {
     category: body.category ?? product.category,
-    type: body.type ?? product.type,
+    type_id: body.type_id ?? product.type_id,
     brand_id: body.brand_id ?? product.brand_id,
     unit_id: body.unit_id ?? product.unit_id,
     pieces_per_unit: body.pieces_per_unit ?? product.pieces_per_unit,
@@ -1205,11 +1236,12 @@ function handleProducts(
   // Deactivating alone is always allowed; anything else needs a complete product.
   if (changesFields || (nextActive && !product.active)) {
     const errors = validateProduct(merged);
+    checkReference('types', 'type_id', body.type_id, product.type_id, errors);
     checkReference('brands', 'brand_id', body.brand_id, product.brand_id, errors);
     checkReference('units', 'unit_id', body.unit_id, product.unit_id, errors);
     if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
     product.category = text(merged.category).trim().toLowerCase() as ProductCategory;
-    product.type = text(merged.type).trim().toLowerCase() as ProductType;
+    product.type_id = text(merged.type_id);
     product.brand_id = text(merged.brand_id);
     product.unit_id = text(merged.unit_id);
     product.pieces_per_unit = merged.pieces_per_unit as number;
@@ -1244,6 +1276,8 @@ function validateLookup(
   if (note !== null && note.length > 120) errors.note = 'Use at most 120 characters.';
   return errors;
 }
+
+const LOOKUP_ID_PREFIX = { types: 23, brands: 21, units: 22 } as const;
 
 const collapse = (value: unknown) => text(value).trim().split(/\s+/).filter(Boolean).join(' ');
 
@@ -1285,7 +1319,7 @@ function handleLookups(
     const duplicate = duplicateName(kind, name);
     if (duplicate) return duplicate;
     state.nextId += 1;
-    const row = lookup(uuid(kind === 'brands' ? 21 : 22, state.nextId), name, note, true, 0);
+    const row = lookup(uuid(LOOKUP_ID_PREFIX[kind], state.nextId), name, note, true, 0);
     row.created_at = row.updated_at = new Date().toISOString();
     list.push(row);
     if (kind === 'units') record('created', 'unit', name, `Added unit of measure “${name}”`);
@@ -1330,7 +1364,8 @@ function handleCatalogue(
   query: URLSearchParams,
 ): Reply {
   if (kind === 'products') return handleProducts(method, id, body, query);
-  if (kind === 'brands' || kind === 'units') return handleLookups(kind, method, id, body, query);
+  if (kind === 'types' || kind === 'brands' || kind === 'units')
+    return handleLookups(kind, method, id, body, query);
   return fail(404, 'Not found');
 }
 

@@ -39,12 +39,12 @@ export function UserMenu() {
         >
           <span
             aria-hidden="true"
-            className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+            className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-[0.6875rem] font-bold"
           >
             {initialsOf(displayName)}
           </span>
           <span className="sr-only min-w-0 flex-col text-left leading-tight md:not-sr-only md:flex">
-            <span className="truncate text-[0.84375rem] font-semibold">{displayName}</span>
+            <span className="truncate text-[0.8125rem] font-semibold">{displayName}</span>
             <span className="sr-only">, </span>
             <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
           </span>

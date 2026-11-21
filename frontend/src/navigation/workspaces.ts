@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Store,
+  Tags,
   Truck,
   Users,
   UsersRound,
@@ -48,6 +49,52 @@ function monthlyReports(path: string, description: string): NavItem {
     icon: ClipboardCheck,
     pages: [{ path, tab: 'Reports', title: 'Monthly reports', description, layout: 'table' }],
     details: [{ path: `${path}/[id]`, label: 'Monthly report', layout: 'form' }],
+  };
+}
+
+/**
+ * The condom catalogue (products and the types, brands and units they use). It
+ * is national master data, so MOH and the warehouse workspace show the same
+ * screens; who may change it follows `catalogue:manage`, set per role.
+ */
+function catalogue(path: string): NavItem {
+  return {
+    id: 'catalogue',
+    label: 'Product catalogue',
+    icon: Tags,
+    pages: [
+      {
+        path,
+        tab: 'Condoms',
+        title: 'Product catalogue',
+        description:
+          'Condom products, each a brand, category and type in one unit. Orders and stock pick from the active ones.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/types`,
+        tab: 'Types',
+        title: 'Product types',
+        description:
+          'How condom products reach people, such as free public-sector supply, social marketing or commercial sale.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/brands`,
+        tab: 'Brands',
+        title: 'Brands',
+        description: 'Brands condom products are distributed or sold under.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/units`,
+        tab: 'Units of measure',
+        title: 'Units of measure',
+        description:
+          'Units condoms are packed and counted in. Each product says how many condoms its unit holds.',
+        layout: 'table',
+      },
+    ],
   };
 }
 
@@ -181,36 +228,7 @@ export const workspaces: readonly Workspace[] = [
               },
             ],
           },
-          {
-            id: 'catalogue',
-            label: 'Product catalogue',
-            icon: Package,
-            pages: [
-              {
-                path: '/moh/catalogue',
-                tab: 'Condoms',
-                title: 'Product catalogue',
-                description:
-                  'Condom products, each a brand, category and type in one unit. Orders and stock pick from the active ones.',
-                layout: 'table',
-              },
-              {
-                path: '/moh/catalogue/brands',
-                tab: 'Brands',
-                title: 'Brands',
-                description: 'Brands condom products are distributed or sold under.',
-                layout: 'table',
-              },
-              {
-                path: '/moh/catalogue/units',
-                tab: 'Units of measure',
-                title: 'Units of measure',
-                description:
-                  'Units condoms are packed and counted in. Each product says how many condoms its unit holds.',
-                layout: 'table',
-              },
-            ],
-          },
+          catalogue('/moh/catalogue'),
           {
             id: 'locations',
             label: 'Stores & locations',
@@ -435,6 +453,7 @@ export const workspaces: readonly Workspace[] = [
               },
             ],
           },
+          catalogue('/warehouse/catalogue'),
         ],
       },
       {

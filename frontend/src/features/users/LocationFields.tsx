@@ -123,7 +123,7 @@ export function LocationFields({ need, control, register, setValue, errors }: Lo
   const noHotspots = districtId !== '' && hotspots.isSuccess && hotspotOptions.length === 0;
 
   return (
-    <fieldset className="flex flex-col gap-4 rounded-lg border p-4 sm:col-span-2">
+    <fieldset className="flex flex-col gap-3 rounded-lg border p-3 sm:col-span-2">
       <legend className="px-1 text-sm font-medium">Where they work</legend>
       <p className="text-muted-foreground -mt-1 text-sm">{need.reason}</p>
 

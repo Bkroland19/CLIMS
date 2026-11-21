@@ -51,26 +51,14 @@ export default function SignIn() {
         contentContainerStyle={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }}
       >
         <View style={{ alignItems: "center", paddingHorizontal: 24, marginBottom: 28, gap: 10 }}>
-          <View
+          <Image
+            source={require("../../assets/images/moh-seal.png")}
             accessible
+            accessibilityRole="image"
             accessibilityLabel="Ministry of Health, Republic of Uganda"
-            style={{
-              width: 88,
-              height: 88,
-              borderRadius: T.ios ? 20 : 24,
-              backgroundColor: "#fff",
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: T.sep,
-            }}
-          >
-            <Image
-              source={require("../../assets/images/coat-of-arms.png")}
-              style={{ width: 64, height: 64 }}
-              resizeMode="contain"
-            />
-          </View>
+            style={{ width: 96, height: 96 }}
+            resizeMode="contain"
+          />
           <Txt
             accessibilityRole="header"
             style={{ fontSize: 34, fontWeight: "700", letterSpacing: 0.5 }}

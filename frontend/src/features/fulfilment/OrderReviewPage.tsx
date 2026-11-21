@@ -185,7 +185,7 @@ function OrderReview({ order }: { order: HotspotOrder }) {
   const status = ORDER_STATUS[order.status];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <DetailHeader
         title={order.id}
         status={<StatusBadge status={status.label} tone={status.tone} />}
@@ -194,8 +194,8 @@ function OrderReview({ order }: { order: HotspotOrder }) {
         <StepTracker aria-label="Order progress" steps={orderSteps(order, check, now)} />
       </DetailHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="gap-section flex min-w-0 flex-col">
           <OrderBanner
             ref={bannerRef}
             order={order}
@@ -337,7 +337,7 @@ function OrderReview({ order }: { order: HotspotOrder }) {
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <OrderSummary order={order} />
           <HistoryCard references={[order.id]} now={now} />
         </div>
@@ -599,7 +599,7 @@ function OrderSummary({ order }: { order: HotspotOrder }) {
       <CardHeader>
         <CardTitle>Request</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-3">
         <DetailList
           items={[
             {

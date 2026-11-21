@@ -21,7 +21,7 @@ interface EmptyStateProps {
 /** Shown in place of a list that has nothing in it. */
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <Empty className="py-12">
+    <Empty className="py-8">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <Icon aria-hidden="true" />

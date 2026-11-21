@@ -1,20 +1,18 @@
 import React from "react";
 import { Image, View } from "react-native";
 import { images } from "@/constants";
-import { useTheme } from "@/context/theme/ThemeProvider";
 import { useResponsive } from "@/hooks/useResponsive";
 import { AppText } from "@/components/ui";
 
 /**
- * Ministry of Health, Republic of Uganda identity: the official coat of arms on a white
- * plate (so it stays legible in dark mode) with the ministry name in large, theme-aware text.
+ * Ministry of Health, Republic of Uganda identity: the ministry's seal (the coat of arms in
+ * its own white field, so it stays legible in dark mode) with the ministry name in large,
+ * theme-aware text.
  */
 const MohLogo: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
-  const { colors, shadows } = useTheme();
   const { isCompact } = useResponsive();
   const small = compact || isCompact;
-  const plate = small ? 96 : 120;
-  const crest = plate - 24;
+  const seal = small ? 96 : 120;
 
   return (
     <View
@@ -23,25 +21,7 @@ const MohLogo: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
       accessibilityLabel="Ministry of Health, Republic of Uganda"
       style={{ alignItems: "center" }}
     >
-      <View
-        style={{
-          width: plate,
-          height: plate,
-          borderRadius: plate / 2,
-          backgroundColor: "#FFFFFF",
-          alignItems: "center",
-          justifyContent: "center",
-          borderWidth: 1,
-          borderColor: colors.border,
-          ...shadows.card,
-        }}
-      >
-        <Image
-          source={images.coatOfArms}
-          style={{ width: crest, height: crest }}
-          resizeMode="contain"
-        />
-      </View>
+      <Image source={images.mohSeal} style={{ width: seal, height: seal }} resizeMode="contain" />
       <AppText
         variant="heading"
         maxFontSizeMultiplier={1.2}

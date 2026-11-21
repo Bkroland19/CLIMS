@@ -40,7 +40,7 @@ export function FilterTabs<Value extends string>({
 }: FilterTabsProps<Value>) {
   return (
     <nav aria-label={label} className={cn('max-w-full overflow-x-auto', className)}>
-      <ul className="bg-secondary inline-flex gap-1 rounded-lg p-1">
+      <ul className="bg-secondary inline-flex gap-0.5 rounded-lg p-0.5">
         {tabs.map((tab) => {
           const isActive = tab.value === value;
           return (
@@ -50,7 +50,7 @@ export function FilterTabs<Value extends string>({
                 scroll={false}
                 aria-current={isActive ? 'true' : undefined}
                 className={cn(
-                  'focus-visible:ring-ring inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2',
+                  'focus-visible:ring-ring inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-medium whitespace-nowrap outline-none focus-visible:ring-2',
                   isActive
                     ? 'bg-card text-foreground shadow-xs'
                     : 'text-muted-foreground hover:text-foreground',

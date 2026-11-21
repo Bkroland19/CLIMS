@@ -72,7 +72,7 @@ function DispatchView({ order }: { order: HotspotOrder }) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <DetailHeader
         title={`Dispatch ${order.id} to ${order.hotspot.name}`}
         status={<StatusBadge status={status.label} tone={status.tone} />}
@@ -95,8 +95,8 @@ function DispatchView({ order }: { order: HotspotOrder }) {
         </Alert>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div className="gap-section flex min-w-0 flex-col">
           <Card>
             <CardHeader>
               <CardTitle>Assign a rider</CardTitle>
@@ -211,7 +211,7 @@ function DeliveryNote({ order, riderName }: DeliveryNoteProps) {
       aria-labelledby="delivery-note-heading"
       data-print-region
     >
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-muted-foreground text-xs">
@@ -273,7 +273,7 @@ function DeliveryNote({ order, riderName }: DeliveryNoteProps) {
           />
         </div>
 
-        <div className="grid gap-6 pt-6 sm:grid-cols-3">
+        <div className="grid gap-4 pt-4 sm:grid-cols-3">
           {[
             'Issued by · district store',
             `Delivered by · ${riderName ?? 'rider'}`,

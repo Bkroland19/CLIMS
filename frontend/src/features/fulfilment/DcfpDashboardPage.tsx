@@ -55,7 +55,7 @@ export default function DcfpDashboardPage() {
   const activity = useActivity();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="Orders, stock and warehouse requests" />
 
       <StatCardGrid>
@@ -93,7 +93,7 @@ export default function DcfpDashboardPage() {
         />
       </StatCardGrid>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_22rem]">
         <TaskList
           title="Needs your action"
           tasks={
@@ -119,7 +119,7 @@ export default function DcfpDashboardPage() {
           }}
         />
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <Card>
             <CardHeader>
               <CardTitle>District store</CardTitle>
@@ -129,7 +129,7 @@ export default function DcfpDashboardPage() {
                 </Button>
               </CardAction>
             </CardHeader>
-            <CardContent className="flex flex-col gap-5">
+            <CardContent className="flex flex-col gap-3">
               {store.isPending ? (
                 <Skeleton className="h-24 w-full" />
               ) : store.isError ? (
@@ -180,7 +180,7 @@ export default function DcfpDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="gap-section grid lg:grid-cols-3">
         <TrendChart
           title="District store stock"
           description="Male condoms in the district store, last 30 days"

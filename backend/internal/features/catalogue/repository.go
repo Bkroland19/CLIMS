@@ -34,6 +34,7 @@ var productTexts = texts{
 }
 
 // lookupKind describes a brand-like table: a unique name, an optional note and an active flag.
+// Product types, brands and units of measure are all lookups.
 type lookupKind struct {
 	texts
 	path          string // URL segment under /catalogue
@@ -46,6 +47,24 @@ type lookupKind struct {
 	// Messages for a product that references a missing or inactive row.
 	missing  string
 	inactive string
+}
+
+var types = lookupKind{
+	texts: texts{
+		notFound:  "Product type not found.",
+		inUse:     "This type is used by products. Deactivate it instead.",
+		duplicate: "A type with this name already exists.",
+	},
+	path:          "types",
+	singular:      "product type",
+	table:         "product_types",
+	productColumn: "type_id",
+	inUse:         `EXISTS (SELECT 1 FROM condoms c WHERE c.type_id = t.id)`,
+	validate: func(name string, note *string) validationError {
+		return check(typeFields{Name: name, Note: note})
+	},
+	missing:  "Choose an existing type.",
+	inactive: "This type is inactive. Choose an active type.",
 }
 
 var brands = lookupKind{
@@ -105,9 +124,10 @@ const productInUse = `(EXISTS (SELECT 1 FROM orders o WHERE o.condom_id = c.id)
 		EXISTS (SELECT 1 FROM condom_inventories ci WHERE btrim(ci.condom_id) = c.legacy_id)
 		OR EXISTS (SELECT 1 FROM hot_spot_stocks hs WHERE btrim(hs.condom_id) = c.legacy_id))))`
 
-const productSelect = `SELECT c.id, c.category, c.type, b.id, b.name, u.id, u.name, c.pieces_per_unit,
+const productSelect = `SELECT c.id, c.category, pt.id, pt.name, b.id, b.name, u.id, u.name, c.pieces_per_unit,
 	c.active, ` + productInUse + `, c.created_at, c.updated_at
 	FROM condoms c
+	LEFT JOIN product_types pt ON pt.id = c.type_id
 	LEFT JOIN brands b ON b.id = c.brand_id
 	LEFT JOIN unit_of_measures u ON u.id = c.unit_id`
 
@@ -126,25 +146,30 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 func scanProduct(row pgx.Row) (Product, error) {
 	var p Product
-	var brandID, brandName, unitID, unitName *string
-	if err := row.Scan(&p.ID, &p.Category, &p.Type, &brandID, &brandName, &unitID, &unitName,
+	var typeID, typeName, brandID, brandName, unitID, unitName *string
+	if err := row.Scan(&p.ID, &p.Category, &typeID, &typeName, &brandID, &brandName, &unitID, &unitName,
 		&p.PiecesPerUnit, &p.Active, &p.InUse, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return Product{}, err
 	}
-	if brandID != nil && brandName != nil {
-		p.Brand = &Ref{ID: *brandID, Name: *brandName}
-	}
-	if unitID != nil && unitName != nil {
-		p.Unit = &Ref{ID: *unitID, Name: *unitName}
-	}
+	p.Type = ref(typeID, typeName)
+	p.Brand = ref(brandID, brandName)
+	p.Unit = ref(unitID, unitName)
 	return p, nil
+}
+
+// ref is the linked record a LEFT JOIN found, or nil.
+func ref(id, name *string) *Ref {
+	if id == nil || name == nil {
+		return nil
+	}
+	return &Ref{ID: *id, Name: *name}
 }
 
 // listProducts returns products by category, brand and type; active filters when set.
 func (r *Repository) listProducts(ctx context.Context, active *bool) ([]Product, error) {
 	rows, err := r.db.Query(ctx, productSelect+`
 		WHERE ($1::boolean IS NULL OR c.active = $1)
-		ORDER BY c.category NULLS LAST, lower(b.name) NULLS LAST, c.type NULLS LAST, c.created_at, c.id`, active)
+		ORDER BY c.category NULLS LAST, lower(b.name) NULLS LAST, lower(pt.name) NULLS LAST, c.created_at, c.id`, active)
 	if err != nil {
 		return nil, err
 	}
@@ -165,19 +190,18 @@ func (r *Repository) createProduct(ctx context.Context, fields ProductFields) (P
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	problems := validationError{}
-	if err = checkReference(ctx, tx, brands, "brand_id", fields.BrandID, nil, problems); err != nil {
-		return Product{}, err
-	}
-	if err = checkReference(ctx, tx, units, "unit_id", fields.UnitID, nil, problems); err != nil {
-		return Product{}, err
+	for _, reference := range productReferences(fields) {
+		if err = checkReference(ctx, tx, reference.kind, reference.field, reference.id, nil, problems); err != nil {
+			return Product{}, err
+		}
 	}
 	if len(problems) > 0 {
 		return Product{}, problems
 	}
 	var id string
-	if err = tx.QueryRow(ctx, `INSERT INTO condoms (category, type, brand_id, unit_id, pieces_per_unit)
+	if err = tx.QueryRow(ctx, `INSERT INTO condoms (category, type_id, brand_id, unit_id, pieces_per_unit)
 		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		fields.Category, fields.Type, fields.BrandID, fields.UnitID, fields.PiecesPerUnit).Scan(&id); err != nil {
+		fields.Category, fields.TypeID, fields.BrandID, fields.UnitID, fields.PiecesPerUnit).Scan(&id); err != nil {
 		return Product{}, err
 	}
 	product, err := getProduct(ctx, tx, id)
@@ -198,9 +222,9 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 	defer func() { _ = tx.Rollback(ctx) }()
 	var current ProductFields
 	var active bool
-	if err = tx.QueryRow(ctx, `SELECT category, type, brand_id, unit_id, pieces_per_unit, active
+	if err = tx.QueryRow(ctx, `SELECT category, type_id, brand_id, unit_id, pieces_per_unit, active
 		FROM condoms WHERE id = $1 FOR UPDATE`, id).Scan(
-		&current.Category, &current.Type, &current.BrandID, &current.UnitID, &current.PiecesPerUnit, &active); err != nil {
+		&current.Category, &current.TypeID, &current.BrandID, &current.UnitID, &current.PiecesPerUnit, &active); err != nil {
 		return Product{}, err
 	}
 	merged := current.overlay(patch.ProductFields)
@@ -213,14 +237,13 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 		if problems == nil {
 			problems = validationError{}
 		}
-		// A brand or unit that is already on the product may stay even if it was deactivated since.
-		if _, invalid := problems["brand_id"]; !invalid {
-			if err = checkReference(ctx, tx, brands, "brand_id", patch.BrandID, current.BrandID, problems); err != nil {
-				return Product{}, err
+		// A type, brand or unit that is already on the product may stay even if it was deactivated since.
+		currentIDs := productReferences(current)
+		for i, reference := range productReferences(patch.ProductFields) {
+			if _, invalid := problems[reference.field]; invalid {
+				continue
 			}
-		}
-		if _, invalid := problems["unit_id"]; !invalid {
-			if err = checkReference(ctx, tx, units, "unit_id", patch.UnitID, current.UnitID, problems); err != nil {
+			if err = checkReference(ctx, tx, reference.kind, reference.field, reference.id, currentIDs[i].id, problems); err != nil {
 				return Product{}, err
 			}
 		}
@@ -228,9 +251,9 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 			return Product{}, problems
 		}
 	}
-	if _, err = tx.Exec(ctx, `UPDATE condoms SET category = $2, type = $3, brand_id = $4, unit_id = $5,
+	if _, err = tx.Exec(ctx, `UPDATE condoms SET category = $2, type_id = $3, brand_id = $4, unit_id = $5,
 		pieces_per_unit = $6, active = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-		id, merged.Category, merged.Type, merged.BrandID, merged.UnitID, merged.PiecesPerUnit, nextActive); err != nil {
+		id, merged.Category, merged.TypeID, merged.BrandID, merged.UnitID, merged.PiecesPerUnit, nextActive); err != nil {
 		return Product{}, err
 	}
 	product, err := getProduct(ctx, tx, id)
@@ -245,8 +268,24 @@ func (r *Repository) deleteProduct(ctx context.Context, id string) error {
 		`DELETE FROM condoms WHERE id = $1`, id)
 }
 
-// checkReference records a problem under field when id names a brand or unit that does not
-// exist or is inactive. An unchanged reference (equal to current) is not checked.
+// productReference is a lookup a product names, and the request field that names it.
+type productReference struct {
+	kind  lookupKind
+	field string
+	id    *string
+}
+
+// productReferences lists the lookups fields name, always in the same order.
+func productReferences(fields ProductFields) []productReference {
+	return []productReference{
+		{types, "type_id", fields.TypeID},
+		{brands, "brand_id", fields.BrandID},
+		{units, "unit_id", fields.UnitID},
+	}
+}
+
+// checkReference records a problem under field when id names a type, brand or unit that does
+// not exist or is inactive. An unchanged reference (equal to current) is not checked.
 func checkReference(ctx context.Context, q querier, kind lookupKind, field string, id, current *string,
 	problems validationError) error {
 	if id == nil || (current != nil && *current == *id) {
@@ -386,7 +425,8 @@ func (r *Repository) deleteUnlessInUse(ctx context.Context, inUseQuery, deleteQu
 func duplicateName(err error) error {
 	var dbError *pgconn.PgError
 	if errors.As(err, &dbError) && dbError.Code == "23505" &&
-		(dbError.ConstraintName == "brands_name_key" || dbError.ConstraintName == "unit_of_measures_name_key") {
+		(dbError.ConstraintName == "product_types_name_key" || dbError.ConstraintName == "brands_name_key" ||
+			dbError.ConstraintName == "unit_of_measures_name_key") {
 		return errDuplicateName
 	}
 	return err

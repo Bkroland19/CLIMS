@@ -90,8 +90,8 @@ const isHideable = (column: { hideable?: boolean; defaultHidden?: boolean }) =>
   column.hideable === true || column.defaultHidden === true;
 
 const DENSITY_CLASSES: Record<TableDensity, string> = {
-  comfortable: 'py-2.25',
-  compact: 'py-1',
+  comfortable: 'py-1.5',
+  compact: 'py-0.5',
 };
 
 /** A native checkbox that can also show "some ticked", which only a property can set. */
@@ -112,8 +112,8 @@ function SelectCheckbox({
     if (ref.current) ref.current.indeterminate = indeterminate;
   }, [indeterminate]);
   return (
-    // The label is the 32px target around the 16px box.
-    <label htmlFor={id} className="-m-2 flex size-8 cursor-pointer items-center justify-center">
+    // The label is the 28px target around the 16px box.
+    <label htmlFor={id} className="-m-1.5 flex size-7 cursor-pointer items-center justify-center">
       <Checkbox
         id={id}
         ref={ref}
@@ -132,11 +132,11 @@ const SKELETON_ROWS = 5;
  * a row never requires scrolling to find its controls.
  */
 const STICKY_ACTIONS_CLASS = 'sticky right-0 z-10';
-/** Cells are 9 × 12px, with 16px at the table's outer edges. */
+/** Cells are 6 × 12px (2px when compact), with 16px at the table's outer edges. */
 const EDGE_CLASS = 'px-3 first:pl-4 last:pr-4';
 const HEAD_CLASS = cn(
   EDGE_CLASS,
-  'text-muted-foreground h-auto py-2 text-xs font-semibold tracking-wider uppercase',
+  'text-muted-foreground h-auto py-1.5 text-[0.6875rem] font-semibold tracking-wider uppercase',
 );
 
 /**
@@ -213,15 +213,15 @@ export function DataTable<Row>({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {isLoading || hasRows || toolbar ? (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full sm:max-w-xs">
             <label htmlFor={searchId} className="sr-only">
               Search {label.toLowerCase()}
             </label>
             <Search
-              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
               aria-hidden="true"
             />
             <Input
@@ -235,7 +235,7 @@ export function DataTable<Row>({
               }}
               placeholder={searchPlaceholder}
               autoComplete="off"
-              className="bg-card pl-9"
+              className="bg-card pl-8"
               disabled={!hasRows}
             />
           </div>
@@ -410,7 +410,7 @@ export function DataTable<Row>({
                           className={cn(
                             STICKY_ACTIONS_CLASS,
                             EDGE_CLASS,
-                            'bg-card py-1 text-right',
+                            'bg-card py-0 text-right',
                             // Opaque, so the sticky cell still covers what scrolls under it.
                             isSelected &&
                               'bg-[color-mix(in_oklab,var(--color-primary)_5%,var(--color-card))]',
@@ -428,8 +428,8 @@ export function DataTable<Row>({
         )}
 
         {!showError && page.total > 0 ? (
-          <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
+          <div className="flex flex-col gap-2 border-t px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-muted-foreground text-[0.8125rem] tabular-nums" aria-live="polite">
               Showing {formatNumber(page.from)}–{formatNumber(page.to)} of{' '}
               {formatNumber(page.total)}
             </p>

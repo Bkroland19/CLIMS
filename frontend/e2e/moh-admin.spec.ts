@@ -189,16 +189,42 @@ test.describe('catalogue', () => {
     await expectToast(page, 'Protector Plus · Male · Socially marketed activated');
     await expect(inactive).not.toContainText('Inactive');
 
-    const fc2Box = 'Actions for FC2 · Female · Free (public sector) (Box of 100)';
+    const fc2Box = 'Actions for FC2 · Female · Free (Box of 100)';
     await page.getByRole('button', { name: fc2Box }).click();
     await page.getByRole('menuitem', { name: 'Deactivate' }).click();
-    await expectToast(page, 'FC2 · Female · Free (public sector) deactivated');
+    await expectToast(page, 'FC2 · Female · Free deactivated');
 
     await page.reload();
     await expect(inactive).not.toContainText('Inactive');
     await page.getByRole('link', { name: /^Inactive/ }).click();
     await expect(page.getByRole('button', { name: fc2Box })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Actions for Protector Plus/ })).toBeHidden();
+  });
+
+  test('adds a product type and offers it for new products', async ({ page }) => {
+    await open(page, '/moh/catalogue/types', 'Product types');
+    await page.getByRole('button', { name: 'Actions for Free' }).click();
+    // Products use Free, so it can only be deactivated.
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeHidden();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Add type' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a type' });
+    await dialog.getByRole('textbox', { name: 'Type name' }).fill('free');
+    await dialog.getByRole('button', { name: 'Add type' }).click();
+    await expect(dialog.getByText('A type with this name already exists.')).toBeVisible();
+
+    await dialog.getByRole('textbox', { name: 'Type name' }).fill('Donated');
+    await dialog.getByRole('button', { name: 'Add type' }).click();
+    await expectToast(page, 'Donated added to product types');
+    await expect(dialog).toBeHidden();
+
+    await open(page, '/moh/catalogue', 'Product catalogue');
+    await page.getByRole('button', { name: 'Add product' }).click();
+    await page.getByRole('combobox', { name: 'Type' }).click();
+    await expect(page.getByRole('option', { name: 'Donated' })).toBeVisible();
+    // Retired types are not offered.
+    await expect(page.getByRole('option', { name: /Workplace/ })).toBeHidden();
   });
 
   test('deletes an unused brand after confirming', async ({ page }) => {

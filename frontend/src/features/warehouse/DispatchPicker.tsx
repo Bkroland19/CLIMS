@@ -25,7 +25,7 @@ interface DispatchPickerProps {
  */
 export function DispatchPicker({ groups, onPick, disabled = false, now }: DispatchPickerProps) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3">
       {groups.map((group) => (
         <PickTable
           key={group.product}
