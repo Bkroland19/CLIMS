@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"clims-backend/internal/features/apidocs"
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/auth"
 	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/health"
@@ -27,13 +28,14 @@ import (
 
 func documentationApp() *fiber.App {
 	app := fiber.New()
-	repo := users.NewRepository(nil)
+	auditor := audit.NewService(nil)
+	repo := users.NewRepository(nil, auditor)
 	service := users.NewService(repo)
 	roles := rbac.NewRepository(nil)
 	jwt := middleware.NewJWTMiddleware("test-secret")
 	active := users.ActiveUser(repo)
 	v1 := app.Group("/api/v1")
-	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwt, active)
+	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret", auditor), jwt, active)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwt, active)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roles), jwt, active)
 	orders.RegisterRoutes(v1, orders.NewRepository(nil, notifications.NewService()), jwt, active)
@@ -43,6 +45,7 @@ func documentationApp() *fiber.App {
 	locations.RegisterRoutes(v1, locations.NewHandler(nil), jwt, active)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(nil), jwt, active)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(nil), jwt, active)
+	audit.RegisterRoutes(v1, audit.NewRepository(nil), auditor, jwt, active)
 	health.RegisterRoutes(app, health.NewHandler(nil, "test", "test", "test"))
 	apidocs.RegisterRoutes(app, os.DirFS(filepath.Join("..", "..", "..", "docs", "api")))
 	return app

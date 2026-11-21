@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/rbac"
 
 	"github.com/jackc/pgx/v5"
@@ -19,9 +20,26 @@ var ErrLastAdmin = errors.New("cannot disable or demote the last active admin")
 // ErrUnknownStore means a store_id names no store.
 var ErrUnknownStore = errors.New("unknown store")
 
-type Repository struct{ DB *pgxpool.Pool }
+type Repository struct {
+	DB    *pgxpool.Pool
+	audit audit.Auditor
+}
 
-func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
+func NewRepository(db *pgxpool.Pool, auditor audit.Auditor) *Repository {
+	return &Repository{DB: db, audit: auditor}
+}
+
+// createdAccount is what a new account's audit entry records; never the password.
+type createdAccount struct {
+	Username  string   `json:"username"`
+	Email     string   `json:"email"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Phone     string   `json:"phone_number"`
+	StoreID   *string  `json:"store_id"`
+	RoleIDs   []string `json:"role_ids"`
+}
+
 func (r *Repository) CreateUser(ctx context.Context, req AccountInput, passwordHash string, roleID string) (string, error) {
 	var roleIDs []string
 	if roleID != "" {
@@ -52,6 +70,19 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 		if err = replaceRoles(ctx, tx, id, roleIDs); err != nil {
 			return "", err
 		}
+	}
+	// Nobody is signed in for a public sign-up, so the new account is its own actor.
+	entry := audit.Entry{Action: "user.created", Target: &audit.Subject{Type: "user", ID: id},
+		Changes: audit.Diff(nil, createdAccount{Username: req.Username, Email: req.Email, FirstName: req.FirstName,
+			LastName: req.LastName, Phone: req.Phone, StoreID: req.StoreID, RoleIDs: roleIDs})}
+	if audit.Anonymous(ctx) {
+		entry.Action, entry.ActorID = "auth.registered", id
+	}
+	if req.StoreID != nil {
+		entry.Related = []audit.Subject{{Type: "store", ID: *req.StoreID}}
+	}
+	if err = r.audit.Record(ctx, tx, entry); err != nil {
+		return "", err
 	}
 	return id, tx.Commit(ctx)
 }

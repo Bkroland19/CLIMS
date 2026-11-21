@@ -10,6 +10,7 @@ import (
 	"clims-backend/internal/config"
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/apidocs"
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/auth"
 	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/health"
@@ -61,6 +62,8 @@ func main() {
 	app.Use(recover.New())
 	// Sets X-Request-ID so a logged failure can be matched to the request that caused it.
 	app.Use(requestid.New())
+	// Gives audit entries the request's address, device, request ID, user and session.
+	app.Use(audit.Middleware())
 	app.Use(middleware.NewSlogLogger())
 
 	app.Use(helmet.New())
@@ -84,7 +87,8 @@ func main() {
 	v1 := app.Group("/api/v1")
 	jwtAuthMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
-	userRepo := users.NewRepository(dbPool)
+	auditor := audit.NewService(dbPool)
+	userRepo := users.NewRepository(dbPool, auditor)
 	if client := os.Getenv("IDENTITY_SYNC_CLIENT_ID"); client != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, os.Getenv("OIDC_ISSUER"), client)
@@ -102,7 +106,7 @@ func main() {
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
 
-	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret), jwtAuthMiddleware, activeUser)
+	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret, auditor), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
 	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
@@ -111,6 +115,7 @@ func main() {
 	reports.RegisterRoutes(v1, reports.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
