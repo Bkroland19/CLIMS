@@ -26,6 +26,7 @@ func scopeFor(user *users.User) scope {
 		storeID:      user.StoreID,
 		submit:       user.HasPermission("hotspots:submit"),
 		activate:     user.HasPermission("hotspots:activate"),
+		readDistrict: user.HasPermission("hotspots:read_district"),
 		allDistricts: user.HasPermission("hotspots:all_districts"),
 	}
 }

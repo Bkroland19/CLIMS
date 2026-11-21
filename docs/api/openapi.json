@@ -54,7 +54,7 @@
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Raise a hotspot stockout alert",
-        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
+        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
         "responses": {
           "201": {
             "description": "Success",
@@ -338,7 +338,9 @@
           {
             "name": "status",
             "in": "query",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "limit",
@@ -1837,7 +1839,7 @@
         "tags": ["Hotspots"],
         "operationId": "listHotspots",
         "summary": "List hotspots",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
         "responses": {
           "200": {
             "description": "Success",
@@ -1998,7 +2000,7 @@
         "tags": ["Hotspots"],
         "operationId": "getHotspot",
         "summary": "Get a hotspot",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2111,7 +2113,7 @@
         "tags": ["Hotspots"],
         "operationId": "commentOnHotspot",
         "summary": "Comment on a hotspot",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. A comment from the submitter notifies the district; any other comment notifies the submitter. The status does not change.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. A comment from the submitter notifies the district; any other comment notifies the submitter. The status does not change. District read access (hotspots:read_district) does not open a hotspot's thread.",
         "responses": {
           "201": {
             "description": "Success",
