@@ -2,7 +2,7 @@
   "expo": {
     "name": "CLIMS",
     "slug": "clims-app",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lmd",
@@ -10,7 +10,9 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -21,7 +23,10 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -67,7 +72,7 @@
       "eas": {
         "projectId": "d680bffa-d623-48a1-b8b8-aea07cfc200c"
       },
-      "releaseVersion": "2.2.0"
+      "releaseVersion": "2.2.1"
     },
     "owner": "wafula3"
   }
