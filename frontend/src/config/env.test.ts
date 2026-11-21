@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ConfigError, parseConfig } from './env';
+import { ConfigError, parseConfig, parseMapTiles, tileOrigins } from './env';
 
 describe('parseConfig', () => {
   it.each([
@@ -44,11 +44,41 @@ describe('parseConfig', () => {
     );
   });
 
-  it('reports a missing maps key as null rather than an empty string', () => {
-    expect(parseConfig({}).googleMapsApiKey).toBeNull();
-    expect(parseConfig({ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: '  ' }).googleMapsApiKey).toBeNull();
-    expect(parseConfig({ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ' key-123 ' }).googleMapsApiKey).toBe(
-      'key-123',
-    );
+  it('uses the OpenStreetMap layers unless told otherwise', () => {
+    const { mapTiles } = parseConfig({});
+    expect(mapTiles.kind).toBe('basemaps');
+    expect(mapTiles.kind === 'basemaps' && mapTiles.basemaps.map(({ id }) => id)).toEqual([
+      'streets',
+      'humanitarian',
+    ]);
+    expect(tileOrigins(mapTiles)).toEqual([
+      'https://tile.openstreetmap.org',
+      'https://a.tile.openstreetmap.fr',
+      'https://b.tile.openstreetmap.fr',
+      'https://c.tile.openstreetmap.fr',
+    ]);
+  });
+
+  it('turns the base map off, or points it at a tile server of its own', () => {
+    expect(parseConfig({ NEXT_PUBLIC_MAP_TILES: ' off ' }).mapTiles).toEqual({ kind: 'off' });
+    const own = parseMapTiles('https://tiles.example.org/{z}/{x}/{y}.png', 'Ministry <tiles>');
+    expect(own).toEqual({
+      kind: 'basemaps',
+      basemaps: [
+        expect.objectContaining({
+          tiles: ['https://tiles.example.org/{z}/{x}/{y}.png'],
+          attribution: 'Ministry &#60;tiles&#62;',
+        }),
+      ],
+    });
+    expect(tileOrigins(own)).toEqual(['https://tiles.example.org']);
+  });
+
+  it.each([
+    'tiles.example.org/{z}/{x}/{y}.png',
+    'http://tiles.example.org/{z}/{x}/{y}.png',
+    'https://tiles.example.org/{z}/{x}.png',
+  ])('refuses the tile setting %s, naming the variable', (value) => {
+    expect(() => parseMapTiles(value)).toThrow(/NEXT_PUBLIC_MAP_TILES/);
   });
 });

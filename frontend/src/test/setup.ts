@@ -40,6 +40,19 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next/link', () => ({ default: TestLink }));
 
+/*
+ * Next.js keeps `useSearchParams` and `usePathname` in step with the History API,
+ * so a page may write its address with `history.replaceState` (no server round
+ * trip). The test router follows those calls the same way.
+ */
+for (const method of ['pushState', 'replaceState'] as const) {
+  const original = window.history[method].bind(window.history);
+  window.history[method] = (data: unknown, unused: string, href?: string | URL | null) => {
+    original(data, unused, href);
+    if (href !== undefined && href !== null) testRouter.replace(String(href));
+  };
+}
+
 beforeEach(() => {
   testRouter.reset();
 });

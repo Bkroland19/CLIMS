@@ -12,10 +12,11 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   // Send only the origin, not the full path, to other sites.
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // The app uses none of these device features, so no script may ask for them.
+  // The app uses none of these device features, so no script may ask for them,
+  // except location: the hotspot map can centre on where a field user stands.
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    value: 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()',
   },
 ];
 

@@ -35,6 +35,8 @@ interface Hotspot {
   subcounty: { id: string; name: string } | null;
   submitted_by_id: string;
   created_at: string;
+  /** The Go API's review step when it differs from `status` (only "deactivated" does). */
+  review_override?: 'deactivated';
 }
 
 interface HotspotEvent {
@@ -234,7 +236,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       created_at: daysAgo(12),
     }),
   ];
-  if (dataset !== 'worst') return demo;
+  if (dataset !== 'worst') return [...demo, ...mapHotspots()];
   // The values that break layouts come first, because the first rows are what is on screen.
   return [
     hotspot({ name: 'Unplaced hotspot', status: 'submitted', created_at: daysAgo(0) }),
@@ -256,7 +258,109 @@ function seedHotspots(dataset: string): Hotspot[] {
       created_at: daysAgo(3),
     }),
     ...demo,
+    ...mapHotspots(),
   ];
+}
+
+/*
+ * A few hundred hotspots around five towns, for the map's clusters, heatmap and
+ * filters. Generated from a fixed seed, so every run draws the same map. Wakiso
+ * and Kampala are left alone: other screens' tests rely on what those hold.
+ */
+const MAP_TOWNS = [
+  {
+    district: placeId(2, 3),
+    centre: [2.7746, 32.299],
+    count: 90,
+    villages: ['Laroo', 'Pece', 'Bardege', 'Layibi', 'Koro', 'Unyama', 'Awach', 'Bobi', 'Lalogi'],
+  },
+  {
+    district: placeId(2, 4),
+    centre: [0.4244, 33.2042],
+    count: 110,
+    villages: ['Bugembe', 'Walukuba', 'Masese', 'Mpumudde', 'Budondo', 'Kakira', 'Mafubira'],
+  },
+  {
+    district: MUKONO,
+    centre: [0.3533, 32.7553],
+    count: 80,
+    villages: ['Seeta', 'Namilyango', 'Goma', 'Kyetume', 'Nakisunga', 'Ntenjeru', 'Katosi'],
+  },
+  {
+    district: placeId(2, 2),
+    centre: [0.8492, 32.4731],
+    count: 50,
+    villages: ['Bombo', 'Wobulenzi', 'Kasana', 'Zirobwe', 'Kikyusa', 'Katikamu'],
+  },
+  {
+    district: placeId(2, 1),
+    centre: [0.225, 32.3136],
+    count: 40,
+    villages: ['Buwama', 'Kammengo', 'Nkozi', 'Kituntu', 'Muduuma'],
+  },
+] as const;
+
+const VENUES = [
+  'Bar',
+  'Bar',
+  'Lodge',
+  'Guest House',
+  'Boda Stage',
+  'Landing Site',
+  'Market',
+  'Restaurant',
+  'Massage Parlour',
+  'Night Club',
+  'New',
+  'Old',
+];
+const CONTACTS = ['Achen Grace', 'Okot Denis', 'Nabirye Sarah', 'Waiswa Peter', 'Namubiru Joan'];
+
+function mapHotspots(): Hotspot[] {
+  // mulberry32: a tiny seeded generator.
+  let seed = 20261121;
+  const random = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T;
+  // Points cluster around the town and a few trading centres near it.
+  const spread = () => (random() + random() + random() - 1.5) * 0.09;
+
+  return MAP_TOWNS.flatMap((town) => {
+    const centres = Array.from({ length: 4 }, () => [
+      town.centre[0] + spread() * 2,
+      town.centre[1] + spread() * 2,
+    ]);
+    return Array.from({ length: town.count }, (_, index) => {
+      const village = pick(town.villages);
+      const venue = pick(VENUES);
+      const roll = random();
+      const status: Status =
+        roll < 0.78 ? 'active' : roll < 0.88 ? 'active' : roll < 0.96 ? 'submitted' : 'rejected';
+      const has = random();
+      const centre = index % 3 === 0 ? town.centre : pick(centres);
+      const placed = random() > 0.08;
+      return hotspot({
+        name: `${village} ${venue === 'New' || venue === 'Old' ? 'Hotspot' : venue} ${String(index + 1)}`,
+        type: venue,
+        village,
+        district_id: town.district,
+        subcounty: null,
+        contact_person_name: pick(CONTACTS),
+        contact_person_telephone: `+2567${String(Math.floor(10_000_000 + random() * 89_999_999))}`,
+        has_condom_dispenser: has < 0.4 ? true : has < 0.9 ? false : null,
+        dispenser_condition: has < 0.4 ? pick(['Good', 'Good', 'Good', 'Poor', 'Broken']) : null,
+        latitude: placed ? Number((centre[0] + spread()).toFixed(5)) : null,
+        longitude: placed ? Number((centre[1] + spread()).toFixed(5)) : null,
+        status,
+        review_override: roll >= 0.78 && roll < 0.88 ? 'deactivated' : undefined,
+        created_at: daysAgo(10 + Math.floor(random() * 700)),
+      });
+    });
+  });
 }
 
 const state = { hotspots: [] as Hotspot[], events: [] as HotspotEvent[] };
@@ -335,6 +439,33 @@ function act(id: string, action: string, body: Body): Reply {
   return ok(target);
 }
 
+const REGION_OF = new Map(DISTRICTS_BY_REGION.map((place) => [place.id, place.region_id]));
+
+/**
+ * A hotspot as both the Go API sends it (`review_status`, nested `region`,
+ * `district` and `contact_person`) and as the earlier screens read it (the review
+ * step in `status`, flat contact fields), so either kind of screen works here.
+ */
+function present(item: Hotspot) {
+  const district = DISTRICTS.find((place) => place.id === item.district_id) ?? null;
+  const region = REGIONS.find((place) => place.id === REGION_OF.get(item.district_id)) ?? null;
+  return {
+    ...item,
+    review_override: undefined,
+    review_status: item.review_override ?? (item.status === 'verified' ? 'submitted' : item.status),
+    region,
+    district,
+    contact_person: item.contact_person_name
+      ? {
+          id: `${item.id}-contact`,
+          name: item.contact_person_name,
+          phone_number: item.contact_person_telephone,
+        }
+      : null,
+    updated_at: item.created_at,
+  };
+}
+
 /** A page of hotspots, optionally one district's, as `GET /hotspots?district_id=&limit=&offset=`. */
 function listHotspots(query: URLSearchParams): Reply {
   const districtId = query.get('district_id');
@@ -343,7 +474,44 @@ function listHotspots(query: URLSearchParams): Reply {
   const matching = districtId
     ? state.hotspots.filter((item) => item.district_id === districtId)
     : state.hotspots;
-  return ok(matching.slice(offset, offset + limit));
+  return ok(matching.slice(offset, offset + limit).map(present));
+}
+
+/** `GET /hotspots/{id}`: the hotspot and its comment thread. */
+function hotspotDetail(id: string): Reply {
+  const target = state.hotspots.find((item) => item.id === id);
+  if (!target) return fail(404, 'hotspot not found');
+  const comments = [
+    ...(target.comment
+      ? [
+          {
+            id: `${id}-c1`,
+            user_id: VHT,
+            action: 'comment',
+            comment: target.comment,
+            created_at: target.created_at,
+          },
+        ]
+      : []),
+    ...(target.rejection_reason
+      ? [
+          {
+            id: `${id}-c2`,
+            user_id: null,
+            action: 'rejected',
+            comment: target.rejection_reason,
+            created_at: target.created_at,
+          },
+        ]
+      : []),
+  ];
+  return ok({ ...present(target), comments });
+}
+
+/** `GET /hotspots/{id}/events`: the hotspot's steps, oldest first. */
+function hotspotEvents(id: string): Reply {
+  if (!state.hotspots.some((item) => item.id === id)) return fail(404, 'hotspot not found');
+  return ok(state.events.filter((event) => event.hot_spot_id === id).reverse());
 }
 
 /** Answers `GET /locations/regions`, `/districts?region_id=`, `/subcounties?district_id=` and `/stores`. */
@@ -393,6 +561,8 @@ export function handleHotspots(
   if (method === 'GET' && id === undefined) return listHotspots(query);
   if (method === 'POST' && id === undefined) return submit(body);
   if (method === 'GET' && id === 'notifications') return ok(state.events);
+  if (method === 'GET' && id && segment === undefined) return hotspotDetail(id);
+  if (method === 'GET' && id && segment === 'events') return hotspotEvents(id);
   if (method === 'POST' && id && segment === 'actions' && action) return act(id, action, body);
   return fail(404, 'Not found');
 }
