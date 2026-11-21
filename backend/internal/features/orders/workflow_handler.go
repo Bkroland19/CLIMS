@@ -14,11 +14,10 @@ import (
 )
 
 func (h *Handler) stockout(c fiber.Ctx) error {
+	// An alert names the product only; quantities are the DCFP's decision.
 	var input struct {
 		HotSpotID string  `json:"hot_spot_id"`
 		CondomID  string  `json:"condom_id"`
-		UnitID    string  `json:"unit_of_measure_id"`
-		Quantity  int32   `json:"quantity_needed"`
 		Comment   *string `json:"comment"`
 	}
 	if err := request.DecodeJSON(c, &input); err != nil {
@@ -26,19 +25,28 @@ func (h *Handler) stockout(c fiber.Ctx) error {
 	}
 	hotSpotID, hotSpotErr := request.ParseUUID(input.HotSpotID)
 	productID, productErr := request.ParseUUID(input.CondomID)
-	unitID, unitErr := request.ParseUUID(input.UnitID)
-	if hotSpotErr != nil || productErr != nil || unitErr != nil || input.Quantity <= 0 {
-		return response.Error(c, 422, "provide hotspot, product and unit UUIDs and a positive quantity", nil)
+	if hotSpotErr != nil || productErr != nil {
+		return response.Error(c, 422, "provide hotspot and product UUIDs", nil)
+	}
+	if input.Comment != nil {
+		comment := strings.TrimSpace(*input.Comment)
+		if len(comment) > 4000 {
+			return response.Error(c, 422, "comment must be at most 4000 characters", nil)
+		}
+		input.Comment = &comment
+		if comment == "" {
+			input.Comment = nil
+		}
 	}
 	access := scopeFor(users.CurrentUser(c))
 	if !access.allStores && !assigned(access.hotSpotID, hotSpotID) {
 		return workflowError(c, errWorkflowForbidden)
 	}
-	order, err := h.repo.reportStockout(c.Context(), access.userID, hotSpotID, productID, unitID, input.Quantity, input.Comment)
+	order, err := h.repo.reportStockout(c.Context(), access.userID, hotSpotID, productID, input.Comment)
 	if err != nil {
 		return workflowError(c, err)
 	}
-	return response.Success(c, 201, "stockout queued", order)
+	return response.Success(c, 201, "stockout alert sent to the district", order)
 }
 
 var actionPermissions = map[string]string{
@@ -82,7 +90,7 @@ func (h *Handler) performAction(c fiber.Ctx) error {
 }
 
 func validActionInput(action string, input *ActionInput) bool {
-	for _, id := range []*string{input.WarehouseID, input.RiderID} {
+	for _, id := range []*string{input.WarehouseID, input.RiderID, input.UnitOfMeasureID} {
 		if id != nil {
 			parsed, err := request.ParseUUID(*id)
 			if err != nil {
@@ -100,6 +108,9 @@ func validActionInput(action string, input *ActionInput) bool {
 		}
 	}
 	if (input.WarehouseID != nil) != (action == "request-replenishment") ||
+		(input.Quantity != nil) != (action == "request-replenishment") ||
+		(input.Quantity != nil && *input.Quantity < 1) ||
+		(input.UnitOfMeasureID != nil && action != "dispatch" && action != "request-replenishment") ||
 		(input.DeliveryNote != nil) != (action == "deliver") ||
 		(input.QuantityReceived != nil) != (action == "receive") ||
 		(input.RiderID != nil && action != "dispatch") ||
@@ -138,7 +149,7 @@ func workflowError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, errWorkflowForbidden):
 		return response.Error(c, 403, err.Error(), nil)
-	case errors.Is(err, errWorkflowConflict):
+	case errors.Is(err, errWorkflowConflict), errors.Is(err, errNotEnoughStock):
 		return response.Error(c, 409, err.Error(), nil)
 	case errors.Is(err, errWorkflowInput), errors.Is(err, errHotSpotRoute):
 		return response.Error(c, 422, err.Error(), nil)

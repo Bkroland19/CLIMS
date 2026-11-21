@@ -29,7 +29,7 @@ Every record also has `in_use`, `created_at` and `updated_at`; brands and units 
 | PATCH  | `/api/v1/catalogue/{brands,units}/{id}` | `catalogue:manage` |
 | DELETE | `/api/v1/catalogue/{brands,units}/{id}` | `catalogue:manage` |
 
-Reads are open to every active user because order and stock forms pick from the catalogue. Lists take `?active=true` (for pickers) or `?active=false`. Migration 17 grants `catalogue:manage` to `admin` and `moh`.
+Reads are open to every active user because order and stock forms pick from the catalogue. Lists take `?active=true` (for pickers) or `?active=false`. Migration 18 grants `catalogue:manage` to `admin` and `moh`.
 
 ## Rules
 
@@ -40,7 +40,7 @@ Reads are open to every active user because order and stock forms pick from the 
 
 ## Legacy products
 
-Migration 17 reshapes `condoms` in place, so references keep their UUIDs. It archives every earlier row unchanged in `legacy_condoms` and converts it with `import_legacy_condoms()`, which `scripts/prepare_legacy_seed.py` also calls when importing the legacy backup:
+Migration 18 reshapes `condoms` in place, so references keep their UUIDs. It archives every earlier row unchanged in `legacy_condoms` and converts it with `import_legacy_condoms()`, which `scripts/prepare_legacy_seed.py` also calls when importing the legacy backup:
 
 - Category and type are matched ignoring case (`Male`, `Free`, `Commercial`, "Socially marketed"). Brand text becomes a row in `brands`. The legacy unit reference is matched by legacy ID.
 - A row whose category, type or brand cannot be recognised is deactivated.

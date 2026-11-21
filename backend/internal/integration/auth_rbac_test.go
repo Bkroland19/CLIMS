@@ -452,7 +452,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	// Migration 17 deliberately grants catalogue:manage to moh; every other non-admin grant is the custom one.
+	// Migration 18 deliberately grants catalogue:manage to moh; every other non-admin grant is the custom one.
 	var mohManagesCatalogue bool
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id

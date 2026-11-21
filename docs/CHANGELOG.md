@@ -24,7 +24,7 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   script except the ones Next.js writes, each marked with a per-request nonce.
 - Condom catalogue API (`/api/v1/catalogue/products`, `/brands`, `/units`) with create, partial
   update, activate, deactivate and delete for unused records, behind the new `catalogue:manage`
-  permission (admin and moh). Migration 17 converts legacy products, deactivating unrecognised
+  permission (admin and moh). Migration 18 converts legacy products, deactivating unrecognised
   ones and marking those without a unit or pack size as incomplete. See `docs/modules/catalogue.md`.
 - The catalogue screens use that API: edit, activate, deactivate and delete products, brands and
   units, a Brands tab, status filters and an Incomplete badge for legacy products.

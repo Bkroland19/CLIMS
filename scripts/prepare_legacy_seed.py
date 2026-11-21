@@ -40,7 +40,7 @@ for match in re.finditer(r'^CREATE TABLE "(\w+)" \(\n(.*?)\n\);', schema, re.M |
         if table == "notifications" and column == "id":
             value += "::uuid"
         values.append(value)
-    # Archived source tables; migrations 6, 16 and 17 replaced the originals.
+    # Archived source tables; migrations 6, 16 and 18 replaced the originals.
     target_table = {
         "orders": "legacy_orders",
         "hot_spots": "legacy_hot_spots",

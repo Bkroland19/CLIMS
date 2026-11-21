@@ -72,7 +72,7 @@ export function userRoleLabels(user: Pick<User, 'roles' | 'role'>): string[] {
 }
 
 /*
- * Every permission the Go API defines (its migrations 2, 6, 8, 13 and 17), worded
+ * Every permission the Go API defines (its migrations 2, 6, 8, 13 and 18), worded
  * from the server's own descriptions. "Assigned" store, hotspot or district
  * means the one on the user's account; the `all_*` codes lift that limit.
  */

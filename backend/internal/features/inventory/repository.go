@@ -95,13 +95,13 @@ type HotspotStock struct {
 	DistrictID      *string    `json:"district_id"`
 	CondomID        string     `json:"condom_id"`
 	Product         string     `json:"product"`
-	UnitOfMeasureID string     `json:"unit_of_measure_id"`
-	Unit            string     `json:"unit"`
+	UnitOfMeasureID *string    `json:"unit_of_measure_id"`
+	Unit            *string    `json:"unit"`
 	Delivered       int64      `json:"delivered"`
 	Deliveries      int64      `json:"deliveries"`
 	LastDeliveredAt *time.Time `json:"last_delivered_at"`
 	InTransit       int64      `json:"in_transit"`
-	Requested       int64      `json:"requested"`
+	OpenAlerts      int64      `json:"open_alerts"`
 	OnHoldRequests  int64      `json:"on_hold_requests"`
 	LastStockoutAt  time.Time  `json:"last_stockout_at"`
 }
@@ -112,8 +112,9 @@ type HotspotFilter struct {
 	Period    period
 }
 
-// hotspots reports stock sent to each hotspot through stockout orders: delivered in the period,
-// on the way, and still requested. Hotspot consumption is not recorded, so this is supply, not a count.
+// hotspots reports stock sent to each hotspot through stockout alerts: delivered in the period, on the
+// way, and alerts still open. An open alert has no unit until the DCFP acts, so it is reported on a row
+// without one. Hotspot consumption is not recorded, so this is supply, not a count.
 func (r *Repository) hotspots(ctx context.Context, access scope, f HotspotFilter) ([]HotspotStock, error) {
 	rows, err := r.db.Query(ctx, `SELECT h.id, h.name, h.district_id, o.condom_id, `+productName+`,
 			o.unit_of_measure_id, um.name,
@@ -121,17 +122,17 @@ func (r *Repository) hotspots(ctx context.Context, access scope, f HotspotFilter
 			count(*) FILTER (WHERE o.order_status = 'delivered' AND `+inPeriod+`),
 			max(o.updated_at) FILTER (WHERE o.order_status = 'delivered'),
 			COALESCE(sum(o.quantity_issued) FILTER (WHERE o.order_status = 'dispatched'), 0),
-			COALESCE(sum(o.quantity_needed) FILTER (WHERE o.order_status IN ('queued', 'reviewed', 'on_hold', 'confirmed')), 0),
+			count(*) FILTER (WHERE o.order_status IN ('queued', 'on_hold')),
 			count(*) FILTER (WHERE o.order_status = 'on_hold'),
 			max(o.created_at)
 		FROM orders o
 		JOIN hot_spots h ON h.id = o.hot_spot_id
 		JOIN condoms c ON c.id = o.condom_id
-		JOIN unit_of_measures um ON um.id = o.unit_of_measure_id
+		LEFT JOIN unit_of_measures um ON um.id = o.unit_of_measure_id
 		WHERE ($1::boolean OR o.hot_spot_id = $2::uuid OR o.ordered_from_store_id = $3::uuid)
 			AND ($4::uuid IS NULL OR o.hot_spot_id = $4) AND ($5::uuid IS NULL OR o.condom_id = $5)
 		GROUP BY h.id, h.name, h.district_id, o.condom_id, c.brand_id, c.type, c.category, o.unit_of_measure_id, um.name
-		ORDER BY h.name, 5, um.name`,
+		ORDER BY h.name, 5, um.name NULLS FIRST`,
 		access.allStores, access.hotSpotID, access.storeID, f.HotSpotID, f.CondomID, f.Period.from, f.Period.to)
 	if err != nil {
 		return nil, err
@@ -236,22 +237,23 @@ func (r *Repository) record(ctx context.Context, actorID string, in MovementInpu
 }
 
 type ProductSummary struct {
-	CondomID            string `json:"condom_id"`
-	Product             string `json:"product"`
-	UnitOfMeasureID     string `json:"unit_of_measure_id"`
-	Unit                string `json:"unit"`
-	WarehouseOnHand     int64  `json:"warehouse_on_hand"`
-	WarehouseAvailable  int64  `json:"warehouse_available"`
-	DistrictOnHand      int64  `json:"district_on_hand"`
-	DistrictAvailable   int64  `json:"district_available"`
-	InTransit           int64  `json:"in_transit"`
-	DeliveredToHotspots int64  `json:"delivered_to_hotspots"`
-	OpenHotspotRequests int64  `json:"open_hotspot_requests"`
-	OnHoldRequests      int64  `json:"on_hold_requests"`
+	CondomID            string  `json:"condom_id"`
+	Product             string  `json:"product"`
+	UnitOfMeasureID     *string `json:"unit_of_measure_id"`
+	Unit                *string `json:"unit"`
+	WarehouseOnHand     int64   `json:"warehouse_on_hand"`
+	WarehouseAvailable  int64   `json:"warehouse_available"`
+	DistrictOnHand      int64   `json:"district_on_hand"`
+	DistrictAvailable   int64   `json:"district_available"`
+	InTransit           int64   `json:"in_transit"`
+	DeliveredToHotspots int64   `json:"delivered_to_hotspots"`
+	OpenHotspotRequests int64   `json:"open_hotspot_requests"`
+	OnHoldRequests      int64   `json:"on_hold_requests"`
 }
 
 // summary totals each product across the supply chain: warehouse and district stock, stock on the
-// way (warehouse to district or district to hotspot), and hotspot deliveries in the period.
+// way (warehouse to district or district to hotspot), and hotspot deliveries in the period. Open
+// stockout alerts without a unit yet are counted on a row whose unit is null.
 func (r *Repository) summary(ctx context.Context, condomID *string, p period) ([]ProductSummary, error) {
 	balance := func(storeType, expression string) string {
 		return `COALESCE((SELECT sum(` + expression + `) FROM order_store_stock b JOIN stores s ON s.id = b.store_id
@@ -260,7 +262,7 @@ func (r *Repository) summary(ctx context.Context, condomID *string, p period) ([
 	}
 	orders := func(aggregate, condition string) string {
 		return `COALESCE((SELECT ` + aggregate + ` FROM orders o WHERE o.condom_id = k.condom_id
-			AND o.unit_of_measure_id = k.unit_of_measure_id AND ` + condition + `), 0)`
+			AND o.unit_of_measure_id IS NOT DISTINCT FROM k.unit_of_measure_id AND ` + condition + `), 0)`
 	}
 	rows, err := r.db.Query(ctx, `WITH keys AS (
 			SELECT condom_id, unit_of_measure_id FROM order_store_stock
@@ -270,13 +272,13 @@ func (r *Repository) summary(ctx context.Context, condomID *string, p period) ([
 			`+balance("district", "b.on_hand")+`, `+balance("district", "b.on_hand - b.reserved")+`,
 			`+orders("sum(o.quantity_issued)", "o.order_status = 'dispatched'")+`,
 			`+orders("sum(o.quantity_issued)", "o.hot_spot_id IS NOT NULL AND o.order_status = 'delivered' AND "+summaryPeriod)+`,
-			`+orders("count(*)", "o.hot_spot_id IS NOT NULL AND o.order_status IN ('queued', 'reviewed', 'on_hold', 'confirmed')")+`,
+			`+orders("count(*)", "o.hot_spot_id IS NOT NULL AND o.order_status IN ('queued', 'on_hold')")+`,
 			`+orders("count(*)", "o.order_status = 'on_hold'")+`
 		FROM keys k
 		JOIN condoms c ON c.id = k.condom_id
-		JOIN unit_of_measures um ON um.id = k.unit_of_measure_id
+		LEFT JOIN unit_of_measures um ON um.id = k.unit_of_measure_id
 		WHERE $1::uuid IS NULL OR k.condom_id = $1
-		ORDER BY 2, 4`, condomID, p.from, p.to)
+		ORDER BY 2, 4 NULLS FIRST`, condomID, p.from, p.to)
 	if err != nil {
 		return nil, err
 	}

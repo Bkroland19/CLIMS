@@ -61,7 +61,7 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 	if len(hotspots) != 1 || hotspots[0]["last_delivered_at"] == nil {
 		t.Fatalf("hotspot stock: %v", hotspots)
 	}
-	expect("hotspot", hotspots[0], map[string]float64{"delivered": 45, "deliveries": 1, "in_transit": 0, "requested": 0})
+	expect("hotspot", hotspots[0], map[string]float64{"delivered": 45, "deliveries": 1, "in_transit": 0, "open_alerts": 0, "on_hold_requests": 0})
 
 	summary := list("/inventory/summary", admin)
 	if len(summary) != 1 {
@@ -96,4 +96,27 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/inventory/summary", nil, districtToken, 403)
 	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": stock[district]["condom_id"],
 		"unit_of_measure_id": stock[district]["unit_of_measure_id"], "reason": "receipt", "quantity": 5}, districtToken, 403)
+
+	// An open alert has no unit until the DCFP acts, so reports show it on a row without one.
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": stock[district]["condom_id"]}, admin, 201)
+	var alertRow map[string]any
+	for _, row := range list("/inventory/hotspots?hot_spot_id="+hotSpot, admin) {
+		if row["unit_of_measure_id"] == nil {
+			alertRow = row
+		}
+	}
+	if alertRow == nil {
+		t.Fatal("open alert missing from the hotspot report")
+	}
+	expect("open alert", alertRow, map[string]float64{"open_alerts": 1, "delivered": 0})
+	var alertSummary map[string]any
+	for _, row := range list("/inventory/summary", admin) {
+		if row["unit_of_measure_id"] == nil {
+			alertSummary = row
+		}
+	}
+	if alertSummary == nil || alertSummary["unit"] != nil {
+		t.Fatalf("open alert missing from the summary: %v", alertSummary)
+	}
+	expect("summary alert", alertSummary, map[string]float64{"open_hotspot_requests": 1, "district_on_hand": 0})
 }
