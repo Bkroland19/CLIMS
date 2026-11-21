@@ -39,7 +39,7 @@ This regenerates migration 1, its rollback, the PostgreSQL seed, and `infra/data
 
 ## Hotspot conversion
 
-Migration 15 reshapes `hot_spots` in place, so references from orders, inventory and users keep their UUIDs. Every earlier row is archived unchanged in `legacy_hot_spots`, including hotspots submitted through migrations 8 and 9. The legacy importer writes there too. `import_legacy_hot_spots()` converts the archive and runs both in migration 15 and at the end of `make db-seed`. It only converts rows that have not been converted yet.
+Migration 16 reshapes `hot_spots` in place, so references from orders, inventory and users keep their UUIDs. Every earlier row is archived unchanged in `legacy_hot_spots`, including hotspots submitted through migrations 8 and 9. The legacy importer writes there too. `import_legacy_hot_spots()` converts the archive and runs both in migration 16 and at the end of `make db-seed`. It only converts rows that have not been converted yet.
 
 The conversion:
 
