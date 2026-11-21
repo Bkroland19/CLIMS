@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"clims-backend/internal/features/notifications"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -40,11 +42,13 @@ type scope struct {
 }
 
 type Repository struct {
-	db *pgxpool.Pool
+	db       *pgxpool.Pool
+	notifier notifications.Notifier
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+// NewRepository needs a notifier with NotificationTypes registered.
+func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier) *Repository {
+	return &Repository{db: db, notifier: notifier}
 }
 
 const columns = `id, condom_id, quantity_needed, quantity_issued, order_status,

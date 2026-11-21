@@ -15,6 +15,7 @@ import (
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
 	"clims-backend/internal/features/locations"
+	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -34,10 +35,11 @@ func documentationApp() *fiber.App {
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwt, active)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwt, active)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roles), jwt, active)
-	orders.RegisterRoutes(v1, orders.NewRepository(nil), jwt, active)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(nil), jwt, active)
+	orders.RegisterRoutes(v1, orders.NewRepository(nil, notifications.NewService()), jwt, active)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(nil, notifications.NewService()), jwt, active)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(nil), jwt, active)
 	locations.RegisterRoutes(v1, locations.NewHandler(nil), jwt, active)
+	notifications.RegisterRoutes(v1, notifications.NewRepository(nil), jwt, active)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(nil), jwt, active)
 	health.RegisterRoutes(app, health.NewHandler(nil, "test", "test", "test"))
 	apidocs.RegisterRoutes(app, os.DirFS(filepath.Join("..", "..", "..", "docs", "api")))

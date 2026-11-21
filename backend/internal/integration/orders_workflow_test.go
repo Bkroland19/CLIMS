@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -55,16 +56,24 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		t.Fatalf("stockout alert should carry no quantity: %v", parent)
 	}
 	parentPath := "/orders/" + parent["id"].(string)
-	notifications := func(token, wantAction string) {
+	// inbox returns the central-inbox notification of this type about the order, if any.
+	inbox := func(token, orderID, typeName string) map[string]any {
 		t.Helper()
-		events := request("GET", "/orders/notifications", nil, token, 200)["data"].([]any)
-		for _, event := range events {
-			if event.(map[string]any)["action"] == wantAction {
-				return
+		for _, item := range request("GET", "/notifications?limit=100", nil, token, 200)["data"].([]any) {
+			n := item.(map[string]any)
+			if n["resource_type"] == "order" && n["resource_id"] == orderID && n["type"] == typeName {
+				return n
 			}
 		}
-		t.Fatalf("notification %s missing: %v", wantAction, events)
+		return nil
 	}
+	notified := func(token, orderID, typeName string) {
+		t.Helper()
+		if inbox(token, orderID, typeName) == nil {
+			t.Fatalf("notification %s about order %s missing", typeName, orderID)
+		}
+	}
+	parentID := parent["id"].(string)
 	act := func(order, name, token string, input any, code int, state string) map[string]any {
 		t.Helper()
 		result := request("POST", order+"/actions/"+name, input, token, code)
@@ -77,7 +86,19 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		}
 		return data
 	}
-	notifications(districtToken, "stockout_reported")
+	notified(districtToken, parentID, "order.stockout_reported")
+	// Riders share the district store but do not process alerts.
+	if inbox(riderToken, parentID, "order.stockout_reported") != nil {
+		t.Fatal("the rider was alerted to a stockout")
+	}
+	deprecated := false // The orders inbox keeps working until clients use the central one.
+	for _, event := range request("GET", "/orders/notifications", nil, districtToken, 200)["data"].([]any) {
+		e := event.(map[string]any)
+		deprecated = deprecated || e["order_id"] == parentID && e["action"] == "stockout_reported"
+	}
+	if !deprecated {
+		t.Fatal("the deprecated orders inbox stopped receiving stockouts")
+	}
 	if parent["ordered_from_store_id"] != district {
 		t.Fatalf("alert should go to the hotspot's district store: %v", parent)
 	}
@@ -87,10 +108,8 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		t.Fatal(err)
 	}
 	_, otherToken := account("dfcp", "workflow-other-district", &otherStore, nil, "orders:process", "orders:replenish", "orders:receive")
-	for _, event := range request("GET", "/orders/notifications", nil, otherToken, 200)["data"].([]any) {
-		if event.(map[string]any)["order_id"] == parent["id"] {
-			t.Fatal("another district's DCFP was notified of the alert")
-		}
+	if inbox(otherToken, parentID, "order.stockout_reported") != nil {
+		t.Fatal("another district's DCFP was notified of the alert")
 	}
 	act(parentPath, "dispatch", otherToken, map[string]any{"rider_id": riderID, "unit_of_measure_id": unit, "quantity_issued": 1}, 404, "")
 	// A hotspot without a district cannot route an alert.
@@ -125,7 +144,11 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	}
 	childPath := "/orders/" + child["id"].(string)
 	act(parentPath, "request-replenishment", districtToken, replenish, 409, "")
-	notifications(warehouseToken, "replenishment_requested")
+	childID := child["id"].(string)
+	if replenishment := inbox(warehouseToken, childID, "order.replenishment_requested"); replenishment == nil ||
+		!strings.Contains(replenishment["body"].(string), "requested 50 ") {
+		t.Fatalf("replenishment notification: %v", replenishment)
+	}
 	// The warehouse reviews a request before checking stock, and rechecks a held request directly.
 	act(childPath, "check-stock", warehouseToken, nil, 409, "")
 	act(childPath, "review", warehouseToken, nil, 200, "reviewed")
@@ -137,13 +160,19 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 51}, 422, "")
 	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 0}, 422, "")
 	act(childPath, "dispatch", warehouseToken, nil, 200, "dispatched")
+	notified(districtToken, childID, "order.shipment_dispatched")
+	// The receipt notifies the district's other processors, not the DCFP who records it.
+	_, colleagueToken := account("dfcp", "workflow-district-colleague", &district, nil, "orders:process", "orders:replenish", "orders:receive")
 	act(childPath, "receive", districtToken, map[string]any{"quantity_received": 55}, 422, "")
 	act(childPath, "receive", districtToken, map[string]any{"quantity_received": 55, "quantity_issued": 5}, 422, "")
 	receipt := map[string]any{"quantity_received": 55, "discrepancy_note": "Five additional units counted"}
 	act(childPath, "receive", districtToken, receipt, 200, "received")
 	act(childPath, "receive", districtToken, receipt, 409, "")
 	// With the stock in, the alert still waits for the DCFP, who sends what the hotspot needs.
-	notifications(districtToken, "receive")
+	notified(colleagueToken, childID, "order.shipment_received")
+	if inbox(districtToken, childID, "order.shipment_received") != nil {
+		t.Fatal("the DCFP who recorded the receipt was notified of it")
+	}
 	if held := request("GET", parentPath, nil, districtToken, 200)["data"].(map[string]any); held["order_status"] != "on_hold" {
 		t.Fatalf("receipt should leave the alert to the DCFP: %v", held)
 	}
@@ -153,9 +182,12 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		dispatched["unit_of_measure_id"] != unit || dispatched["rider_id"] != riderID {
 		t.Fatalf("dispatch should record the DCFP's unit and quantity: %v", dispatched)
 	}
-	notifications(riderToken, "dispatch")
+	if assignment := inbox(riderToken, parentID, "order.delivery_assigned"); assignment == nil ||
+		!strings.HasPrefix(assignment["body"].(string), "Deliver 45 ") {
+		t.Fatalf("delivery assignment: %v", assignment)
+	}
 	act(parentPath, "deliver", riderToken, map[string]any{"delivery_note": "Received by hotspot manager"}, 200, "delivered")
-	notifications(hotspotToken, "deliver")
+	notified(hotspotToken, parentID, "order.delivered")
 	request("GET", parentPath+"/events", nil, hotspotToken, 200)
 	balance := func(store string, wantOnHand int) {
 		t.Helper()

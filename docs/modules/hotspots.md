@@ -28,18 +28,18 @@ A hotspot's `status` is only ever `active` or `inactive`. Its `review_status` re
 
 ## Endpoints
 
-| Method | Route                              | Permission          | Who                       |
-| ------ | ---------------------------------- | ------------------- | ------------------------- |
-| GET    | `/api/v1/hotspots`                 | `hotspots:read`     | VHT, DCFP, national users |
-| POST   | `/api/v1/hotspots`                 | `hotspots:submit`   | VHT                       |
-| GET    | `/api/v1/hotspots/notifications`   | `hotspots:read`     | VHT, DCFP                 |
-| GET    | `/api/v1/hotspots/{id}`            | `hotspots:read`     | VHT, DCFP, national users |
-| PUT    | `/api/v1/hotspots/{id}`            | `hotspots:submit`   | Submitting VHT            |
-| GET    | `/api/v1/hotspots/{id}/events`     | `hotspots:read`     | VHT, DCFP, national users |
-| POST   | `/api/v1/hotspots/{id}/comments`   | `hotspots:read`     | Submitting VHT, DCFP      |
-| POST   | `/api/v1/hotspots/{id}/activate`   | `hotspots:activate` | DCFP of the district      |
-| POST   | `/api/v1/hotspots/{id}/deactivate` | `hotspots:activate` | DCFP of the district      |
-| POST   | `/api/v1/hotspots/{id}/reject`     | `hotspots:activate` | DCFP of the district      |
+| Method | Route                              | Permission          | Who                               |
+| ------ | ---------------------------------- | ------------------- | --------------------------------- |
+| GET    | `/api/v1/hotspots`                 | `hotspots:read`     | VHT, DCFP, national users         |
+| POST   | `/api/v1/hotspots`                 | `hotspots:submit`   | VHT                               |
+| GET    | `/api/v1/hotspots/notifications`   | `hotspots:read`     | Deprecated; use the central inbox |
+| GET    | `/api/v1/hotspots/{id}`            | `hotspots:read`     | VHT, DCFP, national users         |
+| PUT    | `/api/v1/hotspots/{id}`            | `hotspots:submit`   | Submitting VHT                    |
+| GET    | `/api/v1/hotspots/{id}/events`     | `hotspots:read`     | VHT, DCFP, national users         |
+| POST   | `/api/v1/hotspots/{id}/comments`   | `hotspots:read`     | Submitting VHT, DCFP              |
+| POST   | `/api/v1/hotspots/{id}/activate`   | `hotspots:activate` | DCFP of the district              |
+| POST   | `/api/v1/hotspots/{id}/deactivate` | `hotspots:activate` | DCFP of the district              |
+| POST   | `/api/v1/hotspots/{id}/reject`     | `hotspots:activate` | DCFP of the district              |
 
 The submission form gets its region, district and subcounty IDs from the shared [locations](locations.md) endpoints.
 
@@ -68,19 +68,21 @@ Lists return the hotspots directly as `data`, most recently updated first; a com
 
 ## Notifications
 
-Every step writes a `hot_spot_events` row. The rows are the hotspot's history (`/events`) and the in-app inbox (`/notifications`). An event's `status` is the review status after the step.
+Each step is sent through the shared [notification service](notifications.md), so it reaches people in their central inbox (`GET /api/v1/notifications`) with a title, message, read state and a link to the hotspot. The step is also written to `hot_spot_events`, the hotspot's history (`/events`), whose `status` is the review status after the step.
 
-| Event         | Sent to                                                          |
-| ------------- | ---------------------------------------------------------------- |
-| `submitted`   | The hotspot's district, read by its DCFPs                        |
-| `updated`     | The district                                                     |
-| `resubmitted` | The district                                                     |
-| `commented`   | The district if the submitter commented, otherwise the submitter |
-| `activated`   | The submitter                                                    |
-| `deactivated` | The submitter                                                    |
-| `rejected`    | The submitter                                                    |
+| Type                  | Sent to                                                                  |
+| --------------------- | ------------------------------------------------------------------------ |
+| `hotspot.submitted`   | DCFPs of the hotspot's district (`hotspots:activate` in that district)   |
+| `hotspot.updated`     | The district's DCFPs                                                     |
+| `hotspot.resubmitted` | The district's DCFPs                                                     |
+| `hotspot.commented`   | The district's DCFPs if the submitter commented, otherwise the submitter |
+| `hotspot.activated`   | The submitter, with the DCFP's comment                                   |
+| `hotspot.deactivated` | The submitter, with the reason                                           |
+| `hotspot.rejected`    | The submitter, with the reason                                           |
 
-Rows are written in the same transaction as the change. A push or SMS notification service can deliver any row with `notify_district_id` or `notify_user_id` without changing this module.
+District notifications go only to people with `hotspots:activate` in the district, not to everyone assigned to its store. A legacy hotspot without a district has no district recipients. The person who acted is never notified of their own step.
+
+`GET /api/v1/hotspots/notifications`, the earlier hotspot-only inbox, is deprecated. It keeps working until the web and mobile clients use the central inbox, and is then removed.
 
 ## Setup
 

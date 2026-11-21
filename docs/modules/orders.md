@@ -28,7 +28,22 @@ The supplied legacy dataset has no order rows. The migration archives any rows f
 
 `review` and `check-stock` apply only to warehouse requests; an alert goes straight to the DCFP's decision. Migration 17 returned alerts left mid-way by the earlier quantity-based flow to `queued` and released the stock they had reserved.
 
-Workflow actions use `POST /api/v1/orders/{id}/actions/{action}`. Run `GET /api/v1/orders?status=on_hold` to review held orders, `GET /api/v1/orders/{id}/events` for audit history and `GET /api/v1/orders/notifications` for the in-app inbox. Notifications are persisted for polling.
+Workflow actions use `POST /api/v1/orders/{id}/actions/{action}`. Run `GET /api/v1/orders?status=on_hold` to review held orders, `GET /api/v1/orders/{id}/events` for audit history.
+
+### Notifications
+
+Workflow steps notify people through the shared [notification service](notifications.md), so they appear in each person's central inbox (`GET /api/v1/notifications`) with a message, read state and a link to the order. A store is notified through the people holding the permission that acts on the step there, not everyone assigned to it, and the person who acted is never notified of their own step.
+
+| Type                            | Sent to                                                  |
+| ------------------------------- | -------------------------------------------------------- |
+| `order.stockout_reported`       | `orders:process` at the hotspot's district store (DCFPs) |
+| `order.replenishment_requested` | `orders:process` at the warehouse                        |
+| `order.shipment_dispatched`     | `orders:receive` at the district store                   |
+| `order.shipment_received`       | `orders:process` at the district store                   |
+| `order.delivery_assigned`       | The rider the DCFP dispatched                            |
+| `order.delivered`               | The hotspot manager who reported the stockout            |
+
+`review`, `check-stock`, holding an alert for replenishment, and orders outside the workflow notify nobody. `GET /api/v1/orders/notifications`, the earlier orders-only inbox, is deprecated: it keeps working until the web and mobile clients use the central inbox, and is then removed.
 
 Grant `orders:read` plus `orders:stockout` to hotspot managers, `orders:process`, `orders:replenish` and `orders:receive` to DCFPs, `orders:process` to warehouse staff and `orders:deliver` to riders. Assign the corresponding hotspot or store to each user. Record verified opening balances per store, product and unit as receipts with `POST /api/v1/inventory/movements` before processing orders (see [inventory](inventory.md)). Dispatch and receipt add their own entries to the inventory ledger. The workflow uses those balances for warehouse reservations, dispatch and receipt. Historical stock imports and inventory reconciliation are handled outside this workflow.
 

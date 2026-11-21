@@ -22,6 +22,7 @@ import (
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
 	"clims-backend/internal/features/locations"
+	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -146,10 +147,14 @@ func TestAuthRBACIntegration(t *testing.T) {
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwtMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtMiddleware, activeUser)
-	orders.RegisterRoutes(v1, orders.NewRepository(pool), jwtMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool), jwtMiddleware, activeUser)
+	notifier := notifications.NewService()
+	notifier.MustRegister(hotspots.NotificationTypes()...)
+	notifier.MustRegister(orders.NotificationTypes()...)
+	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier), jwtMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier), jwtMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
+	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
@@ -371,6 +376,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
+	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
 	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
 

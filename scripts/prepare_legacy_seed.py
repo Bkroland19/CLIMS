@@ -24,6 +24,9 @@ for line in seed.splitlines():
 
 for match in re.finditer(r'^CREATE TABLE "(\w+)" \(\n(.*?)\n\);', schema, re.M | re.S):
     table, definition = match.groups()
+    # Laravel's notifications table was empty and migration 19 reused its name.
+    if table == "notifications":
+        continue
     columns = re.findall(r'^  "(\w+)" ', definition, re.M)
     numeric_id = bool(re.search(r'^  "id" (?:bigint|int) ', definition, re.M))
     targets = []
@@ -37,8 +40,6 @@ for match in re.finditer(r'^CREATE TABLE "(\w+)" \(\n(.*?)\n\);', schema, re.M |
             continue
         targets.append(f'"{column}"')
         value = f'source."{column}"'
-        if table == "notifications" and column == "id":
-            value += "::uuid"
         values.append(value)
     # Archived source tables; migrations 6, 16 and 18 replaced the originals.
     target_table = {
