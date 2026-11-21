@@ -853,6 +853,80 @@
         ]
       }
     },
+    "/api/v1/users/{id}/store": {
+      "patch": {
+        "tags": ["Users"],
+        "operationId": "setUserStore",
+        "summary": "Assign a user's store",
+        "description": "Sets the store whose orders and stock the user works with: a DCFP's or delivery agent's district store, or a warehouse's national store. `null` clears it. Requires all permissions: users:update.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserStoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error.store_id` says what to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["users:update"]
+      }
+    },
     "/api/v1/users/{id}/status": {
       "patch": {
         "tags": ["Users"],
@@ -1790,6 +1864,57 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/locations/stores": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "listLocationStores",
+        "summary": "List stores",
+        "description": "Stock-holding points: the national warehouses first, then district stores by name. Any active user may read them. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "store_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["national", "district"]
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "Only this district's store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
       }
     },
     "/api/v1/locations/subcounties": {
@@ -3648,6 +3773,12 @@
             "format": "uuid",
             "nullable": true
           },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The store whose orders and stock the account works with. Must exist."
+          },
           "hot_spot_id": {
             "type": "string",
             "format": "uuid",
@@ -3699,6 +3830,19 @@
           "role_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "SetUserStoreRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["store_id"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "An existing store, or null to clear it."
           }
         }
       },
@@ -5124,6 +5268,55 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "Store": {
+        "type": "object",
+        "required": ["id", "code", "name", "store_type", "district_id", "district_name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "`jms` or `nms` for a national warehouse; the district's DHIS2 UID for a district store."
+          },
+          "name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "StoreListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Store"
+            }
           }
         }
       },

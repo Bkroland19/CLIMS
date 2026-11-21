@@ -379,6 +379,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
 	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
+	testStoreAssignment(t, pool, request, adminToken, userToken)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
@@ -503,6 +504,17 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if products != 4 || archivedProducts != 4 || activeProducts != 2 || brandCount != 2 {
 		t.Fatalf("legacy catalogue upgrade: products=%d archived=%d active=%d brands=%d",
 			products, archivedProducts, activeProducts, brandCount)
+	}
+
+	// Upgrades gain the second national warehouse and fill in missing warehouse stores.
+	var nationalStores, jmsWithoutStore int
+	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM stores WHERE store_type = 'national'),
+		(SELECT count(*) FROM users u JOIN role_user ru ON ru.user_id = u.id JOIN roles r ON r.id = ru.role_id
+			WHERE r.name = 'jms' AND u.store_id IS NULL)`).Scan(&nationalStores, &jmsWithoutStore); err != nil {
+		t.Fatal(err)
+	}
+	if nationalStores != 2 || jmsWithoutStore != 0 {
+		t.Fatalf("store assignment upgrade: national=%d jms without store=%d", nationalStores, jmsWithoutStore)
 	}
 
 }

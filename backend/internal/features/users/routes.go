@@ -14,6 +14,7 @@ func RegisterRoutes(router fiber.Router, handler *Handler, jwtMiddleware, active
 	users.Patch("/:id/role", rbac.RequirePermission("roles:assign"), handler.AssignRole)
 	users.Put("/:id/roles", rbac.RequirePermission("roles:assign"), handler.SetRoles)
 	users.Patch("/:id/status", rbac.RequirePermission("users:update"), handler.SetStatus)
+	users.Patch("/:id/store", rbac.RequirePermission("users:update"), handler.SetStore)
 	users.Get("/:id/sessions", rbac.RequirePermission("users:read"), handler.UserSessions)
 	users.Delete("/:id/sessions", rbac.RequirePermission("users:update"), handler.RevokeUserSessions)
 }
