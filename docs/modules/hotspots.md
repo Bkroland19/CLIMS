@@ -84,6 +84,17 @@ District notifications go only to people with `hotspots:activate` in the distric
 
 `GET /api/v1/hotspots/notifications`, the earlier hotspot-only inbox, is deprecated. It keeps working until the web and mobile clients use the central inbox, and is then removed.
 
+## Map
+
+The web map (`/moh/hotspot-map`, `/dcfp/hotspot-map`; `frontend/src/features/hotspots/map/`) draws every hotspot the user can see on OpenStreetMap with MapLibre GL. It reads only the endpoints above:
+
+- **Loading.** A user with `hotspots:all_districts` and no district chosen loads `GET /hotspots?district_id=` for each district from `GET /locations/districts`, six requests at a time, and the map fills in as districts arrive. One district's pages come from the `(district_id, updated_at)` index in milliseconds; paging the whole table instead costs a sort of every row for each page, over half a second at the deepest pages with 18,000 hotspots. Hotspots with no district are in no district's list, so the national map cannot show them. A DCFP or VHT has one list, read six pages at a time. A district chosen in the MOH top bar loads that district only.
+- **Selection.** `GET /hotspots/{id}` and `GET /hotspots/{id}/events` fill the detail panel.
+- **Positions.** A record with no coordinates, out-of-range ones or (0, 0) is not drawn. The page counts them and lists them so they can be corrected.
+- **Grouping free text.** Legacy `type` and `dispenser_condition` are free text (types were cut at 8 characters, and "New" or "Old" says nothing about the venue). The map sorts them into venue groups and dispenser states by keyword (`map/records.ts`); the detail panel shows the recorded text.
+
+The base map comes from `NEXT_PUBLIC_MAP_TILES`: empty uses the OpenStreetMap community tiles (Streets and Humanitarian), whose usage policies cover light use with attribution; `off` draws no base map (the end-to-end tests); a `https://…/{z}/{x}/{y}.png` template points at a deployment's own tile server, credited with `NEXT_PUBLIC_MAP_ATTRIBUTION`. A busy production deployment should use its own or a paid tile server.
+
 ## Setup
 
 Migrations 8 and 16 grant the hotspot permissions to `admin` only. Grant the other roles through `PUT /api/v1/roles/{id}/permissions`:
