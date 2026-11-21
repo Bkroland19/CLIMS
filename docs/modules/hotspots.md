@@ -52,7 +52,7 @@ Lists return the hotspots directly as `data`, most recently updated first; a com
 
 ## Rules
 
-- **Visibility:** a VHT (`hotspots:submit`) sees the hotspots they submitted. A DCFP (`hotspots:activate`) sees every hotspot in the district of their assigned store (`users.store_id`). `hotspots:all_districts` sees every hotspot, for national users. Anything else returns HTTP 404.
+- **Visibility:** a VHT (`hotspots:submit`) sees the hotspots they submitted. With `hotspots:read_district` they also see the **active** hotspots in the district they work in (their assigned store's district, or else their assigned subcounty's), to choose one when requesting stock; this does not let them comment on or edit those hotspots. A DCFP (`hotspots:activate`) sees every hotspot in the district of their assigned store (`users.store_id`). `hotspots:all_districts` sees every hotspot, for national users. Anything else returns HTTP 404.
 - **Submission:** these fields are required:
   - name and type
   - `region_id`, `district_id` and `subcounty_id`

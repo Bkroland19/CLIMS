@@ -8,6 +8,7 @@ import {
   Plus,
   ShieldCheck,
   UserCheck,
+  Warehouse,
   UserRound,
   UserRoundX,
   Users,
@@ -39,6 +40,7 @@ import type { User } from './api';
 import { isActive, roleLabel, userRoleLabels, userStatusLabel } from './access';
 import { BulkUserActions } from './BulkUserActions';
 import { EditRolesDialog } from './EditRolesDialog';
+import { EditStoreDialog } from './EditStoreDialog';
 import {
   ACTIVITY_FILTERS,
   activityFilterFrom,
@@ -85,7 +87,11 @@ export function usersHref({ status, role, activity = 'all' }: UsersFilters): str
 }
 
 type Dialog =
-  { kind: 'create' } | { kind: 'roles'; user: User } | { kind: 'sessions'; user: User } | null;
+  | { kind: 'create' }
+  | { kind: 'roles'; user: User }
+  | { kind: 'store'; user: User }
+  | { kind: 'sessions'; user: User }
+  | null;
 
 /** "Today", "3 weeks ago" or "Never", with the exact time on hover. */
 function LastSignIn({ user, now }: { user: User; now: Date }) {
@@ -396,6 +402,17 @@ export default function UsersPage() {
                       },
                     ] satisfies RowActionItem[])
                   : []),
+                ...(canUpdate
+                  ? ([
+                      {
+                        label: 'Change store',
+                        icon: Warehouse,
+                        onSelect: () => {
+                          setDialog({ kind: 'store', user });
+                        },
+                      },
+                    ] satisfies RowActionItem[])
+                  : []),
                 {
                   label: 'Signed-in devices',
                   icon: MonitorSmartphone,
@@ -458,6 +475,10 @@ export default function UsersPage() {
             setProfileId(null);
             setDialog({ kind: 'sessions', user: profileUser });
           }}
+          onChangeStore={() => {
+            setProfileId(null);
+            setDialog({ kind: 'store', user: profileUser });
+          }}
           onDeactivate={() => {
             setProfileId(null);
             setUserToDeactivate(profileUser);
@@ -484,6 +505,18 @@ export default function UsersPage() {
           user={dialog.user}
           // Signing yourself out everywhere is done from your own account menu, one device at a time.
           canSignOut={canUpdate && currentUser?.id !== dialog.user.id}
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowActions(dialog.user.id, event);
+          }}
+        />
+      ) : null}
+      {dialog?.kind === 'store' ? (
+        <EditStoreDialog
+          key={dialog.user.id}
+          user={dialog.user}
           onClose={() => {
             setDialog(null);
           }}

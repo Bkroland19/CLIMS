@@ -39,6 +39,8 @@ type scope struct {
 	hotSpotID *string
 	userID    string
 	allStores bool
+	// stockoutDistrict lets the user raise alerts for active hotspots in the district they work in.
+	stockoutDistrict bool
 }
 
 type Repository struct {

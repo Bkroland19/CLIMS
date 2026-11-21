@@ -64,5 +64,7 @@ JOIN public.users u ON u.legacy_id = source.id::text
 JOIN public.roles r ON r.legacy_id = source.role;
 SELECT public.import_legacy_condoms();
 SELECT public.import_legacy_hot_spots();
+-- After the hotspot import, which creates the district stores.
+SELECT public.assign_user_stores();
 COMMIT;"""
 )

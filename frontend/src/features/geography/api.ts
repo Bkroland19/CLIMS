@@ -14,6 +14,7 @@ import { parseList, type HttpClient } from '@/lib/api';
  *   GET /locations/districts?region_id=           [{ id, name }]
  *   GET /locations/subcounties?district_id=       [{ id, name }]
  *   GET /hotspots?district_id=&limit=&offset=     [{ id, name, village, subcounty, review_status }]
+ *   GET /locations/stores                         [{ id, code, name, store_type, district_id, district_name }]
  */
 
 const placeSchema = z.object({ id: z.string().min(1), name: z.string().trim().min(1) });
@@ -129,4 +130,25 @@ export function villageNames(hotspots: readonly Pick<PlacedHotspot, 'village'>[]
     if (village && !villages.has(key)) villages.set(key, village);
   }
   return [...villages.values()].sort((a, b) => a.localeCompare(b));
+}
+
+export const STORE_TYPES = ['national', 'district'] as const;
+export type StoreType = (typeof STORE_TYPES)[number];
+
+const storeSchema = z.object({
+  id: z.string().min(1),
+  /** `jms` or `nms` for a national warehouse; the district's DHIS2 UID for a district store. */
+  code: z.string(),
+  name: z.string(),
+  store_type: z.enum(STORE_TYPES),
+  district_id: z.string().nullable(),
+  district_name: z.string().nullable(),
+});
+
+/** A stock-holding point: a national warehouse or a district's store. */
+export type Store = z.infer<typeof storeSchema>;
+
+/** Every store: the national warehouses first, then district stores by name. */
+export async function listStores(http: HttpClient, signal?: AbortSignal): Promise<Store[]> {
+  return parseList(storeSchema, await http.get('/locations/stores', { signal }), 'stores');
 }

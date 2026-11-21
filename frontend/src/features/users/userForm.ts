@@ -57,8 +57,9 @@ export const newUserSchema = z.object({
       (value) => new TextEncoder().encode(value).length <= PASSWORD_MAX_BYTES,
       `Use at most ${PASSWORD_MAX_BYTES} characters.`,
     ),
-  // Where the person works, shown and checked by role (see `locationNeedFor`). Only a hotspot
-  // manager's hotspot is sent: the API stores no other place for a user yet.
+  // Where the person works, shown and checked by role (see `locationNeedFor`). The API keeps
+  // a hotspot manager's hotspot and, from the district, a DCFP's or delivery agent's store
+  // (`stores.ts`); the rest of the place is only checked here.
   region_id: z.string(),
   district_id: z.string(),
   subcounty_id: z.string(),
@@ -110,7 +111,7 @@ export function locationNeedFor(roleName: string | null): LocationNeed | null {
         pick: 'village',
         required: ['region_id', 'district_id'],
         reason:
-          'A district focal person or delivery agent works in one district. Subcounty and village are optional.',
+          'A district focal person or delivery agent works in one district, at its store. Subcounty and village are optional.',
       };
     default:
       return null;
@@ -186,9 +187,14 @@ export const NEW_USER_SERVER_FIELDS = { role_ids: 'role_id' } as const satisfies
  * The request body for the validated form: the email lower-cased; the phone is
  * already in `+256` form; the one role as a list. `need` is the chosen role's
  * (`locationNeedFor`): its hotspot is sent when it asks for one, and the rest
- * of the place stays behind (see the schema).
+ * of the place stays behind (see the schema). `storeId` is the store the role
+ * works at (`storeFor`), when it has one.
  */
-export function toNewUserInput(values: NewUserFormOutput, need: LocationNeed | null): NewUserInput {
+export function toNewUserInput(
+  values: NewUserFormOutput,
+  need: LocationNeed | null,
+  storeId: string | null = null,
+): NewUserInput {
   return {
     username: values.username,
     email: values.email.toLowerCase(),
@@ -198,6 +204,7 @@ export function toNewUserInput(values: NewUserFormOutput, need: LocationNeed | n
     phone_number: values.phone_number,
     role_ids: [values.role_id],
     ...(need?.pick === 'hotspot' && values.hot_spot_id ? { hot_spot_id: values.hot_spot_id } : {}),
+    ...(storeId ? { store_id: storeId } : {}),
   };
 }
 
