@@ -1,6 +1,24 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as SecureStore from "expo-secure-store";
-import { login, setAuthToken, type ApiUser } from "./api";
+import {
+  configureAuth,
+  endRemoteSession,
+  fetchMe,
+  getTokens,
+  login,
+  setTokens,
+  toStoredTokens,
+  type ApiUser,
+  type StoredTokens,
+} from "./api";
 import { DEFAULT_PERSONAS } from "./seed";
 import type { AppRole } from "./types";
 
@@ -11,18 +29,28 @@ export interface SessionUser {
   email: string;
   phone: string;
   role: AppRole;
+  /** Hotspot managers: the hotspot assigned to them (`hot_spot_id`), which their alerts are for. */
+  hotspotId?: string | null;
   demo?: boolean;
 }
 
 interface SessionCtx {
   user: SessionUser | null;
   restoring: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  /** `identifier` is an email address, username or phone number. */
+  signIn: (identifier: string, password: string) => Promise<void>;
   signInDemo: (role: AppRole) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
-const KEY = "clims.session.v2";
+// v3 adds the refresh token; v2 sessions held only a 15-minute access token and are dropped.
+const KEY = "clims.session.v3";
+const OLD_KEYS = ["clims.session.v2"];
+
+interface Persisted {
+  user: SessionUser;
+  tokens: StoredTokens | null;
+}
 const Ctx = createContext<SessionCtx | null>(null);
 
 /** Backend role names (RBAC catalog) that this app serves. */
@@ -48,55 +76,125 @@ export function appRoleOf(u: ApiUser): AppRole | null {
   return null;
 }
 
+function toSessionUser(u: ApiUser, role: AppRole): SessionUser {
+  const name =
+    [u.first_name || u.firstname, u.last_name || u.lastname].filter(Boolean).join(" ").trim() ||
+    u.username;
+  return {
+    id: u.id,
+    hotspotId: u.hot_spot_id ?? null,
+    name,
+    username: u.username,
+    email: u.email,
+    phone: u.phone_number || "",
+    role,
+  };
+}
+
+const WRONG_ROLE =
+  "This app is for VHTs, hotspot managers and riders. Use the CLIMS website for your role.";
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const userRef = useRef<SessionUser | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const write = useCallback(async (p: Persisted | null) => {
+    if (p) await SecureStore.setItemAsync(KEY, JSON.stringify(p)).catch(() => {});
+    else await SecureStore.deleteItemAsync(KEY).catch(() => {});
+  }, []);
+
+  const clearLocal = useCallback(async () => {
+    setTokens(null);
+    setUser(null);
+    await write(null);
+  }, [write]);
+
+  // Rotated tokens are persisted so a restart resumes the same session; a refused refresh
+  // token signs the user out.
+  useEffect(() => {
+    configureAuth({
+      tokensChanged: (t) => {
+        const u = userRef.current;
+        if (u && !u.demo) write({ user: u, tokens: t });
+      },
+      sessionEnded: () => {
+        clearLocal();
+      },
+    });
+  }, [write, clearLocal]);
 
   useEffect(() => {
     let live = true;
     (async () => {
+      let restored: Persisted | null = null;
       try {
+        for (const k of OLD_KEYS) SecureStore.deleteItemAsync(k).catch(() => {});
         const raw = await SecureStore.getItemAsync(KEY);
-        if (raw && live) {
-          const s = JSON.parse(raw) as { user: SessionUser; token: string | null; exp: number };
-          if (s.user && (s.user.demo || s.exp > Date.now())) {
-            setAuthToken(s.token);
-            setUser(s.user);
-          }
+        const s = raw ? (JSON.parse(raw) as Persisted) : null;
+        if (s?.user && (s.user.demo || (s.tokens && s.tokens.refreshExp > Date.now()))) {
+          restored = s;
+          setTokens(s.tokens);
+          if (live) setUser(s.user);
+        } else if (s) {
+          await write(null);
         }
       } catch {
         // A corrupt or unreadable session just means signing in again.
       } finally {
         if (live) setRestoring(false);
       }
+
+      // Reload the profile in the background so role and name changes reach the phone.
+      // Offline, the cached profile stays; a revoked session signs out via sessionEnded.
+      if (!restored || restored.user.demo) return;
+      try {
+        const me = await fetchMe();
+        // Bail if the user signed out (or in as someone else) while this was in flight.
+        if (!live || userRef.current?.id !== me.id) return;
+        const role = appRoleOf(me);
+        if (!role) {
+          const t = getTokens();
+          await clearLocal();
+          if (t) endRemoteSession(t);
+          return;
+        }
+        const u = toSessionUser(me, role);
+        setUser(u);
+        const t = getTokens();
+        if (t) await write({ user: u, tokens: t });
+      } catch {
+        // Offline or server error: keep working with the cached profile.
+      }
     })();
     return () => {
       live = false;
     };
-  }, []);
+  }, [write, clearLocal]);
 
-  const persist = useCallback(async (u: SessionUser, token: string | null, exp: number) => {
-    setAuthToken(token);
-    setUser(u);
-    await SecureStore.setItemAsync(KEY, JSON.stringify({ user: u, token, exp })).catch(() => {});
-  }, []);
+  const persist = useCallback(
+    async (u: SessionUser, t: StoredTokens | null) => {
+      setTokens(t);
+      setUser(u);
+      await write({ user: u, tokens: t });
+    },
+    [write],
+  );
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
-      const res = await login(email, password);
+    async (identifier: string, password: string) => {
+      const res = await login(identifier, password);
+      const t = toStoredTokens(res);
       const role = appRoleOf(res.user);
       if (!role) {
-        throw new Error(
-          "This app is for VHTs, hotspot managers and riders. Use the CLIMS website for your role.",
-        );
+        // Don't leave a session open on the server for an account this app can't serve.
+        endRemoteSession(t);
+        throw new Error(WRONG_ROLE);
       }
-      const u = res.user;
-      const name = [u.firstname, u.lastname].filter(Boolean).join(" ").trim() || u.username;
-      await persist(
-        { id: u.id, name, username: u.username, email: u.email, phone: u.phone_number || "", role },
-        res.token,
-        Date.now() + res.expires_in * 1000,
-      );
+      await persist(toSessionUser(res.user, role), t);
     },
     [persist],
   );
@@ -111,17 +209,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       await persist(
         { id: `demo-${role}`, name, username, email: "", phone, role, demo: true },
         null,
-        0,
       );
     },
     [persist],
   );
 
   const signOut = useCallback(async () => {
-    setAuthToken(null);
-    setUser(null);
-    await SecureStore.deleteItemAsync(KEY).catch(() => {});
-  }, []);
+    const t = getTokens();
+    await clearLocal();
+    // Revoke the session on the server without making the user wait for the network.
+    if (t) endRemoteSession(t);
+  }, [clearLocal]);
 
   const value = useMemo(
     () => ({ user, restoring, signIn, signInDemo, signOut }),
