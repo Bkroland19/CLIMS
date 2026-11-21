@@ -4,19 +4,17 @@ import type { AppRole } from "./types";
 import type { IconName } from "@/components/m/Icon";
 
 export type TabKey =
-  "hotspots" | "requests" | "dashboard" | "orders" | "deliveries" | "history" | "reports" | "me";
+  "hotspots" | "requests" | "dashboard" | "orders" | "deliveries" | "history" | "me";
 
 export const TABS: Record<AppRole, { key: TabKey; label: string; icon: IconName }[]> = {
   vht: [
     { key: "hotspots", label: "Hotspots", icon: "pin" },
     { key: "requests", label: "Requests", icon: "list" },
-    { key: "reports", label: "Reports", icon: "clipboard" },
     { key: "me", label: "Me", icon: "user" },
   ],
   hm: [
     { key: "dashboard", label: "Home", icon: "home" },
     { key: "orders", label: "Orders", icon: "list" },
-    { key: "reports", label: "Reports", icon: "clipboard" },
     { key: "me", label: "Me", icon: "user" },
   ],
   rider: [
@@ -39,7 +37,6 @@ export const TAB_LABEL: Record<TabKey, string> = {
   orders: "Orders",
   deliveries: "Deliveries",
   history: "History",
-  reports: "Reports",
   me: "Me",
 };
 
