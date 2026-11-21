@@ -102,7 +102,7 @@
         "tags": ["Orders"],
         "operationId": "listOrderNotifications",
         "summary": "List order notifications",
-        "description": "Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
+        "description": "Deprecated: use GET /api/v1/notifications, which carries every order notification with read state. This endpoint is removed once the web and mobile clients have switched. Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
         "responses": {
           "200": {
             "description": "Success",
@@ -147,7 +147,8 @@
               "default": 0
             }
           }
-        ]
+        ],
+        "deprecated": true
       }
     },
     "/api/v1/orders/{id}/events": {
