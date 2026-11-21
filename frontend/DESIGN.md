@@ -173,6 +173,27 @@ primitive only to align it with the tokens above, and keep the edit small so
 The light and dark series colours were checked for colour-vision separation and 3:1 against their
 surface. If you change one, check the set again.
 
+## Maps
+
+The hotspot map (`features/hotspots/map`) is the one map. Extend it rather than adding another.
+
+- **The base map is context, not content.** OpenStreetMap tiles are desaturated in light and
+  inverted (with the hue turned back, so water stays blue) in dark, so the hotspots carry the
+  colour.
+- **Markers are fills.** Active and a working dispenser take `primary`; the other states take the
+  status colours (`warning`, `destructive`, `info`, neutral `role-system`). WebGL cannot read CSS,
+  so `map/palette.ts` reads the tokens and reads them again when the theme changes. Never write a
+  hex value for a marker.
+- **Clusters are rings** split by the same categories, with the count inside. Each is a real
+  button whose name says what it holds in words.
+- **The key is a filter.** Its tabs choose what colour means; each entry switches its hotspots on
+  and off.
+- **The list beside the map is the accessible route.** Everything on the map is reachable from it
+  by keyboard. Colour never stands alone: rows carry a chip for every state except the usual one
+  (active), and the hover label and detail panel name the state.
+- Overlays on the map are `bg-card/95` panels with a 1px border and a small shadow, so they stay
+  legible over any tile.
+
 ## Accessibility
 
 Target: WCAG 2.2 AA.
