@@ -14,6 +14,7 @@ import (
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
 	"clims-backend/internal/features/locations"
+	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -87,6 +88,7 @@ func main() {
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
+	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {
