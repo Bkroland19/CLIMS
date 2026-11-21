@@ -242,6 +242,7 @@ export function StockoutForm({
         />
         <Input
           label="Comment (optional)"
+          max={COMMENT_MAX}
           value={comment}
           onChangeText={setComment}
           ph="e.g. Busy weekend coming"
