@@ -10,6 +10,7 @@ import (
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/apidocs"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/health"
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
@@ -90,6 +91,7 @@ func main() {
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {

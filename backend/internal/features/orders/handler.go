@@ -152,6 +152,10 @@ func orderError(c fiber.Ctx, err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return response.Error(c, 404, "order not found", nil)
 	}
+	if errors.Is(err, errInactiveProduct) {
+		const message = "This product is inactive and cannot be ordered."
+		return response.Error(c, 422, message, map[string]string{"condom_id": message})
+	}
 	var dbError *pgconn.PgError
 	if errors.As(err, &dbError) {
 		switch dbError.Code {

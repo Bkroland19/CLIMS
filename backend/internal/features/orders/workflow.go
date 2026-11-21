@@ -27,6 +27,9 @@ type ActionInput struct {
 func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, condomID, unitID string, quantity int32, comment *string) (Order, error) {
 	var order Order
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		if err := checkOrderable(ctx, tx, condomID); err != nil {
+			return err
+		}
 		var err error
 		order, err = scanOrder(tx.QueryRow(ctx, `
 			INSERT INTO orders (hot_spot_id, condom_id, unit_of_measure_id, quantity_needed,

@@ -10,6 +10,7 @@ import (
 
 	"clims-backend/internal/features/apidocs"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/health"
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
@@ -37,6 +38,7 @@ func documentationApp() *fiber.App {
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(nil), jwt, active)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(nil), jwt, active)
 	locations.RegisterRoutes(v1, locations.NewHandler(nil), jwt, active)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(nil), jwt, active)
 	health.RegisterRoutes(app, health.NewHandler(nil, "test", "test", "test"))
 	apidocs.RegisterRoutes(app, os.DirFS(filepath.Join("..", "..", "..", "docs", "api")))
 	return app
