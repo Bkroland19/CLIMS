@@ -28,6 +28,9 @@
       "name": "Hotspots"
     },
     {
+      "name": "Locations"
+    },
+    {
       "name": "Inventory"
     },
     {
@@ -1766,6 +1769,111 @@
             "$ref": "#/components/responses/InternalError"
           }
         }
+      }
+    },
+    "/api/v1/locations/regions": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "listLocationRegions",
+        "summary": "List regions",
+        "description": "Lists regions by name.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotPlaceListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/locations/districts": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "listLocationDistricts",
+        "summary": "List districts",
+        "description": "Lists districts by name, optionally filtered by region_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistrictListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/locations/subcounties": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "listLocationSubcounties",
+        "summary": "List subcounties",
+        "description": "Lists subcounties by name for the required district_id.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotPlaceListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "district_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/hotspots": {
