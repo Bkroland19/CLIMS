@@ -6,6 +6,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **VHT stockout alerts for their district.** A VHT with the new `orders:stockout_district` permission can
+  raise a stockout alert for any active hotspot in the district they work in (assigned store's district,
+  or else assigned subcounty's). Inactive hotspots and other districts are refused.
+- `hotspots:read_district` lets a VHT list and view their district's active hotspots, to choose one; it
+  does not open those hotspots' comment threads.
+- Migration 20 adds the two permissions (granted to admin). Grant VHTs `hotspots:read`, `hotspots:submit`,
+  `hotspots:read_district`, `orders:stockout` and `orders:stockout_district` through the RBAC API.
 - **Web app** in `frontend/`, imported from the `LMD_FE` prototype and rebuilt on Next.js 16,
   React 19, TypeScript, Tailwind CSS 4 and shadcn/ui, themed after the SalesOps dashboard reference in light
   mode with an optional dark theme. Decisions are recorded in `docs/adr/0001-frontend-stack.md`.

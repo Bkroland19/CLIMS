@@ -375,6 +375,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatalf("orders leaked to unassigned user: %v", visible)
 	}
 
+	testDistrictStockouts(t, pool, request, login, adminToken, condomID)
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
 	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)

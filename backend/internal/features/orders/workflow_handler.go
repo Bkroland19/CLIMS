@@ -39,7 +39,15 @@ func (h *Handler) stockout(c fiber.Ctx) error {
 		}
 	}
 	access := scopeFor(users.CurrentUser(c))
-	if !access.allStores && !assigned(access.hotSpotID, hotSpotID) {
+	allowed := access.allStores || assigned(access.hotSpotID, hotSpotID)
+	if !allowed && access.stockoutDistrict {
+		// A VHT may raise an alert on behalf of any active hotspot in the district they work in.
+		var err error
+		if allowed, err = h.repo.activeInDistrictOf(c.Context(), access.userID, hotSpotID); err != nil {
+			return workflowError(c, err)
+		}
+	}
+	if !allowed {
 		return workflowError(c, errWorkflowForbidden)
 	}
 	order, err := h.repo.reportStockout(c.Context(), access.userID, hotSpotID, productID, input.Comment)
