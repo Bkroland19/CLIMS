@@ -12,6 +12,7 @@ import { ROLE_LABEL, useMe, useSession } from "@/lib/session";
 import { useNotes, useStore } from "@/lib/store";
 import type { AppEvent } from "@/lib/types";
 import { call } from "./common";
+import { TYPE } from "@/lib/fonts";
 
 const ORG: Record<string, (e: AppEvent) => string> = {
   DCFP: () => `${DCFP.district} district`,
@@ -119,11 +120,11 @@ export function Me() {
       <Section>
         <View style={{ alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 16 }}>
           <Avatar ini={initials(me.name)} size={72} />
-          <Txt style={{ fontSize: 22, fontWeight: T.ios ? "700" : "500", textAlign: "center" }}>
+          <Txt style={{ ...TYPE.title, fontWeight: T.ios ? "700" : "600", textAlign: "center" }}>
             {me.name}
           </Txt>
           <Txt
-            style={{ color: T.fg2, fontSize: 15, textAlign: "center" }}
+            style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}
           >{`${ROLE_LABEL[me.role]} · ${DCFP.district}`}</Txt>
         </View>
       </Section>
@@ -133,6 +134,7 @@ export function Me() {
         <Row t={area[0]} v={area[1]} />
       </List>
       <Fields
+        card
         h="Appearance"
         f={mode === "system" ? "Follows your phone's light or dark setting." : undefined}
       >
@@ -147,7 +149,7 @@ export function Me() {
           onChange={setMode}
         />
       </Fields>
-      <Fields h="Notifications">
+      <Fields card h="Notifications">
         <Toggle
           label="Push notifications"
           sub="Order and delivery updates"
@@ -193,7 +195,7 @@ export function Me() {
       </List>
       <Sheet visible={outbox} title="Waiting to send" onClose={() => setOutbox(false)}>
         {offline ? (
-          <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, fontSize: 14 }}>
+          <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, ...TYPE.subhead }}>
             These will send automatically when the phone is back online.
           </Txt>
         ) : null}

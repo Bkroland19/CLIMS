@@ -54,6 +54,7 @@ import { useMe } from "@/lib/session";
 import { useStore, type RefreshResult } from "@/lib/store";
 import type { Order, Qty } from "@/lib/types";
 import { call, firstName, hotspotChip, inactiveNote, matches, shortId, stockStats } from "./common";
+import { TYPE } from "@/lib/fonts";
 
 export function useMine() {
   const { s } = useStore();
@@ -893,7 +894,7 @@ export function VhtMap() {
                 marginHorizontal: 32,
                 marginTop: -12,
                 marginBottom: 16,
-                fontSize: 13,
+                ...TYPE.footnote,
                 color: T.danger,
               }}
             >

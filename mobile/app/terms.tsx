@@ -7,6 +7,7 @@ import { Section, Txt } from "@/components/m/kit";
 import Icon from "@/components/m/Icon";
 import { useColumn } from "@/hooks/useResponsive";
 import { TERMS, TERMS_UPDATED, TERMS_VERSION } from "@/constants/legal";
+import { TYPE } from "@/lib/fonts";
 
 /**
  * Terms and conditions. Built from the field app's kit, which needs only the theme the root layout
@@ -50,10 +51,10 @@ export default function TermsScreen() {
           >
             <Icon name="shield" size={30} color={T.icFg} />
           </View>
-          <Txt style={{ fontSize: 15, color: T.fg2, textAlign: "center" }}>
+          <Txt style={{ ...TYPE.subhead, color: T.fg2, textAlign: "center" }}>
             Ministry of Health · Republic of Uganda
           </Txt>
-          <Txt style={{ fontSize: 13, color: T.fg2, textAlign: "center" }}>
+          <Txt style={{ ...TYPE.footnote, color: T.fg2, textAlign: "center" }}>
             {`Version ${TERMS_VERSION} · Last updated ${TERMS_UPDATED}`}
           </Txt>
         </View>

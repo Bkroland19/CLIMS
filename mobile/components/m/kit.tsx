@@ -24,7 +24,7 @@ import type { Tokens } from "@/constants/design";
 import { useT } from "@/lib/theme";
 import { MAX_SHEET_WIDTH, useResponsive } from "@/hooks/useResponsive";
 import type { ChipDef, Tone } from "@/lib/format";
-import { FONT, fontFor, trackingFor, useFontsReady } from "@/lib/fonts";
+import { FONT, TYPE, fontFor, trackingFor, useFontsReady } from "@/lib/fonts";
 import Icon, { type IconName } from "./Icon";
 
 /* ───────────── Text ───────────── */
@@ -84,7 +84,7 @@ function SecFoot({ f, px }: { f?: string; px?: number }) {
   return (
     <Txt
       style={{
-        fontSize: 13,
+        ...TYPE.footnote,
         color: T.fg2,
         paddingHorizontal: px ?? T.shPx,
         paddingTop: 7,
@@ -183,9 +183,7 @@ export function List({
             backgroundColor: T.rowBg,
           }}
         >
-          <Txt style={{ color: T.fg2, fontSize: 15, textAlign: "center", lineHeight: 21 }}>
-            {empty}
-          </Txt>
+          <Txt style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}>{empty}</Txt>
         </View>
       ) : null}
     </Section>
@@ -206,7 +204,7 @@ export function Chip({ c }: { c?: ChipDef | null }) {
         alignSelf: "flex-start",
       }}
     >
-      <Txt style={{ color: tn.fg, fontSize: 12, fontWeight: "600" }} numberOfLines={1}>
+      <Txt style={{ color: tn.fg, ...TYPE.caption, fontWeight: "600" }} numberOfLines={1}>
         {c.label}
       </Txt>
     </View>
@@ -354,7 +352,7 @@ export function Hero({
           <Txt style={{ fontSize: 20, lineHeight: 26, fontWeight: T.ios ? "700" : "600" }}>
             {title}
           </Txt>
-          {sub ? <Txt style={{ color: T.fg2, fontSize: 15 }}>{sub}</Txt> : null}
+          {sub ? <Txt style={{ color: T.fg2, ...TYPE.subhead }}>{sub}</Txt> : null}
           {chip ? (
             <View style={{ marginTop: 4 }}>
               <Chip c={chip} />
@@ -377,7 +375,7 @@ export function Hero({
                   gap: 2,
                 }}
               >
-                <Txt style={{ fontSize: 13, color: T.fg2 }}>{x.label}</Txt>
+                <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{x.label}</Txt>
                 <Txt
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -391,13 +389,15 @@ export function Hero({
                 >
                   {x.value}
                 </Txt>
-                {x.note ? <Txt style={{ fontSize: 13, color: x.fg ?? T.fg2 }}>{x.note}</Txt> : null}
+                {x.note ? (
+                  <Txt style={{ ...TYPE.footnote, color: x.fg ?? T.fg2 }}>{x.note}</Txt>
+                ) : null}
               </View>
             ))}
           </View>
         ) : null}
         {steps?.length ? <Steps items={steps} /> : null}
-        {msg ? <Txt style={{ color: T.fg2, fontSize: 15, lineHeight: 21 }}>{msg}</Txt> : null}
+        {msg ? <Txt style={{ color: T.fg2, ...TYPE.subhead }}>{msg}</Txt> : null}
         {children ? <View style={{ gap: 8 }}>{children}</View> : null}
       </View>
     </Section>
@@ -441,11 +441,15 @@ export function Steps({ items }: { items: StepItem[] }) {
             </View>
             <View style={{ flex: 1, paddingBottom: last ? 0 : 12 }}>
               <Txt
-                style={{ fontSize: 15, color: S[4], fontWeight: S[5] as TextStyle["fontWeight"] }}
+                style={{
+                  ...TYPE.subhead,
+                  color: S[4],
+                  fontWeight: S[5] as TextStyle["fontWeight"],
+                }}
               >
                 {it.label}
               </Txt>
-              {it.sub ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{it.sub}</Txt> : null}
+              {it.sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{it.sub}</Txt> : null}
             </View>
           </View>
         );
@@ -488,8 +492,8 @@ export function Banner({
         <View style={{ flexDirection: "row", gap: 10 }}>
           <Icon name={tn.icon as IconName} size={20} color={tn.fg} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Txt style={{ color: tn.fg, fontWeight: "600", fontSize: 15 }}>{title}</Txt>
-            {body ? <Txt style={{ color: T.fg, fontSize: 14, lineHeight: 20 }}>{body}</Txt> : null}
+            <Txt style={{ color: tn.fg, fontWeight: "600", ...TYPE.subhead }}>{title}</Txt>
+            {body ? <Txt style={{ color: T.fg, ...TYPE.subhead }}>{body}</Txt> : null}
           </View>
         </View>
         {items?.map((e) => (
@@ -498,8 +502,8 @@ export function Banner({
             onPress={e.onPress}
             style={{ marginLeft: 30, paddingVertical: 4 }}
           >
-            <Txt style={{ fontSize: 14, fontWeight: "600", color: tn.fg }}>{e.where}</Txt>
-            <Txt style={{ fontSize: 13, color: T.fg }}>{e.msg}</Txt>
+            <Txt style={{ ...TYPE.subhead, fontWeight: "600", color: tn.fg }}>{e.where}</Txt>
+            <Txt style={{ ...TYPE.footnote, color: T.fg }}>{e.msg}</Txt>
           </Pressable>
         ))}
         {act ? (
@@ -508,7 +512,7 @@ export function Banner({
             style={{ marginLeft: 30, paddingVertical: 4 }}
             accessibilityRole="button"
           >
-            <Txt style={{ color: T.tint, fontWeight: "600", fontSize: 15 }}>{act.label}</Txt>
+            <Txt style={{ color: T.tint, fontWeight: "600", ...TYPE.subhead }}>{act.label}</Txt>
           </Pressable>
         ) : null}
       </View>
@@ -556,9 +560,7 @@ export function Done({
           {title}
         </Txt>
         {body ? (
-          <Txt style={{ color: T.fg2, fontSize: 15, textAlign: "center", lineHeight: 21 }}>
-            {body}
-          </Txt>
+          <Txt style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}>{body}</Txt>
         ) : null}
       </View>
     </Section>
@@ -573,8 +575,7 @@ export function Note({ text, center }: { text: string; center?: boolean }) {
         marginHorizontal: 24,
         marginBottom: T.secGap,
         color: T.fg2,
-        fontSize: 14,
-        lineHeight: 20,
+        ...TYPE.footnote,
         textAlign: center ? "center" : "left",
       }}
     >
@@ -655,20 +656,37 @@ export function Btns({ children }: { children: React.ReactNode }) {
 /* ───────────── Form fields ───────────── */
 
 /** A titled group of fields. iOS: inset white card. Material: stacked outlined fields. */
-export function Fields({ h, f, children }: { h?: string; f?: string; children?: React.ReactNode }) {
+export function Fields({
+  h,
+  f,
+  card,
+  children,
+}: {
+  h?: string;
+  f?: string;
+  /**
+   * Settings-style group: on Material the controls sit in the same tonal card as list rows, with
+   * the list's heading inset, so a screen that mixes lists and controls (Me) lines up. iOS fields
+   * are a grouped card already.
+   */
+  card?: boolean;
+  children?: React.ReactNode;
+}) {
   const T = useT();
   const kids = React.Children.toArray(children).filter(Boolean);
-  // Material fields sit flush in the 16dp margin, so their heading lines up with the field labels;
-  // iOS headings keep the inset that matches text inside the grouped card.
+  const mdCard = card && !T.ios;
+  // Material form fields sit flush in the 16dp margin, so their heading lines up with the field
+  // labels; iOS headings (and Material cards) keep the inset that matches text inside a card.
   return (
-    <Section h={h} f={f} px={T.ios ? undefined : 16}>
+    <Section h={h} f={f} px={T.ios || mdCard ? undefined : 16}>
       <View
         style={{
           marginHorizontal: 16,
-          borderRadius: T.ios ? T.listR : 0,
+          borderRadius: T.ios || mdCard ? T.listR : 0,
           overflow: "hidden",
           gap: T.fGap,
-          backgroundColor: T.fRowBg,
+          backgroundColor: mdCard ? T.rowBg : T.fRowBg,
+          ...(mdCard ? { paddingHorizontal: 16, paddingVertical: 12 } : null),
         }}
       >
         {kids.map((k, i) => (
@@ -721,15 +739,14 @@ function FieldBox({
         <View style={row ? { flex: 1 } : undefined}>
           <Txt
             style={{
-              fontSize: 13,
-              lineHeight: 18,
+              ...TYPE.footnote,
               color: err ? T.danger : focused ? T.tint : T.fg2,
               fontWeight: "500",
             }}
           >
             {label}
           </Txt>
-          {sub ? <Txt style={{ fontSize: 12.5, lineHeight: 17, color: T.fg3 }}>{sub}</Txt> : null}
+          {sub ? <Txt style={{ ...TYPE.caption, color: T.fg3 }}>{sub}</Txt> : null}
         </View>
         {children}
       </View>
@@ -737,7 +754,7 @@ function FieldBox({
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
           <Txt
             accessibilityLiveRegion={err ? "polite" : undefined}
-            style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: err ? T.danger : T.fg2 }}
+            style={{ flex: 1, ...TYPE.caption, color: err ? T.danger : T.fg2 }}
           >
             {note ?? ""}
           </Txt>
@@ -819,8 +836,7 @@ export function Input({
       <Txt
         accessibilityLabel={`${value.length} of ${max} characters`}
         style={{
-          fontSize: 12.5,
-          lineHeight: 17,
+          ...TYPE.caption,
           color: near ? T.warnFg : T.fg3,
           fontVariant: ["tabular-nums"],
         }}
@@ -1081,8 +1097,23 @@ export function Toggle({
   onChange: (v: boolean) => void;
 }) {
   const T = useT();
+  // A switch reads as a list row: title at row size with a footnote under it, not a small field
+  // label, so it matches the rows around it on settings screens.
   return (
-    <FieldBox label={label} sub={sub} row>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        minHeight: T.rowMin - 12,
+        paddingHorizontal: T.ios ? 16 : 0,
+        paddingVertical: T.ios ? 6 : 0,
+      }}
+    >
+      <View style={{ flex: 1, gap: 2 }}>
+        <Txt>{label}</Txt>
+        {sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{sub}</Txt> : null}
+      </View>
       <Switch
         value={value}
         onValueChange={onChange}
@@ -1090,7 +1121,7 @@ export function Toggle({
         trackColor={{ true: T.switchOn, false: T.switchOff }}
         thumbColor={T.ios ? undefined : value ? (T.dark ? T.b1Fg : "#fff") : T.switchThumbOff}
       />
-    </FieldBox>
+    </View>
   );
 }
 
@@ -1136,7 +1167,7 @@ export function Check({
       </View>
       <View style={{ flex: 1 }}>
         <Txt style={{ fontSize: 16 }}>{label}</Txt>
-        {sub ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{sub}</Txt> : null}
+        {sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{sub}</Txt> : null}
       </View>
     </Pressable>
   );
@@ -1174,7 +1205,7 @@ export function Pick({
       >
         <View style={{ flex: 1 }}>
           <Txt style={{ fontSize: 16, fontWeight: "500" }}>{value}</Txt>
-          {sub ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{sub}</Txt> : null}
+          {sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{sub}</Txt> : null}
         </View>
         <Icon name="chevD" size={20} color={T.fg2} />
       </Pressable>
@@ -1309,7 +1340,7 @@ export function Progress({ count, step, label }: { count: number; step: number; 
           />
         ))}
       </View>
-      <Txt style={{ fontSize: 13, color: T.fg2 }}>{label}</Txt>
+      <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{label}</Txt>
     </View>
   );
 }

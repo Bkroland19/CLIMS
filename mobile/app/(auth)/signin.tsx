@@ -11,6 +11,7 @@ import { ROLE_LABEL, useSession } from "@/lib/session";
 import type { AppRole } from "@/lib/types";
 import { call } from "@/screens/common";
 import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
+import { TYPE } from "@/lib/fonts";
 
 export default function SignIn() {
   const { T, scheme } = useTheme();
@@ -108,7 +109,7 @@ export default function SignIn() {
 
         <Txt
           style={{
-            fontSize: 18,
+            ...TYPE.title,
             fontWeight: "700",
             paddingHorizontal: 16,
             marginBottom: T.ios ? 4 : 8,

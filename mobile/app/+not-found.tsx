@@ -6,6 +6,7 @@ import { useT } from "@/lib/theme";
 import { Btn, Btns, Txt } from "@/components/m/kit";
 import Icon from "@/components/m/Icon";
 import { MAX_FORM_WIDTH, useColumn } from "@/hooks/useResponsive";
+import { TYPE } from "@/lib/fonts";
 
 /**
  * Shown for links that match no screen. Built from the field app's kit, which needs only the theme the
@@ -42,11 +43,11 @@ export default function NotFoundScreen() {
           </View>
           <Txt
             accessibilityRole="header"
-            style={{ fontSize: 22, fontWeight: "700", textAlign: "center" }}
+            style={{ ...TYPE.title, fontWeight: "700", textAlign: "center" }}
           >
             We couldn&apos;t find that page
           </Txt>
-          <Txt style={{ color: T.fg2, fontSize: 15, textAlign: "center", lineHeight: 21 }}>
+          <Txt style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}>
             It may have moved or no longer exists.
           </Txt>
         </View>

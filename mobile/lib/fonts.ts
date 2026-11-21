@@ -54,3 +54,21 @@ export function useAppFonts(): [boolean, boolean] {
   });
   return [loaded && !error, loaded || !!error];
 }
+
+/**
+ * The type scale. Every piece of body-level text uses one of these pairs, so sizes and line
+ * spacing line up across screens; platform chrome (large titles, tab and sheet labels) keeps its
+ * own native sizes in the kit. Line heights sit on a 2pt grid and give wrapped lines room to read.
+ */
+export const TYPE = {
+  /** Hints, counters, timestamps. */
+  caption: { fontSize: 12, lineHeight: 16 },
+  /** Field labels, section notes, secondary detail. */
+  footnote: { fontSize: 13, lineHeight: 18 },
+  /** Supporting lines under a title, banner titles, links. */
+  subhead: { fontSize: 15, lineHeight: 20 },
+  /** Row text, inputs, paragraphs. */
+  body: { fontSize: 16, lineHeight: 22 },
+  /** Card and screen titles. */
+  title: { fontSize: 20, lineHeight: 26 },
+} as const;
