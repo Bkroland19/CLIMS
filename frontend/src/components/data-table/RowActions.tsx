@@ -1,4 +1,4 @@
-import { Ellipsis, type LucideIcon } from 'lucide-react';
+import { EllipsisVertical, type LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -45,7 +45,7 @@ export function RowActions({ label, actions }: RowActionsProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label={label}>
-          <Ellipsis aria-hidden="true" />
+          <EllipsisVertical aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

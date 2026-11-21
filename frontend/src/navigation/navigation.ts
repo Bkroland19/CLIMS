@@ -30,7 +30,7 @@ export interface NavPage {
  */
 export interface NavDetail {
   path: string;
-  /** The last breadcrumb, and the page title. */
+  /** The page title. */
   label: string;
   layout: PageLayout;
 }
