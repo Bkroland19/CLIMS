@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import type { RecordedRequest } from '@/test/fakeAdapter';
@@ -39,6 +40,11 @@ const STORES: DistrictStoreSummary[] = [
 function api(summary: { status: number; body?: unknown }) {
   return (request: RecordedRequest) => {
     switch (request.url) {
+      case '/national/summary?district=Gulu':
+        return { status: 200, body: envelope({ ...SUMMARY, stockouts_last_7_days: 1 }) };
+      case '/national/hotspot-orders?district=Gulu':
+      case '/national/activity?district=Gulu':
+        return { status: 200, body: envelope([]) };
       case '/national/summary':
         return summary;
       case '/national/district-stores':
@@ -95,6 +101,34 @@ describe('MohDashboardPage', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Stock, orders and deliveries on this page are illustrative/),
+    ).toBeInTheDocument();
+  });
+
+  it('changes the figures, latest order and drill-down links when switching districts', async () => {
+    const user = userEvent.setup();
+    renderApp(<MohDashboardPage />, {
+      route: '/moh',
+      signedIn: true,
+      replies: [api({ status: 200, body: envelope(SUMMARY) })],
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Latest order ORD-0141' }),
+    ).toBeInTheDocument();
+    const district = screen.getByRole('combobox', { name: 'District' });
+    await user.click(district);
+    await user.click(await screen.findByRole('option', { name: 'Gulu' }));
+
+    expect(await screen.findByText('No open hotspot orders')).toBeInTheDocument();
+    const stockouts = screen.getByRole('link', { name: /Stockouts in the last 7 days/ });
+    expect(stockouts).toHaveTextContent('1');
+    expect(stockouts).toHaveAttribute('href', '/moh/orders?district=Gulu');
+    expect(screen.queryByText('Hotspot orders, national')).not.toBeInTheDocument();
+
+    await user.click(district);
+    await user.click(await screen.findByRole('option', { name: 'All districts' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Latest order ORD-0141' }),
     ).toBeInTheDocument();
   });
 

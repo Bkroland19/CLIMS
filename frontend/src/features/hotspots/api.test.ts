@@ -45,6 +45,17 @@ describe('listHotspots', () => {
       has_condom_dispenser: true,
     });
   });
+
+  it('sends the district UUID so the API filters before limiting results', async () => {
+    const http = fakeHttp({ success: true, data: [] });
+    const signal = new AbortController().signal;
+
+    await listHotspots(http, signal, wire.district_id);
+
+    expect(http.get).toHaveBeenCalledWith(`/hotspots?limit=100&district_id=${wire.district_id}`, {
+      signal,
+    });
+  });
 });
 
 describe('actOnHotspot', () => {

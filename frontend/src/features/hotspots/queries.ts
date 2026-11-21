@@ -7,6 +7,7 @@ import {
   actOnHotspot,
   listDistricts,
   listHotspotNotifications,
+  listLocationDistricts,
   listHotspots,
   submitHotspot,
   type HotspotAction,
@@ -15,8 +16,14 @@ import {
 
 const hotspotsKey = ['hotspots'] as const;
 
-export function useHotspots() {
-  return useApiQuery(hotspotsKey, listHotspots);
+export function useHotspots(districtId: string | null = null) {
+  return useApiQuery([...hotspotsKey, 'list', districtId], (http, signal) =>
+    listHotspots(http, signal, districtId),
+  );
+}
+
+export function useLocationDistricts(enabled: boolean) {
+  return useApiQuery(['locations', 'districts'], listLocationDistricts, { enabled });
 }
 
 export function useHotspotNotifications() {

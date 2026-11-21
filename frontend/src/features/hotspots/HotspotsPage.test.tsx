@@ -146,6 +146,34 @@ describe('HotspotsPage for a VHT', () => {
 });
 
 describe('HotspotMapPage', () => {
+  it('requests hotspots for the selected district in the MoH map', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderApp(<HotspotMapPage canSwitchDistrict />, {
+      route: '/moh/hotspot-map',
+      signedIn: true,
+      replies: [
+        (request) =>
+          request.url === '/locations/districts'
+            ? list({ id: district, name: 'Wakiso' })
+            : list(hotspot('active')),
+      ],
+    });
+
+    const select = screen.getByRole('combobox', { name: 'District' });
+    await waitFor(() => expect(select).toBeEnabled());
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: 'Wakiso' }));
+
+    await waitFor(() => {
+      expect(requests).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ url: '/hotspots?limit=100' }),
+          expect.objectContaining({ url: `/hotspots?limit=100&district_id=${district}` }),
+        ]),
+      );
+    });
+  });
+
   it('explains what to configure when no maps key is set, instead of a broken map', async () => {
     renderApp(<HotspotMapPage />, { signedIn: true, replies: [list(hotspot('active'))] });
 

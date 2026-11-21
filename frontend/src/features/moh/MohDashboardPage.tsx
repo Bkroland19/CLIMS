@@ -2,7 +2,7 @@
 
 import { CircleAlert, Clock, Inbox, List, Package } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { ActivityTimeline } from '@/components/ActivityTimeline';
@@ -28,6 +28,7 @@ import { EMPTY_VALUE, formatDuration, formatNumber } from '@/lib/format';
 
 import type { DistrictStoreSummary } from './api';
 import { latestOpenOrder } from './audit';
+import { DistrictFilter } from './DistrictFilter';
 import { listHref, MOH_PATHS } from './filters';
 import { districtStockStatus, openOrders, ordersByStage, warehouseTotals } from './national';
 import {
@@ -46,75 +47,86 @@ const RECENT_EVENTS = 8;
 
 /** National view of condom stock, hotspot orders and deliveries. */
 export default function MohDashboardPage() {
-  const summary = useNationalSummary();
+  const district = useSearchParams().get('district') || null;
+  const summary = useNationalSummary(district);
 
   return (
     <div className="flex flex-col gap-6">
       <SampleDataNotice subject="Stock, orders and deliveries" />
+      <DistrictFilter
+        value={district}
+        hrefFor={(next) => listHref(MOH_PATHS.dashboard, { district: next })}
+      />
 
       {summary.isError ? (
         <div className="bg-card rounded-card border">
           <ErrorState
-            title="Could not load the national figures"
+            title={
+              district
+                ? 'Could not load the district figures'
+                : 'Could not load the national figures'
+            }
             error={summary.error}
             onRetry={() => void summary.refetch()}
             isRetrying={summary.isRefetching}
           />
         </div>
       ) : (
-        <Headlines summary={summary} />
+        <Headlines summary={summary} district={district} />
       )}
 
-      <LatestOrder />
+      <LatestOrder district={district} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <TrendChart
-          title="National warehouse stock"
-          description="Male condoms at NMS and JMS, last 12 weeks"
-          categoryLabel="Week"
-          series={[
-            { key: 'nms', label: 'NMS', color: 'var(--chart-2)' },
-            { key: 'jms', label: 'JMS', color: 'var(--chart-1)' },
-          ]}
-          rows={SAMPLE_WAREHOUSE_STOCK}
-          isSample
-        />
-        <TrendChart
-          title="Hotspot orders, national"
-          description="Received vs fulfilled per week, last 8 weeks"
-          categoryLabel="Week"
-          series={[
-            { key: 'received', label: 'Received', color: 'var(--chart-1)' },
-            { key: 'fulfilled', label: 'Fulfilled', color: 'var(--chart-2)' },
-          ]}
-          rows={SAMPLE_NATIONAL_ORDERS}
-          isSample
-        />
-        <ShareList
-          title="Stockouts by district"
-          description="Reported in the last 30 days"
-          totalLabel="Stockouts"
-          shares={SAMPLE_STOCKOUTS_BY_DISTRICT.map((share) => ({
-            ...share,
-            color: 'var(--chart-4)',
-          }))}
-          isSample
-        />
-      </div>
+      {!district && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <TrendChart
+            title="National warehouse stock"
+            description="Male condoms at NMS and JMS, last 12 weeks"
+            categoryLabel="Week"
+            series={[
+              { key: 'nms', label: 'NMS', color: 'var(--chart-2)' },
+              { key: 'jms', label: 'JMS', color: 'var(--chart-1)' },
+            ]}
+            rows={SAMPLE_WAREHOUSE_STOCK}
+            isSample
+          />
+          <TrendChart
+            title="Hotspot orders, national"
+            description="Received vs fulfilled per week, last 8 weeks"
+            categoryLabel="Week"
+            series={[
+              { key: 'received', label: 'Received', color: 'var(--chart-1)' },
+              { key: 'fulfilled', label: 'Fulfilled', color: 'var(--chart-2)' },
+            ]}
+            rows={SAMPLE_NATIONAL_ORDERS}
+            isSample
+          />
+          <ShareList
+            title="Stockouts by district"
+            description="Reported in the last 30 days"
+            totalLabel="Stockouts"
+            shares={SAMPLE_STOCKOUTS_BY_DISTRICT.map((share) => ({
+              ...share,
+              color: 'var(--chart-4)',
+            }))}
+            isSample
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
-        <Pipeline summary={summary} />
-        <DistrictStores />
+        <Pipeline summary={summary} district={district} />
+        <DistrictStores district={district} />
       </div>
 
-      <RecentActivity />
+      <RecentActivity district={district} />
     </div>
   );
 }
 
 type SummaryQuery = ReturnType<typeof useNationalSummary>;
 
-function Headlines({ summary }: { summary: SummaryQuery }) {
+function Headlines({ summary, district }: { summary: SummaryQuery; district: string | null }) {
   const data = summary.data;
   const stock = data ? warehouseTotals(data.warehouse_stock) : null;
   const orders = data ? openOrders(data.orders_by_status) : null;
@@ -124,11 +136,11 @@ function Headlines({ summary }: { summary: SummaryQuery }) {
     <div className="flex flex-col gap-2">
       <StatCardGrid>
         <StatCard
-          label="Stock at warehouses"
+          label="National warehouse stock"
           value={formatNumber(stock?.total)}
           icon={Package}
           accent="positive"
-          href={MOH_PATHS.requests}
+          href={listHref(MOH_PATHS.requests, { district })}
           isLoading={isLoading}
         />
         <StatCard
@@ -136,7 +148,7 @@ function Headlines({ summary }: { summary: SummaryQuery }) {
           value={formatNumber(orders?.open)}
           icon={Inbox}
           accent="info"
-          href={MOH_PATHS.orders}
+          href={listHref(MOH_PATHS.orders, { district })}
           isLoading={isLoading}
         />
         <StatCard
@@ -144,7 +156,7 @@ function Headlines({ summary }: { summary: SummaryQuery }) {
           value={formatNumber(data?.stockouts_last_7_days)}
           icon={CircleAlert}
           accent="caution"
-          href={MOH_PATHS.orders}
+          href={listHref(MOH_PATHS.orders, { district })}
           isLoading={isLoading}
         />
         <StatCard
@@ -152,7 +164,7 @@ function Headlines({ summary }: { summary: SummaryQuery }) {
           value={lead === null ? EMPTY_VALUE : formatDuration(lead * 60_000)}
           icon={Clock}
           accent="violet"
-          href={listHref(MOH_PATHS.orders, { status: 'closed' })}
+          href={listHref(MOH_PATHS.orders, { status: 'closed', district })}
           isLoading={isLoading}
         />
       </StatCardGrid>
@@ -171,8 +183,8 @@ function Headlines({ summary }: { summary: SummaryQuery }) {
 }
 
 /** The newest open order, traced step by step, as the prototype's "Tracing" card. */
-function LatestOrder() {
-  const orders = useNationalOrders(null);
+function LatestOrder({ district }: { district: string | null }) {
+  const orders = useNationalOrders(district);
   if (orders.isPending) {
     return (
       <div role="status">
@@ -200,7 +212,11 @@ function LatestOrder() {
         <EmptyState
           icon={Inbox}
           title="No open hotspot orders"
-          description="New stockout notifications from any district will be traced here."
+          description={
+            district
+              ? `New stockout notifications from ${district} will be traced here.`
+              : 'New stockout notifications from any district will be traced here.'
+          }
         />
       </div>
     );
@@ -222,7 +238,7 @@ function LatestOrder() {
   );
 }
 
-function Pipeline({ summary }: { summary: SummaryQuery }) {
+function Pipeline({ summary, district }: { summary: SummaryQuery; district: string | null }) {
   if (summary.isPending) {
     return (
       <div role="status" className="bg-card rounded-card border p-5">
@@ -236,14 +252,14 @@ function Pipeline({ summary }: { summary: SummaryQuery }) {
   return (
     <ShareList
       title="Hotspot orders by stage"
-      description="All districts, open and closed this month"
+      description={`${district ?? 'All districts'}, open and closed this month`}
       totalLabel="Orders"
       shares={ordersByStage(summary.data.orders_by_status)}
     />
   );
 }
 
-function DistrictStores() {
+function DistrictStores({ district }: { district: string | null }) {
   const router = useRouter();
   const stores = useDistrictStores();
   const columns = useMemo<DataTableColumn<DistrictStoreSummary>[]>(
@@ -293,7 +309,13 @@ function DistrictStores() {
         <DataTable
           label="District stores"
           columns={columns}
-          rows={stores.data}
+          rows={
+            district
+              ? stores.data?.filter(
+                  (store) => store.district.toLowerCase() === district.toLowerCase(),
+                )
+              : stores.data
+          }
           getRowId={(store) => store.district}
           isLoading={stores.isPending}
           error={stores.error}
@@ -329,12 +351,14 @@ function DistrictStores() {
   );
 }
 
-function RecentActivity() {
-  const activity = useNationalActivity();
+function RecentActivity({ district }: { district: string | null }) {
+  const activity = useNationalActivity(district);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Activity across the supply chain</CardTitle>
+        <CardTitle>
+          {district ? `Activity in ${district}` : 'Activity across the supply chain'}
+        </CardTitle>
         <CardDescription>Latest actions by every role</CardDescription>
       </CardHeader>
       <CardContent>
