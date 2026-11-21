@@ -35,7 +35,7 @@ func documentationApp() *fiber.App {
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwt, active)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roles), jwt, active)
 	orders.RegisterRoutes(v1, orders.NewRepository(nil), jwt, active)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(nil), jwt, active)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(nil, notifications.NewService()), jwt, active)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(nil), jwt, active)
 	locations.RegisterRoutes(v1, locations.NewHandler(nil), jwt, active)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(nil), jwt, active)

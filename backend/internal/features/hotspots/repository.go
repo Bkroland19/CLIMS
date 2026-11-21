@@ -5,6 +5,8 @@ import (
 	"errors"
 	"slices"
 
+	"clims-backend/internal/features/notifications"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -45,11 +47,13 @@ type scope struct {
 }
 
 type Repository struct {
-	db *pgxpool.Pool
+	db       *pgxpool.Pool
+	notifier notifications.Notifier
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+// NewRepository needs a notifier with NotificationTypes registered.
+func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier) *Repository {
+	return &Repository{db: db, notifier: notifier}
 }
 
 // The district a DCFP is responsible for, from their assigned store ($1 is the user).
@@ -162,7 +166,7 @@ func (r *Repository) submit(ctx context.Context, actorID string, input SubmitReq
 				return err
 			}
 		}
-		return addEvent(ctx, tx, id, actorID, EventSubmitted, true, nil)
+		return r.record(ctx, tx, id, actorID, EventSubmitted, true, nil, nil)
 	})
 	return id, err
 }
@@ -208,7 +212,7 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 			id, d.ContactPersonName, d.ContactPersonPhone); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, id, actorID, event, true, nil)
+		return r.record(ctx, tx, id, actorID, event, true, nil, nil)
 	})
 }
 
@@ -233,7 +237,7 @@ func (r *Repository) comment(ctx context.Context, access scope, id, text string)
 		if !fromSubmitter {
 			notifyUser = submittedBy
 		}
-		return addEvent(ctx, tx, id, access.userID, EventCommented, fromSubmitter, notifyUser)
+		return r.record(ctx, tx, id, access.userID, EventCommented, fromSubmitter, notifyUser, &text)
 	})
 }
 
@@ -259,7 +263,7 @@ func (r *Repository) decide(ctx context.Context, access scope, id, action, text 
 		if err := addComment(ctx, tx, id, access.userID, step.commentAction, text); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, id, access.userID, step.event, false, submittedBy)
+		return r.record(ctx, tx, id, access.userID, step.event, false, submittedBy, &text)
 	})
 }
 
@@ -333,14 +337,5 @@ func checkDetails(ctx context.Context, tx pgx.Tx, d Details, excludeID *string) 
 func addComment(ctx context.Context, tx pgx.Tx, hotSpotID, userID, action, text string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO hot_spot_comments (hot_spot_id, user_id, action, comment)
 		VALUES ($1, $2, $3, $4)`, hotSpotID, userID, action, text)
-	return err
-}
-
-// addEvent records a workflow step with the hotspot's resulting review status.
-// With notifyDistrict it goes to the hotspot's district, where DCFPs read it.
-func addEvent(ctx context.Context, tx pgx.Tx, hotSpotID, actorID, action string, notifyDistrict bool, notifyUser *string) error {
-	_, err := tx.Exec(ctx, `INSERT INTO hot_spot_events (hot_spot_id, actor_id, action, status, notify_district_id, notify_user_id)
-		SELECT h.id, $2, $3, h.review_status, CASE WHEN $4 THEN h.district_id END, $5
-		FROM hot_spots h WHERE h.id = $1`, hotSpotID, actorID, action, notifyDistrict, notifyUser)
 	return err
 }
