@@ -40,7 +40,11 @@ export default function NotFoundScreen() {
         <Button
           title="Back to start"
           onPress={() => router.replace("/")}
-          style={{ marginTop: 24, alignSelf: "stretch" }}
+          style={{
+            marginTop: 24,
+            width: "100%",
+            maxWidth: 420,
+          }}
         />
       </View>
     </>
