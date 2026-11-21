@@ -10,6 +10,7 @@ import (
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/apidocs"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/health"
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
@@ -24,6 +25,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -53,6 +55,8 @@ func main() {
 
 	app := fiber.New()
 	app.Use(recover.New())
+	// Sets X-Request-ID so a logged failure can be matched to the request that caused it.
+	app.Use(requestid.New())
 	app.Use(middleware.NewSlogLogger())
 
 	app.Use(helmet.New())
@@ -94,6 +98,7 @@ func main() {
 	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {

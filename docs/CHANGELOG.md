@@ -22,6 +22,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   (`.github/workflows/ci.yml`).
 - Security headers on every page, including a Content-Security-Policy that allows no inline
   script except the ones Next.js writes, each marked with a per-request nonce.
+- Condom catalogue API (`/api/v1/catalogue/products`, `/brands`, `/units`) with create, partial
+  update, activate, deactivate and delete for unused records, behind the new `catalogue:manage`
+  permission (admin and moh). Migration 18 converts legacy products, deactivating unrecognised
+  ones and marking those without a unit or pack size as incomplete. See `docs/modules/catalogue.md`.
+- The catalogue screens use that API: edit, activate, deactivate and delete products, brands and
+  units, a Brands tab, status filters and an Incomplete badge for legacy products.
+- Every response carries an `X-Request-ID`, which the request log records.
 
 ### Changed
 
@@ -37,6 +44,11 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - Hotspot status is chosen from a list (active, pending, inactive) instead of typed freely. A
   record saved with another status keeps it.
 - Organisation units are chosen by name instead of entered as a numeric id.
+- API validation errors are reported under JSON field names with readable messages
+  (`"pieces_per_unit": "Must be at most 100,000."`) instead of Go field names and rule tags.
+- New orders and stockout requests reject inactive products.
+- A product's type is its distribution channel (free, socially marketed or commercial), and its
+  brand is chosen from the brand list. The product minimum level is removed.
 
 ### Removed
 

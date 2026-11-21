@@ -171,6 +171,29 @@ describe('createUser', () => {
     });
   });
 
+  it('keeps the readable messages the Go API sends under JSON field names', async () => {
+    const { http } = setup({
+      status: 422,
+      body: {
+        success: false,
+        message: 'validation failed',
+        error: {
+          username: 'Use at least 3 characters.',
+          role_id: 'Choose a valid item from the list.',
+          hot_spot_id: 'Choose a valid item from the list.',
+        },
+      },
+    });
+    await expect(createUser(http, input)).rejects.toMatchObject({
+      kind: 'validation',
+      fieldErrors: {
+        username: ['Use at least 3 characters.'],
+        role_ids: ['Choose at least one role from the list.'],
+        hot_spot_id: ['Choose the hotspot from the list.'],
+      },
+    });
+  });
+
   it('places a duplicate email beside the email field', async () => {
     const { http } = setup({
       status: 409,

@@ -59,4 +59,4 @@ Each notification has its `type`, `title`, `body`, the related `resource_type` a
 
 ## Storage
 
-`notifications` stores each send once, with its rendered text. `notification_recipients` holds one row per person with their `read_at`. Migration 18 created both and dropped Laravel's unused, empty `notifications` table. The legacy `user_notifications` table is kept as history. Notifications are kept indefinitely.
+`notifications` stores each send once, with its rendered text. `notification_recipients` holds one row per person with their `read_at`. Migration 19 created both and dropped Laravel's unused, empty `notifications` table. The legacy `user_notifications` table is kept as history. Notifications are kept indefinitely.

@@ -13,6 +13,7 @@ The backend is a single Go service with feature packages under `backend/internal
 | [locations](locations.md)         | Region, district and subcounty lookups shared by every feature                    | PostgreSQL geography tables                                   |
 | [notifications](notifications.md) | Shared notification service and every user's inbox                                | PostgreSQL; users, roles, permissions and stores              |
 | [inventory](inventory.md)         | Stock balances, movement ledger, hotspot supply and national stock reports        | PostgreSQL; orders tables and the RBAC permission gate        |
+| [catalogue](catalogue.md)         | Condom products, brands and units of measure; retiring records in use             | PostgreSQL; RBAC permission gate                              |
 | health                            | Process and database probes                                                       | PostgreSQL connection pool                                    |
 | apidocs                           | Public Swagger UI and OpenAPI asset routes                                        | Root `docs/api/` filesystem                                   |
 

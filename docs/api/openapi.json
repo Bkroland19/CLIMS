@@ -3,7 +3,7 @@
   "info": {
     "title": "CLIMS API",
     "version": "2.2.0",
-    "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, inventory reporting, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
+    "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, inventory reporting, the condom catalogue, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
   },
   "servers": [
     {
@@ -34,6 +34,9 @@
       "name": "Inventory"
     },
     {
+      "name": "Catalogue"
+    },
+    {
       "name": "Notifications"
     },
     {
@@ -51,7 +54,7 @@
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Raise a hotspot stockout alert",
-        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422.",
+        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
         "responses": {
           "201": {
             "description": "Success",
@@ -364,7 +367,7 @@
         "tags": ["Orders"],
         "operationId": "createOrder",
         "summary": "Request stock",
-        "description": "Requires orders:create. The requesting store must match the current user’s store unless they have orders:all_stores. The date defaults to the database current date.",
+        "description": "Requires orders:create. The requesting store must match the current user’s store unless they have orders:all_stores. The date defaults to the database current date. Inactive products are rejected with 422 and `error.condom_id`.",
         "responses": {
           "201": {
             "description": "Success",
@@ -2281,6 +2284,736 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/catalogue/products": {
+      "get": {
+        "tags": ["Catalogue"],
+        "operationId": "listCatalogueProducts",
+        "summary": "List products",
+        "description": "Any active user may read the catalogue. Sorted by category, brand and type. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "description": "true lists only active records (for pickers), false only inactive ones.",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Catalogue"],
+        "operationId": "createCatalogueProduct",
+        "summary": "Create a product",
+        "description": "New products are active. Requires all permissions: catalogue:manage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. Includes a brand or unit that does not exist or is inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/products/{id}": {
+      "patch": {
+        "tags": ["Catalogue"],
+        "operationId": "updateCatalogueProduct",
+        "summary": "Edit, activate or deactivate a product",
+        "description": "Changes any subset of fields. Deactivating alone is always allowed, so incomplete legacy products can be retired; any other change, or activating, must leave the product complete. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Product not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. Includes missing fields when activating or editing an incomplete product, and a newly chosen brand or unit that is inactive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      },
+      "delete": {
+        "tags": ["Catalogue"],
+        "operationId": "deleteCatalogueProduct",
+        "summary": "Delete an unused product",
+        "description": "Only products that no order or stock record references can be deleted; deactivate the others. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Product not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The product is used by stock or order records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/brands": {
+      "get": {
+        "tags": ["Catalogue"],
+        "operationId": "listCatalogueBrands",
+        "summary": "List brands",
+        "description": "Any active user may read the catalogue. Sorted by name. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "description": "true lists only active records (for pickers), false only inactive ones.",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Catalogue"],
+        "operationId": "createCatalogueBrand",
+        "summary": "Create a brand",
+        "description": "New brands are active. Requires all permissions: catalogue:manage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBrandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "A brand with this name already exists; `error.name` repeats the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/brands/{id}": {
+      "patch": {
+        "tags": ["Catalogue"],
+        "operationId": "updateCatalogueBrand",
+        "summary": "Rename, describe, activate or deactivate a brand",
+        "description": "Renaming updates every product that uses it. Deactivating does not change its products; it only stops the brand being newly chosen. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBrandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Brand not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A brand with this name already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      },
+      "delete": {
+        "tags": ["Catalogue"],
+        "operationId": "deleteCatalogueBrand",
+        "summary": "Delete an unused brand",
+        "description": "Only a brand that no products reference can be deleted; deactivate the others. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Brand not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The brand is used by products.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/units": {
+      "get": {
+        "tags": ["Catalogue"],
+        "operationId": "listCatalogueUnits",
+        "summary": "List units of measure",
+        "description": "Any active user may read the catalogue. Sorted by name. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "description": "true lists only active records (for pickers), false only inactive ones.",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Catalogue"],
+        "operationId": "createCatalogueUnit",
+        "summary": "Create a unit of measure",
+        "description": "New units are active. Requires all permissions: catalogue:manage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUnitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "A unit of measure with this name already exists; `error.name` repeats the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/units/{id}": {
+      "patch": {
+        "tags": ["Catalogue"],
+        "operationId": "updateCatalogueUnit",
+        "summary": "Rename, describe, activate or deactivate a unit of measure",
+        "description": "Renaming updates every product that uses it. Deactivating does not change its products; it only stops the unit of measure being newly chosen. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUnitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Unit of measure not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A unit of measure with this name already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      },
+      "delete": {
+        "tags": ["Catalogue"],
+        "operationId": "deleteCatalogueUnit",
+        "summary": "Delete an unused unit of measure",
+        "description": "Only a unit of measure that no products, orders or stock reference can be deleted; deactivate the others. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Unit of measure not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The unit of measure is used by products, orders or stock.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
       }
     },
     "/api/v1/notifications": {
@@ -4413,6 +5146,375 @@
           }
         }
       },
+      "CatalogueRef": {
+        "type": "object",
+        "required": ["id", "name"],
+        "description": "A linked brand or unit of measure.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "description": "A condom product. Converted legacy products may have null category, type, brand, unit or pieces_per_unit; every field is required to create a product and before one is activated or edited.",
+        "required": [
+          "id",
+          "category",
+          "type",
+          "brand",
+          "unit",
+          "pieces_per_unit",
+          "active",
+          "in_use",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["male", "female"],
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": ["free", "socially_marketed", "commercial"],
+            "nullable": true,
+            "description": "Distribution channel."
+          },
+          "brand": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogueRef"
+              }
+            ],
+            "nullable": true
+          },
+          "unit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogueRef"
+              }
+            ],
+            "nullable": true
+          },
+          "pieces_per_unit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "nullable": true,
+            "description": "How many condoms one unit holds."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Inactive products are hidden from pickers and cannot be ordered."
+          },
+          "in_use": {
+            "type": "boolean",
+            "description": "Referenced by orders or stock records, so it can be deactivated but not deleted."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProductResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Product"
+          }
+        }
+      },
+      "ProductListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          }
+        }
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "type", "brand_id", "unit_id", "pieces_per_unit"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["male", "female"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["free", "socially_marketed", "commercial"]
+          },
+          "brand_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An active brand."
+          },
+          "unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An active unit of measure."
+          },
+          "pieces_per_unit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          }
+        }
+      },
+      "UpdateProductRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "description": "Any subset of fields. Deactivating alone is always allowed; any other change, or activating, must leave the product complete. A brand or unit already on the product may stay even if it has since been deactivated.",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["male", "female"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["free", "socially_marketed", "commercial"]
+          },
+          "brand_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An active brand."
+          },
+          "unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An active unit of measure."
+          },
+          "pieces_per_unit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CatalogueLookup": {
+        "type": "object",
+        "description": "A brand or a unit of measure.",
+        "required": [
+          "id",
+          "name",
+          "note",
+          "active",
+          "in_use",
+          "product_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Inactive brands and units cannot be newly chosen for a product."
+          },
+          "in_use": {
+            "type": "boolean",
+            "description": "Referenced by a product (or, for units, by orders or stock), so it can be deactivated but not deleted."
+          },
+          "product_count": {
+            "type": "integer",
+            "description": "Products that use it, active or not."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CatalogueLookupResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CatalogueLookup"
+          }
+        }
+      },
+      "CatalogueLookupListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogueLookup"
+            }
+          }
+        }
+      },
+      "CreateBrandRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          }
+        }
+      },
+      "UpdateBrandRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateUnitRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          }
+        }
+      },
+      "UpdateUnitRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificationsMarkedResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": ["marked"],
+            "properties": {
+              "marked": {
+                "type": "integer",
+                "format": "int64",
+                "description": "How many unread notifications were marked read."
+              }
+            }
+          }
+        }
+      },
       "Notification": {
         "type": "object",
         "required": [
@@ -4512,30 +5614,6 @@
               "unread": {
                 "type": "integer",
                 "format": "int64"
-              }
-            }
-          }
-        }
-      },
-      "NotificationsMarkedResponse": {
-        "type": "object",
-        "required": ["success", "message", "data"],
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [true]
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object",
-            "required": ["marked"],
-            "properties": {
-              "marked": {
-                "type": "integer",
-                "format": "int64",
-                "description": "How many unread notifications were marked read."
               }
             }
           }

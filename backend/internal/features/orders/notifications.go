@@ -54,6 +54,13 @@ func notification(action string, toStore bool) (string, string, bool) {
 	return "", "", false
 }
 
+// productLabel names a product the same way as the inventory reports: brand,
+// distribution channel and category, e.g. "Engabu Free Male".
+const productLabel = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id = c.brand_id),
+	CASE c.type WHEN 'free' THEN 'Free' WHEN 'socially_marketed' THEN 'Socially marketed'
+		WHEN 'commercial' THEN 'Commercial' END,
+	CASE c.category WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female' END)`
+
 // record writes a workflow step to order_events, the order's history, and notifies
 // the people concerned. A store is notified through the people holding the permission
 // that acts on the step there, rather than everyone assigned to it.
@@ -81,7 +88,7 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID
 	var hotspot, product, fromStore, toStore string
 	var unit *string
 	if err := tx.QueryRow(ctx, `SELECT coalesce(h.name, ph.name, 'a hotspot'),
-			concat_ws(' ', nullif(btrim(c.brand), ''), nullif(btrim(c.type), ''), nullif(btrim(c.category), '')),
+			`+productLabel+`,
 			um.name, fs.name, ts.name
 		FROM orders o
 		JOIN condoms c ON c.id = o.condom_id

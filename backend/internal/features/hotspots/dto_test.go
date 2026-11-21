@@ -42,16 +42,16 @@ func TestSubmissionRejectsMissingOrInvalidFields(t *testing.T) {
 	outOfRange := 91.0
 	longVillage := string(make([]byte, 101))
 	cases := map[string]func(*SubmitRequest){
-		"Name":               func(r *SubmitRequest) { r.Name = " " },
-		"Type":               func(r *SubmitRequest) { r.Type = "" },
-		"RegionID":           func(r *SubmitRequest) { r.RegionID = "not-a-uuid" },
-		"SubcountyID":        func(r *SubmitRequest) { r.SubcountyID = "" },
-		"Village":            func(r *SubmitRequest) { r.Village = &longVillage },
-		"Latitude":           func(r *SubmitRequest) { r.Latitude = &outOfRange },
-		"Longitude":          func(r *SubmitRequest) { r.Longitude = nil },
-		"ContactPersonName":  func(r *SubmitRequest) { r.ContactPersonName = "" },
-		"ContactPersonPhone": func(r *SubmitRequest) { r.ContactPersonPhone = "07-12" },
-		"HasCondomDispenser": func(r *SubmitRequest) { r.HasCondomDispenser = nil },
+		"name":                 func(r *SubmitRequest) { r.Name = " " },
+		"type":                 func(r *SubmitRequest) { r.Type = "" },
+		"region_id":            func(r *SubmitRequest) { r.RegionID = "not-a-uuid" },
+		"subcounty_id":         func(r *SubmitRequest) { r.SubcountyID = "" },
+		"village":              func(r *SubmitRequest) { r.Village = &longVillage },
+		"latitude":             func(r *SubmitRequest) { r.Latitude = &outOfRange },
+		"longitude":            func(r *SubmitRequest) { r.Longitude = nil },
+		"contact_person_name":  func(r *SubmitRequest) { r.ContactPersonName = "" },
+		"contact_person_phone": func(r *SubmitRequest) { r.ContactPersonPhone = "07-12" },
+		"has_condom_dispenser": func(r *SubmitRequest) { r.HasCondomDispenser = nil },
 	}
 	for field, mutate := range cases {
 		request := validSubmission()
