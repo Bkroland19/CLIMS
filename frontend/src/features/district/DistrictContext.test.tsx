@@ -39,10 +39,14 @@ it('keeps the district across warehouse pages and clears it when the warehouse d
   await user.click(await screen.findByRole('option', { name: 'Wakiso' }));
   expect(screen.getByRole('status')).toHaveTextContent('Wakiso');
 
-  act(() => testRouter.push('/warehouse/requests?store=NMS'));
+  act(() => {
+    testRouter.push('/warehouse/requests?store=NMS');
+  });
   expect(screen.getByRole('status')).toHaveTextContent('Wakiso');
 
-  act(() => testRouter.push('/warehouse/requests?store=JMS'));
+  act(() => {
+    testRouter.push('/warehouse/requests?store=JMS');
+  });
   expect(screen.getByRole('status')).toHaveTextContent('Unfiltered');
   await waitFor(() => expect(selector).toBeEnabled());
   expect(selector).toHaveTextContent('All served districts');
