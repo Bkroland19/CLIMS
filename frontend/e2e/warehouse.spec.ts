@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { MOCK_URL } from './support/env';
 import { resetMock } from './support/mock';
 import { expectToast, open } from './support/ui';
 
 /*
- * The warehouse forms, and the round trip with the district: the mock seeds WR-2026-0031
+ * The warehouse forms, and a district request reaching the warehouse: the mock seeds WR-2026-0031
  * (new, at JMS), WR-2026-0030 (queued at NMS, for Mukono) and WR-2026-0027 (on hold at JMS,
  * for Lira, awaiting a supplier delivery).
  */
@@ -79,14 +80,20 @@ async function dispatch(page: Page, id: string): Promise<void> {
   await expectToast(page, `${id} dispatched to Wakiso district store.`);
 }
 
-test('a district request goes to the warehouse, is dispatched, and is received', async ({
+test('a district request reaches the warehouse, which accepts and dispatches it', async ({
   page,
+  request,
 }) => {
-  // District: ask NMS for stock.
-  await open(page, '/dcfp/restock/new', 'New warehouse request');
-  await page.getByRole('button', { name: 'Send request to NMS' }).click();
-  await expect(page).toHaveURL(/\/dcfp\/restock\/WR-\d{4}-\d{4}$/);
-  const id = new URL(page.url()).pathname.split('/').pop() ?? '';
+  // District: Wakiso asks NMS for stock. The warehouse screens still read the mock's own
+  // requests, so the request is raised there directly; the DCFP's receipt of a Go API order is
+  // covered in dcfp.spec.ts.
+  const response = await request.post(`${MOCK_URL}/api/v1/warehouse-requests`, {
+    headers: { Authorization: 'Bearer mock-token' },
+    data: { warehouse: 'NMS', items: { male: 6000, female: 0 }, linked_orders: [], note: '' },
+  });
+  expect(response.ok()).toBe(true);
+  const { data } = (await response.json()) as { data: { id: string } };
+  const id = data.id;
   expect(id).toMatch(/^WR-\d{4}-\d{4}$/);
 
   // Warehouse: accept, check stock, dispatch.
@@ -95,14 +102,4 @@ test('a district request goes to the warehouse, is dispatched, and is received',
   await expectToast(page, `${id} accepted and queued.`);
   await dispatch(page, id);
   await expect(page.getByText('WB-NMS-26-1300').first()).toBeVisible();
-
-  // District: the consignment is waiting to be received.
-  await open(page, `/dcfp/restock/${id}`, 'Warehouse request');
-  await expect(page.getByRole('heading', { name: 'Receive and verify stock' })).toBeVisible();
-  await page.getByRole('checkbox', { name: /checked batch numbers and expiry dates/ }).check();
-  await page.getByRole('checkbox', { name: /signed waybill WB-NMS-26-1300/ }).check();
-  await page.getByRole('button', { name: 'Confirm receipt and issue GRN' }).click();
-
-  await expectToast(page, `${id} received. District stock updated.`);
-  await expect(page.getByRole('heading', { name: /^Goods received note / })).toBeVisible();
 });

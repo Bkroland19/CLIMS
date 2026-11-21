@@ -1,7 +1,11 @@
 import { PanelLeft } from 'lucide-react';
 import Link from 'next/link';
 
-import { type AppNotification, NotificationsBell } from '@/components/layout/NotificationsBell';
+import {
+  type AppNotification,
+  type NotificationActions,
+  NotificationsBell,
+} from '@/components/layout/NotificationsBell';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { Button } from '@/components/ui/button';
@@ -11,10 +15,11 @@ import { HOME_PATH } from '@/navigation/paths';
 interface TopBarProps {
   /** Passed to the bell; leave out while there is no notification feed. */
   notifications?: readonly AppNotification[];
+  notificationActions?: NotificationActions;
 }
 
 /** The full-width bar above the sidebar and page: menu toggle, product, bell, theme and account. */
-export function TopBar({ notifications }: TopBarProps) {
+export function TopBar({ notifications, notificationActions }: TopBarProps) {
   const { isMobile, state, toggleSidebar } = useSidebar();
   const toggleLabel = isMobile
     ? 'Open menu'
@@ -49,7 +54,7 @@ export function TopBar({ notifications }: TopBarProps) {
         <span className="text-muted-foreground truncate text-sm">Ministry of Health · Uganda</span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <NotificationsBell notifications={notifications} />
+        <NotificationsBell notifications={notifications} actions={notificationActions} />
         <ThemeToggle />
       </div>
       <div className="flex min-w-0 shrink-0 items-center border-l pl-3">

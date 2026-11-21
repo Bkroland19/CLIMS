@@ -1,4 +1,4 @@
-import DcfpDashboardPage from '@/features/fulfilment/DcfpDashboardPage';
+import DcfpDashboardPage from '@/features/dcfp/DcfpDashboardPage';
 import { pageMetadata } from '@/navigation/pageMetadata';
 
 export const metadata = pageMetadata('/dcfp');

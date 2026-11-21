@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { type AppNotification, NotificationsBell } from './NotificationsBell';
 
@@ -66,5 +66,37 @@ describe('NotificationsBell', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(bell).toHaveFocus();
+  });
+
+  it('counts only unread notifications, and lists read ones quietly', async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationsBell
+        notifications={[notification(1), { ...notification(2), unread: false }]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Notifications, 1 new' }));
+
+    expect(within(await screen.findByRole('list')).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByText('Unread:')).toHaveLength(1);
+  });
+
+  it('opens a notification through its link and marks the lot read on request', async () => {
+    const user = userEvent.setup();
+    const actions = { onOpen: vi.fn(), onMarkAllRead: vi.fn() };
+    const linked = { ...notification(1), href: '/dcfp/stockouts' };
+    render(<NotificationsBell notifications={[linked, notification(2)]} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications, 2 new' }));
+    await user.click(screen.getByRole('button', { name: 'Mark all read' }));
+    expect(actions.onMarkAllRead).toHaveBeenCalledOnce();
+
+    const link = screen.getByRole('link', { name: /Order ORD-101 was confirmed/ });
+    expect(link).toHaveAttribute('href', '/dcfp/stockouts');
+    await user.click(link);
+    expect(actions.onOpen).toHaveBeenCalledWith(linked);
+    // Following a notification closes the list.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

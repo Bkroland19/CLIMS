@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -108,7 +108,7 @@ describe('signing in', () => {
   it('signs in and lands on the page the visitor originally asked for', async () => {
     const user = userEvent.setup();
     const { store, requests } = renderApp(routes, {
-      route: '/dcfp/orders',
+      route: '/dcfp/stockouts',
       replies: [
         {
           status: 200,
@@ -131,7 +131,9 @@ describe('signing in', () => {
     await user.type(screen.getByLabelText('Password'), 'a-test-password');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Orders' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Stockout notifications' }),
+    ).toBeInTheDocument();
     expect(store.getState().auth.session?.token).toBe('tok');
     expect(requests[0]).toMatchObject({
       url: '/auth/login',
@@ -263,14 +265,54 @@ describe('app shell', () => {
     expect(storage.getItem('clims.sidebar-open')).toBe('false');
   });
 
-  it('says plainly that notifications are not connected yet', async () => {
+  it('lists the inbox in the bell, counting the unread, and marks them read', async () => {
     const user = userEvent.setup();
-    renderApp(routes, { route: '/moh/users', signedIn: true });
+    const inbox = [
+      {
+        id: 'n1',
+        type: 'order.stockout_reported',
+        title: 'Stockout at Kisenyi Landing',
+        body: 'Kisenyi Landing, Kisenyi, Kampala, is out of Engabu Free Female.',
+        resource_type: 'hotspot',
+        resource_id: 'h1',
+        read_at: null,
+        created_at: '2026-11-21T09:00:00Z',
+      },
+      {
+        id: 'n2',
+        type: 'order.shipment_received',
+        title: 'Stock received at Kampala',
+        body: '500 boxes arrived.',
+        resource_type: 'order',
+        resource_id: 'o1',
+        read_at: '2026-11-20T09:00:00Z',
+        created_at: '2026-11-20T08:00:00Z',
+      },
+    ];
+    const { requests } = renderApp(routes, {
+      route: '/moh/users',
+      signedIn: true,
+      replies: [
+        (request) =>
+          request.method === 'GET' && request.url.startsWith('/notifications')
+            ? { status: 200, body: { success: true, data: inbox } }
+            : { status: 200, body: [] },
+      ],
+    });
     await screen.findByRole('heading', { name: 'User management' });
 
-    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(await screen.findByRole('button', { name: 'Notifications, 1 new' }));
 
-    expect(await screen.findByText('Notifications are not connected yet.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Kisenyi Landing, Kisenyi, Kampala, is out of Engabu Free Female.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('500 boxes arrived.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mark all read' }));
+    await waitFor(() => {
+      expect(requests).toContainEqual(
+        expect.objectContaining({ method: 'POST', url: '/notifications/read-all' }),
+      );
+    });
   });
 });
 

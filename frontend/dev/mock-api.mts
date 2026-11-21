@@ -25,6 +25,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { handleDcfp, seedDcfp } from './mock/dcfp.mts';
 import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
 import { handleWarehouse, seedWarehouse } from './mock/warehouse.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
@@ -75,6 +76,7 @@ if (!isDatasetName(DATASET)) {
 function seedAll(dataset: (typeof datasets)[number]): void {
   seedHotspotsMock(dataset);
   seedFulfilment(dataset);
+  seedDcfp(dataset);
   seedWarehouse(dataset);
   seedMoh(dataset);
   seedOnboarding();
@@ -174,6 +176,14 @@ async function route(request: IncomingMessage): Promise<Reply> {
   if (admin) return admin;
   if (Object.hasOwn(lookups, resource)) return reply(200, lookups[resource]);
 
+  // The DCFP's stockout reports and warehouse orders, and the inbox, in the Go API's shapes.
+  const dcfp = handleDcfp(
+    request.method ?? 'GET',
+    parts,
+    body,
+    new URL(request.url ?? '/', 'http://mock').searchParams,
+  );
+  if (dcfp) return dcfp;
   const fulfilment = handleFulfilment(request.method ?? 'GET', parts, body);
   if (fulfilment) return fulfilment;
   const warehouse = handleWarehouse(request.method ?? 'GET', parts, body);
