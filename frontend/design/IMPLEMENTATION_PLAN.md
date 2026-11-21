@@ -33,7 +33,7 @@ Web roles in the prototype:
 | Onboarding (signed out) | Invitation → phone → SMS code → password → check details | — |
 | DCFP (district focal person) | Dashboard · Orders (Queue, Held for stock) · Restock (Warehouse requests, District store) · Dispatch · Hotspots · Monthly reports | Review order · New warehouse request · Warehouse request · Dispatch order · Report |
 | Warehouse (NMS / JMS, switchable) | District requests · Stock · Monthly reports | District request · Report |
-| MOH | Dashboard · Orders (Hotspot orders, Warehouse orders) · Reports (Submissions) · Users & access (Users, Roles & permissions) · Product catalogue (Condoms, Units of measure) · Stores & locations (Stores, Geography) · Audit log | Order audit trail · Report |
+| MOH | Dashboard · Orders (Hotspot orders, Warehouse orders) · Reports (Submissions) · Users & access (Users, Roles & permissions) · Product catalogue (Condoms, Brands, Units of measure) · Stores & locations (Stores, Geography) · Audit log | Order audit trail · Report |
 
 Source files: `Onboarding`, `DcfpWorkspace`, `WarehouseWorkspace`,
 `MohWorkspace`, `AdminWorkspace` (MOH administration), `ReportsWorkspace`
@@ -79,7 +79,8 @@ match `DESIGN.md`. Differences:
 
 The Go API has **auth, users and roles (RBAC) only**. It has nothing for
 hotspots, orders, warehouse requests, dispatch, deliveries, stock, reports,
-catalogue, stores, geography, audit, invitations or SMS codes. Today the
+stores, geography, audit, invitations or SMS codes. (Update: the product catalogue,
+with brands and units, is now in the Go API at `/catalogue`; see `docs/modules/catalogue.md`.) Today the
 frontend serves condoms, hotspots and inventory from `dev/mock-api.mjs` and
 sample data (`components/SampleData.tsx`).
 
@@ -118,7 +119,8 @@ unless asked.
 6. **MOH workspace:** dashboard, hotspot and warehouse orders, order audit
    trail.
 7. **MOH administration:** users and roles (wired to the real
-   `/users` and `/roles` API), product catalogue and units, stores and geography,
+   `/users` and `/roles` API), product catalogue, brands and units (wired to the real
+   `/catalogue` API), stores and geography,
    audit log.
 8. **Monthly reports:** DCFP and warehouse submission flow (figures checked
    before sending), MOH submissions list and report detail.
@@ -229,5 +231,5 @@ its visible text (WCAG 2.5.3).
 ## Still open
 
 1. Backend: which of orders, warehouse requests, dispatch, stock, reports,
-   catalogue, stores, geography, audit and invitations are planned for the Go
+   stores, geography, audit and invitations are planned for the Go
    API, and in what order? This sets which phases can go live first.
