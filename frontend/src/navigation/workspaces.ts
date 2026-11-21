@@ -191,14 +191,22 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Condoms',
                 title: 'Product catalogue',
                 description:
-                  'Condom products. Category, brand and type together identify a product.',
+                  'Condom products, each a brand, category and type in one unit. Orders and stock pick from the active ones.',
+                layout: 'table',
+              },
+              {
+                path: '/moh/catalogue/brands',
+                tab: 'Brands',
+                title: 'Brands',
+                description: 'Brands condom products are distributed or sold under.',
                 layout: 'table',
               },
               {
                 path: '/moh/catalogue/units',
                 tab: 'Units of measure',
                 title: 'Units of measure',
-                description: 'Units condoms are counted in, and how many pieces each holds.',
+                description:
+                  'Units condoms are packed and counted in. Each product says how many condoms its unit holds.',
                 layout: 'table',
               },
             ],

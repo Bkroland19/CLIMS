@@ -18,6 +18,7 @@ import (
 
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
 	"clims-backend/internal/features/locations"
@@ -149,6 +150,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool), jwtMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
 		t.Helper()
@@ -319,7 +321,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 		         SELECT 'test-district', 'Test district', id FROM region RETURNING id),
 		     destination AS (INSERT INTO stores(code, name, store_type, district_id)
 		         SELECT 'test-district', 'Test district store', 'district', id FROM district RETURNING id),
-		     product AS (SELECT id FROM condoms ORDER BY id LIMIT 1),
+		     product AS (SELECT id FROM condoms WHERE active ORDER BY id LIMIT 1),
 		     unit AS (SELECT id FROM unit_of_measures ORDER BY id LIMIT 1)
 		SELECT source.id, destination.id, product.id, unit.id FROM source, destination, product, unit
 	`).Scan(&sourceID, &destinationID, &condomID, &unitID); err != nil {
@@ -370,6 +372,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
+	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
@@ -449,11 +452,18 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id WHERE r.name<>'admin')`).Scan(&userCount, &roleCount); err != nil {
+	// Migration 18 deliberately grants catalogue:manage to moh; every other non-admin grant is the custom one.
+	var mohManagesCatalogue bool
+	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
+		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
+			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'),
+		EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
+			JOIN permissions p ON p.id = rp.permission_id WHERE r.name='moh' AND p.name='catalogue:manage')`).Scan(
+		&userCount, &roleCount, &mohManagesCatalogue); err != nil {
 		t.Fatal(err)
 	}
-	if userCount != 455 || roleCount != 1 {
-		t.Fatal("upgrade changed user count or lost custom permission grants")
+	if userCount != 455 || roleCount != 1 || !mohManagesCatalogue {
+		t.Fatal("upgrade changed user count, lost custom permission grants or did not grant moh the catalogue")
 	}
 	// Upgrading a database that already holds the backup resolves the same duplicates.
 	assertUniqueIdentifiers(t, upgrade)
@@ -475,6 +485,18 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	if archived != 1 || current != 0 {
 		t.Fatalf("legacy orders upgrade: archived=%d current=%d", archived, current)
+	}
+
+	// Upgraded legacy products keep their UUIDs and convert like freshly imported ones.
+	var products, archivedProducts, activeProducts, brandCount int
+	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM condoms), (SELECT count(*) FROM legacy_condoms l
+		JOIN condoms c ON c.id = l.id), (SELECT count(*) FROM condoms WHERE active), (SELECT count(*) FROM brands)`).Scan(
+		&products, &archivedProducts, &activeProducts, &brandCount); err != nil {
+		t.Fatal(err)
+	}
+	if products != 4 || archivedProducts != 4 || activeProducts != 2 || brandCount != 2 {
+		t.Fatalf("legacy catalogue upgrade: products=%d archived=%d active=%d brands=%d",
+			products, archivedProducts, activeProducts, brandCount)
 	}
 
 }

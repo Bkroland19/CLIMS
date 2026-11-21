@@ -2,6 +2,7 @@ package orders
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -80,7 +81,32 @@ func (r *Repository) get(ctx context.Context, access scope, id string) (Order, e
 		` AND id = $5`, access.allStores, access.storeID, access.hotSpotID, access.userID, id))
 }
 
+// errInactiveProduct stops new orders and stockout requests for a deactivated product.
+// Orders already in progress, and their replenishments, carry on.
+var errInactiveProduct = errors.New("product is inactive")
+
+// checkOrderable rejects a deactivated product. A product that does not exist is left to the
+// foreign key, which reports it.
+func checkOrderable(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, condomID string) error {
+	var active bool
+	err := q.QueryRow(ctx, `SELECT active FROM condoms WHERE id = $1`, condomID).Scan(&active)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return nil
+	case err != nil:
+		return err
+	case !active:
+		return errInactiveProduct
+	}
+	return nil
+}
+
 func (r *Repository) create(ctx context.Context, actorID string, input createRequest) (Order, error) {
+	if err := checkOrderable(ctx, r.db, input.CondomID); err != nil {
+		return Order{}, err
+	}
 	return scanOrder(r.db.QueryRow(ctx, `
 		INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
 			ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment)

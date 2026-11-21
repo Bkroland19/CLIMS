@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 )
 
 // NewSlogLogger initializes a JSON structured logger middleware using Go's built-in slog
@@ -33,6 +34,7 @@ func NewSlogLogger() fiber.Handler {
 			slog.Int("status", status),
 			slog.Duration("latency", duration),
 			slog.String("ip", c.IP()),
+			slog.String("request_id", requestid.FromContext(c)),
 		)
 
 		return err

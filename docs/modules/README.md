@@ -12,6 +12,7 @@ The backend is a single Go service with feature packages under `backend/internal
 | [hotspots](hotspots.md)   | VHT hotspot submission; DCFP review, activation and deactivation                  | PostgreSQL; RBAC permission gate and current user             |
 | [locations](locations.md) | Region, district and subcounty lookups shared by every feature                    | PostgreSQL geography tables                                   |
 | [inventory](inventory.md) | Stock balances, movement ledger, hotspot supply and national stock reports        | PostgreSQL; orders tables and the RBAC permission gate        |
+| [catalogue](catalogue.md) | Condom products, brands and units of measure; retiring records in use             | PostgreSQL; RBAC permission gate                              |
 | health                    | Process and database probes                                                       | PostgreSQL connection pool                                    |
 | apidocs                   | Public Swagger UI and OpenAPI asset routes                                        | Root `docs/api/` filesystem                                   |
 
