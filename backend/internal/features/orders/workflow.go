@@ -47,7 +47,7 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, con
 		if err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, order, actorID, "stockout_reported", &order.OrderedFromStoreID, nil)
+		return r.record(ctx, tx, order, actorID, "stockout_reported", &order.OrderedFromStoreID, nil)
 	})
 	return order, err
 }
@@ -78,13 +78,13 @@ func (r *Repository) act(ctx context.Context, access scope, id, action string, i
 		} else if !access.allStores && !assigned(access.storeID, expectedStore) {
 			return errWorkflowForbidden
 		}
-		result, err = transition(ctx, tx, order, access.userID, action, input)
+		result, err = r.transition(ctx, tx, order, access.userID, action, input)
 		return err
 	})
 	return result, err
 }
 
-func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
+func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
 	next := order.Status
 	var notifyStore, notifyUser *string
 	alert := order.HotSpotID != nil
@@ -117,7 +117,7 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		if input.UnitOfMeasureID == nil || input.Quantity == nil {
 			return Order{}, errWorkflowInput
 		}
-		return requestReplenishment(ctx, tx, order, actorID, *input.WarehouseID, *input.UnitOfMeasureID, *input.Quantity)
+		return r.requestReplenishment(ctx, tx, order, actorID, *input.WarehouseID, *input.UnitOfMeasureID, *input.Quantity)
 	case "dispatch":
 		var quantity int32
 		var onHand int64
@@ -235,7 +235,7 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 	if err != nil {
 		return Order{}, err
 	}
-	return result, addEvent(ctx, tx, result, actorID, action, notifyStore, notifyUser)
+	return result, r.record(ctx, tx, result, actorID, action, notifyStore, notifyUser)
 }
 
 // recordMovement adds an order's stock change at a store to the inventory ledger.
@@ -259,7 +259,7 @@ func reserve(ctx context.Context, tx pgx.Tx, order Order) (bool, error) {
 
 // requestReplenishment asks the warehouse for the unit and quantity the DCFP chose, linked to the alert,
 // which then waits on hold. An alert has one open request at a time.
-func requestReplenishment(ctx context.Context, tx pgx.Tx, order Order, actorID, warehouseID, unitID string, quantity int32) (Order, error) {
+func (r *Repository) requestReplenishment(ctx context.Context, tx pgx.Tx, order Order, actorID, warehouseID, unitID string, quantity int32) (Order, error) {
 	child, err := scanOrder(tx.QueryRow(ctx, `INSERT INTO orders
 		(parent_order_id, condom_id, unit_of_measure_id, quantity_needed, ordered_by_id,
 			ordered_for_store_id, ordered_from_store_id, order_status)
@@ -277,10 +277,10 @@ func requestReplenishment(ctx context.Context, tx pgx.Tx, order Order, actorID, 
 	if err != nil {
 		return Order{}, err
 	}
-	if err = addEvent(ctx, tx, held, actorID, "request-replenishment", nil, nil); err != nil {
+	if err = r.record(ctx, tx, held, actorID, "request-replenishment", nil, nil); err != nil {
 		return Order{}, err
 	}
-	return child, addEvent(ctx, tx, child, actorID, "replenishment_requested", &warehouseID, nil)
+	return child, r.record(ctx, tx, child, actorID, "replenishment_requested", &warehouseID, nil)
 }
 
 type Event struct {
@@ -290,12 +290,6 @@ type Event struct {
 	Action    string    `json:"action"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
-}
-
-func addEvent(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, storeID, userID *string) error {
-	_, err := tx.Exec(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, notify_store_id, notify_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6)`, order.ID, actorID, action, order.Status, storeID, userID)
-	return err
 }
 
 func (r *Repository) listEvents(ctx context.Context, access scope, id *string, offset int32) ([]Event, error) {

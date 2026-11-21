@@ -84,11 +84,12 @@ func main() {
 	// One notification service for every feature; each registers its own types.
 	notifier := notifications.NewService()
 	notifier.MustRegister(hotspots.NotificationTypes()...)
+	notifier.MustRegister(orders.NotificationTypes()...)
 
 	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
-	orders.RegisterRoutes(v1, orders.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
