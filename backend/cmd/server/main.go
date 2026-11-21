@@ -55,7 +55,9 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	app := fiber.New()
+	// c.IP() is the client's real address behind nginx; see middleware.WithClientIP.
+	app := fiber.New(middleware.WithClientIP(fiber.Config{}, cfg.TrustedProxies))
+	app.Use(middleware.ClientIP())
 	app.Use(recover.New())
 	// Sets X-Request-ID so a logged failure can be matched to the request that caused it.
 	app.Use(requestid.New())
