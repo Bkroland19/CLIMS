@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "last_mile_condom_distribution",
-    "slug": "lmd",
-    "version": "2.2.0",
+    "name": "CLIMS",
+    "slug": "clims-app",
+    "version": "2.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lmd",
@@ -33,16 +33,29 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 192,
           "resizeMode": "contain",
-          "backgroundColor": "#F3F8F3",
+          "backgroundColor": "#f7faf3",
           "dark": {
-            "image": "./assets/images/splash.png",
-            "backgroundColor": "#0C120D"
+            "image": "./assets/images/splash-logo-dark.png",
+            "backgroundColor": "#10140f"
+          },
+          "ios": {
+            "backgroundColor": "#f2f2f7",
+            "dark": {
+              "backgroundColor": "#000000"
+            }
+          },
+          "android": {
+            "backgroundColor": "#f7faf3",
+            "dark": {
+              "backgroundColor": "#10140f"
+            }
           }
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
@@ -52,9 +65,10 @@
         "origin": false
       },
       "eas": {
-        "projectId": "34fc2cbe-c7f6-460e-ae08-a69ce4573a85"
+        "projectId": "d680bffa-d623-48a1-b8b8-aea07cfc200c"
       },
-      "releaseVersion": "2.2.0"
-    }
+      "releaseVersion": "2.2.1"
+    },
+    "owner": "wafula3"
   }
 }

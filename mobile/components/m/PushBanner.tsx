@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, View } from "react-native";
+import { Animated, Pressable, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "@/lib/theme";
 import { useMe } from "@/lib/session";
 import { useNotes, useStore } from "@/lib/store";
 import type { AppEvent } from "@/lib/types";
 import { orgOf, useOpenNote } from "@/screens/shared";
+import { MAX_SHEET_WIDTH } from "@/hooks/useResponsive";
 import Icon from "./Icon";
 import { Txt } from "./kit";
+import { TYPE } from "@/lib/fonts";
 
 /**
  * Heads-up banner for the newest unread notification, shown once per app launch
@@ -16,6 +18,7 @@ import { Txt } from "./kit";
 export default function PushBanner() {
   const T = useT();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const me = useMe();
   const { s, ready } = useStore();
   const notes = useNotes();
@@ -46,12 +49,16 @@ export default function PushBanner() {
   }, [ready, notes, s.read, me.role, y]);
 
   if (!ev) return null;
+  // Centred and capped on tablets; clear of notches at the sides.
+  const centre = Math.max(0, (width - MAX_SHEET_WIDTH) / 2);
+  const left = Math.max(8, centre, insets.left + 8);
+  const right = Math.max(8, centre, insets.right + 8);
   return (
     <Animated.View
       style={{
         position: "absolute",
-        left: 8,
-        right: 8,
+        left,
+        right,
         top: insets.top + (T.ios ? 4 : 8),
         transform: [{ translateY: y }],
         zIndex: 50,
@@ -91,10 +98,10 @@ export default function PushBanner() {
         </View>
         <View style={{ flex: 1 }}>
           <Txt
-            style={{ fontSize: 13, color: T.fg2 }}
+            style={{ ...TYPE.footnote, color: T.fg2 }}
             numberOfLines={1}
-          >{`CLIMS · ${orgOf(ev)} · ${ev.ref}`}</Txt>
-          <Txt style={{ fontSize: 15, fontWeight: "500" }} numberOfLines={2}>
+          >{`CLIMS · ${orgOf(ev)}`}</Txt>
+          <Txt style={{ ...TYPE.subhead, fontWeight: "500" }} numberOfLines={2}>
             {ev.text}
           </Txt>
         </View>

@@ -16,6 +16,9 @@ var ErrUnknownRole = errors.New("unknown role")
 
 var ErrLastAdmin = errors.New("cannot disable or demote the last active admin")
 
+// ErrUnknownStore means a store_id names no store.
+var ErrUnknownStore = errors.New("unknown store")
+
 type Repository struct{ DB *pgxpool.Pool }
 
 func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
@@ -33,12 +36,15 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 		return "", err
 	}
 	defer tx.Rollback(ctx)
+	if err = checkStore(ctx, tx, req.StoreID); err != nil {
+		return "", err
+	}
 	var id string
 	err = tx.QueryRow(ctx, `INSERT INTO users
-		(username,email,password,firstname,lastname,phone_number,location,organisation_unit_id,hot_spot_id,status,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
+		(username,email,password,firstname,lastname,phone_number,location,organisation_unit_id,hot_spot_id,store_id,status,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
 		req.Username, req.Email, passwordHash, req.FirstName, req.LastName, req.Phone,
-		req.Location, req.Assignment.OrganisationUnitID, req.Assignment.HotSpotID).Scan(&id)
+		req.Location, req.Assignment.OrganisationUnitID, req.Assignment.HotSpotID, req.StoreID).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -252,4 +258,40 @@ func replaceRoles(ctx context.Context, tx pgx.Tx, userID string, roleIDs []strin
 		WHERE u.id = $1 AND r.id = ANY($2::text[]::uuid[]) ON CONFLICT DO NOTHING`,
 		userID, roleIDs)
 	return err
+}
+
+// checkStore returns ErrUnknownStore when storeID names no store. users.store_id has no
+// foreign key (the column predates the stores table), so the API checks instead.
+func checkStore(ctx context.Context, tx pgx.Tx, storeID *string) error {
+	if storeID == nil {
+		return nil
+	}
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM stores WHERE id = $1)`, *storeID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return ErrUnknownStore
+	}
+	return nil
+}
+
+// SetUserStore assigns the store a user works with, or clears it when storeID is nil.
+func (r *Repository) SetUserStore(ctx context.Context, id string, storeID *string) error {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err = checkStore(ctx, tx, storeID); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `UPDATE users SET store_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, id, storeID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return tx.Commit(ctx)
 }

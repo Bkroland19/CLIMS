@@ -26,6 +26,7 @@ All routes require JWT authentication and an active account.
 | PATCH  | `/api/v1/users/{id}/role`   | `roles:assign`                         |
 | PUT    | `/api/v1/users/{id}/roles`  | `roles:assign`                         |
 | PATCH  | `/api/v1/users/{id}/status` | `users:update`                         |
+| PATCH  | `/api/v1/users/{id}/store`  | `users:update`                         |
 
 Listing defaults to `limit=50&offset=0`, allows limits from 1 to 100, and orders by user ID. Account responses include names, email, phone, status, and the complete `roles` array with each role’s permissions. The legacy `role` field contains the assigned role with the lowest UUID, or null when there are no assignments. `PasswordHash` has `json:"-"` and is never serialized.
 
@@ -51,7 +52,13 @@ Administrator creation accepts existing `organisation_unit_id` and `hot_spot_id`
 
 `UpdateUserAccess` updates role or account status inside a transaction. It takes a PostgreSQL transaction advisory lock before reading and updating the account, serializing account-access changes. A request that would disable or demote the last active account with the `admin` role returns 409. This guard applies to concurrent API requests; operators with direct database access must preserve the invariant themselves.
 
-Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, changes to an existing account’s work context, or organization-scoped access.
+Allowed status updates are `active` and `disabled`. Use `PUT /api/v1/users/{id}/roles` with up to 100 existing role UUIDs in `role_ids` to replace the full set. Duplicate IDs collapse into one assignment, and an empty array clears the set. The legacy `PATCH /api/v1/users/{id}/role` endpoint replaces the full set with one role. There is no user deletion endpoint. The current API also does not provide profile editing, password changes, or organization-scoped access.
+
+## Stores
+
+An account's `store_id` decides which orders and stock it works with: a DCFP or delivery agent works at their district's store, and NMS or JMS staff at their national warehouse. `POST /api/v1/users` accepts an optional `store_id`, and `PATCH /api/v1/users/{id}/store` sets it (`{ "store_id": "<uuid>" }`) or clears it (`{ "store_id": null }`); leaving the field out is a 422. `users.store_id` has no foreign key, because the column predates the `stores` table, so both endpoints check the store exists and answer 422 with `error.store_id` otherwise. The web app picks the store from the role and the district chosen; list stores with `GET /api/v1/locations/stores`.
+
+Migration 20 adds National Medical Stores beside the Joint Medical Store and fills in missing stores with `assign_user_stores()`: `nms` and `jms` staff get their warehouse, and DCFPs and delivery agents the store of their legacy district. It never replaces a store already set, and the legacy seed importer calls it too.
 
 ## Administrator provisioning
 

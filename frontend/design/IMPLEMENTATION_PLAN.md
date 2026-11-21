@@ -133,6 +133,14 @@ unless asked.
 
 ### Phase 4 notes (DCFP workspace)
 
+> **Superseded for the DCFP's own screens (2026-11-21).** Hotspot stockouts are now reports that
+> notify the DCFP, and the DCFP orders stock from NMS or JMS directly (`docs/modules/orders.md`).
+> The DCFP screens use the Go API through `src/features/dcfp/` (`/orders/stockouts`,
+> `/orders/warehouse-requests`, `/orders`, `/orders/{id}/actions/receive`), and the mock serves the
+> same paths from `dev/mock/dcfp.mts`. The order queue, held orders and dispatch screens are gone.
+> The contract below still describes what the MOH and warehouse screens and the district store
+> page read from the mock.
+
 **Fulfilment API contract.** Not yet in the Go API. The client (`src/features/fulfilment/api.ts`)
 and the mock (`dev/mock/fulfilment.mts`) use these paths and shapes. Every reply uses the Go
 envelope: `{ success: true, data }`, or `{ success: false, message, error?: { field: message } }`.

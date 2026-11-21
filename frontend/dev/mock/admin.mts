@@ -14,6 +14,8 @@
  * `{ success, data }` envelope and `{ success: false, message, error }` failures.
  */
 
+import { MOCK_STORES, mockDistrictStoreId } from './hotspots.mts';
+
 export interface Reply {
   status: number;
   body: unknown;
@@ -40,6 +42,8 @@ interface User {
   last_login_at: string | null;
   login_count: number;
   created_at: string;
+  /** The store whose orders and stock they work with. */
+  store_id: string | null;
 }
 
 /** A product type, a brand or a unit of measure (`catalogue.Lookup` in the Go API). */
@@ -230,6 +234,13 @@ const LAST_SEEN_DAYS: readonly (number | null)[] = [
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
 
+/** A demo account's store, as migration 20 assigns it: DCFPs at Wakiso's, warehouse staff at theirs. */
+function seedStoreFor(roles: readonly string[]): string | null {
+  if (roles.includes('dfcp')) return mockDistrictStoreId('Wakiso');
+  const warehouse = roles.find((role) => role === 'jms' || role === 'nms');
+  return MOCK_STORES.find((store) => store.code === warehouse)?.id ?? null;
+}
+
 function seedUsers(dataset: string): User[] {
   if (dataset === 'empty') return [];
   const rows = DEMO_USERS.map(
@@ -246,6 +257,7 @@ function seedUsers(dataset: string): User[] {
       phone_number,
       status,
       role_ids: roles.map(roleId),
+      store_id: seedStoreFor(roles),
     }),
   );
   if (dataset !== 'worst') return rows;
@@ -263,6 +275,7 @@ function seedUsers(dataset: string): User[] {
       last_login_at: daysAgo(3650),
       login_count: 1_234_567,
       created_at: daysAgo(4000),
+      store_id: null,
     },
     {
       id: uuid(2, 901),
@@ -276,6 +289,7 @@ function seedUsers(dataset: string): User[] {
       last_login_at: null,
       login_count: 0,
       created_at: daysAgo(0),
+      store_id: null,
     },
     ...rows,
   ];
@@ -284,6 +298,10 @@ function seedUsers(dataset: string): User[] {
 const BRAND = (n: number) => uuid(21, n);
 const UNIT = (n: number) => uuid(22, n);
 const TYPE = (n: number) => uuid(23, n);
+
+/** A seeded catalogue product's or unit's id, for other mocks that refer to them. */
+export const mockProductId = (n: number) => uuid(20, n);
+export const mockUnitId = UNIT;
 
 function lookup(id: string, name: string, note: string | null, active = true, age = 400): Lookup {
   return { id, name, note, active, created_at: daysAgo(age), updated_at: daysAgo(age / 2) };
@@ -808,6 +826,18 @@ const isUuid = (value: unknown): boolean =>
   typeof value === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
+/** Mirrors the Go API's store_id checks: null clears; anything else must name a store. */
+function checkStoreId(value: unknown): Reply | null {
+  if (value === undefined || value === null) return null;
+  if (!isUuid(value)) {
+    return fail(422, 'validation failed', { store_id: 'Choose a valid item from the list.' });
+  }
+  if (!MOCK_STORES.some((store) => store.id === value)) {
+    return fail(422, 'validation failed', { store_id: 'Choose an existing store.' });
+  }
+  return null;
+}
+
 function userView(user: User) {
   const roles = state.roles.filter((role) => user.role_ids.includes(role.id));
   return {
@@ -824,6 +854,7 @@ function userView(user: User) {
       (session) => !session.revoked_at && session.expires_at > new Date().toISOString(),
     ).length,
     created_at: user.created_at,
+    store_id: user.store_id,
     role: roles[0] ?? null,
     roles,
   };
@@ -892,6 +923,8 @@ function handleUsers(
     if (!roleIds.every((roleIdValue) => state.roles.some((role) => role.id === roleIdValue))) {
       return fail(422, 'unknown role_id');
     }
+    const storeProblem = checkStoreId(body.store_id);
+    if (storeProblem) return storeProblem;
     const email = text(body.email).trim().toLowerCase();
     if (state.users.some((user) => user.email.toLowerCase() === email)) {
       return fail(409, 'email already exists');
@@ -909,6 +942,7 @@ function handleUsers(
       last_login_at: null,
       login_count: 0,
       created_at: new Date().toISOString(),
+      store_id: typeof body.store_id === 'string' ? body.store_id : null,
     };
     state.users.push(user);
     const names = state.roles.filter((role) => roleIds.includes(role.id)).map((role) => role.name);
@@ -969,6 +1003,22 @@ function handleUsers(
       ]);
     }
     return ok({ revoked: live.length });
+  }
+
+  if (sub === 'store' && method === 'PATCH') {
+    if (!('store_id' in body)) {
+      return fail(422, 'validation failed', { store_id: 'This field is required.' });
+    }
+    const storeProblem = checkStoreId(body.store_id);
+    if (storeProblem) return storeProblem;
+    const next = typeof body.store_id === 'string' ? body.store_id : null;
+    const storeName = (storeId: string | null) =>
+      MOCK_STORES.find((store) => store.id === storeId)?.name ?? null;
+    record('updated', 'user', name, 'Changed store', [
+      { field: 'store', old: storeName(user.store_id), new: storeName(next) },
+    ]);
+    user.store_id = next;
+    return ok(null);
   }
 
   if (sub === 'status' && method === 'PATCH') {

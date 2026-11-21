@@ -89,12 +89,3 @@ export const initials = (name: string) =>
     .map((w) => w[0]!.toUpperCase())
     .join("")
     .slice(0, 2);
-
-/** A YYYY-MM reporting period; reports are due on the 20th of the following month. */
-export const periodOf = (p: string) => {
-  const [y, m] = p.split("-").map(Number);
-  const month = new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long" });
-  const days = new Date(y, m, 0).getDate();
-  const due = new Date(y, m, 20);
-  return { label: `${month} ${y}`, month, days, due: dateLabel(due.getTime()) };
-};

@@ -9,7 +9,7 @@ import (
 )
 
 // testInventoryReports runs after the order workflow: the warehouse received 100 and dispatched 50,
-// the district received 55 and dispatched 45 to the hotspot, which received one delivery of 45.
+// and the district counted 55 on receipt. Stockout reports are not orders, so nothing went to a hotspot.
 func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 	request func(string, string, any, string, int) map[string]any,
 	admin, districtToken, warehouse, district, hotSpot string,
@@ -36,18 +36,17 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 		stock[row["store_id"].(string)] = row
 	}
 	expect("warehouse stock", stock[warehouse], map[string]float64{"on_hand": 50, "reserved": 0, "available": 50, "incoming": 0})
-	expect("district stock", stock[district], map[string]float64{"on_hand": 10, "available": 10})
+	expect("district stock", stock[district], map[string]float64{"on_hand": 55, "available": 55})
 	if stock[warehouse]["store_type"] != "national" || stock[district]["district_name"] == nil {
 		t.Fatalf("stock rows lack store details: %v", stock)
 	}
 
 	// The ledger explains the district balance, newest first.
 	moves := list("/inventory/movements?store_id="+district, admin)
-	if len(moves) != 2 || moves[0]["reason"] != "dispatch" || moves[1]["reason"] != "order_receipt" || moves[0]["order_id"] == nil {
+	if len(moves) != 1 || moves[0]["reason"] != "order_receipt" || moves[0]["order_id"] == nil {
 		t.Fatalf("district movements: %v", moves)
 	}
-	expect("district dispatch", moves[0], map[string]float64{"quantity": -45, "on_hand_after": 10})
-	expect("district receipt", moves[1], map[string]float64{"quantity": 55, "on_hand_after": 55})
+	expect("district receipt", moves[0], map[string]float64{"quantity": 55, "on_hand_after": 55})
 	if receipts := list("/inventory/movements?reason=receipt&store_id="+warehouse, admin); len(receipts) != 1 {
 		t.Fatalf("warehouse receipt missing: %v", receipts)
 	}
@@ -57,18 +56,17 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 	}
 	request("GET", "/inventory/movements?from=2026-02-30", nil, admin, 400)
 
-	hotspots := list("/inventory/hotspots?hot_spot_id="+hotSpot, admin)
-	if len(hotspots) != 1 || hotspots[0]["last_delivered_at"] == nil {
-		t.Fatalf("hotspot stock: %v", hotspots)
+	// The hotspot report covers alert orders raised before stockouts became reports; there are none here.
+	if hotspots := list("/inventory/hotspots?hot_spot_id="+hotSpot, admin); len(hotspots) != 0 {
+		t.Fatalf("hotspot stock from a stockout report: %v", hotspots)
 	}
-	expect("hotspot", hotspots[0], map[string]float64{"delivered": 45, "deliveries": 1, "in_transit": 0, "open_alerts": 0, "on_hold_requests": 0})
 
 	summary := list("/inventory/summary", admin)
 	if len(summary) != 1 {
 		t.Fatalf("summary: %v", summary)
 	}
-	expect("summary", summary[0], map[string]float64{"warehouse_on_hand": 50, "district_on_hand": 10,
-		"in_transit": 0, "delivered_to_hotspots": 45, "open_hotspot_requests": 0})
+	expect("summary", summary[0], map[string]float64{"warehouse_on_hand": 50, "district_on_hand": 55,
+		"in_transit": 0, "delivered_to_hotspots": 0, "open_hotspot_requests": 0})
 
 	// Adjustments cannot push stock below zero (nothing is reserved) and must say why.
 	adjust := func(quantity int, code int) map[string]any {
@@ -77,8 +75,8 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 			"unit_of_measure_id": stock[district]["unit_of_measure_id"], "reason": "adjustment", "quantity": quantity,
 			"note": "Stock count"}, admin, code)
 	}
-	adjust(-20, 409)
-	expect("adjustment", adjust(-3, 201)["data"].(map[string]any), map[string]float64{"quantity": -3, "on_hand_after": 7})
+	adjust(-60, 409)
+	expect("adjustment", adjust(-3, 201)["data"].(map[string]any), map[string]float64{"quantity": -3, "on_hand_after": 52})
 
 	// A DCFP sees and adjusts only the district store, and not the national summary.
 	var dfcpRole string
@@ -90,33 +88,13 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 	if own := list("/inventory/stock", districtToken); len(own) != 1 || own[0]["store_id"] != district {
 		t.Fatalf("district user saw other stores: %v", own)
 	}
-	if own := list("/inventory/hotspots", districtToken); len(own) != 1 {
-		t.Fatalf("district user should see its hotspot: %v", own)
-	}
 	request("GET", "/inventory/summary", nil, districtToken, 403)
 	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": stock[district]["condom_id"],
 		"unit_of_measure_id": stock[district]["unit_of_measure_id"], "reason": "receipt", "quantity": 5}, districtToken, 403)
 
-	// An open alert has no unit until the DCFP acts, so reports show it on a row without one.
+	// A stockout report moves no stock and opens no request, so the reports are unchanged by one.
 	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": stock[district]["condom_id"]}, admin, 201)
-	var alertRow map[string]any
-	for _, row := range list("/inventory/hotspots?hot_spot_id="+hotSpot, admin) {
-		if row["unit_of_measure_id"] == nil {
-			alertRow = row
-		}
+	if after := list("/inventory/summary", admin); len(after) != 1 || after[0]["open_hotspot_requests"] != float64(0) {
+		t.Fatalf("a stockout report changed the summary: %v", after)
 	}
-	if alertRow == nil {
-		t.Fatal("open alert missing from the hotspot report")
-	}
-	expect("open alert", alertRow, map[string]float64{"open_alerts": 1, "delivered": 0})
-	var alertSummary map[string]any
-	for _, row := range list("/inventory/summary", admin) {
-		if row["unit_of_measure_id"] == nil {
-			alertSummary = row
-		}
-	}
-	if alertSummary == nil || alertSummary["unit"] != nil {
-		t.Fatalf("open alert missing from the summary: %v", alertSummary)
-	}
-	expect("summary alert", alertSummary, map[string]float64{"open_hotspot_requests": 1, "district_on_hand": 0})
 }

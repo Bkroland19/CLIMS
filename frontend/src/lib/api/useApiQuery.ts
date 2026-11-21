@@ -9,6 +9,8 @@ interface ApiQueryOptions {
   staleTime?: number;
   /** False holds the request back, e.g. until the screen that needs it is open. Defaults to true. */
   enabled?: boolean;
+  /** Refetch this often, in ms, while the query is in use, e.g. to check for new notifications. */
+  refetchInterval?: number;
 }
 
 /**

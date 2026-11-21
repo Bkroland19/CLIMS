@@ -10,6 +10,16 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { items as fmtItems } from "./format";
+import { isAxiosError } from "axios";
+import {
+  isNetworkError,
+  listHotspotsPage,
+  type ApiHotspot,
+  submitErrorMessage,
+  submitHotspot,
+  toLocalHotspot,
+} from "./hotspots";
+import { reportStockout, stockoutErrorMessage, toLocalOrder } from "./orders";
 import { createSeed, DEFAULT_PERSONAS, HM_HOTSPOT } from "./seed";
 import { useMe } from "./session";
 import type {
@@ -21,8 +31,6 @@ import type {
   Hotspot,
   OutboxItem,
   Qty,
-  ReportError,
-  ReportValues,
 } from "./types";
 
 /**
@@ -45,11 +53,36 @@ interface StoreCtx {
   ready: boolean;
   offline: boolean;
   send: (type: ActionType, payload: any, label: string) => SendResult;
-  /** Record validation errors on a report. Local only, never queued. */
-  reportErrors: (id: string, values: ReportValues, errors: ReportError[]) => void;
+  /**
+   * Reload the first page of the signed-in VHT's submitted hotspots, replacing the phone's list.
+   * `status` is "ok", "offline", "forbidden" (the vht role lacks hotspots:read) or "error";
+   * `hasMore` says whether loadMoreHotspots can fetch another page. Demo sign-ins resolve "ok".
+   */
+  refreshHotspots: () => Promise<PageResult>;
+  /** Append the next page of submitted hotspots, starting at `offset` (the number already loaded). */
+  loadMoreHotspots: (offset: number) => Promise<PageResult>;
+  /** Replace the phone's copies of API orders with a fresh list from GET /orders. */
+  syncApiOrders: (orders: DomainState["orders"]) => void;
+  /** Save an action to the outbox even when online, e.g. after a request failed on the network. */
+  queue: (type: ActionType, payload: any, label: string) => void;
   markRead: (role: AppRole) => void;
   reset: () => void;
 }
+
+export type RefreshResult = "ok" | "offline" | "forbidden" | "error";
+export interface PageResult {
+  status: RefreshResult;
+  hasMore: boolean;
+}
+
+const failure = (err: unknown): PageResult => ({
+  status: isNetworkError(err)
+    ? "offline"
+    : isAxiosError(err) && err.response?.status === 403
+      ? "forbidden"
+      : "error",
+  hasMore: false,
+});
 
 const Ctx = createContext<StoreCtx | null>(null);
 
@@ -122,18 +155,31 @@ function apply(
         },
       };
     }
+    case "stockout": {
+      // `p.order` comes from toLocalOrder: the API's alert with its UUID.
+      const order = p.order as DomainState["orders"][number];
+      return {
+        id: order.id,
+        next: { ...s, orders: [order, ...s.orders.filter((o) => o.id !== order.id)] },
+      };
+    }
     case "mapHotspot": {
+      // `p.hotspot` comes from toLocalHotspot (the API's copy, with its UUID) or draftHotspot
+      // (demo sign-ins). New hotspots wait inactive for the DCFP's review either way.
       const nums = s.hotspots.map((h) => parseInt(h.id.replace(/\D/g, ""), 10) || 0);
-      const id = `HS-${String(Math.max(0, ...nums) + 1).padStart(4, "0")}`;
+      const id: string = p.hotspot.id ?? `HS-${String(Math.max(0, ...nums) + 1).padStart(4, "0")}`;
       const h: Hotspot = {
-        ...p.hotspot,
-        id,
-        district: "Wakiso",
-        status: "Active",
+        status: "Inactive",
+        reviewStatus: "submitted",
         stock: { male: 0, female: 0 },
         mappedAt: now,
+        ...p.hotspot,
+        id,
       };
-      return { id, next: { ...s, hotspots: [h, ...s.hotspots] } };
+      return {
+        id,
+        next: { ...s, hotspots: [h, ...s.hotspots.filter((x) => x.id !== id)] },
+      };
     }
     case "confirmReceipt": {
       const o = s.orders.find((x) => x.id === p.id);
@@ -222,52 +268,21 @@ function apply(
         },
       };
     }
-    case "rptSave":
-      return {
-        next: {
-          ...s,
-          reports: s.reports.map((r) =>
-            r.id === p.id ? { ...r, values: p.values, savedAt: now } : r,
-          ),
-        },
-      };
-    case "rptSend": {
-      const r = s.reports.find((x) => x.id === p.id);
-      if (!r) return { next: s };
-      const receipt = `MOH-${String(new Date(now).getFullYear()).slice(2)}${String(new Date(now).getMonth() + 1).padStart(2, "0")}-${String(now % 10000).padStart(4, "0")}`;
-      return {
-        next: {
-          ...s,
-          reports: s.reports.map((x) =>
-            x.id === p.id
-              ? {
-                  ...x,
-                  values: p.values,
-                  status: "sent",
-                  errors: [],
-                  runs: x.runs + 1,
-                  savedAt: now,
-                  sentAt: now,
-                  receipt,
-                  reporter: me,
-                }
-              : x,
-          ),
-          events: [
-            ev({
-              ref: r.id,
-              role: "MOH",
-              actor: "Ministry of Health",
-              text: "Received your monthly report",
-              to: [r.own],
-            }),
-            ...s.events,
-          ],
-        },
-      };
-    }
   }
   return { next: s };
+}
+
+/**
+ * Monthly reporting was removed from the field app. Drop what older versions saved for it:
+ * the reports, their MOH notifications, and report saves still waiting in the outbox.
+ */
+export function withoutReports(saved: DomainState & { reports?: unknown }): DomainState {
+  const { reports: _reports, ...rest } = saved;
+  return {
+    ...rest,
+    events: rest.events.filter((e) => !e.ref.startsWith("RPT-")),
+    outbox: rest.outbox.filter((it) => !String(it.type).startsWith("rpt")),
+  };
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -291,7 +306,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(key)
       .then((raw) => {
         if (!live) return;
-        if (raw) commit(JSON.parse(raw));
+        if (raw) commit(withoutReports(JSON.parse(raw)));
         else commit(createSeed(personas));
       })
       .catch(() => {})
@@ -306,14 +321,92 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(key, JSON.stringify(s)).catch(() => {});
   }, [s, key, ready]);
 
-  const flush = useCallback(() => {
-    const cur = ref.current;
-    if (!cur.outbox.length) return;
-    let next: DomainState = { ...cur, outbox: [] };
-    for (const it of cur.outbox)
-      next = apply(next, it.type, it.payload, it.role, me.name, Date.now()).next;
-    commit(next);
+  const flushing = useRef(false);
+
+  /**
+   * Send the outbox in order. Hotspot submissions (payloads with a `request`) go to the API and
+   * stop the flush if the network drops again; everything else still applies locally.
+   */
+  const flush = useCallback(async () => {
+    if (flushing.current) return;
+    flushing.current = true;
+    try {
+      for (;;) {
+        const it = ref.current.outbox[0];
+        if (!it) break;
+        const drop = (st: DomainState) => ({
+          ...st,
+          outbox: st.outbox.filter((x) => x.id !== it.id),
+        });
+        if (it.type === "mapHotspot" && it.payload?.request) {
+          try {
+            const res = await submitHotspot(it.payload.request);
+            const hotspot = toLocalHotspot(res, me.name, it.payload.request.comment);
+            commit(
+              apply(drop(ref.current), it.type, { hotspot }, it.role, me.name, Date.now()).next,
+            );
+          } catch (err) {
+            if (isNetworkError(err)) break;
+            // Refused (duplicate name, mismatched place…): tell the VHT so they can map it again.
+            const cur = drop(ref.current);
+            const now = Date.now();
+            commit({
+              ...cur,
+              events: [
+                {
+                  id: `EV-${now}-${it.id}`,
+                  t: now,
+                  ref: `MAP-${it.id}`,
+                  role: "System",
+                  actor: "CLIMS",
+                  text: `Couldn't submit ${it.payload.request.name}. ${submitErrorMessage(err)}`,
+                  to: [it.role],
+                },
+                ...cur.events,
+              ],
+            });
+          }
+          continue;
+        }
+        if (it.type === "stockout" && it.payload?.request) {
+          const { request, hotspot, product } = it.payload;
+          try {
+            const res = await reportStockout(request);
+            const order = toLocalOrder(res, { hotspot, product }, me.name);
+            commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
+          } catch (err) {
+            if (isNetworkError(err)) break;
+            const cur = drop(ref.current);
+            const now = Date.now();
+            commit({
+              ...cur,
+              events: [
+                {
+                  id: `EV-${now}-${it.id}`,
+                  t: now,
+                  ref: `REQ-${it.id}`,
+                  role: "System",
+                  actor: "CLIMS",
+                  text: `Couldn't send the stock request for ${hotspot}. ${stockoutErrorMessage(err)}`,
+                  to: [it.role],
+                },
+                ...cur.events,
+              ],
+            });
+          }
+          continue;
+        }
+        commit(apply(drop(ref.current), it.type, it.payload, it.role, me.name, Date.now()).next);
+      }
+    } finally {
+      flushing.current = false;
+    }
   }, [commit, me.name]);
+
+  // Anything queued in an earlier session goes out as soon as this one has loaded.
+  useEffect(() => {
+    if (ready && !offline) flush();
+  }, [ready, offline, flush]);
 
   useEffect(
     () =>
@@ -325,41 +418,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [flush],
   );
 
+  const queue = useCallback(
+    (type: ActionType, payload: any, label: string) => {
+      const cur = ref.current;
+      const item: OutboxItem = {
+        id: `OB-${Date.now()}`,
+        type,
+        payload,
+        label,
+        role: me.role,
+        at: Date.now(),
+      };
+      commit({ ...cur, outbox: [...cur.outbox, item] });
+    },
+    [commit, me.role],
+  );
+
   const send = useCallback(
     (type: ActionType, payload: any, label: string): SendResult => {
       const cur = ref.current;
       if (offline) {
-        const item: OutboxItem = {
-          id: `OB-${Date.now()}`,
-          type,
-          payload,
-          label,
-          role: me.role,
-          at: Date.now(),
-        };
-        commit({ ...cur, outbox: [...cur.outbox, item] });
+        queue(type, payload, label);
         return { queued: true };
       }
       const { next, id } = apply(cur, type, payload, me.role, me.name, Date.now());
       commit(next);
       return { queued: false, id };
     },
-    [offline, commit, me.role, me.name],
-  );
-
-  const reportErrors = useCallback(
-    (id: string, values: ReportValues, errors: ReportError[]) => {
-      const cur = ref.current;
-      commit({
-        ...cur,
-        reports: cur.reports.map((r) =>
-          r.id === id
-            ? { ...r, values, errors, status: "errors", runs: r.runs + 1, savedAt: Date.now() }
-            : r,
-        ),
-      });
-    },
-    [commit],
+    [offline, commit, queue, me.role, me.name],
   );
 
   const markRead = useCallback(
@@ -370,11 +456,89 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [commit],
   );
 
+  /** Store one page of API hotspots: the API's copy wins, keeping what only the phone knows. */
+  const storePage = useCallback(
+    (page: ApiHotspot[], replace: boolean) => {
+      const cur = ref.current;
+      const prev = new Map(cur.hotspots.map((h) => [h.id, h]));
+      const fresh = page.map((a) => {
+        const h = toLocalHotspot(a, me.name, null);
+        const p = prev.get(h.id);
+        return p
+          ? { ...h, stock: p.stock, lastDelivery: p.lastDelivery, comment: p.comment, vhts: p.vhts }
+          : h;
+      });
+      const ids = new Set(fresh.map((h) => h.id));
+      const rest = cur.hotspots.filter((h) => h.source !== "api");
+      // A refresh replaces the API list with page one; later pages append in the API's order.
+      const earlier = replace
+        ? []
+        : cur.hotspots.filter((h) => h.source === "api" && !ids.has(h.id));
+      commit({ ...cur, hotspots: [...earlier, ...fresh, ...rest] });
+    },
+    [commit, me.name],
+  );
+
+  const refreshHotspots = useCallback(async (): Promise<PageResult> => {
+    if (me.demo) return { status: "ok", hasMore: false };
+    try {
+      const page = await listHotspotsPage({ offset: 0, submittedBy: me.id });
+      storePage(page.items, true);
+      return { status: "ok", hasMore: page.hasMore };
+    } catch (err) {
+      return failure(err);
+    }
+  }, [me.demo, me.id, storePage]);
+
+  const loadMoreHotspots = useCallback(
+    async (offset: number): Promise<PageResult> => {
+      if (me.demo) return { status: "ok", hasMore: false };
+      try {
+        const page = await listHotspotsPage({ offset, submittedBy: me.id });
+        storePage(page.items, false);
+        return { status: "ok", hasMore: page.hasMore };
+      } catch (err) {
+        return failure(err);
+      }
+    },
+    [me.demo, me.id, storePage],
+  );
+
+  const syncApiOrders = useCallback(
+    (orders: DomainState["orders"]) => {
+      const cur = ref.current;
+      commit({ ...cur, orders: [...orders, ...cur.orders.filter((o) => o.source !== "api")] });
+    },
+    [commit],
+  );
+
   const reset = useCallback(() => commit(createSeed(personas)), [commit, personas]);
 
   const value = useMemo(
-    () => ({ s, ready, offline, send, reportErrors, markRead, reset }),
-    [s, ready, offline, send, reportErrors, markRead, reset],
+    () => ({
+      s,
+      ready,
+      offline,
+      send,
+      queue,
+      refreshHotspots,
+      loadMoreHotspots,
+      syncApiOrders,
+      markRead,
+      reset,
+    }),
+    [
+      s,
+      ready,
+      offline,
+      send,
+      queue,
+      refreshHotspots,
+      loadMoreHotspots,
+      syncApiOrders,
+      markRead,
+      reset,
+    ],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -389,13 +553,22 @@ export function useStore() {
 export function useNotes() {
   const { s } = useStore();
   const me = useMe();
-  return useMemo(
-    () =>
-      s.events
-        .filter((e) => e.to.includes(me.role) && e.actor !== me.name)
-        .sort((a, b) => b.t - a.t),
-    [s.events, me.role, me.name],
-  );
+  return useMemo(() => {
+    // Signed-in VHTs and hotspot managers only hear about their own hotspots and orders (and the app's own alerts),
+    // not the sample data the phone starts with.
+    const ownOnly = (me.role === "vht" || me.role === "hm") && !me.demo;
+    const hotspots = new Set(s.hotspots.filter((h) => h.source === "api").map((h) => h.id));
+    const refs = new Set([
+      ...hotspots,
+      ...s.orders.filter((o) => o.source === "api" || hotspots.has(o.hotspotId)).map((o) => o.id),
+    ]);
+    return s.events
+      .filter((e) => e.to.includes(me.role) && e.actor !== me.name)
+      .filter(
+        (e) => !ownOnly || refs.has(e.ref) || e.ref.startsWith("MAP-") || e.ref.startsWith("REQ-"),
+      )
+      .sort((a, b) => b.t - a.t);
+  }, [s.events, s.hotspots, s.orders, me.role, me.name, me.demo]);
 }
 
 /** Unread notifications for the signed-in role. */

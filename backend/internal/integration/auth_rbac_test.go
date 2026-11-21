@@ -22,6 +22,7 @@ import (
 	"clims-backend/internal/features/hotspots"
 	"clims-backend/internal/features/inventory"
 	"clims-backend/internal/features/locations"
+	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -146,10 +147,14 @@ func TestAuthRBACIntegration(t *testing.T) {
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwtMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtMiddleware, activeUser)
-	orders.RegisterRoutes(v1, orders.NewRepository(pool), jwtMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool), jwtMiddleware, activeUser)
+	notifier := notifications.NewService()
+	notifier.MustRegister(hotspots.NotificationTypes()...)
+	notifier.MustRegister(orders.NotificationTypes()...)
+	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier), jwtMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier), jwtMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
+	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
@@ -370,9 +375,12 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatalf("orders leaked to unassigned user: %v", visible)
 	}
 
+	testDistrictStockouts(t, pool, request, login, adminToken, condomID)
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
+	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
 	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
+	testStoreAssignment(t, pool, request, adminToken, userToken)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)
@@ -498,6 +506,17 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if products != 4 || archivedProducts != 4 || activeProducts != 2 || brandCount != 2 {
 		t.Fatalf("legacy catalogue upgrade: products=%d archived=%d active=%d brands=%d",
 			products, archivedProducts, activeProducts, brandCount)
+	}
+
+	// Upgrades gain the second national warehouse and fill in missing warehouse stores.
+	var nationalStores, jmsWithoutStore int
+	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM stores WHERE store_type = 'national'),
+		(SELECT count(*) FROM users u JOIN role_user ru ON ru.user_id = u.id JOIN roles r ON r.id = ru.role_id
+			WHERE r.name = 'jms' AND u.store_id IS NULL)`).Scan(&nationalStores, &jmsWithoutStore); err != nil {
+		t.Fatal(err)
+	}
+	if nationalStores != 2 || jmsWithoutStore != 0 {
+		t.Fatalf("store assignment upgrade: national=%d jms without store=%d", nationalStores, jmsWithoutStore)
 	}
 
 }

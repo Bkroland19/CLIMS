@@ -19,7 +19,7 @@ import { PRODUCTS, sumQuantities, type ProductKey } from './products';
 import { useDistrictStore, useOrders, useRequests } from './queries';
 import { RecordView } from '@/components/RecordView';
 import { StockLevel } from './StockLevel';
-import { DCFP_PATHS } from './tasks';
+import { DCFP_PATHS } from '@/features/dcfp/orders';
 
 export default function DistrictStorePage() {
   const store = useDistrictStore();
@@ -195,7 +195,7 @@ function StoreView({ store }: { store: DistrictStore }) {
             </p>
           </div>
           <Button asChild className="self-start sm:self-auto">
-            <Link href={DCFP_PATHS.newRequest}>
+            <Link href={DCFP_PATHS.newOrder}>
               <Plus data-icon="inline-start" />
               Request stock
             </Link>

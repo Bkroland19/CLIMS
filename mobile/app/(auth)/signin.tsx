@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useT } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
 import { loginErrorMessage } from "@/lib/api";
 import { ROOT } from "@/lib/nav";
@@ -10,12 +10,18 @@ import { DCFP } from "@/lib/seed";
 import { ROLE_LABEL, useSession } from "@/lib/session";
 import type { AppRole } from "@/lib/types";
 import { call } from "@/screens/common";
+import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
+import { TYPE } from "@/lib/fonts";
 
 export default function SignIn() {
-  const T = useT();
+  const { T } = useTheme();
   const insets = useSafeAreaInsets();
   const { signIn, signInDemo } = useSession();
-  const [email, setEmail] = useState("");
+  const col = useColumn(MAX_FORM_WIDTH);
+  const { isShort, isCompact } = useResponsive();
+  // The Ministry of Health seal, the same as the web app's, sized like the EMS app's crest.
+  const seal = isShort ? 80 : isCompact ? 104 : 120;
+  const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -26,7 +32,7 @@ export default function SignIn() {
     setErr("");
     setBusy(true);
     try {
-      await signIn(email, pw);
+      await signIn(id, pw);
       router.replace("/");
     } catch (e) {
       setErr(loginErrorMessage(e));
@@ -48,48 +54,64 @@ export default function SignIn() {
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={[
+          col.style,
+          {
+            flexGrow: 1,
+            justifyContent: "center",
+            paddingTop: insets.top + (isShort ? 16 : 40),
+            paddingBottom: insets.bottom + 24,
+          },
+        ]}
       >
-        <View style={{ alignItems: "center", paddingHorizontal: 24, marginBottom: 28, gap: 10 }}>
+        <View
+          style={{
+            alignItems: "center",
+            paddingHorizontal: isCompact ? 16 : 24,
+            marginBottom: isShort ? 20 : 32,
+            gap: isShort ? 4 : 6,
+          }}
+        >
+          {/* The seal carries its own white field and ring, so it needs no card in dark mode. */}
           <Image
             source={require("../../assets/images/moh-seal.png")}
             accessible
             accessibilityRole="image"
-            accessibilityLabel="Ministry of Health, Republic of Uganda"
-            style={{ width: 96, height: 96 }}
+            accessibilityLabel="The Republic of Uganda, Ministry of Health"
+            style={{ width: seal, height: seal, marginBottom: isShort ? 4 : 8 }}
             resizeMode="contain"
           />
           <Txt
             accessibilityRole="header"
-            style={{ fontSize: 34, fontWeight: "700", letterSpacing: 0.5 }}
+            style={{ fontSize: isShort || isCompact ? 28 : 32, fontWeight: "700" }}
           >
             CLIMS
           </Txt>
-          <Txt style={{ color: T.fg2, fontSize: 15 }}>Ministry of Health · Uganda</Txt>
-          <Txt
-            style={{
-              color: T.fg2,
-              fontSize: 15,
-              textAlign: "center",
-              lineHeight: 21,
-              marginTop: 4,
-            }}
-          >
-            Sign in with the email and password your district focal person gave you.
+          <Txt style={{ color: T.fg2, fontSize: 15, fontWeight: "500" }}>
+            Ministry of Health, Uganda
           </Txt>
         </View>
 
         {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
 
+        <Txt
+          style={{
+            ...TYPE.title,
+            fontWeight: "700",
+            paddingHorizontal: 16,
+            marginBottom: T.ios ? 4 : 8,
+          }}
+        >
+          Sign in
+        </Txt>
         <Fields>
           <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            label="Email, username or phone"
+            value={id}
+            onChangeText={setId}
             autoCapitalize="none"
-            autoComplete="email"
-            ph="name@example.org"
+            autoComplete="username"
+            ph="name@example.org or 0772 123456"
           />
           <Input
             label="Password"
@@ -104,7 +126,7 @@ export default function SignIn() {
           <Btn
             label={busy ? "Signing in…" : "Sign in"}
             onPress={enter}
-            dis={busy || !email.trim() || !pw}
+            dis={busy || !id.trim() || !pw}
           />
           <Btn label="Forgot password?" kind="text" onPress={() => setForgot(true)} />
           {__DEV__ ? (

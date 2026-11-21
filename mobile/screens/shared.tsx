@@ -12,6 +12,7 @@ import { ROLE_LABEL, useMe, useSession } from "@/lib/session";
 import { useNotes, useStore } from "@/lib/store";
 import type { AppEvent } from "@/lib/types";
 import { call } from "./common";
+import { TYPE } from "@/lib/fonts";
 
 const ORG: Record<string, (e: AppEvent) => string> = {
   DCFP: () => `${DCFP.district} district`,
@@ -35,14 +36,14 @@ const NOTE_IC: Record<string, IconName> = {
 export function useOpenNote() {
   const nav = useNav();
   const me = useMe();
-  const { s } = useStore();
   return useCallback(
     (e: AppEvent) => {
-      if (s.reports.some((r) => r.id === e.ref)) return nav.go(`report/${e.ref}`);
+      if (e.ref.startsWith("MAP-")) return nav.go("map");
+      if (e.ref.startsWith("REQ-")) return nav.go("request");
       if (me.role === "rider") return nav.go(`delivery/${e.ref}`);
       return nav.go(`order/${e.ref}`);
     },
-    [nav, me.role, s.reports],
+    [nav, me.role],
   );
 }
 
@@ -68,7 +69,7 @@ export function Inbox() {
     <Row
       key={e.id}
       t={e.text}
-      s={`${orgOf(e)} · ${e.ref} · ${ago(e.t)}`}
+      s={`${orgOf(e)} · ${ago(e.t)}`}
       dot={e.t > rd}
       ic={NOTE_IC[e.role] ?? "bell"}
       onPress={() => open(e)}
@@ -101,7 +102,6 @@ export function Me() {
   const { s, offline, reset } = useStore();
   const { mode, setMode } = useTheme();
   const [push, setPush] = useState(true);
-  const [rem, setRem] = useState(true);
   const [outbox, setOutbox] = useState(false);
   const nq = s.outbox.length;
   const area =
@@ -118,11 +118,13 @@ export function Me() {
   return (
     <Screen title="Me" root>
       <Section>
-        <View style={{ alignItems: "center", gap: 8, paddingVertical: 8 }}>
+        <View style={{ alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 16 }}>
           <Avatar ini={initials(me.name)} size={72} />
-          <Txt style={{ fontSize: 22, fontWeight: T.ios ? "700" : "500" }}>{me.name}</Txt>
+          <Txt style={{ ...TYPE.title, fontWeight: T.ios ? "700" : "600", textAlign: "center" }}>
+            {me.name}
+          </Txt>
           <Txt
-            style={{ color: T.fg2, fontSize: 15 }}
+            style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}
           >{`${ROLE_LABEL[me.role]} · ${DCFP.district}`}</Txt>
         </View>
       </Section>
@@ -132,6 +134,7 @@ export function Me() {
         <Row t={area[0]} v={area[1]} />
       </List>
       <Fields
+        card
         h="Appearance"
         f={mode === "system" ? "Follows your phone's light or dark setting." : undefined}
       >
@@ -146,21 +149,13 @@ export function Me() {
           onChange={setMode}
         />
       </Fields>
-      <Fields h="Notifications">
+      <Fields card h="Notifications">
         <Toggle
           label="Push notifications"
           sub="Order and delivery updates"
           value={push}
           onChange={setPush}
         />
-        {me.role !== "rider" ? (
-          <Toggle
-            label="Report reminders"
-            sub="Before the 20th of each month"
-            value={rem}
-            onChange={setRem}
-          />
-        ) : null}
       </Fields>
       <List
         h="Offline"
@@ -200,7 +195,7 @@ export function Me() {
       </List>
       <Sheet visible={outbox} title="Waiting to send" onClose={() => setOutbox(false)}>
         {offline ? (
-          <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, fontSize: 14 }}>
+          <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, ...TYPE.subhead }}>
             These will send automatically when the phone is back online.
           </Txt>
         ) : null}
@@ -224,10 +219,6 @@ const GUIDES: Record<string, [string, string][]> = {
       "Requesting stock for a hotspot",
       "Count what is left with the contact person, then send. The district reviews it within a day.",
     ],
-    [
-      "Monthly outreach report",
-      "Due on the 20th. The app checks your figures before they reach MOH.",
-    ],
   ],
   hm: [
     [
@@ -238,7 +229,6 @@ const GUIDES: Record<string, [string, string][]> = {
       "When the rider arrives",
       "Count the condoms with the rider, sign the delivery note, then confirm receipt in the app.",
     ],
-    ["Monthly report", "Due on the 20th. The app checks your figures before they reach MOH."],
   ],
   rider: [
     [

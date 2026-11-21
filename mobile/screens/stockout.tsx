@@ -1,0 +1,312 @@
+import React, { useCallback, useEffect, useState } from "react";
+import Screen from "@/components/m/Screen";
+import {
+  Banner,
+  Btn,
+  Btns,
+  Done,
+  Fields,
+  Input,
+  List,
+  Note,
+  Pick,
+  Row,
+  Search,
+  Seg,
+  Select,
+  Sheet,
+  SkeletonList,
+} from "@/components/m/kit";
+import { isNetworkError, listHotspotsPage, toLocalHotspot } from "@/lib/hotspots";
+import { useNav } from "@/lib/nav";
+import {
+  COMMENT_MAX,
+  listProducts,
+  ProductsUnavailable,
+  productsProblemMessage,
+  reportStockout,
+  stockoutComment,
+  stockoutErrorMessage,
+  toLocalOrder,
+  type Product,
+} from "@/lib/orders";
+import { useMe } from "@/lib/session";
+import { useStore } from "@/lib/store";
+import type { Hotspot } from "@/lib/types";
+import { matches } from "./common";
+
+type Reason = "Out of stock" | "Running low";
+
+/**
+ * A signed-in VHT's stock request: a stockout alert for a hotspot and product
+ * (POST /orders/stockouts). The district's DCFP decides the quantity.
+ */
+export function StockoutForm({
+  hotspotId,
+  fixed,
+}: {
+  hotspotId?: string;
+  /** A hotspot manager's own hotspot: no picker, and no hotspot list to load. */
+  fixed?: { id: string; name: string };
+}) {
+  const nav = useNav();
+  const me = useMe();
+  const { s, send, queue, offline } = useStore();
+
+  // Hotspots: the API's active list, a page at a time, falling back to what the phone already has.
+  const cached = s.hotspots.filter((h) => h.source === "api" && h.status === "Active");
+  const [hotspots, setHotspots] = useState<Hotspot[]>(cached);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingHotspots, setLoadingHotspots] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [products, setProducts] = useState<Product[] | null>(null);
+  const [productsErr, setProductsErr] = useState("");
+
+  const loadPage = useCallback(
+    async (offset: number) => {
+      const page = await listHotspotsPage({ offset, status: "active" });
+      const items = page.items.map((h) => toLocalHotspot(h, me.name, null));
+      setHotspots((prev) => {
+        const seen = new Set(prev.map((h) => h.id));
+        return [...prev, ...items.filter((h) => !seen.has(h.id))];
+      });
+      setHasMore(page.hasMore);
+    },
+    [me.name],
+  );
+
+  const loadMore = () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    loadPage(hotspots.length)
+      .catch(() => setHasMore(false))
+      .finally(() => setLoadingMore(false));
+  };
+
+  useEffect(() => {
+    let live = true;
+    (fixed
+      ? Promise.resolve({ items: [], hasMore: false })
+      : listHotspotsPage({ offset: 0, status: "active" })
+    )
+      .then((page) => {
+        if (fixed) return;
+        if (!live) return;
+        setHotspots(page.items.map((h) => toLocalHotspot(h, me.name, null)));
+        setHasMore(page.hasMore);
+      })
+      .catch(() => {
+        // Offline or refused: keep the phone's copy.
+      })
+      .finally(() => live && setLoadingHotspots(false));
+    listProducts()
+      .then((list) => live && setProducts(list))
+      .catch((e: unknown) => {
+        if (!live) return;
+        setProducts([]);
+        setProductsErr(
+          productsProblemMessage(e instanceof ProductsUnavailable ? e.problem : "error"),
+        );
+      });
+    return () => {
+      live = false;
+    };
+    // `fixed` is the signed-in manager's own hotspot and doesn't change while the form is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me.name]);
+
+  const [selId, setSel] = useState<string | undefined>(hotspotId);
+  // Opened from a hotspot's page, it may not be in the pages loaded so far.
+  const sel = hotspots.find((h) => h.id === selId) ?? s.hotspots.find((h) => h.id === selId);
+  const [productId, setProduct] = useState("");
+  const product = products?.find((p) => p.id === productId);
+  const [reason, setReason] = useState<Reason>("Out of stock");
+  const [comment, setComment] = useState("");
+  const [pick, setPick] = useState(false);
+  const [pq, setPq] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState("");
+  const [done, setDone] = useState<"sent" | "queued" | null>(null);
+
+  // Pick the only choices for the VHT.
+  const hotspot:
+    Pick<Hotspot, "id" | "name" | "village" | "subcounty" | "district" | "contact"> | undefined =
+    fixed
+      ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
+      : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
+  const chosenProduct = product ?? (products?.length === 1 ? products[0] : undefined);
+  const tooLong = comment.trim().length > COMMENT_MAX;
+  const ready = !!hotspot && !!chosenProduct && !tooLong && !busy;
+
+  const submit = async () => {
+    if (!hotspot || !chosenProduct) return;
+    setRefused("");
+    const request = {
+      hot_spot_id: hotspot.id,
+      condom_id: chosenProduct.id,
+      comment: stockoutComment(reason, comment),
+    };
+    const names = { hotspot: hotspot.name, product: chosenProduct.name };
+    const label = `Stock request · ${hotspot.name}`;
+    if (offline) {
+      queue("stockout", { request, ...names }, label);
+      setDone("queued");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await reportStockout(request);
+      send("stockout", { order: toLocalOrder(res, names, me.name) }, label);
+      setDone("sent");
+    } catch (e) {
+      if (isNetworkError(e)) {
+        queue("stockout", { request, ...names }, label);
+        setDone("queued");
+      } else {
+        setRefused(stockoutErrorMessage(e));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done)
+    return (
+      <Screen title="Request stock" backLabel="Back">
+        {done === "sent" ? (
+          <Done
+            title="Stock request sent"
+            body={`${hotspot?.district || "The district"} focal person is notified about ${chosenProduct?.name} at ${hotspot?.name} and decides how much to send.`}
+          />
+        ) : (
+          <Done
+            tone="info"
+            icon="wifiOff"
+            title="Saved on this phone"
+            body="It goes to the district as soon as you are back online. You don't need to send it again."
+          />
+        )}
+        <Btns>
+          <Btn
+            label="View requests"
+            onPress={() => {
+              nav.back();
+              if (nav.tab !== "requests") nav.toTab("requests");
+            }}
+          />
+          <Btn label="Back" kind="text" onPress={nav.back} />
+        </Btns>
+      </Screen>
+    );
+
+  return (
+    <Screen title="Request stock" backLabel="Back">
+      {refused ? <Banner tone="danger" title="Couldn't send" body={refused} /> : null}
+      {productsErr ? <Banner tone="warning" title="No product list" body={productsErr} /> : null}
+      {fixed ? null : (
+        <Fields h="Hotspot">
+          <Pick
+            label="Hotspot"
+            value={
+              hotspot?.name ??
+              (hotspots.length
+                ? "Choose a hotspot"
+                : loadingHotspots
+                  ? "Loading hotspots…"
+                  : "No active hotspots")
+            }
+            sub={hotspot ? [hotspot.village, hotspot.subcounty].filter(Boolean).join(", ") : ""}
+            onPress={() => setPick(true)}
+          />
+        </Fields>
+      )}
+      {!fixed && !hotspots.length && !loadingHotspots ? (
+        <Note text="Only active hotspots can get stock. New hotspots become active when the district focal person approves them." />
+      ) : null}
+      <Fields h="What's needed" f="The district focal person decides how much to send.">
+        <Select
+          label="Product"
+          value={chosenProduct?.id ?? ""}
+          options={(products ?? []).map((p) => ({ v: p.id, l: p.name }))}
+          onChange={setProduct}
+          loading={products === null}
+        />
+        <Seg
+          label="What's happening?"
+          options={[
+            ["Out of stock", "Out of stock"],
+            ["Running low", "Running low"],
+          ]}
+          value={reason}
+          onChange={setReason}
+        />
+        <Input
+          label="Comment (optional)"
+          max={COMMENT_MAX}
+          value={comment}
+          onChangeText={setComment}
+          ph="e.g. Busy weekend coming"
+          multiline
+          err={tooLong ? `Use at most ${COMMENT_MAX} characters.` : ""}
+        />
+      </Fields>
+      <Btns>
+        <Btn
+          label={busy ? "Sending…" : offline ? "Save and send when online" : "Send stock request"}
+          onPress={submit}
+          dis={!ready}
+        />
+      </Btns>
+      <Note
+        center
+        text={
+          fixed
+            ? "The district focal person is notified and decides how much to send."
+            : hotspot?.contact
+              ? `${hotspot.contact} confirms receipt when the rider arrives.`
+              : "The hotspot manager confirms receipt when the rider arrives."
+        }
+      />
+      <Sheet visible={pick} title="Choose hotspot" onClose={() => setPick(false)}>
+        <Search value={pq} onChangeText={setPq} ph="Name, village or contact" />
+        {loadingHotspots && !hotspots.length ? <SkeletonList rows={5} /> : null}
+        <List
+          empty={
+            loadingHotspots && !hotspots.length
+              ? undefined
+              : hotspots.length
+                ? hasMore
+                  ? `No loaded hotspots match “${pq}”. Show more to search further.`
+                  : `No hotspots match “${pq}”.`
+                : "No active hotspots yet."
+          }
+        >
+          {hotspots
+            .filter((h) => matches(pq, h.name, h.village, h.subcounty, h.contact))
+            .map((h) => (
+              <Row
+                key={h.id}
+                t={h.name}
+                s={[h.village, h.subcounty].filter(Boolean).join(", ")}
+                ic={h.id === hotspot?.id ? "check" : "pin"}
+                fw={h.id === hotspot?.id ? "600" : "400"}
+                onPress={() => {
+                  setSel(h.id);
+                  setRefused("");
+                  setPq("");
+                  setPick(false);
+                }}
+              />
+            ))}
+        </List>
+        {loadingMore ? (
+          <SkeletonList rows={2} />
+        ) : hasMore ? (
+          <Btns>
+            <Btn label="Show more hotspots" kind="secondary" onPress={loadMore} />
+          </Btns>
+        ) : null}
+      </Sheet>
+    </Screen>
+  );
+}

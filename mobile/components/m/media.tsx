@@ -12,6 +12,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useT } from "@/lib/theme";
 import Icon from "./Icon";
 import { Btn, PhotoView, Section, Txt } from "./kit";
+import { TYPE } from "@/lib/fonts";
 
 /* ───────────── Map card ───────────── */
 
@@ -94,7 +95,7 @@ export function MapCard({
           {wait ? (
             <View style={{ alignItems: "center", gap: 8 }}>
               <ActivityIndicator color={T.tint} />
-              <Txt style={{ fontSize: 14, color: T.fg2 }}>{waitTxt}</Txt>
+              <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{waitTxt}</Txt>
             </View>
           ) : has ? (
             <Svg width={36} height={44} viewBox="0 0 24 30">
@@ -108,8 +109,8 @@ export function MapCard({
         </View>
         <View style={{ padding: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <Txt style={{ fontSize: 15, fontWeight: "600" }}>{cap}</Txt>
-            {cap2 ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{cap2}</Txt> : null}
+            <Txt style={{ ...TYPE.subhead, fontWeight: "600" }}>{cap}</Txt>
+            {cap2 ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{cap2}</Txt> : null}
           </View>
           {has && link && !wait ? (
             <Pressable
@@ -188,7 +189,7 @@ export function PhotoField({
         {value ? (
           <>
             <PhotoView uri={value} />
-            {when ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{when}</Txt> : null}
+            {when ? <Txt style={{ ...TYPE.caption, color: T.fg2 }}>{when}</Txt> : null}
           </>
         ) : (
           <View
@@ -205,7 +206,7 @@ export function PhotoField({
             }}
           >
             <Icon name="camera" size={28} color={T.fg3} />
-            <Txt style={{ fontSize: 14, color: T.fg2, textAlign: "center" }}>
+            <Txt style={{ ...TYPE.footnote, color: T.fg2, textAlign: "center" }}>
               {hint ?? "Take a clear photo."}
             </Txt>
           </View>
@@ -331,12 +332,12 @@ export function SignaturePad({
               style={{ position: "absolute", left: 0, right: 0, top: 40, alignItems: "center" }}
             >
               <Icon name="pen" size={20} color={T.fg3} />
-              <Txt style={{ color: T.fg3, fontSize: 14, marginTop: 4 }}>Sign here</Txt>
+              <Txt style={{ color: T.fg3, ...TYPE.footnote, marginTop: 4 }}>Sign here</Txt>
             </View>
           ) : null}
         </View>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Txt style={{ flex: 1, fontSize: 13, color: T.fg2 }}>{who}</Txt>
+          <Txt style={{ flex: 1, ...TYPE.footnote, color: T.fg2 }}>{who}</Txt>
           {d ? <Btn label="Clear" kind="text" small onPress={clear} /> : null}
         </View>
       </View>
