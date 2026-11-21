@@ -98,7 +98,7 @@ export async function listHotspotNotifications(
 }
 
 export async function listDistricts(http: HttpClient, signal?: AbortSignal): Promise<District[]> {
-  return parseList(districtSchema, await http.get('/hotspots/districts', { signal }), 'districts');
+  return parseList(districtSchema, await http.get('/locations/districts', { signal }), 'districts');
 }
 
 export interface MappableHotspot extends Hotspot {

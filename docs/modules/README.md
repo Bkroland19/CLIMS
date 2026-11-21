@@ -10,6 +10,7 @@ The backend is a single Go service with feature packages under `backend/internal
 | [users](users.md)         | Account records, account creation, active-account middleware, user administration | RBAC role model, permission gate, and `RoleCatalog` interface |
 | [rbac](rbac.md)           | Role catalog, permission assignments, permission middleware                       | PostgreSQL; no auth or users package dependency               |
 | [hotspots](hotspots.md)   | VHT hotspot submission; DCFP review, activation and deactivation                  | PostgreSQL; RBAC permission gate and current user             |
+| [locations](locations.md) | Region, district and subcounty lookups shared by every feature                    | PostgreSQL geography tables                                   |
 | [inventory](inventory.md) | Stock balances, movement ledger, hotspot supply and national stock reports        | PostgreSQL; orders tables and the RBAC permission gate        |
 | health                    | Process and database probes                                                       | PostgreSQL connection pool                                    |
 | apidocs                   | Public Swagger UI and OpenAPI asset routes                                        | Root `docs/api/` filesystem                                   |
