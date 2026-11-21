@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useT } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
 import { loginErrorMessage } from "@/lib/api";
 import { ROOT } from "@/lib/nav";
@@ -13,12 +13,14 @@ import { call } from "@/screens/common";
 import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
 
 export default function SignIn() {
-  const T = useT();
+  const { T, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { signIn, signInDemo } = useSession();
   const col = useColumn(MAX_FORM_WIDTH);
   const { isShort, isCompact } = useResponsive();
-  const logo = isShort ? 64 : 88;
+  // The MoH crest with its wordmark, sized like the EMS app's sign-in (448×408 source).
+  const logoH = isShort ? 80 : isCompact ? 104 : 120;
+  const logoW = Math.round((logoH * 448) / 408);
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -66,45 +68,54 @@ export default function SignIn() {
           style={{
             alignItems: "center",
             paddingHorizontal: isCompact ? 16 : 24,
-            marginBottom: isShort ? 16 : 28,
-            gap: isShort ? 6 : 10,
+            marginBottom: isShort ? 20 : 32,
+            gap: isShort ? 4 : 6,
           }}
         >
           <View
             accessible
-            accessibilityLabel="Ministry of Health, Republic of Uganda"
-            style={{
-              width: logo,
-              height: logo,
-              borderRadius: logo / 4, // matches the splash tile (assets/images/splash-icon.png)
-              backgroundColor: "#fff",
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: T.sep,
-            }}
+            accessibilityRole="image"
+            accessibilityLabel="The Republic of Uganda, Ministry of Health"
+            style={[
+              { marginBottom: isShort ? 4 : 8 },
+              // The crest's lettering is black, so on the dark theme it sits on a white card.
+              scheme === "dark" && {
+                backgroundColor: "#fff",
+                borderRadius: 20,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+              },
+            ]}
           >
             <Image
-              source={require("../../assets/images/coat-of-arms.png")}
-              style={{ width: logo * 0.73, height: logo * 0.73 }}
+              source={require("../../assets/images/moh-logo.png")}
+              style={{ width: logoW, height: logoH }}
               resizeMode="contain"
             />
           </View>
           <Txt
             accessibilityRole="header"
-            style={{
-              fontSize: isShort || isCompact ? 28 : 34,
-              fontWeight: "700",
-              letterSpacing: 0.5,
-            }}
+            style={{ fontSize: isShort || isCompact ? 28 : 32, fontWeight: "700" }}
           >
             CLIMS
           </Txt>
-          <Txt style={{ color: T.fg2, fontSize: 15 }}>Ministry of Health · Uganda</Txt>
+          <Txt style={{ color: T.fg2, fontSize: 15, fontWeight: "500" }}>
+            Ministry of Health, Uganda
+          </Txt>
         </View>
 
         {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
 
+        <Txt
+          style={{
+            fontSize: 18,
+            fontWeight: "700",
+            paddingHorizontal: 16,
+            marginBottom: T.ios ? 4 : 8,
+          }}
+        >
+          Sign in
+        </Txt>
         <Fields>
           <Input
             label="Email, username or phone"

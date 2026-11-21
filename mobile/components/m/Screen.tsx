@@ -193,9 +193,9 @@ export default function Screen({
             style={{
               paddingHorizontal: 16,
               paddingBottom: 8,
-              fontSize: isCompact ? 30 : 34,
+              fontSize: isCompact ? 26 : 30,
               fontWeight: "700",
-              lineHeight: isCompact ? 36 : 40,
+              lineHeight: isCompact ? 32 : 36,
             }}
           >
             {title}
@@ -236,7 +236,7 @@ export default function Screen({
         <Txt
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ flex: 1, fontSize: isCompact ? 20 : 22, lineHeight: 28 }}
+          style={{ flex: 1, fontSize: isCompact ? 19 : 20, lineHeight: 28 }}
         >
           {title}
         </Txt>

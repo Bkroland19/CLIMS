@@ -4,6 +4,7 @@ import {
   Animated,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,18 +24,40 @@ import type { Tokens } from "@/constants/design";
 import { useT } from "@/lib/theme";
 import { MAX_SHEET_WIDTH, useResponsive } from "@/hooks/useResponsive";
 import type { ChipDef, Tone } from "@/lib/format";
+import { FONT, fontFor, trackingFor, useFontsReady } from "@/lib/fonts";
 import Icon, { type IconName } from "./Icon";
 
 /* ───────────── Text ───────────── */
 
 export function Txt({ style, ...p }: TextProps & { style?: TextStyle | TextStyle[] }) {
   const T = useT();
-  return <Text {...p} style={[{ color: T.fg, fontSize: T.rowFs }, style as TextStyle]} />;
+  const fonts = useFontsReady();
+  const flat = StyleSheet.flatten([{ color: T.fg, fontSize: T.rowFs }, style]) as TextStyle;
+  if (!fonts) return <Text {...p} style={flat} />;
+  // Each Inter file is one weight: pick the file for the weight and keep the weight "normal", so
+  // Android never synthesises bold on top of it. Larger text gets Inter's tighter display tracking.
+  return (
+    <Text
+      {...p}
+      style={{
+        ...flat,
+        fontFamily: flat.fontFamily ?? fontFor(flat.fontWeight),
+        fontWeight: "normal",
+        letterSpacing: flat.letterSpacing ?? trackingFor(flat.fontSize ?? T.rowFs),
+      }}
+    />
+  );
+}
+
+/** Inter for text inputs, once it has loaded. */
+function useInputFont(weight: "regular" | "semibold" = "regular"): TextStyle {
+  const fonts = useFontsReady();
+  return fonts ? { fontFamily: FONT[weight], fontWeight: "normal" } : {};
 }
 
 /* ───────────── Section scaffolding ───────────── */
 
-function SecHead({ h }: { h?: string }) {
+function SecHead({ h, px }: { h?: string; px?: number }) {
   const T = useT();
   if (!h) return null;
   return (
@@ -43,17 +66,19 @@ function SecHead({ h }: { h?: string }) {
       style={{
         fontSize: T.shFs,
         color: T.shFg,
-        fontWeight: T.shFw,
+        // Inter's medium reads clearly at heading sizes; uppercase headings get open tracking.
+        fontWeight: T.shUpper ? T.shFw : "600",
+        letterSpacing: T.shUpper ? 0.6 : 0.1,
         textTransform: T.shUpper ? "uppercase" : "none",
-        paddingHorizontal: T.shPx,
-        paddingBottom: T.ios ? 7 : 8,
+        paddingHorizontal: px ?? T.shPx,
+        paddingBottom: T.ios ? 6 : 6,
       }}
     >
       {h}
     </Txt>
   );
 }
-function SecFoot({ f }: { f?: string }) {
+function SecFoot({ f, px }: { f?: string; px?: number }) {
   const T = useT();
   if (!f) return null;
   return (
@@ -61,7 +86,7 @@ function SecFoot({ f }: { f?: string }) {
       style={{
         fontSize: 13,
         color: T.fg2,
-        paddingHorizontal: T.shPx,
+        paddingHorizontal: px ?? T.shPx,
         paddingTop: 7,
         lineHeight: 18,
       }}
@@ -76,18 +101,21 @@ export function Section({
   f,
   children,
   style,
+  px,
 }: {
   h?: string;
   f?: string;
   children?: React.ReactNode;
   style?: ViewStyle;
+  /** Inset of the heading and footnote; defaults to the list inset. */
+  px?: number;
 }) {
   const T = useT();
   return (
     <View style={[{ marginBottom: T.secGap }, style]}>
-      <SecHead h={h} />
+      <SecHead h={h} px={px} />
       {children}
-      <SecFoot f={f} />
+      <SecFoot f={f} px={px} />
     </View>
   );
 }
@@ -323,7 +351,7 @@ export function Hero({
         }}
       >
         <View style={{ gap: 4 }}>
-          <Txt style={{ fontSize: T.ios ? 22 : 22, fontWeight: T.ios ? "700" : "500" }}>
+          <Txt style={{ fontSize: 20, lineHeight: 26, fontWeight: T.ios ? "700" : "600" }}>
             {title}
           </Txt>
           {sub ? <Txt style={{ color: T.fg2, fontSize: 15 }}>{sub}</Txt> : null}
@@ -354,7 +382,12 @@ export function Hero({
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.6}
-                  style={{ fontSize: 26, fontWeight: "700", color: x.fg ?? T.fg }}
+                  style={{
+                    fontSize: 26,
+                    fontWeight: "700",
+                    color: x.fg ?? T.fg,
+                    fontVariant: ["tabular-nums"],
+                  }}
                 >
                   {x.value}
                 </Txt>
@@ -519,7 +552,9 @@ export function Done({
         >
           <Icon name={icon} size={34} color={tn.fg} />
         </View>
-        <Txt style={{ fontSize: 22, fontWeight: "700", textAlign: "center" }}>{title}</Txt>
+        <Txt style={{ fontSize: 20, lineHeight: 26, fontWeight: "700", textAlign: "center" }}>
+          {title}
+        </Txt>
         {body ? (
           <Txt style={{ color: T.fg2, fontSize: 15, textAlign: "center", lineHeight: 21 }}>
             {body}
@@ -623,8 +658,10 @@ export function Btns({ children }: { children: React.ReactNode }) {
 export function Fields({ h, f, children }: { h?: string; f?: string; children?: React.ReactNode }) {
   const T = useT();
   const kids = React.Children.toArray(children).filter(Boolean);
+  // Material fields sit flush in the 16dp margin, so their heading lines up with the field labels;
+  // iOS headings keep the inset that matches text inside the grouped card.
   return (
-    <Section h={h} f={f}>
+    <Section h={h} f={f} px={T.ios ? undefined : 16}>
       <View
         style={{
           marginHorizontal: 16,
@@ -656,6 +693,8 @@ function FieldBox({
   err,
   children,
   row,
+  focused,
+  aside,
 }: {
   label: string;
   sub?: string;
@@ -663,50 +702,76 @@ function FieldBox({
   err?: string;
   children: React.ReactNode;
   row?: boolean;
+  /** Highlights the label while the field has focus. */
+  focused?: boolean;
+  /** Shown at the end of the hint row, e.g. a character counter. */
+  aside?: React.ReactNode;
 }) {
   const T = useT();
+  const note = err || hint;
   return (
     <View
       style={{
-        paddingVertical: T.ios ? 10 : 4,
+        paddingVertical: T.ios ? 8 : 2,
         paddingHorizontal: T.ios ? 16 : 0,
-        gap: T.ios ? 2 : 6,
+        gap: T.ios ? 2 : 4,
       }}
     >
       <View style={row ? { flexDirection: "row", alignItems: "center", gap: 12 } : undefined}>
         <View style={row ? { flex: 1 } : undefined}>
           <Txt
             style={{
-              fontSize: T.ios ? 13 : 14,
-              color: err ? T.danger : T.fg2,
-              fontWeight: T.ios ? "400" : "500",
+              fontSize: 13,
+              lineHeight: 18,
+              color: err ? T.danger : focused ? T.tint : T.fg2,
+              fontWeight: "500",
             }}
           >
             {label}
           </Txt>
-          {sub ? <Txt style={{ fontSize: 13, color: T.fg3 }}>{sub}</Txt> : null}
+          {sub ? <Txt style={{ fontSize: 12.5, lineHeight: 17, color: T.fg3 }}>{sub}</Txt> : null}
         </View>
         {children}
       </View>
-      {err ? (
-        <Txt style={{ fontSize: 13, color: T.danger }}>{err}</Txt>
-      ) : hint ? (
-        <Txt style={{ fontSize: 13, color: T.fg2 }}>{hint}</Txt>
+      {note || aside ? (
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+          <Txt
+            accessibilityLiveRegion={err ? "polite" : undefined}
+            style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: err ? T.danger : T.fg2 }}
+          >
+            {note ?? ""}
+          </Txt>
+          {aside}
+        </View>
       ) : null}
     </View>
   );
 }
 
-const inputStyle = (T: Tokens, err?: string, multiline?: boolean): TextStyle => ({
-  minHeight: multiline ? 88 : T.inH,
-  borderWidth: err ? 1.5 : T.inBw,
-  borderColor: err ? T.danger : T.inBd,
+/** Rows a text area shows before it scrolls, and their height. */
+const AREA_LINE = 22;
+
+const inputStyle = (
+  T: Tokens,
+  err?: string,
+  multiline?: boolean,
+  focused?: boolean,
+  rows = 3,
+): TextStyle => ({
+  minHeight: multiline ? rows * AREA_LINE + (T.ios ? 8 : 20) : T.inH,
+  // Material fields thicken and take the brand colour on focus; iOS cells stay borderless.
+  borderWidth: focused && !T.ios ? 2 : err ? 1.5 : T.inBw,
+  borderColor: err ? T.danger : focused && !T.ios ? T.tint : T.inBd,
   borderRadius: T.inR,
-  paddingHorizontal: T.ios ? 0 : 14,
-  paddingVertical: multiline ? (T.ios ? 4 : 12) : 0,
-  fontSize: T.ios ? 17 : 16,
+  paddingHorizontal: T.ios ? 0 : 12,
+  paddingVertical: multiline ? (T.ios ? 4 : 10) : 0,
+  fontSize: 16,
+  lineHeight: multiline ? AREA_LINE : undefined,
   color: T.fg,
   textAlignVertical: multiline ? "top" : "center",
+  // The coloured border is the focus cue; drop the browser's own focus ring on web (React Native
+  // Web accepts "none", which React Native's native types don't list).
+  ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null),
 });
 
 export function Input({
@@ -719,6 +784,8 @@ export function Input({
   hint,
   err,
   multiline,
+  rows,
+  max,
   autoCapitalize,
   autoComplete,
   inputRef,
@@ -733,13 +800,34 @@ export function Input({
   hint?: string;
   err?: string;
   multiline?: boolean;
+  /** Lines a text area shows before scrolling (default 3). */
+  rows?: number;
+  /** Maximum length; a text area also shows a counter. */
+  max?: number;
   autoCapitalize?: "none" | "sentences" | "words";
   autoComplete?: any;
   inputRef?: React.Ref<TextInputInstance>;
   onFocus?: () => void;
 }) {
   const T = useT();
+  const font = useInputFont();
   const [hidden, setHidden] = useState(true);
+  const [focused, setFocused] = useState(false);
+  const near = max != null && value.length >= max * 0.9;
+  const counter =
+    multiline && max != null ? (
+      <Txt
+        accessibilityLabel={`${value.length} of ${max} characters`}
+        style={{
+          fontSize: 12.5,
+          lineHeight: 17,
+          color: near ? T.warnFg : T.fg3,
+          fontVariant: ["tabular-nums"],
+        }}
+      >
+        {`${value.length}/${max}`}
+      </Txt>
+    ) : null;
   const field = (
     <TextInput
       ref={inputRef}
@@ -750,15 +838,26 @@ export function Input({
       keyboardType={keyboardType}
       secureTextEntry={secure && hidden}
       multiline={multiline}
+      maxLength={max}
       autoCapitalize={autoCapitalize}
       autoComplete={autoComplete}
-      onFocus={onFocus}
+      onFocus={() => {
+        setFocused(true);
+        onFocus?.();
+      }}
+      onBlur={() => setFocused(false)}
       accessibilityLabel={label}
-      style={[inputStyle(T, err, multiline), secure ? { paddingRight: 48 } : null]}
+      selectionColor={T.tint}
+      cursorColor={T.tint}
+      style={[
+        inputStyle(T, err, multiline, focused, rows),
+        font,
+        secure ? { paddingRight: 48 } : null,
+      ]}
     />
   );
   return (
-    <FieldBox label={label} hint={hint} err={err}>
+    <FieldBox label={label} hint={hint} err={err} focused={focused} aside={counter}>
       {secure ? (
         <View style={{ justifyContent: "center" }}>
           {field}
@@ -769,7 +868,7 @@ export function Input({
             accessibilityLabel={hidden ? "Show password" : "Hide password"}
             style={{
               position: "absolute",
-              right: T.ios ? 0 : 6,
+              right: T.ios ? 0 : 4,
               height: "100%",
               width: 44,
               alignItems: "center",
@@ -800,7 +899,7 @@ export function ReadOnly({ label, value, sub }: { label: string; value: string; 
           },
         ]}
       >
-        <Txt style={{ color: T.fg2, fontSize: T.ios ? 17 : 16 }}>{value}</Txt>
+        <Txt style={{ color: T.fg2, fontSize: 16 }}>{value}</Txt>
       </View>
     </FieldBox>
   );
@@ -902,6 +1001,7 @@ export function Stepper({
   err?: string;
 }) {
   const T = useT();
+  const semibold = useInputFont("semibold");
   const { isCompact, largeText } = useResponsive();
   // On narrow phones or with large text, the 170dp of controls go under the label.
   const stack = isCompact || largeText;
@@ -944,19 +1044,24 @@ export function Stepper({
           accessibilityLabel={label}
           placeholder="0"
           placeholderTextColor={T.fg3}
-          style={{
-            width: stack ? undefined : 76,
-            flex: stack ? 1 : undefined,
-            minHeight: T.ios ? 34 : 40,
-            textAlign: "center",
-            fontSize: 17,
-            fontWeight: "600",
-            color: T.fg,
-            borderRadius: T.ios ? 8 : 4,
-            backgroundColor: T.stepperInBg,
-            borderWidth: err ? 1.5 : T.ios ? 0 : 1,
-            borderColor: err ? T.danger : T.outline,
-          }}
+          selectionColor={T.tint}
+          style={[
+            {
+              width: stack ? undefined : 76,
+              flex: stack ? 1 : undefined,
+              minHeight: T.ios ? 34 : 40,
+              textAlign: "center",
+              fontSize: 16,
+              fontWeight: "600",
+              fontVariant: ["tabular-nums"],
+              color: T.fg,
+              borderRadius: T.ios ? 8 : 10,
+              backgroundColor: T.stepperInBg,
+              borderWidth: err ? 1.5 : T.ios ? 0 : 1,
+              borderColor: err ? T.danger : T.outline,
+            },
+            semibold,
+          ]}
         />
         {btn("plus", n + step, "Increase")}
       </View>
@@ -1030,7 +1135,7 @@ export function Check({
         {value ? <Icon name="check" size={16} color={T.b1Fg} strokeWidth={3} /> : null}
       </View>
       <View style={{ flex: 1 }}>
-        <Txt style={{ fontSize: T.ios ? 17 : 16 }}>{label}</Txt>
+        <Txt style={{ fontSize: 16 }}>{label}</Txt>
         {sub ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{sub}</Txt> : null}
       </View>
     </Pressable>
@@ -1068,7 +1173,7 @@ export function Pick({
         }}
       >
         <View style={{ flex: 1 }}>
-          <Txt style={{ fontSize: T.ios ? 17 : 16, fontWeight: "500" }}>{value}</Txt>
+          <Txt style={{ fontSize: 16, fontWeight: "500" }}>{value}</Txt>
           {sub ? <Txt style={{ fontSize: 13, color: T.fg2 }}>{sub}</Txt> : null}
         </View>
         <Icon name="chevD" size={20} color={T.fg2} />
@@ -1112,7 +1217,7 @@ export function Select({
           accessibilityLabel={`${label}: ${cur?.l ?? "Choose"}`}
           style={[inputStyle(T, err), { flexDirection: "row", alignItems: "center" }]}
         >
-          <Txt style={{ flex: 1, fontSize: T.ios ? 17 : 16, color: cur && cur.v ? T.fg : T.fg3 }}>
+          <Txt style={{ flex: 1, fontSize: 16, color: cur && cur.v ? T.fg : T.fg3 }}>
             {cur?.l || "Choose…"}
           </Txt>
           <Icon name="chevD" size={20} color={T.fg2} />
@@ -1152,6 +1257,7 @@ export function Search({
   ph: string;
 }) {
   const T = useT();
+  const font = useInputFont();
   return (
     <View
       style={{
@@ -1174,7 +1280,8 @@ export function Search({
         placeholderTextColor={T.placeholder}
         accessibilityLabel={ph}
         returnKeyType="search"
-        style={{ flex: 1, fontSize: T.ios ? 17 : 16, color: T.fg, height: "100%" }}
+        selectionColor={T.tint}
+        style={[{ flex: 1, fontSize: 16, color: T.fg, height: "100%" }, font]}
       />
       {value ? (
         <Pressable onPress={() => onChangeText("")} accessibilityLabel="Clear search" hitSlop={8}>

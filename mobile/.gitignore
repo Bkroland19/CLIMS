@@ -18,3 +18,5 @@ web-build/
 
 expo-env.d.ts
 # @end expo-cli
+# Per-developer environment overrides (e.g. EXPO_PUBLIC_API_URL from npm run start:local)
+.env*.local
