@@ -177,42 +177,6 @@ func (h *Handler) notifications(c fiber.Ctx) error {
 	return response.Success(c, 200, "hotspot notifications retrieved", events)
 }
 
-func (h *Handler) regions(c fiber.Ctx) error {
-	regions, err := h.repo.regions(c.Context())
-	if err != nil {
-		return hotSpotError(c, err)
-	}
-	return response.Success(c, 200, "regions retrieved", regions)
-}
-
-func (h *Handler) districts(c fiber.Ctx) error {
-	var regionID *string
-	if raw := c.Query("region_id"); raw != "" {
-		id, err := request.ParseUUID(raw)
-		if err != nil {
-			return response.Error(c, 400, "region_id must be a nonzero UUID", nil)
-		}
-		regionID = &id
-	}
-	districts, err := h.repo.districts(c.Context(), regionID)
-	if err != nil {
-		return hotSpotError(c, err)
-	}
-	return response.Success(c, 200, "districts retrieved", districts)
-}
-
-func (h *Handler) subcounties(c fiber.Ctx) error {
-	districtID, err := request.ParseUUID(c.Query("district_id"))
-	if err != nil {
-		return response.Error(c, 400, "district_id is required and must be a nonzero UUID", nil)
-	}
-	subcounties, err := h.repo.subcounties(c.Context(), districtID)
-	if err != nil {
-		return hotSpotError(c, err)
-	}
-	return response.Success(c, 200, "subcounties retrieved", subcounties)
-}
-
 func (h *Handler) respondWithDetail(c fiber.Ctx, status int, message, id string) error {
 	detail, err := h.repo.get(c.Context(), scopeFor(users.CurrentUser(c)), id)
 	if err != nil {
