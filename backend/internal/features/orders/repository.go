@@ -17,7 +17,7 @@ type Order struct {
 	DeliveryNote       *string   `json:"delivery_note"`
 	ID                 string    `json:"id"`
 	CondomID           string    `json:"condom_id"`
-	QuantityNeeded     int32     `json:"quantity_needed"`
+	QuantityNeeded     *int32    `json:"quantity_needed"`
 	QuantityIssued     *int32    `json:"quantity_issued"`
 	Status             string    `json:"order_status"`
 	Date               string    `json:"order_date"`
@@ -25,7 +25,7 @@ type Order struct {
 	HandledByID        *string   `json:"handled_by_id"`
 	OrderedForStoreID  string    `json:"ordered_for_store_id"`
 	OrderedFromStoreID string    `json:"ordered_from_store_id"`
-	UnitOfMeasureID    string    `json:"unit_of_measure_id"`
+	UnitOfMeasureID    *string   `json:"unit_of_measure_id"`
 	Comment            *string   `json:"comment"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`

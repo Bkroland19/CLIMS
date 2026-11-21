@@ -24,7 +24,8 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	if err := pool.QueryRow(ctx, `SELECT id FROM hot_spots ORDER BY id LIMIT 1`).Scan(&hotSpot); err != nil {
 		t.Fatal(err)
 	}
-	exec(`INSERT INTO order_hot_spot_routes (hot_spot_id, store_id) VALUES ($1, $2)`, hotSpot, district)
+	// Alerts go to the store of the hotspot's district.
+	exec(`UPDATE hot_spots SET district_id = (SELECT district_id FROM stores WHERE id = $2) WHERE id = $1`, hotSpot, district)
 	account := func(role, name string, store, hotspot *string, permissions ...string) (string, string) {
 		t.Helper()
 		var roleID string
@@ -46,8 +47,13 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	_, warehouseToken := account("jms", "workflow-warehouse", &warehouse, nil, "orders:process")
 	riderID, riderToken := account("delivery agent", "workflow-rider", &district, nil, "orders:deliver")
 
-	stockout := map[string]any{"hot_spot_id": hotSpot, "condom_id": product, "unit_of_measure_id": unit, "quantity_needed": 50}
+	// The hotspot manager raises an alert naming the product only; quantities are the DCFP's decision.
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": product, "quantity_needed": 50}, hotspotToken, 400)
+	stockout := map[string]any{"hot_spot_id": hotSpot, "condom_id": product, "comment": "Dispenser empty since Monday"}
 	parent := request("POST", "/orders/stockouts", stockout, hotspotToken, 201)["data"].(map[string]any)
+	if parent["order_status"] != "queued" || parent["quantity_needed"] != nil || parent["unit_of_measure_id"] != nil {
+		t.Fatalf("stockout alert should carry no quantity: %v", parent)
+	}
 	parentPath := "/orders/" + parent["id"].(string)
 	notifications := func(token, wantAction string) {
 		t.Helper()
@@ -72,15 +78,50 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		return data
 	}
 	notifications(districtToken, "stockout_reported")
+	if parent["ordered_from_store_id"] != district {
+		t.Fatalf("alert should go to the hotspot's district store: %v", parent)
+	}
+	// Only the hotspot's district is notified, not other districts' DCFPs.
+	var otherStore, noDistrictHotSpot string
+	if err := pool.QueryRow(ctx, `SELECT s.id FROM stores s WHERE s.store_type = 'district' AND s.id <> $1 LIMIT 1`, district).Scan(&otherStore); err != nil {
+		t.Fatal(err)
+	}
+	_, otherToken := account("dfcp", "workflow-other-district", &otherStore, nil, "orders:process", "orders:replenish", "orders:receive")
+	for _, event := range request("GET", "/orders/notifications", nil, otherToken, 200)["data"].([]any) {
+		if event.(map[string]any)["order_id"] == parent["id"] {
+			t.Fatal("another district's DCFP was notified of the alert")
+		}
+	}
+	act(parentPath, "dispatch", otherToken, map[string]any{"rider_id": riderID, "unit_of_measure_id": unit, "quantity_issued": 1}, 404, "")
+	// A hotspot without a district cannot route an alert.
+	if err := pool.QueryRow(ctx, `SELECT id FROM hot_spots WHERE district_id IS NULL LIMIT 1`).Scan(&noDistrictHotSpot); err != nil {
+		t.Fatal(err)
+	}
+	if message := request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": noDistrictHotSpot, "condom_id": product},
+		admin, 422)["message"]; message != "hotspot has no district with a store; set the hotspot's district" {
+		t.Fatalf("hotspot without a district: %v", message)
+	}
 	act(parentPath, "review", warehouseToken, nil, 404, "")
 	act(parentPath, "review", hotspotToken, nil, 403, "")
-	act(parentPath, "dispatch", districtToken, map[string]any{"rider_id": riderID}, 409, "")
-	// The district review is automatic: the DCFP checks stock on the queued order directly.
-	act(parentPath, "check-stock", districtToken, nil, 200, "on_hold")
-	replenish := map[string]any{"warehouse_store_id": warehouse}
+	// An alert has nothing to review or check; the DCFP sends stock or asks the warehouse.
+	act(parentPath, "review", districtToken, nil, 409, "")
+	act(parentPath, "check-stock", districtToken, nil, 409, "")
+	send := func(quantity int) map[string]any {
+		return map[string]any{"rider_id": riderID, "unit_of_measure_id": unit, "quantity_issued": quantity}
+	}
+	act(parentPath, "dispatch", districtToken, map[string]any{"rider_id": riderID, "quantity_issued": 45}, 422, "")
+	if message := request("POST", parentPath+"/actions/dispatch", send(45), districtToken, 409)["message"]; message !=
+		"not enough available stock at the district store; request it from the warehouse" {
+		t.Fatalf("empty district store: %v", message)
+	}
+	act(parentPath, "request-replenishment", districtToken, map[string]any{"warehouse_store_id": warehouse}, 422, "")
+	replenish := map[string]any{"warehouse_store_id": warehouse, "unit_of_measure_id": unit, "quantity": 50}
 	child := act(parentPath, "request-replenishment", districtToken, replenish, 201, "queued")
-	if child["parent_order_id"] != parent["id"] {
-		t.Fatalf("unlinked replenishment: %v", child)
+	if child["parent_order_id"] != parent["id"] || child["quantity_needed"] != float64(50) || child["unit_of_measure_id"] != unit {
+		t.Fatalf("replenishment should carry the DCFP's quantity: %v", child)
+	}
+	if held := request("GET", parentPath, nil, districtToken, 200)["data"].(map[string]any); held["order_status"] != "on_hold" {
+		t.Fatalf("alert should wait on hold for the warehouse: %v", held)
 	}
 	childPath := "/orders/" + child["id"].(string)
 	act(parentPath, "request-replenishment", districtToken, replenish, 409, "")
@@ -101,16 +142,16 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	receipt := map[string]any{"quantity_received": 55, "discrepancy_note": "Five additional units counted"}
 	act(childPath, "receive", districtToken, receipt, 200, "received")
 	act(childPath, "receive", districtToken, receipt, 409, "")
-	// Receipt reserves the stock for the held order at once and confirms it to the hotspot manager.
-	if held := request("GET", parentPath, nil, districtToken, 200)["data"].(map[string]any); held["order_status"] != "confirmed" {
-		t.Fatalf("held order not confirmed by receipt: %v", held)
+	// With the stock in, the alert still waits for the DCFP, who sends what the hotspot needs.
+	notifications(districtToken, "receive")
+	if held := request("GET", parentPath, nil, districtToken, 200)["data"].(map[string]any); held["order_status"] != "on_hold" {
+		t.Fatalf("receipt should leave the alert to the DCFP: %v", held)
 	}
-	notifications(hotspotToken, "check-stock")
-	act(parentPath, "review", districtToken, nil, 409, "")
-	partial := map[string]any{"rider_id": riderID, "quantity_issued": 45}
-	dispatched := act(parentPath, "dispatch", districtToken, partial, 200, "dispatched")
-	if dispatched["quantity_issued"] != float64(45) {
-		t.Fatalf("partial dispatch not recorded: %v", dispatched)
+	act(parentPath, "dispatch", districtToken, send(56), 409, "")
+	dispatched := act(parentPath, "dispatch", districtToken, send(45), 200, "dispatched")
+	if dispatched["quantity_issued"] != float64(45) || dispatched["quantity_needed"] != float64(45) ||
+		dispatched["unit_of_measure_id"] != unit || dispatched["rider_id"] != riderID {
+		t.Fatalf("dispatch should record the DCFP's unit and quantity: %v", dispatched)
 	}
 	notifications(riderToken, "dispatch")
 	act(parentPath, "deliver", riderToken, map[string]any{"delivery_note": "Received by hotspot manager"}, 200, "delivered")
