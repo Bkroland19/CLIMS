@@ -27,6 +27,7 @@ function user(overrides: Partial<User>): User {
     login_count: null,
     active_sessions: null,
     created_at: null,
+    store_id: null,
     ...overrides,
   };
 }

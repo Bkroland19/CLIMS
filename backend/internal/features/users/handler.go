@@ -2,6 +2,7 @@ package users
 
 import (
 	"errors"
+	"log/slog"
 	"strconv"
 
 	"clims-backend/internal/pkg/request"
@@ -29,6 +30,9 @@ func (h *Handler) createUser(c fiber.Ctx, req AccountInput, roleIDs []string) er
 	}
 	if errors.Is(err, ErrHashPassword) {
 		return response.Error(c, 500, "failed to hash password", nil)
+	}
+	if errors.Is(err, ErrUnknownStore) {
+		return response.Error(c, 422, "validation failed", map[string]string{"store_id": "Choose an existing store."})
 	}
 	if err != nil {
 		if message, ok := DuplicateIdentifier(err); ok {
@@ -96,6 +100,7 @@ func (h *Handler) CreateUser(c fiber.Ctx) error {
 		return response.Error(c, 422, "provide either role_id or role_ids", nil)
 	}
 	req.AccountInput.Assignment = req.FacilityAssignment
+	req.AccountInput.StoreID = req.StoreID
 	if req.RoleIDs != nil {
 		return h.createUser(c, req.AccountInput, *req.RoleIDs)
 	}
@@ -157,6 +162,39 @@ func (h *Handler) SetStatus(c fiber.Ctx) error {
 		return accessError(c, err)
 	}
 	return response.Success(c, 200, "status updated", nil)
+}
+
+// SetStore assigns the store whose orders and stock a user works with; null clears it.
+func (h *Handler) SetStore(c fiber.Ctx) error {
+	id, err := request.UUIDParam(c)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	var req SetStoreRequest
+	if err = request.DecodeJSON(c, &req); err != nil {
+		return response.Error(c, 400, "invalid request body", err.Error())
+	}
+	if !req.StoreID.Set {
+		return response.Error(c, 422, "validation failed", map[string]string{"store_id": "This field is required."})
+	}
+	var storeID *string
+	if req.StoreID.Value != nil {
+		parsed, parseErr := request.ParseUUID(*req.StoreID.Value)
+		if parseErr != nil {
+			return response.Error(c, 422, "validation failed", map[string]string{"store_id": "Choose a valid item from the list."})
+		}
+		storeID = &parsed
+	}
+	switch err = h.Repo.SetUserStore(c.Context(), id, storeID); {
+	case errors.Is(err, pgx.ErrNoRows):
+		return response.Error(c, 404, "user not found", nil)
+	case errors.Is(err, ErrUnknownStore):
+		return response.Error(c, 422, "validation failed", map[string]string{"store_id": "Choose an existing store."})
+	case err != nil:
+		slog.Error("set user store failed", "error", err)
+		return response.Error(c, 500, "failed to update store", nil)
+	}
+	return response.Success(c, 200, "store updated", nil)
 }
 
 func accessError(c fiber.Ctx, err error) error {

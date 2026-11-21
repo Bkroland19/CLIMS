@@ -31,7 +31,7 @@ test.describe('users', () => {
     await dialog.getByLabel('Email').fill('esther.atim@example.org');
     await dialog.getByLabel('Phone number').fill('0772 123 456');
     await dialog.getByLabel('Password').fill('a-long-password-1');
-    await dialog.getByRole('checkbox', { name: /^District focal person/ }).check();
+    await dialog.getByRole('radio', { name: /^District focal person/ }).check();
 
     // A district focal person works in one district, so the form asks which.
     const where = dialog.getByRole('group', { name: 'Where they work' });
@@ -45,8 +45,10 @@ test.describe('users', () => {
       (request) => request.method() === 'POST' && request.url().endsWith('/api/v1/users'),
     );
     await dialog.getByRole('button', { name: 'Create user' }).click();
-    // The place was checked but not sent: the API does not store it yet.
-    expect((await created).postDataJSON()).not.toHaveProperty('district_id');
+    // The district gives the account its store; the place itself is checked but not sent.
+    const body = (await created).postDataJSON() as Record<string, unknown>;
+    expect(body).not.toHaveProperty('district_id');
+    expect(body.store_id).toEqual(expect.any(String));
 
     await expectToast(page, 'User created');
     await expect(dialog).toBeHidden();
@@ -66,6 +68,27 @@ test.describe('users', () => {
 
     await expectToast(page, 'Roles updated');
     await expect(dialog).toBeHidden();
+  });
+
+  test('moves a DCFP to another district’s store', async ({ page }) => {
+    await open(page, '/moh/users', 'User management');
+    await page.getByRole('button', { name: 'Actions for Sarah Namubiru' }).click();
+    await page.getByRole('menuitem', { name: 'Change store' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Store for Sarah Namubiru' });
+    const store = dialog.getByRole('combobox', { name: 'Store' });
+    await expect(store).toHaveText(/Wakiso district store/);
+    await store.click();
+    // A DCFP is offered district stores only.
+    await expect(page.getByRole('option', { name: /Joint Medical Store/ })).toBeHidden();
+    await page.getByRole('option', { name: /Gulu district store/ }).click();
+    await dialog.getByRole('button', { name: 'Save store' }).click();
+
+    await expectToast(page, 'Store updated');
+    await expect(dialog).toBeHidden();
+    await page.getByRole('button', { name: 'Actions for Sarah Namubiru' }).click();
+    await page.getByRole('menuitem', { name: 'View profile' }).click();
+    await expect(page.getByRole('region', { name: 'Store' })).toContainText('Gulu district store');
   });
 
   test('signs a user out everywhere after confirming', async ({ page }) => {

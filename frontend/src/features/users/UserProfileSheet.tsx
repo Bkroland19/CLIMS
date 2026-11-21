@@ -12,6 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useStores } from '@/features/geography/queries';
 import { formatDate, formatNumber, formatSince, formatTimestamp, initialsOf } from '@/lib/format';
 
 import type { User } from './api';
@@ -24,6 +25,7 @@ import {
 } from './access';
 import { effectivePermissions } from './insights';
 import { RoleBadge } from './RoleBadge';
+import { storeLabel, storeNeedOf } from './stores';
 import { userDisplayName } from './userForm';
 import { WebAccessList } from './WebAccessList';
 
@@ -36,6 +38,7 @@ interface UserProfileSheetProps {
   onClose: () => void;
   onEditRoles: () => void;
   onShowDevices: () => void;
+  onChangeStore: () => void;
   onDeactivate: () => void;
   onReactivate: () => void;
 }
@@ -64,9 +67,16 @@ export function UserProfileSheet({
   onClose,
   onEditRoles,
   onShowDevices,
+  onChangeStore,
   onDeactivate,
   onReactivate,
 }: UserProfileSheetProps) {
+  const stores = useStores();
+  const store = stores.data?.find((candidate) => candidate.id === user.store_id);
+  const storeNeed = storeNeedOf(user.roles.map((role) => role.name));
+  let storeText = 'No store';
+  if (store) storeText = storeLabel(store);
+  else if (user.store_id) storeText = stores.isPending ? 'Loading…' : 'A store no longer listed';
   const name = userDisplayName(user);
   const permissions = effectivePermissions(user);
   const devices = user.active_sessions ?? 0;
@@ -127,6 +137,20 @@ export function UserProfileSheet({
                 ))}
               </ul>
             )}
+          </Section>
+
+          <Section title="Store">
+            <p className="text-sm">{storeText}</p>
+            {storeNeed && !user.store_id ? (
+              <p className="text-muted-foreground text-xs">
+                Their role works at a store. Until one is set they see no orders or stock.
+              </p>
+            ) : null}
+            {canUpdate ? (
+              <Button variant="link" className="h-auto self-start p-0" onClick={onChangeStore}>
+                Change store
+              </Button>
+            ) : null}
           </Section>
 
           <Section title="What they can open">

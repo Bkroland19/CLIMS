@@ -29,6 +29,11 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - The catalogue screens use that API: edit, activate, deactivate and delete products, brands and
   units, a Brands tab, status filters and an Incomplete badge for legacy products.
 - Every response carries an `X-Request-ID`, which the request log records.
+- Store assignment: `GET /api/v1/locations/stores` lists the national warehouses and district
+  stores, and accounts get a store on creation or through `PATCH /api/v1/users/{id}/store`
+  (`users:update`). Migration 20 adds National Medical Stores and fills in missing stores for
+  warehouse staff, DCFPs and delivery agents. In the web app, the new-user form sets the store from
+  the role and district, and Users has a **Change store** action.
 
 ### Changed
 
