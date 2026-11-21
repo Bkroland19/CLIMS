@@ -47,8 +47,8 @@ export function useNationalSummary(district: string | null) {
   );
 }
 
-export function useDistrictStores() {
-  return useApiQuery(nationalKeys.districtStores, listDistrictStores);
+export function useDistrictStores(enabled = true) {
+  return useApiQuery(nationalKeys.districtStores, listDistrictStores, { enabled });
 }
 
 export function useNationalActivity(district: string | null) {

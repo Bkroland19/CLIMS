@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { AppShell } from '@/components/layout/AppShell';
+import { DistrictContextProvider } from '@/features/district/DistrictContext';
 import { useDcfpCounts } from '@/features/fulfilment/useDcfpCounts';
 import { useWarehouseCounts } from '@/features/warehouse/useWarehouseCounts';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
@@ -38,7 +39,7 @@ function SignedInShell({ children }: AppFrameProps) {
   );
   return (
     <AppShell workspaces={workspaces} storage={storage} counts={dcfpCounts ?? warehouseCounts}>
-      {children}
+      <DistrictContextProvider>{children}</DistrictContextProvider>
     </AppShell>
   );
 }

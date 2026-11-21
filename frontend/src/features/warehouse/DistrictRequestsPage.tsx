@@ -1,5 +1,6 @@
 'use client';
 
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { ArrowRight, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -80,13 +81,17 @@ function columnsFor(store: WarehouseCode): DataTableColumn<WarehouseRequest>[] {
 
 export default function DistrictRequestsPage() {
   const { store, href } = useWarehouseStore();
+  const district = useDistrictContext()?.district;
   const requests = useWarehouseRequests(store);
+  const visibleRequests = district
+    ? requests.data?.filter((request) => request.district === district)
+    : requests.data;
   const accept = useAcceptWarehouseRequest(store);
   const router = useRouter();
   const filter = requestFilterFrom(useSearchParams().get('status'));
   const columns = useMemo(() => columnsFor(store), [store]);
 
-  const rows = requests.data?.filter(filter.keeps);
+  const rows = visibleRequests?.filter(filter.keeps);
 
   function actionsFor(request: WarehouseRequest): RowActionItem[] {
     const open = {
@@ -128,7 +133,7 @@ export default function DistrictRequestsPage() {
         tabs={REQUEST_FILTERS.map((option) => ({
           value: option.value,
           label: option.label,
-          ...(requests.data ? { count: requests.data.filter(option.keeps).length } : {}),
+          ...(visibleRequests ? { count: visibleRequests.filter(option.keeps).length } : {}),
         }))}
       />
       <DataTable

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { GoogleMap, InfoWindowF, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 import { MapPinOff } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -111,9 +112,15 @@ export default function HotspotMapPage({
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-  const districtId = canSwitchDistrict ? params.get('district_id') || null : null;
-  const districts = useLocationDistricts(canSwitchDistrict);
-  const hotspots = useHotspots(districtId);
+  const context = useDistrictContext();
+  const districtId = canSwitchDistrict
+    ? context
+      ? context.districtId
+      : params.get('district_id') || null
+    : null;
+  const districts = useLocationDistricts(canSwitchDistrict && !context);
+  const missingDistrictId = Boolean(canSwitchDistrict && context?.district && !districtId);
+  const hotspots = useHotspots(districtId, !missingDistrictId);
   const options = (districts.data ?? []).map(({ id, name }) => ({ value: id, label: name }));
   if (districtId && !options.some(({ value }) => value === districtId)) {
     options.unshift({ value: districtId, label: 'Selected district' });
@@ -122,7 +129,7 @@ export default function HotspotMapPage({
 
   return (
     <>
-      {canSwitchDistrict && (
+      {canSwitchDistrict && !context && (
         <div className="mb-3">
           <FilterSelect
             label="District"
@@ -153,6 +160,12 @@ export default function HotspotMapPage({
             title="The map is not set up"
             description="No Google Maps key is configured for this deployment. Ask whoever deploys CLIMS to set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY."
           />
+        ) : missingDistrictId ? (
+          <EmptyState
+            icon={MapPinOff}
+            title="No map data for this district"
+            description="Choose a district from the location directory to view its hotspots."
+          />
         ) : hotspots.isError && !hotspots.data ? (
           <ErrorState
             title="Could not load hotspots"
@@ -172,7 +185,7 @@ export default function HotspotMapPage({
         )}
       </div>
 
-      {hotspots.data && googleMapsApiKey !== null ? (
+      {!missingDistrictId && hotspots.data && googleMapsApiKey !== null ? (
         <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
           {mapSummary(onMap.length, hotspots.data.length)}
         </p>

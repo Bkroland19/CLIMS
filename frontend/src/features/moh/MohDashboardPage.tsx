@@ -28,6 +28,7 @@ import { EMPTY_VALUE, formatDuration, formatNumber } from '@/lib/format';
 
 import type { DistrictStoreSummary } from './api';
 import { latestOpenOrder } from './audit';
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { DistrictFilter } from './DistrictFilter';
 import { listHref, MOH_PATHS } from './filters';
 import { districtStockStatus, openOrders, ordersByStage, warehouseTotals } from './national';
@@ -47,16 +48,20 @@ const RECENT_EVENTS = 8;
 
 /** National view of condom stock, hotspot orders and deliveries. */
 export default function MohDashboardPage() {
-  const district = useSearchParams().get('district') || null;
+  const params = useSearchParams();
+  const context = useDistrictContext();
+  const district = context ? context.district : params.get('district') || null;
   const summary = useNationalSummary(district);
 
   return (
     <div className="flex flex-col gap-6">
       <SampleDataNotice subject="Stock, orders and deliveries" />
-      <DistrictFilter
-        value={district}
-        hrefFor={(next) => listHref(MOH_PATHS.dashboard, { district: next })}
-      />
+      {!context && (
+        <DistrictFilter
+          value={district}
+          hrefFor={(next) => listHref(MOH_PATHS.dashboard, { district: next })}
+        />
+      )}
 
       {summary.isError ? (
         <div className="bg-card rounded-card border">

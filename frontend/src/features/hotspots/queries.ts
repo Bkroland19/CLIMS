@@ -16,9 +16,11 @@ import {
 
 const hotspotsKey = ['hotspots'] as const;
 
-export function useHotspots(districtId: string | null = null) {
-  return useApiQuery([...hotspotsKey, 'list', districtId], (http, signal) =>
-    listHotspots(http, signal, districtId),
+export function useHotspots(districtId: string | null = null, enabled = true) {
+  return useApiQuery(
+    [...hotspotsKey, 'list', districtId],
+    (http, signal) => listHotspots(http, signal, districtId),
+    { enabled },
   );
 }
 
