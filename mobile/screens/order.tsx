@@ -135,7 +135,7 @@ function ConfirmForm({ o }: { o: Order }) {
             send(
               "confirmReceipt",
               { id: o.id, qty: got, issue: mismatch ? issue.trim() : "" },
-              `Confirm receipt · ${o.id}`,
+              `Confirm receipt · ${o.hotspot}`,
             )
           }
         />
@@ -167,10 +167,10 @@ export function OrderScreen({ id }: { id: string }) {
   const contact = s.hotspots.find((h) => h.id === o.hotspotId)?.contact ?? "The contact person";
   const lines = lineRows(dl?.lines ?? []);
   return (
-    <Screen title={o.id} backLabel={backLabel}>
+    <Screen title="Order" backLabel={backLabel}>
       <Hero
         title={o.hotspot}
-        sub={`${o.id} · ${items(o.approved)}`}
+        sub={`${items(o.approved)} · sent ${ago(o.createdAt)}`}
         chip={orderChip(o.status)}
         steps={orderSteps(o, you)}
         msg={orderMsg(o, you, contact)}
