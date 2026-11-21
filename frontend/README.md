@@ -60,11 +60,12 @@ Run `npm run check` before opening a pull request. CI runs the same thing.
 Next.js compiles every `NEXT_PUBLIC_*` value into the public JavaScript bundle at build time, so
 **none of those may be a secret**.
 
-| Variable                          | Default                 | Purpose                                                                                                  |
-| --------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_BASE_URL`        | `/api`                  | Where the browser sends API calls. A same-origin path, or an `https://` URL (`http` for localhost only). |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | empty                   | Browser key for the hotspot map. Restrict it by HTTP referrer. Without it the map page shows a notice.   |
-| `BACKEND_URL`                     | `http://localhost:8080` | Server side only: where `/api`, `/docs` and `/health` are forwarded when the app is run on its own.      |
+| Variable                      | Default                 | Purpose                                                                                                                       |
+| ----------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_BASE_URL`    | `/api`                  | Where the browser sends API calls. A same-origin path, or an `https://` URL (`http` for localhost only).                      |
+| `NEXT_PUBLIC_MAP_TILES`       | empty                   | The hotspot map's base layer: empty for OpenStreetMap's tiles, `off` for none, or an `https://…/{z}/{x}/{y}.png` tile server. |
+| `NEXT_PUBLIC_MAP_ATTRIBUTION` | empty                   | Credit shown on the map for a tile server set in `NEXT_PUBLIC_MAP_TILES`.                                                     |
+| `BACKEND_URL`                 | `http://localhost:8080` | Server side only: where `/api`, `/docs` and `/health` are forwarded when the app is run on its own.                           |
 
 A value that fails validation stops the app at startup with a message naming the variable.
 
@@ -185,4 +186,5 @@ docker run --rm -p 3000:3000 clims-frontend
 
 The image runs the standalone Next.js server as a non-root user on port 3000. Behind the
 repository's reverse proxy (`infra/nginx`) it does not serve the API: `/api/` is routed to the
-backend there, with the path unchanged. `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is a build argument.
+backend there, with the path unchanged. `NEXT_PUBLIC_MAP_TILES` and `NEXT_PUBLIC_MAP_ATTRIBUTION`
+are build arguments.

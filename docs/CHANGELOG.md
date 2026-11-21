@@ -41,6 +41,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   (`users:update`). Migration 20 adds National Medical Stores and fills in missing stores for
   warehouse staff, DCFPs and delivery agents. In the web app, the new-user form sets the store from
   the role and district, and Users has a **Change store** action.
+- The hotspot map runs on OpenStreetMap with MapLibre GL and reads the Go hotspot endpoints.
+  Hotspots cluster into rings split by review status or dispenser state, with heatmap and
+  point views, a key that doubles as a filter, search, status, dispenser, venue and region
+  filters, a list of the hotspots in view, and a detail panel with the contact person,
+  directions, the nearest hotspots, comments and history. A national user's map loads district by
+  district, so the database never pages through the whole table. The view is kept in the page
+  address, and the hotspots shown export to Excel. See `docs/modules/hotspots.md`.
 
 ### Changed
 
@@ -61,6 +68,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - New orders and stockout requests reject inactive products.
 - A product's type is its distribution channel (free, socially marketed or commercial), and its
   brand is chosen from the brand list. The product minimum level is removed.
+- The hotspot map no longer needs a Google Maps key: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is replaced
+  by the optional `NEXT_PUBLIC_MAP_TILES` (empty for OpenStreetMap, `off`, or a tile server's URL)
+  and `NEXT_PUBLIC_MAP_ATTRIBUTION`. The Content-Security-Policy names the tile servers instead of
+  Google, and `Permissions-Policy` allows location on the app's own pages, for "show my location".
 
 ### Removed
 
@@ -74,6 +85,7 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   Excel export.
 - Ant Design, ApexCharts, styled-components, redux-persist, three unused data-grid libraries,
   webpack, and the `xlsx` package (unpatched advisories on npm).
+- `@react-google-maps/api`, with the Google Maps scripts and hosts it needed.
 
 ### Security
 
