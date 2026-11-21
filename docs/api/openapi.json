@@ -1946,7 +1946,7 @@
         "tags": ["Hotspots"],
         "operationId": "listHotspotNotifications",
         "summary": "List hotspot notifications",
-        "description": "Requires hotspots:read. Events addressed to the user and, with hotspots:activate, to their district; hotspots:all_districts sees every addressed event. Newest first.",
+        "description": "Deprecated: use GET /api/v1/notifications, which carries every hotspot notification with read state. This endpoint is removed once the web and mobile clients have switched. Requires hotspots:read. Events addressed to the user and, with hotspots:activate, to their district; hotspots:all_districts sees every addressed event. Newest first.",
         "responses": {
           "200": {
             "description": "Success",
@@ -1985,7 +1985,8 @@
               "default": 0
             }
           }
-        ]
+        ],
+        "deprecated": true
       }
     },
     "/api/v1/hotspots/{id}": {
