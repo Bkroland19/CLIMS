@@ -65,9 +65,10 @@
         "origin": false
       },
       "eas": {
-        "projectId": "34fc2cbe-c7f6-460e-ae08-a69ce4573a85"
+        "projectId": "8002756e-1d09-44a9-a0dc-877d382b2e89"
       },
       "releaseVersion": "2.2.0"
-    }
+    },
+    "owner": "wafula3"
   }
 }
