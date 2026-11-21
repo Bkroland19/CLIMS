@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
+  KeyboardAvoidingView,
   Image,
   Modal,
   Platform,
@@ -449,24 +450,6 @@ export function Meter({
           backgroundColor: T.fg3,
         }}
       />
-    </View>
-  );
-}
-
-/**
- * Three thin bands in the colours of the Uganda flag, as on Ministry of Health letterheads. Used
- * once per screen at most, under the header band and on sign-in, as the app's identity mark.
- */
-export function FlagStripe({ width, band = 2 }: { width?: number; band?: number }) {
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{ width, alignSelf: width ? "center" : "stretch" }}
-    >
-      <View style={{ height: band, backgroundColor: "#000000" }} />
-      <View style={{ height: band, backgroundColor: "#fcdc04" }} />
-      <View style={{ height: band, backgroundColor: "#d90000" }} />
     </View>
   );
 }
@@ -1532,7 +1515,7 @@ export function Sheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: T.scrim }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: T.scrim }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
         <Animated.View
           style={{
@@ -1626,7 +1609,7 @@ export function Sheet({
             {children}
           </ScrollView>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

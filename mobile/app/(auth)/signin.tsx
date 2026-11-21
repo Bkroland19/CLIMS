@@ -1,21 +1,9 @@
 import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Image, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme";
-import {
-  Banner,
-  Btn,
-  Btns,
-  Fields,
-  FlagStripe,
-  Input,
-  List,
-  Note,
-  Row,
-  Sheet,
-  Txt,
-} from "@/components/m/kit";
+import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
 import { loginErrorMessage } from "@/lib/api";
 import { ROOT } from "@/lib/nav";
 import { DCFP } from "@/lib/seed";
@@ -23,6 +11,7 @@ import { ROLE_LABEL, useSession } from "@/lib/session";
 import type { AppRole } from "@/lib/types";
 import { call } from "@/screens/common";
 import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
+import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import { TYPE } from "@/lib/fonts";
 
 export default function SignIn() {
@@ -40,6 +29,7 @@ export default function SignIn() {
   const [err, setErr] = useState("");
   const [forgot, setForgot] = useState(false);
   const [demo, setDemo] = useState(false);
+  const setScroll = useKeyboardScroll();
 
   const enter = async () => {
     setErr("");
@@ -61,11 +51,11 @@ export default function SignIn() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: T.bg }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    // Padding on both platforms: Android draws edge to edge, so without it the keyboard covers the
+    // sign-in fields; the focused field is then scrolled into view above the keyboard.
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior="padding">
       <ScrollView
+        ref={setScroll}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           col.style,
@@ -104,16 +94,16 @@ export default function SignIn() {
           </View>
           <Txt
             accessibilityRole="header"
-            style={{ fontSize: isShort || isCompact ? 28 : 32, fontWeight: "700" }}
+            style={{
+              fontSize: isShort || isCompact ? 28 : 32,
+              fontWeight: "700",
+            }}
           >
             CLIMS
           </Txt>
           <Txt style={{ color: T.fg2, fontSize: 15, fontWeight: "500" }}>
             Ministry of Health, Uganda
           </Txt>
-          <View style={{ marginTop: 6 }}>
-            <FlagStripe width={56} band={2} />
-          </View>
         </View>
 
         {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}

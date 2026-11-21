@@ -1,7 +1,6 @@
 import React from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +13,9 @@ import { useT } from "@/lib/theme";
 import { useNav } from "@/lib/nav";
 import { useStore, useUnread } from "@/lib/store";
 import { useColumn, useResponsive } from "@/hooks/useResponsive";
+import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import Icon, { type IconName } from "./Icon";
-import { FlagStripe, Txt } from "./kit";
+import { Txt } from "./kit";
 import { TYPE } from "@/lib/fonts";
 
 export interface ScreenAction {
@@ -59,7 +59,8 @@ export default function Screen({
   const action = T.ios ? fab : undefined;
   const unread = useUnread();
   const showBell = !!root && !noHeader;
-  // Tab roots sit under the Ministry green band with the flag stripe; detail pages keep a plain
+  const setScroll = useKeyboardScroll(scrollRef);
+  // Tab roots sit under the Ministry green band; detail pages keep a plain
   // header so the band marks "you are at the top of a section".
   const band = !!root && !noHeader;
   const hdrBg = band ? T.brand : T.hdrBg;
@@ -264,7 +265,6 @@ export default function Screen({
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <StatusBar style={band || T.dark ? "light" : "dark"} />
       {header}
-      {band ? <FlagStripe /> : null}
       {offline ? (
         <View style={{ backgroundColor: T.offBg }}>
           <View
@@ -288,12 +288,11 @@ export default function Screen({
           </View>
         </View>
       ) : null}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/* Padding on both platforms: Android draws edge to edge, so the window no longer resizes
+          for the keyboard and the form would sit underneath it. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
-          ref={scrollRef}
+          ref={setScroll}
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={250}
           onScroll={
