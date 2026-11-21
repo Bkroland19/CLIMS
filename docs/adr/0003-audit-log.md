@@ -106,10 +106,13 @@ already see a hotspot's workflow history at `/hotspots/{id}/events`.
 
 ### 7. The real client address
 
-The backend reads the client's address from nginx's forwarded headers, and trusts those headers
-only when the request comes from nginx. Without this, every entry would record nginx's address, so
-it is the first step. nginx faces clients directly in production; the trusted proxy addresses are
-configurable so a load balancer can be added in front of nginx without a code change.
+The backend reads the client's address from `X-Real-IP`, which nginx overwrites with the address
+that connected to it, so a client cannot supply its own value through nginx (unlike
+`X-Forwarded-For`, which nginx appends to). The header is trusted only on requests from the private
+container network, where nginx is the API's caller; `TRUSTED_PROXIES` can narrow that to named
+addresses. Without this, every entry would record nginx's address, so it is the first step. A load
+balancer in front of nginx is configured in nginx itself (`set_real_ip_from`), so nginx passes on
+the real client address without a code change.
 
 ### 8. Alerts
 
