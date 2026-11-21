@@ -3,7 +3,19 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-n
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme";
-import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
+import {
+  Banner,
+  Btn,
+  Btns,
+  Fields,
+  FlagStripe,
+  Input,
+  List,
+  Note,
+  Row,
+  Sheet,
+  Txt,
+} from "@/components/m/kit";
 import { loginErrorMessage } from "@/lib/api";
 import { ROOT } from "@/lib/nav";
 import { DCFP } from "@/lib/seed";
@@ -77,19 +89,15 @@ export default function SignIn() {
             accessible
             accessibilityRole="image"
             accessibilityLabel="The Republic of Uganda, Ministry of Health"
-            style={[
-              { marginBottom: isShort ? 4 : 8 },
-              // The crest's lettering is black, so on the dark theme it sits on a white card.
-              scheme === "dark" && {
-                backgroundColor: "#fff",
-                borderRadius: 20,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-              },
-            ]}
+            style={{ marginBottom: isShort ? 4 : 8 }}
           >
+            {/* The crest's lettering is black; the dark theme uses a copy with light lettering. */}
             <Image
-              source={require("../../assets/images/moh-logo.png")}
+              source={
+                scheme === "dark"
+                  ? require("../../assets/images/moh-logo-dark.png")
+                  : require("../../assets/images/moh-logo.png")
+              }
               style={{ width: logoW, height: logoH }}
               resizeMode="contain"
             />
@@ -103,6 +111,9 @@ export default function SignIn() {
           <Txt style={{ color: T.fg2, fontSize: 15, fontWeight: "500" }}>
             Ministry of Health, Uganda
           </Txt>
+          <View style={{ marginTop: 6 }}>
+            <FlagStripe width={56} band={2} />
+          </View>
         </View>
 
         {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
@@ -152,7 +163,13 @@ export default function SignIn() {
         />
       </ScrollView>
 
-      <Sheet visible={forgot} title="Forgot password" onClose={() => setForgot(false)}>
+      <Sheet
+        visible={forgot}
+        title="Forgot password"
+        icon="shield"
+        tone="info"
+        onClose={() => setForgot(false)}
+      >
         <Txt
           style={{
             marginHorizontal: 24,
@@ -176,7 +193,7 @@ export default function SignIn() {
         </Btns>
       </Sheet>
 
-      <Sheet visible={demo} title="Sample data" onClose={() => setDemo(false)}>
+      <Sheet visible={demo} title="Sample data" icon="user" onClose={() => setDemo(false)}>
         <List
           h="Sign in as"
           f="Development builds only. Sample Wakiso data is kept on this phone; the API has no hotspot or order endpoints yet."
