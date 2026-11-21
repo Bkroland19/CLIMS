@@ -198,11 +198,14 @@ export function summariseUsers(users: readonly Pick<User, 'status'>[]): {
 }
 
 /*
- * The Go validator reports errors under the request struct's Go field names
- * with a rule tag, e.g. `{ "Username": "failed on validation rule: min" }`.
- * These turn them into the form's field names and a sentence a person can act on.
+ * The Go API reports validation errors under the request's JSON field names with
+ * a readable message, e.g. `{ "username": "Use at least 3 characters." }`. Older
+ * builds used the Go struct's field names and a rule tag
+ * (`{ "Username": "failed on validation rule: min" }`); both are turned into the
+ * form's field names and a sentence a person can act on.
  */
 const GO_FIELDS: Readonly<Record<string, string>> = {
+  role_id: 'role_ids',
   Username: 'username',
   Email: 'email',
   Password: 'password',
@@ -252,9 +255,15 @@ const MESSAGE_FIELDS: readonly { pattern: RegExp; field: string; message: string
   },
 ];
 
+/** Fields picked from a list, where any failure means the same thing to the person. */
+const LIST_MESSAGES: Readonly<Record<string, string>> = {
+  role_ids: 'Choose at least one role from the list.',
+  hot_spot_id: 'Choose the hotspot from the list.',
+};
+
 function readableMessage(field: string, raw: string): string {
   const rule = /failed on validation rule: (\w+)/.exec(raw)?.[1];
-  if (!rule) return raw;
+  if (!rule) return LIST_MESSAGES[field] ?? raw;
   const messages = RULE_MESSAGES[field];
   return messages?.[rule] ?? messages?.default ?? 'Check this value.';
 }
