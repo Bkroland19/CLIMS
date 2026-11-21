@@ -2,6 +2,21 @@
 
 [Documentation index](README.md)
 
+## Local lint hooks
+
+GitHub Actions runs lint on pull requests and pushes to `main`. To run the same linters before local commits and pushes, install the dependencies and enable the repository hooks once per clone:
+
+```bash
+npm ci --prefix frontend
+npm ci --prefix mobile
+python3 -m pip install -r requirements-ci.txt
+git config --local core.hooksPath .githooks
+```
+
+Use the Go version in `backend/go.mod` and the Node version in `.nvmrc`. If you use a Python virtual environment, activate it before installing the dependencies and running Git. On Windows, use `python` if `python3` is unavailable.
+
+Both hooks run `make lint` against the current working tree and block the Git operation on failure. GitHub Actions checks the submitted revision.
+
 ## Start locally
 
 Requires Docker Desktop with Compose v2. Run commands from the repository root:

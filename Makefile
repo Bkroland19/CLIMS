@@ -203,7 +203,7 @@ check-environments:
 lint:
 	cd backend && go vet ./...
 	cd frontend && npm run lint -- --max-warnings=0
-	cd mobile && npm run lint -- --max-warnings=0
+	cd mobile && npm run lint -- --max-warnings=0 --no-cache
 	$(PYTHON) -m ruff check scripts
 
 format:
