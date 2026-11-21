@@ -12,29 +12,35 @@ var (
 	errWorkflowConflict  = errors.New("action is unavailable in the current order state")
 	errWorkflowForbidden = errors.New("this action is outside your assignment")
 	errWorkflowInput     = errors.New("action requires valid shipment or receipt details")
-	errHotSpotRoute      = errors.New("hotspot has no district store route")
+	errHotSpotRoute      = errors.New("hotspot has no district with a store; set the hotspot's district")
+	errNotEnoughStock    = errors.New("not enough available stock at the district store; request it from the warehouse")
 )
 
 type ActionInput struct {
 	WarehouseID      *string `json:"warehouse_store_id"`
 	RiderID          *string `json:"rider_id"`
+	UnitOfMeasureID  *string `json:"unit_of_measure_id"`
+	Quantity         *int32  `json:"quantity"`
 	QuantityReceived *int32  `json:"quantity_received"`
 	QuantityIssued   *int32  `json:"quantity_issued"`
 	DiscrepancyNote  *string `json:"discrepancy_note"`
 	DeliveryNote     *string `json:"delivery_note"`
 }
 
-func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, condomID, unitID string, quantity int32, comment *string) (Order, error) {
+// reportStockout raises a stockout alert for a hotspot. It names the product only: the DCFP decides the
+// unit and quantity when sending stock or requesting it from the warehouse. The alert goes to the store
+// of the hotspot's district, whose DCFPs are notified.
+func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, condomID string, comment *string) (Order, error) {
 	var order Order
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
 		var err error
 		order, err = scanOrder(tx.QueryRow(ctx, `
-			INSERT INTO orders (hot_spot_id, condom_id, unit_of_measure_id, quantity_needed,
-				ordered_by_id, ordered_for_store_id, ordered_from_store_id, order_status, comment)
-			SELECT route.hot_spot_id, $2, $3, $4, $5, route.store_id, route.store_id, 'queued', $6
-			FROM order_hot_spot_routes route JOIN stores s ON s.id = route.store_id
-			WHERE route.hot_spot_id = $1 AND s.store_type = 'district'
-			RETURNING `+columns, hotSpotID, condomID, unitID, quantity, actorID, comment))
+			INSERT INTO orders (hot_spot_id, condom_id, ordered_by_id, ordered_for_store_id, ordered_from_store_id,
+				order_status, comment)
+			SELECT h.id, $2, $3, s.id, s.id, 'queued', $4
+			FROM hot_spots h JOIN stores s ON s.store_type = 'district' AND s.district_id = h.district_id
+			WHERE h.id = $1
+			RETURNING `+columns, hotSpotID, condomID, actorID, comment))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errHotSpotRoute
 		}
@@ -53,14 +59,6 @@ func assigned(id *string, expected string) bool {
 func (r *Repository) act(ctx context.Context, access scope, id, action string, input ActionInput) (Order, error) {
 	var result Order
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if action == "receive" {
-			// Receipt also confirms the held hotspot order. Lock it before its replenishment, the same
-			// order request-replenishment takes, so the two cannot deadlock.
-			if _, err := tx.Exec(ctx, `SELECT FROM orders WHERE id =
-				(SELECT parent_order_id FROM orders WHERE id = $1) FOR UPDATE`, id); err != nil {
-				return err
-			}
-		}
 		order, err := scanOrder(tx.QueryRow(ctx, `SELECT `+columns+` FROM orders WHERE `+visibleOrders+
 			` AND id = $5 FOR UPDATE`, access.allStores, access.storeID, access.hotSpotID, access.userID, id))
 		if err != nil {
@@ -89,16 +87,19 @@ func (r *Repository) act(ctx context.Context, access scope, id, action string, i
 func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
 	next := order.Status
 	var notifyStore, notifyUser *string
+	alert := order.HotSpotID != nil
+	// An open alert waits in the DCFP's queue, or on hold while the warehouse fills a request.
+	openAlert := alert && (order.Status == "queued" || order.Status == "on_hold")
 	switch action {
 	case "review":
-		if order.Status != "queued" && order.Status != "on_hold" {
+		// Only warehouse requests are reviewed; a stockout alert goes straight to the DCFP's decision.
+		if alert || (order.Status != "queued" && order.Status != "on_hold") {
 			return Order{}, errWorkflowConflict
 		}
 		next = "reviewed"
 	case "check-stock":
-		// Hotspot orders are reviewed automatically on queueing; a held order is rechecked directly.
-		if order.Status != "reviewed" && order.Status != "on_hold" &&
-			(order.Status != "queued" || order.HotSpotID == nil) {
+		// A held warehouse request is rechecked directly once stock arrives.
+		if alert || (order.Status != "reviewed" && order.Status != "on_hold") {
 			return Order{}, errWorkflowConflict
 		}
 		reserved, err := reserve(ctx, tx, order)
@@ -108,21 +109,24 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 		next = "on_hold"
 		if reserved {
 			next = "confirmed"
-			if order.HotSpotID != nil {
-				notifyUser = &order.OrderedByID
-			}
 		}
 	case "request-replenishment":
-		if order.Status != "on_hold" || order.HotSpotID == nil {
+		if !openAlert {
 			return Order{}, errWorkflowConflict
 		}
-		return requestReplenishment(ctx, tx, order, actorID, *input.WarehouseID)
+		if input.UnitOfMeasureID == nil || input.Quantity == nil {
+			return Order{}, errWorkflowInput
+		}
+		return requestReplenishment(ctx, tx, order, actorID, *input.WarehouseID, *input.UnitOfMeasureID, *input.Quantity)
 	case "dispatch":
-		if order.Status != "confirmed" {
-			return Order{}, errWorkflowConflict
-		}
-		if order.HotSpotID != nil {
-			if input.RiderID == nil {
+		var quantity int32
+		var onHand int64
+		if alert {
+			// The DCFP sends stock from the district's available balance, choosing the unit and quantity.
+			if !openAlert {
+				return Order{}, errWorkflowConflict
+			}
+			if input.RiderID == nil || input.UnitOfMeasureID == nil || input.QuantityIssued == nil {
 				return Order{}, errWorkflowInput
 			}
 			var eligible bool
@@ -138,35 +142,51 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 			if !eligible {
 				return Order{}, errWorkflowInput
 			}
+			quantity = *input.QuantityIssued
+			err = tx.QueryRow(ctx, `UPDATE order_store_stock
+				SET on_hand = on_hand - $4, updated_at = CURRENT_TIMESTAMP
+				WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND on_hand - reserved >= $4
+				RETURNING on_hand`,
+				order.OrderedFromStoreID, order.CondomID, input.UnitOfMeasureID, quantity).Scan(&onHand)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return Order{}, errNotEnoughStock
+			}
+			if err != nil {
+				return Order{}, err
+			}
+			order.UnitOfMeasureID = input.UnitOfMeasureID
+			order.QuantityNeeded = &quantity
 			order.RiderID = input.RiderID
 			notifyUser = order.RiderID
 		} else {
-			if input.RiderID != nil {
+			// A warehouse request ships what check-stock reserved, or less, releasing the rest.
+			if order.Status != "confirmed" {
+				return Order{}, errWorkflowConflict
+			}
+			if input.RiderID != nil || input.UnitOfMeasureID != nil {
 				return Order{}, errWorkflowInput
+			}
+			quantity = *order.QuantityNeeded
+			if input.QuantityIssued != nil {
+				if *input.QuantityIssued > quantity {
+					return Order{}, errWorkflowInput
+				}
+				quantity = *input.QuantityIssued
+			}
+			err := tx.QueryRow(ctx, `UPDATE order_store_stock
+				SET on_hand = on_hand - $5, reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
+				WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4
+				RETURNING on_hand`,
+				order.OrderedFromStoreID, order.CondomID, order.UnitOfMeasureID, *order.QuantityNeeded, quantity).Scan(&onHand)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return Order{}, errWorkflowConflict
+			}
+			if err != nil {
+				return Order{}, err
 			}
 			notifyStore = &order.OrderedForStoreID
 		}
-		// A partial dispatch issues less than requested and releases the rest of the reservation.
-		quantity := order.QuantityNeeded
-		if input.QuantityIssued != nil {
-			if *input.QuantityIssued > order.QuantityNeeded {
-				return Order{}, errWorkflowInput
-			}
-			quantity = *input.QuantityIssued
-		}
-		var onHand int64
-		err := tx.QueryRow(ctx, `UPDATE order_store_stock
-			SET on_hand = on_hand - $5, reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
-			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4
-			RETURNING on_hand`,
-			order.OrderedFromStoreID, order.CondomID, order.UnitOfMeasureID, order.QuantityNeeded, quantity).Scan(&onHand)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Order{}, errWorkflowConflict
-		}
-		if err != nil {
-			return Order{}, err
-		}
-		if err = recordMovement(ctx, tx, order, order.OrderedFromStoreID, "dispatch", -int64(quantity), onHand, actorID); err != nil {
+		if err := recordMovement(ctx, tx, order, order.OrderedFromStoreID, "dispatch", -int64(quantity), onHand, actorID); err != nil {
 			return Order{}, err
 		}
 		order.QuantityIssued = &quantity
@@ -195,9 +215,6 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 				return Order{}, err
 			}
 		}
-		if err = confirmHeldOrder(ctx, tx, *order.ParentOrderID, actorID); err != nil {
-			return Order{}, err
-		}
 		order.QuantityReceived = input.QuantityReceived
 		order.DiscrepancyNote = input.DiscrepancyNote
 		notifyStore = &order.OrderedForStoreID
@@ -212,8 +229,9 @@ func transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action str
 	}
 	result, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = $2, quantity_issued = $3,
 		handled_by_id = $4, rider_id = $5, quantity_received = $6, discrepancy_note = $7, delivery_note = $8,
-		updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, order.ID, next, order.QuantityIssued,
-		order.HandledByID, order.RiderID, order.QuantityReceived, order.DiscrepancyNote, order.DeliveryNote))
+		quantity_needed = $9, unit_of_measure_id = $10, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 RETURNING `+columns, order.ID, next, order.QuantityIssued, order.HandledByID, order.RiderID,
+		order.QuantityReceived, order.DiscrepancyNote, order.DeliveryNote, order.QuantityNeeded, order.UnitOfMeasureID))
 	if err != nil {
 		return Order{}, err
 	}
@@ -239,43 +257,27 @@ func reserve(ctx context.Context, tx pgx.Tx, order Order) (bool, error) {
 	return tag.RowsAffected() == 1, err
 }
 
-// confirmHeldOrder reserves just-received stock for the hotspot order that requested it, before any
-// other order can take it, and sends the hotspot manager the order confirmation. The caller holds the lock.
-func confirmHeldOrder(ctx context.Context, tx pgx.Tx, id, actorID string) error {
-	held, err := scanOrder(tx.QueryRow(ctx, `SELECT `+columns+` FROM orders WHERE id = $1`, id))
-	if err != nil {
-		return err
-	}
-	if held.Status != "queued" && held.Status != "reviewed" && held.Status != "on_hold" {
-		return nil
-	}
-	reserved, err := reserve(ctx, tx, held)
-	if err != nil || !reserved {
-		return err
-	}
-	confirmed, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = 'confirmed',
-		updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, id))
-	if err != nil {
-		return err
-	}
-	return addEvent(ctx, tx, confirmed, actorID, "check-stock", nil, &confirmed.OrderedByID)
-}
-
-func requestReplenishment(ctx context.Context, tx pgx.Tx, order Order, actorID, warehouseID string) (Order, error) {
+// requestReplenishment asks the warehouse for the unit and quantity the DCFP chose, linked to the alert,
+// which then waits on hold. An alert has one open request at a time.
+func requestReplenishment(ctx context.Context, tx pgx.Tx, order Order, actorID, warehouseID, unitID string, quantity int32) (Order, error) {
 	child, err := scanOrder(tx.QueryRow(ctx, `INSERT INTO orders
 		(parent_order_id, condom_id, unit_of_measure_id, quantity_needed, ordered_by_id,
 			ordered_for_store_id, ordered_from_store_id, order_status)
 		SELECT $1, $2, $3, $4, $5, $6, id, 'queued' FROM stores WHERE id = $7 AND store_type = 'national'
 		ON CONFLICT (parent_order_id) WHERE parent_order_id IS NOT NULL AND order_status <> 'received' DO NOTHING
-		RETURNING `+columns, order.ID, order.CondomID, order.UnitOfMeasureID,
-		order.QuantityNeeded, actorID, order.OrderedFromStoreID, warehouseID))
+		RETURNING `+columns, order.ID, order.CondomID, unitID, quantity, actorID, order.OrderedFromStoreID, warehouseID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Order{}, errWorkflowConflict
 	}
 	if err != nil {
 		return Order{}, err
 	}
-	if err = addEvent(ctx, tx, order, actorID, "request-replenishment", nil, nil); err != nil {
+	held, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = 'on_hold', updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 RETURNING `+columns, order.ID))
+	if err != nil {
+		return Order{}, err
+	}
+	if err = addEvent(ctx, tx, held, actorID, "request-replenishment", nil, nil); err != nil {
 		return Order{}, err
 	}
 	return child, addEvent(ctx, tx, child, actorID, "replenishment_requested", &warehouseID, nil)

@@ -47,8 +47,8 @@
       "post": {
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
-        "summary": "Report a hotspot stockout",
-        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. It queues the order and notifies the routed district store.",
+        "summary": "Raise a hotspot stockout alert",
+        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422.",
         "responses": {
           "201": {
             "description": "Success",
@@ -214,7 +214,7 @@
         "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance an order workflow",
-        "description": "Review, check-stock and dispatch require orders:process and the supplying store. Hotspot orders need no review: check-stock works on queued, reviewed and on_hold hotspot orders, and on reviewed and on_hold warehouse requests. request-replenishment requires orders:replenish, the district store and warehouse_store_id. Warehouse receive requires orders:receive, the requesting store and quantity_received; it also reserves the received stock for the held hotspot order and confirms it when enough is on hand. A discrepancy requires discrepancy_note. Dispatch accepts an optional quantity_issued for a partial dispatch. Hotspot dispatch requires rider_id and deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. Review and check-stock accept an empty body.",
+        "description": "On a stockout alert (queued, or on_hold while the warehouse fills a request) the DCFP either sends stock or asks the warehouse. dispatch takes rider_id (an active rider with orders:deliver at the district store), unit_of_measure_id and quantity_issued, and takes the quantity from the district's available stock; too little returns 409. request-replenishment (orders:replenish) takes warehouse_store_id, unit_of_measure_id and quantity, creates a linked warehouse request, notifies the warehouse and puts the alert on hold; an alert has one open request at a time. review and check-stock do not apply to alerts. A warehouse request is reviewed, stock-checked (which reserves it, or holds it) and dispatched by warehouse staff with orders:process; dispatch may give a smaller quantity_issued. The district then runs receive (orders:receive) with quantity_received, and a mismatch needs discrepancy_note. deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. review and check-stock accept an empty body.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2291,6 +2291,8 @@
     "schemas": {
       "OrderStockoutRequest": {
         "type": "object",
+        "additionalProperties": false,
+        "required": ["hot_spot_id", "condom_id"],
         "properties": {
           "hot_spot_id": {
             "type": "string",
@@ -2300,22 +2302,13 @@
             "type": "string",
             "format": "uuid"
           },
-          "unit_of_measure_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity_needed": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          },
           "comment": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 4000
           }
         },
-        "required": ["hot_spot_id", "condom_id", "unit_of_measure_id", "quantity_needed"],
-        "additionalProperties": false
+        "description": "A stockout alert names the product only. The DCFP chooses the unit and quantity when sending stock or requesting it from the warehouse."
       },
       "OrderActionRequest": {
         "type": "object",
@@ -2345,7 +2338,18 @@
             "type": "integer",
             "format": "int32",
             "minimum": 1,
-            "description": "dispatch only. Issues less than quantity_needed and releases the rest of the reservation. Defaults to quantity_needed."
+            "description": "dispatch: for a stockout alert, the quantity sent to the hotspot (required); for a warehouse request, an optional smaller quantity than requested, releasing the rest of the reservation."
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "dispatch of a stockout alert and request-replenishment: the unit the DCFP sends or requests."
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "description": "request-replenishment only: the quantity to request from the warehouse."
           }
         },
         "additionalProperties": false
@@ -2494,7 +2498,9 @@
           "quantity_needed": {
             "type": "integer",
             "format": "int32",
-            "minimum": 1
+            "minimum": 1,
+            "nullable": true,
+            "description": "Null on an open stockout alert until the DCFP sends stock; then the quantity sent."
           },
           "order_date": {
             "type": "string",
@@ -2510,7 +2516,9 @@
           },
           "unit_of_measure_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null on an open stockout alert until the DCFP sends stock."
           },
           "comment": {
             "type": "string",
@@ -3550,10 +3558,13 @@
           },
           "unit_of_measure_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null on the row for open alerts, which have no unit until the DCFP acts."
           },
           "unit": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "delivered": {
             "type": "integer",
@@ -3572,9 +3583,10 @@
             "type": "integer",
             "format": "int64"
           },
-          "requested": {
+          "open_alerts": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Stockout alerts not yet sent or still waiting for the warehouse."
           },
           "on_hold_requests": {
             "type": "integer",
@@ -3696,10 +3708,13 @@
           },
           "unit_of_measure_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null on the row counting open stockout alerts, which have no unit yet."
           },
           "unit": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "warehouse_on_hand": {
             "type": "integer",
