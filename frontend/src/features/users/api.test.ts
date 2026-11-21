@@ -68,6 +68,10 @@ describe('listUsers', () => {
           status: 'active',
           role: ADMIN_ROLE,
           roles: [ADMIN_ROLE, VHT_ROLE],
+          last_login_at: '2026-11-20T09:00:00Z',
+          login_count: 12,
+          active_sessions: 2,
+          created_at: '2026-01-05T08:00:00Z',
         },
       ]),
     );
@@ -85,6 +89,10 @@ describe('listUsers', () => {
         status: 'active',
         role: 'admin',
         roles: [ADMIN_ROLE, VHT_ROLE],
+        last_login_at: '2026-11-20T09:00:00Z',
+        login_count: 12,
+        active_sessions: 2,
+        created_at: '2026-01-05T08:00:00Z',
       },
     ]);
   });
@@ -148,6 +156,7 @@ describe('createUser', () => {
           Username: 'failed on validation rule: min',
           Phone: 'failed on validation rule: max',
           RoleIDs: 'failed on validation rule: uuid_rfc4122',
+          HotSpotID: 'failed on validation rule: uuid_rfc4122',
         },
       },
     });
@@ -157,6 +166,7 @@ describe('createUser', () => {
         username: ['Use at least 3 characters.'],
         phone_number: ['Enter the number as +256 followed by 9 digits.'],
         role_ids: ['Choose at least one role from the list.'],
+        hot_spot_id: ['Choose the hotspot from the list.'],
       },
     });
   });

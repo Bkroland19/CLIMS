@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { authKeys } from '@/features/auth/queries';
-import { useApiQuery, useHttp } from '@/lib/api';
+import { toApiError, useApiQuery, useHttp, type ApiError } from '@/lib/api';
 
 import {
   createUser,
@@ -15,6 +16,7 @@ import {
   setUserRoles,
   setUserStatus,
   type NewUserInput,
+  type User,
   type UserStatus,
 } from './api';
 
@@ -125,4 +127,52 @@ export function useRevokeUserSessions(userId: string) {
     },
     meta: { handlesOwnErrors: true },
   });
+}
+
+/** A change applied to several users at once from the users list. */
+export type BulkUserAction = 'deactivate' | 'reactivate' | 'sign-out';
+
+export interface BulkUserResult {
+  done: User[];
+  failed: { user: User; error: ApiError }[];
+}
+
+/**
+ * Applies one change to several users, one request at a time, so a failure
+ * names the user it is about and the rest still go through. `progress` counts
+ * the requests answered while it runs. The caller reports the outcome.
+ */
+export function useBulkUserAction() {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const mutation = useMutation({
+    mutationFn: async ({
+      action,
+      users,
+    }: {
+      action: BulkUserAction;
+      users: readonly User[];
+    }): Promise<BulkUserResult> => {
+      const result: BulkUserResult = { done: [], failed: [] };
+      setProgress({ done: 0, total: users.length });
+      for (const [index, user] of users.entries()) {
+        try {
+          if (action === 'sign-out') await revokeUserSessions(http, user.id);
+          else await setUserStatus(http, user.id, action === 'deactivate' ? 'disabled' : 'active');
+          result.done.push(user);
+        } catch (error) {
+          result.failed.push({ user, error: toApiError(error) });
+        }
+        setProgress({ done: index + 1, total: users.length });
+      }
+      return result;
+    },
+    onSettled: async () => {
+      setProgress(null);
+      await queryClient.invalidateQueries({ queryKey: accessKeys.users });
+    },
+    meta: { handlesOwnErrors: true },
+  });
+  return { ...mutation, progress };
 }

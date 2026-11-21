@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -147,5 +148,87 @@ describe('DataTable', () => {
     renderTable({ rows: [{ id: 1, name: '<img src=x onerror=alert(1)>', stock: 1 }] });
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
+  });
+});
+
+describe('DataTable selection', () => {
+  function Selectable() {
+    const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+    return (
+      <>
+        <DataTable
+          label="Sites"
+          columns={columns}
+          rows={sites}
+          getRowId={(site) => site.id}
+          emptyTitle="No sites yet"
+          selection={{
+            selected,
+            onChange: setSelected,
+            rowLabel: (site) => site.name ?? `Site ${site.id}`,
+          }}
+        />
+        <output>{[...selected].join(',')}</output>
+      </>
+    );
+  }
+
+  it('ticks rows one by one, and the header ticks or clears the whole page', async () => {
+    const user = userEvent.setup();
+    render(<Selectable />);
+
+    const first = sites[0];
+    if (!first) throw new Error('no sites');
+    await user.click(screen.getByRole('checkbox', { name: `Select ${first.name}` }));
+    expect(screen.getByRole('status')).toHaveTextContent(String(first.id));
+
+    const header = screen.getByRole('checkbox', { name: /Select every sites row on this page/ });
+    expect(header).toHaveAttribute('aria-checked', 'mixed');
+    await user.click(header);
+    expect(screen.getByRole('status').textContent.split(',')).toHaveLength(10);
+    expect(header).toBeChecked();
+
+    await user.click(header);
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+});
+
+describe('DataTable view menu', () => {
+  it('hides and shows columns, and changes rows per page', async () => {
+    const user = userEvent.setup();
+    const [first, ...rest] = columns;
+    if (!first) throw new Error('no columns');
+    renderTable({
+      preferencesKey: 'sites',
+      columns: [first, ...rest.map((column) => ({ ...column, hideable: true }))],
+    });
+
+    const hideable = rest[0];
+    if (!hideable) throw new Error('need a second column');
+    expect(
+      screen.getByRole('columnheader', { name: new RegExp(hideable.header) }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /View options for sites/ }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: hideable.header }));
+    expect(
+      screen.queryByRole('columnheader', { name: new RegExp(hideable.header) }),
+    ).not.toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: /View options for sites/ }));
+    await user.click(screen.getByRole('menuitemradio', { name: '25' }));
+    expect(screen.getByText('Showing 1–23 of 23')).toBeInTheDocument();
+  });
+
+  it('starts with a column hidden when asked to', () => {
+    const [first, second, ...rest] = columns;
+    if (!first || !second) throw new Error('need two columns');
+    renderTable({
+      preferencesKey: 'sites',
+      columns: [first, { ...second, defaultHidden: true }, ...rest],
+    });
+    expect(
+      screen.queryByRole('columnheader', { name: new RegExp(second.header) }),
+    ).not.toBeInTheDocument();
   });
 });

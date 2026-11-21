@@ -134,4 +134,20 @@ describe('RolesPage', () => {
       expect(screen.getByRole('region', { name: area })).toBeInTheDocument();
     }
   });
+
+  it('says what the role opens on the web, and links to the people who hold it', async () => {
+    renderApp(<RolesPage />, {
+      route: '/moh/users/roles?role=role-dcfp',
+      signedIn: true,
+      replies: [api()],
+    });
+
+    const opens = await screen.findByRole('region', { name: 'What this role opens' });
+    expect(within(opens).getByText('District focal person')).toBeInTheDocument();
+    expect(within(opens).getByText('Full access')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'See the 1 user who holds it' })).toHaveAttribute(
+      'href',
+      '/moh/users?role=role-dcfp',
+    );
+  });
 });

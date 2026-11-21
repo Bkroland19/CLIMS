@@ -31,6 +31,8 @@ interface Hotspot {
   status: Status;
   rejection_reason: string | null;
   district_id: string;
+  /** The subcounty the village is in, as the Go API nests it (`subcounty: { id, name }`). */
+  subcounty: { id: string; name: string } | null;
   submitted_by_id: string;
   created_at: string;
 }
@@ -50,11 +52,59 @@ const TRANSITIONS: Record<string, { from: Status[]; to: Status }> = {
 };
 
 const WAKISO = '7f2c3c5e-1d4b-4c1a-9a51-2a8f6f0b9e11';
-const DISTRICTS = [
-  { id: WAKISO, name: 'Wakiso' },
-  { id: '0d6c4b1e-5a3f-4e2b-8c7d-9f1a2b3c4d5e', name: 'Mukono' },
-  { id: '3e8a9b7c-6d5f-4a1b-9c2d-1e0f9a8b7c6d', name: 'Kampala' },
+const MUKONO = '0d6c4b1e-5a3f-4e2b-8c7d-9f1a2b3c4d5e';
+const KAMPALA = '3e8a9b7c-6d5f-4a1b-9c2d-1e0f9a8b7c6d';
+
+/** A stable UUID-shaped id for the geography below: `g` names the level, `n` the place. */
+const placeId = (g: number, n: number) =>
+  `00000000-0000-4000-${String(8100 + g)}-${String(n).padStart(12, '0')}`;
+
+/*
+ * A slice of Uganda's regions, districts and subcounties, named as the Go API's
+ * tables name them, for `GET /hotspots/regions`, `/districts?region_id=` and
+ * `/subcounties?district_id=`. The three districts the hotspot screens have
+ * always used keep their ids.
+ */
+const REGIONS = [
+  { id: placeId(1, 1), name: 'Acholi' },
+  { id: placeId(1, 2), name: 'Busoga' },
+  { id: placeId(1, 3), name: 'Kampala' },
+  { id: placeId(1, 4), name: 'North Central' },
+  { id: placeId(1, 5), name: 'South Central' },
 ];
+
+const DISTRICTS_BY_REGION = [
+  { id: WAKISO, name: 'Wakiso', region_id: placeId(1, 5) },
+  { id: placeId(2, 1), name: 'Mpigi', region_id: placeId(1, 5) },
+  { id: MUKONO, name: 'Mukono', region_id: placeId(1, 4) },
+  { id: placeId(2, 2), name: 'Luwero', region_id: placeId(1, 4) },
+  { id: KAMPALA, name: 'Kampala', region_id: placeId(1, 3) },
+  { id: placeId(2, 3), name: 'Gulu', region_id: placeId(1, 1) },
+  { id: placeId(2, 4), name: 'Jinja', region_id: placeId(1, 2) },
+];
+
+const DISTRICTS = DISTRICTS_BY_REGION.map(({ id, name }) => ({ id, name }));
+
+const SUBCOUNTIES = [
+  { id: placeId(3, 1), name: 'Makindye Ssabagabo Municipality', district_id: WAKISO },
+  { id: placeId(3, 2), name: 'Katabi Town Council', district_id: WAKISO },
+  { id: placeId(3, 3), name: 'Nansana Division', district_id: WAKISO },
+  { id: placeId(3, 4), name: 'Busukuma Subcounty', district_id: WAKISO },
+  { id: placeId(3, 5), name: 'Buwama Subcounty', district_id: placeId(2, 1) },
+  { id: placeId(3, 6), name: 'Goma Division', district_id: MUKONO },
+  { id: placeId(3, 7), name: 'Kasawo Subcounty', district_id: MUKONO },
+  { id: placeId(3, 8), name: 'Bombo Town Council', district_id: placeId(2, 2) },
+  { id: placeId(3, 9), name: 'Central Division (Kampala CCA)', district_id: KAMPALA },
+  { id: placeId(3, 10), name: 'Kawempe Division', district_id: KAMPALA },
+  { id: placeId(3, 11), name: 'Makindye Division', district_id: KAMPALA },
+  { id: placeId(3, 12), name: 'Bungatira Subcounty', district_id: placeId(2, 3) },
+  { id: placeId(3, 13), name: 'Buwenge Subcounty', district_id: placeId(2, 4) },
+];
+
+const subcounty = (n: number) => {
+  const place = SUBCOUNTIES[n - 1];
+  return place ? { id: place.id, name: place.name } : null;
+};
 const VHT = '5b1d2c3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e';
 
 const ok = (data: unknown, status = 200): Reply => ({ status, body: { success: true, data } });
@@ -86,6 +136,7 @@ function hotspot(
     comment: null,
     rejection_reason: null,
     district_id: WAKISO,
+    subcounty: null,
     submitted_by_id: VHT,
     ...fields,
   };
@@ -98,6 +149,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       name: 'Kajjansi Weekly Market',
       type: 'Market',
       village: 'Kajjansi',
+      subcounty: subcounty(1),
       contact_person_name: 'Nansubuga Aisha',
       contact_person_telephone: '+256772555010',
       has_condom_dispenser: false,
@@ -110,6 +162,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       name: 'Bwebajja Nite Spot',
       type: 'Bar',
       village: 'Bwebajja',
+      subcounty: subcounty(1),
       contact_person_name: 'Kato Musa',
       contact_person_telephone: '+256701333444',
       has_condom_dispenser: true,
@@ -123,6 +176,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       name: 'Kasenyi Landing Site',
       type: 'Landing site',
       village: 'Kasenyi',
+      subcounty: subcounty(2),
       contact_person_name: 'Okello James',
       contact_person_telephone: '+256700000002',
       has_condom_dispenser: true,
@@ -136,6 +190,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       name: 'Nansana Taxi Park',
       type: 'Taxi park',
       village: 'Nansana',
+      subcounty: subcounty(3),
       status: 'rejected',
       rejection_reason: 'Already registered as Nansana Stage.',
       created_at: daysAgo(12),
@@ -242,11 +297,40 @@ function act(id: string, action: string, body: Body): Reply {
   return ok(target);
 }
 
+/** A page of hotspots, optionally one district's, as `GET /hotspots?district_id=&limit=&offset=`. */
+function listHotspots(query: URLSearchParams): Reply {
+  const districtId = query.get('district_id');
+  const limit = Number(query.get('limit') ?? 50);
+  const offset = Number(query.get('offset') ?? 0);
+  const matching = districtId
+    ? state.hotspots.filter((item) => item.district_id === districtId)
+    : state.hotspots;
+  return ok(matching.slice(offset, offset + limit));
+}
+
 /** Answers `/hotspots…`, or returns null for any other path. */
-export function handleHotspots(method: string, parts: string[], body: Body): Reply | null {
+export function handleHotspots(
+  method: string,
+  parts: string[],
+  body: Body,
+  query: URLSearchParams = new URLSearchParams(),
+): Reply | null {
   const [resource, id, segment, action] = parts;
   if (resource !== 'hotspots') return null;
-  if (method === 'GET' && id === undefined) return ok(state.hotspots);
+  if (method === 'GET' && id === undefined) return listHotspots(query);
+  if (method === 'GET' && id === 'regions') return ok(REGIONS);
+  if (method === 'GET' && id === 'subcounties') {
+    const districtId = query.get('district_id');
+    if (!districtId) return fail(400, 'district_id is required and must be a nonzero UUID');
+    return ok(SUBCOUNTIES.filter((place) => place.district_id === districtId));
+  }
+  if (method === 'GET' && id === 'districts' && query.get('region_id')) {
+    return ok(
+      DISTRICTS_BY_REGION.filter((place) => place.region_id === query.get('region_id')).map(
+        ({ id: districtId, name }) => ({ id: districtId, name }),
+      ),
+    );
+  }
   if (method === 'POST' && id === undefined) return submit(body);
   if (method === 'GET' && id === 'notifications') return ok(state.events);
   if (method === 'GET' && id === 'districts') return ok(DISTRICTS);

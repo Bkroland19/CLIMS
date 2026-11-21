@@ -11,7 +11,8 @@ import UsersPage from './UsersPage';
 const ADMIN = { id: 'role-admin', name: 'admin', permissions: ['users:read'] };
 const DCFP = { id: 'role-dcfp', name: 'dfcp', permissions: [] };
 const VHT = { id: 'role-vht', name: 'vht', permissions: [] };
-const roles = [ADMIN, DCFP, VHT];
+const MANAGER = { id: 'role-manager', name: 'hotspot manager', permissions: [] };
+const roles = [ADMIN, DCFP, VHT, MANAGER];
 
 const users = [
   // id 1 is the signed-in test user.
@@ -54,8 +55,45 @@ type Reply = { status: number; body?: unknown } | { failure: 'network' };
  * Answers the page's two reads (users, roles) from the fixtures and hands
  * every write to `write`, so the order the queries fire in does not matter.
  */
+/** The places the location step offers, in the Go API's lookup shapes. */
+const REGION = { id: 'region-sc', name: 'South Central' };
+const DISTRICT = { id: 'district-wakiso', name: 'Wakiso' };
+const SUBCOUNTY = { id: 'subcounty-katabi', name: 'Katabi Town Council' };
+const HOTSPOTS_IN_WAKISO = [
+  {
+    id: 'hotspot-landing',
+    name: 'Kasenyi Landing Site',
+    village: 'Kasenyi',
+    subcounty: SUBCOUNTY,
+    review_status: 'active',
+  },
+  { id: 'hotspot-bar', name: 'Kasenyi Bar', village: 'kasenyi', subcounty: SUBCOUNTY },
+  {
+    id: 'hotspot-market',
+    name: 'Nansana Market',
+    village: 'Nansana',
+    subcounty: { id: 'subcounty-nansana', name: 'Nansana' },
+    review_status: 'rejected',
+  },
+  // Most converted hotspots have no subcounty; a manager must still find them.
+  { id: 'hotspot-legacy', name: 'Gayaza Road Lodge', village: 'Kiwenda', subcounty: null },
+];
+
+const ok = (data: unknown): Reply => ({ status: 200, body: { success: true, data } });
+
+function geography(request: RecordedRequest): Reply | null {
+  if (request.method !== 'GET') return null;
+  if (request.url === '/hotspots/regions') return ok([REGION]);
+  if (request.url === `/hotspots/districts?region_id=${REGION.id}`) return ok([DISTRICT]);
+  if (request.url === `/hotspots/subcounties?district_id=${DISTRICT.id}`) return ok([SUBCOUNTY]);
+  if (request.url.startsWith(`/hotspots?district_id=${DISTRICT.id}`)) return ok(HOTSPOTS_IN_WAKISO);
+  return null;
+}
+
 function api(write: (request: RecordedRequest) => Reply = () => ({ status: 200, body: {} })) {
   return (request: RecordedRequest): Reply => {
+    const place = geography(request);
+    if (place) return place;
     if (request.method === 'GET' && request.url.startsWith('/users')) {
       return { status: 200, body: { success: true, data: { users, limit: 100, offset: 0 } } };
     }
@@ -77,8 +115,27 @@ async function fillNewUser(user: ReturnType<typeof userEvent.setup>) {
   await user.type(within(dialog).getByLabelText('Email'), 'Grace.Akello@Example.org');
   await user.type(within(dialog).getByLabelText(/Phone number/), '0772 100 201');
   await user.type(within(dialog).getByLabelText('Password'), 'a-test-password');
-  await user.click(within(dialog).getByRole('checkbox', { name: /^VHT/ }));
+  await user.click(within(dialog).getByRole('radio', { name: /^VHT/ }));
+  // A VHT works in one village, so the form asks where, down to the village.
+  await choosePlace(user, dialog, 'Region', REGION.name);
+  await choosePlace(user, dialog, 'District', DISTRICT.name);
+  await choosePlace(user, dialog, 'Subcounty', SUBCOUNTY.name);
+  await user.type(within(dialog).getByLabelText(/^Village/), 'Kasenyi');
   return dialog;
+}
+
+async function choosePlace(
+  user: ReturnType<typeof userEvent.setup>,
+  dialog: HTMLElement,
+  level: string,
+  name: string,
+) {
+  const select = within(dialog).getByRole('combobox', { name: new RegExp(`^${level}`) });
+  await waitFor(() => {
+    expect(select).toBeEnabled();
+  });
+  await user.click(select);
+  await user.click(await screen.findByRole('option', { name }));
 }
 
 describe('UsersPage', () => {
@@ -124,7 +181,7 @@ describe('UsersPage', () => {
     expect(screen.getByText('James Okello')).toBeInTheDocument();
   });
 
-  it('creates a user with the roles ticked, sending the phone in +256 form', async () => {
+  it('creates a user with the role chosen, sending the phone in +256 form', async () => {
     const user = userEvent.setup();
     const { requests } = renderApp(<UsersPage />, {
       signedIn: true,
@@ -154,6 +211,75 @@ describe('UsersPage', () => {
         },
       }),
     ]);
+    // The location was checked but not sent: the API does not store it and rejects unknown fields.
+    expect(writes(requests)[0]?.body).not.toHaveProperty('village');
+  });
+
+  it('lets a new user start with one role only', async () => {
+    const user = userEvent.setup();
+    renderApp(<UsersPage />, { signedIn: true, replies: [api()] });
+    await screen.findByText('James Okello');
+
+    await user.click(screen.getByRole('button', { name: 'Add user' }));
+    const dialog = await screen.findByRole('dialog');
+    const group = within(dialog).getByRole('radiogroup', { name: 'Role' });
+    await user.click(within(group).getByRole('radio', { name: /^VHT/ }));
+    await user.click(within(group).getByRole('radio', { name: /^District focal person/ }));
+
+    expect(within(group).getByRole('radio', { name: /^District focal person/ })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: /^VHT/ })).not.toBeChecked();
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('asks a hotspot manager for their hotspot, found by name or village, and saves it', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderApp(<UsersPage />, {
+      signedIn: true,
+      replies: [api(() => ({ status: 201, body: { success: true, data: { user_id: 'new' } } }))],
+    });
+    await screen.findByText('James Okello');
+
+    await user.click(screen.getByRole('button', { name: 'Add user' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('First name'), 'Grace');
+    await user.type(within(dialog).getByLabelText('Last name'), 'Akello');
+    await user.type(within(dialog).getByLabelText('Username'), 'gakello');
+    await user.type(within(dialog).getByLabelText('Email'), 'grace@example.org');
+    await user.type(within(dialog).getByLabelText('Password'), 'a-test-password');
+    await user.click(within(dialog).getByRole('radio', { name: /^Hotspot manager/ }));
+    await choosePlace(user, dialog, 'Region', REGION.name);
+    await choosePlace(user, dialog, 'District', DISTRICT.name);
+    // The hotspot itself places them, so there is no subcounty or village to fill in.
+    expect(within(dialog).queryByRole('combobox', { name: /^Subcounty/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/^Village/)).not.toBeInTheDocument();
+
+    // Submitting without one says what is missing and moves there.
+    await user.click(within(dialog).getByRole('button', { name: 'Create user' }));
+    expect(await within(dialog).findByText('Choose the hotspot they run.')).toBeInTheDocument();
+    const picker = within(dialog).getByRole('combobox', { name: /^Hotspot/ });
+    expect(picker).toHaveFocus();
+
+    await user.click(picker);
+    const search = await screen.findByRole('combobox', { name: 'Search by name or village' });
+    // A rejected hotspot is not offered; one with no subcounty on record is.
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Gayaza Road LodgeKiwenda',
+      'Kasenyi Barkasenyi, Katabi Town Council',
+      'Kasenyi Landing SiteKasenyi, Katabi Town Council',
+    ]);
+    await user.type(search, 'kasenyi landing');
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    await user.keyboard('{Enter}');
+    expect(picker).toHaveTextContent('Kasenyi Landing Site');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Create user' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(writes(requests)[0]?.body).toMatchObject({
+      role_ids: ['role-manager'],
+      hot_spot_id: 'hotspot-landing',
+    });
   });
 
   it('checks the form before sending anything', async () => {
@@ -170,7 +296,7 @@ describe('UsersPage', () => {
     expect(
       within(dialog).getByText('Enter a Ugandan mobile number, e.g. +256 772 123 456.'),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText('Choose at least one role.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Choose a role.')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Username')).toHaveAttribute('aria-invalid', 'true');
     expect(writes(requests)).toEqual([]);
   });
@@ -546,5 +672,126 @@ describe("UsersPage: a user's signed-in devices", () => {
     const dialog = await openDevices(user);
     expect(await within(dialog).findByText('Could not load signed-in devices')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+});
+
+describe('UsersPage insights, bulk actions and profile', () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+  const [sarah, james, grace] = users;
+  const withActivity = [
+    { ...sarah, last_login_at: daysAgo(0), login_count: 40, active_sessions: 1 },
+    { ...james, last_login_at: daysAgo(120), login_count: 3, active_sessions: 0 },
+    { ...grace, last_login_at: null, login_count: 0, active_sessions: 0 },
+  ];
+
+  function activityApi(
+    write: (request: RecordedRequest) => Reply = () => ({ status: 200, body: {} }),
+  ) {
+    const base = api(write);
+    return (request: RecordedRequest): Reply => {
+      if (request.method === 'GET' && request.url.startsWith('/users?')) {
+        return ok({ users: withActivity, limit: 100, offset: 0 });
+      }
+      return base(request);
+    };
+  }
+
+  it('sums the accounts up, each figure a shortcut to its list', async () => {
+    renderApp(<UsersPage />, { signedIn: true, replies: [activityApi()] });
+
+    await screen.findByText('Grace Atim');
+    const never = screen.getByRole('link', { name: /Never signed in/ });
+    expect(never).toHaveTextContent('1');
+    expect(never).toHaveAttribute('href', '/moh/users?activity=never');
+    expect(screen.getByRole('link', { name: /Can sign in/ })).toHaveTextContent('2');
+    expect(screen.getByRole('link', { name: /Signed in this month/ })).toHaveTextContent('1');
+  });
+
+  it('filters by activity from the address, and says when someone last signed in', async () => {
+    renderApp(<UsersPage />, {
+      route: '/moh/users?activity=dormant',
+      signedIn: true,
+      replies: [activityApi()],
+    });
+
+    const row = (await screen.findByText('James Okello')).closest('tr');
+    if (!row) throw new Error('James Okello has no table row');
+    expect(within(row).getByText('4 months ago')).toBeInTheDocument();
+    expect(screen.queryByText('Grace Atim')).not.toBeInTheDocument();
+  });
+
+  it('deactivates the ticked users it applies to, after confirming', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderApp(<UsersPage />, {
+      signedIn: true,
+      replies: [activityApi(() => ({ status: 200, body: { success: true, data: null } }))],
+    });
+
+    await screen.findByText('Grace Atim');
+    for (const name of ['Sarah Nakato', 'James Okello', 'Grace Atim']) {
+      await user.click(screen.getByRole('checkbox', { name: `Select ${name}` }));
+    }
+    const bar = screen.getByRole('region', { name: 'Selected users' });
+    expect(within(bar).getByText('3 users selected')).toBeInTheDocument();
+
+    // Sarah is the signed-in user and James is already deactivated: only Grace is left.
+    await user.click(within(bar).getByRole('button', { name: /^Deactivate/ }));
+    const confirm = await screen.findByRole('alertdialog', { name: 'Deactivate 1 user?' });
+    expect(confirm).toHaveTextContent('2 users of those ticked are left out');
+    await user.click(within(confirm).getByRole('button', { name: 'Deactivate' }));
+
+    await waitFor(() => {
+      expect(writes(requests)).toEqual([
+        expect.objectContaining({
+          method: 'PATCH',
+          url: '/users/u-8/status',
+          body: { status: 'disabled' },
+        }),
+      ]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Selected users' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens a profile that says what the person can open and do', async () => {
+    const user = userEvent.setup();
+    renderApp(<UsersPage />, { signedIn: true, replies: [activityApi()] });
+
+    await user.click(await screen.findByRole('button', { name: 'James Okello' }));
+    const profile = await screen.findByRole('dialog', { name: 'James Okello' });
+    const opens = within(profile).getByRole('region', { name: 'What they can open' });
+    // A district focal person (and VHT) opens the DCFP and VHT workspaces.
+    expect(within(opens).getByText('District focal person')).toBeInTheDocument();
+    expect(within(opens).getByText('Village health team')).toBeInTheDocument();
+    expect(within(profile).getByText('4 months ago')).toBeInTheDocument();
+
+    await user.click(within(profile).getByRole('button', { name: 'Edit roles' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Roles for James Okello' }),
+    ).toBeInTheDocument();
+  });
+
+  it('asks where a new user works only for roles that work in one place', async () => {
+    const user = userEvent.setup();
+    renderApp(<UsersPage />, { signedIn: true, replies: [activityApi()] });
+    await screen.findByText('Grace Atim');
+
+    await user.click(screen.getByRole('button', { name: 'Add user' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add user' });
+    await user.click(within(dialog).getByRole('radio', { name: /^Administrator/ }));
+    expect(
+      within(dialog).queryByRole('group', { name: 'Where they work' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('radio', { name: /^District focal person/ }));
+    const where = within(dialog).getByRole('group', { name: 'Where they work' });
+    expect(within(where).getByText(/Not saved with the account yet/)).toBeInTheDocument();
+    expect(within(where).getByRole('combobox', { name: /^District/ })).toBeDisabled();
+    // For a district focal person only the region and district are required.
+    expect(within(where).getAllByText('(optional)')).toHaveLength(2);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Create user' }));
+    expect(await within(where).findByText('Choose a region.')).toBeInTheDocument();
   });
 });

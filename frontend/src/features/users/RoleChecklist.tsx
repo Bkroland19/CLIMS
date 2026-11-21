@@ -7,7 +7,7 @@ import { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 import type { Role } from './api';
-import { roleDescription, roleLabel } from './access';
+import { RoleOption } from './RoleOption';
 
 interface RoleChecklistProps {
   roles: readonly Role[] | undefined;
@@ -64,15 +64,9 @@ export function RoleChecklist({
         <ul className="grid gap-2 sm:grid-cols-2">
           {(roles ?? []).map((role, index) => {
             const checked = value.includes(role.id);
-            const description = roleDescription(role);
             return (
               <li key={role.id}>
-                <label
-                  className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm',
-                    checked ? 'border-primary bg-primary/5' : 'border-border',
-                  )}
-                >
+                <RoleOption role={role} selected={checked}>
                   <Checkbox
                     ref={index === 0 ? firstCheckboxRef : undefined}
                     className="mt-0.5"
@@ -86,13 +80,7 @@ export function RoleChecklist({
                       );
                     }}
                   />
-                  <span className="min-w-0">
-                    <span className="block font-medium">{roleLabel(role)}</span>
-                    {description ? (
-                      <span className="text-muted-foreground block text-xs">{description}</span>
-                    ) : null}
-                  </span>
-                </label>
+                </RoleOption>
               </li>
             );
           })}

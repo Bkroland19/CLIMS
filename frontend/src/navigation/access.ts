@@ -73,7 +73,8 @@ const rank = (level: AccessLevel | undefined) => (level === 'full' ? 2 : level =
  * server says otherwise; the API still refuses what they may not do.
  */
 export function webAccessFor(roleNames: readonly string[] | null): WebAccess {
-  if (roleNames === null) return { workspaces: ALL_FULL, warehouses: WAREHOUSES, noWorkspace: null };
+  if (roleNames === null)
+    return { workspaces: ALL_FULL, warehouses: WAREHOUSES, noWorkspace: null };
 
   const workspaces: Partial<Record<WorkspaceId, AccessLevel>> = {};
   const warehouses = new Set<WarehouseCode>();

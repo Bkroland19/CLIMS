@@ -1,18 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useMemo, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 
 import { FormDialog } from '@/components/form/FormDialog';
 import { formLevelError } from '@/components/form/serverErrors';
 import { TextField } from '@/components/form/TextField';
 
 import type { Role } from './api';
+import { LocationFields } from './LocationFields';
 import { useCreateUser } from './queries';
-import { RoleChecklist } from './RoleChecklist';
+import { RolePicker } from './RolePicker';
 import {
   NEW_USER_DEFAULTS,
   NEW_USER_FIELDS,
-  newUserSchema,
+  NEW_USER_SERVER_FIELDS,
+  locationNeedFor,
+  newUserSchemaFor,
   toNewUserInput,
   type NewUserFormInput,
   type NewUserFormOutput,
@@ -37,25 +40,34 @@ export function UserFormDialog({
   onClose,
 }: UserFormDialogProps) {
   const createUser = useCreateUser();
+  // The role chosen decides whether, and how precisely, the form asks where the person works.
+  const roleNameOf = useMemo(
+    () => (roleId: string) => roles?.find((role) => role.id === roleId)?.name ?? null,
+    [roles],
+  );
+  const schema = useMemo(() => newUserSchemaFor(roleNameOf), [roleNameOf]);
   const {
     control,
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<NewUserFormInput, unknown, NewUserFormOutput>({
-    resolver: zodResolver(newUserSchema),
+    resolver: zodResolver(schema),
     defaultValues: NEW_USER_DEFAULTS,
   });
+  const roleId = useWatch({ control, name: 'role_id' });
+  const locationNeed = locationNeedFor(roleNameOf(roleId));
 
   const [formError, setFormError] = useState<string | null>(null);
 
   const onSubmit = handleSubmit((values) => {
     setFormError(null);
-    createUser.mutate(toNewUserInput(values), {
+    createUser.mutate(toNewUserInput(values, locationNeedFor(roleNameOf(values.role_id))), {
       onSuccess: onClose,
       onError: (error) => {
-        setFormError(formLevelError(error, NEW_USER_FIELDS, setError));
+        setFormError(formLevelError(error, NEW_USER_FIELDS, setError, NEW_USER_SERVER_FIELDS));
       },
     });
   });
@@ -126,20 +138,29 @@ export function UserFormDialog({
       />
       <Controller
         control={control}
-        name="role_ids"
+        name="role_id"
         render={({ field, fieldState }) => (
-          <RoleChecklist
+          <RolePicker
             roles={roles}
             isLoading={isLoadingRoles}
             loadError={rolesError}
             value={field.value}
             onChange={field.onChange}
             onBlur={field.onBlur}
-            firstCheckboxRef={field.ref}
+            inputRef={field.ref}
             error={fieldState.error?.message}
           />
         )}
       />
+      {locationNeed ? (
+        <LocationFields
+          need={locationNeed}
+          control={control}
+          register={register}
+          setValue={setValue}
+          errors={errors}
+        />
+      ) : null}
     </FormDialog>
   );
 }

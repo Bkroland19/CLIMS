@@ -411,6 +411,9 @@ export function DataTable<Row>({
                             STICKY_ACTIONS_CLASS,
                             EDGE_CLASS,
                             'bg-card py-1 text-right',
+                            // Opaque, so the sticky cell still covers what scrolls under it.
+                            isSelected &&
+                              'bg-[color-mix(in_oklab,var(--color-primary)_5%,var(--color-card))]',
                           )}
                         >
                           {rowActions(row)}

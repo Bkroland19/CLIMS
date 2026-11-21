@@ -18,6 +18,7 @@ import {
  *
  *   GET    /users?limit&offset      { users, limit, offset }    users:read
  *   POST   /users                   { user_id }                 users:create + roles:assign
+ *          (body may carry `hot_spot_id`: a hotspot manager's hotspot)
  *   PUT    /users/:id/roles         { role_ids }                roles:assign
  *   PATCH  /users/:id/status        { status: active|disabled } users:update
  *   GET    /users/:id/sessions      [session]                   users:read
@@ -86,7 +87,10 @@ export type User = z.output<typeof userSchema>;
 /** The statuses the API accepts for `PATCH /users/:id/status`. */
 export type UserStatus = 'active' | 'disabled';
 
-/** `POST /users`. `phone_number` is sent normalised (`+256…`) or blank. */
+/**
+ * `POST /users`. `phone_number` is sent normalised (`+256…`) or blank.
+ * `hot_spot_id` is the hotspot a hotspot manager runs, stored on the account.
+ */
 export interface NewUserInput {
   username: string;
   email: string;
@@ -95,6 +99,7 @@ export interface NewUserInput {
   lastname: string;
   phone_number: string;
   role_ids: string[];
+  hot_spot_id?: string;
 }
 
 /** The API's largest page; the list is read page by page up to this many pages. */
@@ -206,6 +211,7 @@ const GO_FIELDS: Readonly<Record<string, string>> = {
   Phone: 'phone_number',
   RoleID: 'role_ids',
   RoleIDs: 'role_ids',
+  HotSpotID: 'hot_spot_id',
 };
 
 const RULE_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -228,6 +234,7 @@ const RULE_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>>> 
   lastname: { max: 'Use at most 20 characters.' },
   phone_number: { max: 'Enter the number as +256 followed by 9 digits.' },
   role_ids: { default: 'Choose at least one role from the list.' },
+  hot_spot_id: { default: 'Choose the hotspot from the list.' },
 };
 
 /** Messages the API sends without a field, matched to the field they are about. */

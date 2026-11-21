@@ -31,7 +31,21 @@ test.describe('users', () => {
     await dialog.getByLabel('Phone number').fill('0772 123 456');
     await dialog.getByLabel('Password').fill('a-long-password-1');
     await dialog.getByRole('checkbox', { name: /^District focal person/ }).check();
+
+    // A district focal person works in one district, so the form asks which.
+    const where = dialog.getByRole('group', { name: 'Where they work' });
+    await expect(where.getByRole('combobox', { name: /^District/ })).toBeDisabled();
     await dialog.getByRole('button', { name: 'Create user' }).click();
+    await expect(where.getByText('Choose a region.')).toBeVisible();
+    await choose(page, 'Region', 'South Central');
+    await choose(page, 'District', 'Wakiso');
+
+    const created = page.waitForRequest(
+      (request) => request.method() === 'POST' && request.url().endsWith('/api/v1/users'),
+    );
+    await dialog.getByRole('button', { name: 'Create user' }).click();
+    // The place was checked but not sent: the API does not store it yet.
+    expect((await created).postDataJSON()).not.toHaveProperty('district_id');
 
     await expectToast(page, 'User created');
     await expect(dialog).toBeHidden();

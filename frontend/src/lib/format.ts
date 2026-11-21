@@ -119,6 +119,7 @@ export function formatSince(value: string | null | undefined, now: Date = new Da
   if (days === 1) return 'Yesterday';
   if (days < 7) return ago(days, 'day');
   if (days < 35) return ago(Math.floor(days / 7), 'week');
-  if (days < 365) return ago(Math.max(1, Math.floor(days / 30.44)), 'month');
+  // Months to the nearest whole one, as people say them: 120 days is "4 months ago".
+  if (days < 365) return ago(Math.min(11, Math.max(1, Math.round(days / 30.44))), 'month');
   return ago(Math.floor(days / 365.25), 'year');
 }

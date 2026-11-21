@@ -36,10 +36,14 @@ export function TableViewMenu({ label, columns, preferences, onChange }: TableVi
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="bg-card">
+        {/* The name starts with the visible word, so speech users can say what they see. */}
+        <Button
+          variant="outline"
+          className="bg-card"
+          aria-label={`View options for ${label.toLowerCase()}`}
+        >
           <Settings2 data-icon="inline-start" aria-hidden="true" />
           View
-          <span className="sr-only">options for {label.toLowerCase()}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

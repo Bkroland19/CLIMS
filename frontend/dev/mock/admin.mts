@@ -36,6 +36,10 @@ interface User {
   phone_number: string;
   status: string;
   role_ids: string[];
+  /** When they last signed in; null for an account never used. */
+  last_login_at: string | null;
+  login_count: number;
+  created_at: string;
 }
 
 interface Unit {
@@ -196,10 +200,33 @@ const DEMO_USERS: readonly [string, string, string, string, string[], string][] 
   ['Brian', 'Mugisha', 'b.mugisha@example.org', '+256759440812', ['delivery agent'], 'disabled'],
 ];
 
+/** Days since each demo user last signed in, in `DEMO_USERS` order; null: never. */
+const LAST_SEEN_DAYS: readonly (number | null)[] = [
+  0,
+  1,
+  3,
+  12,
+  40,
+  2,
+  130,
+  null,
+  5,
+  0,
+  200,
+  null,
+  60,
+];
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
+
 function seedUsers(dataset: string): User[] {
   if (dataset === 'empty') return [];
   const rows = DEMO_USERS.map(
     ([firstname, lastname, email, phone_number, roles, status], index) => ({
+      last_login_at:
+        LAST_SEEN_DAYS[index] === null ? null : daysAgo((LAST_SEEN_DAYS[index] ?? 0) + 0.2),
+      login_count: LAST_SEEN_DAYS[index] === null ? 0 : 7 + ((index * 37) % 400),
+      created_at: daysAgo(420 - index * 25),
       id: uuid(2, index + 1),
       username: `${firstname}.${lastname}`.toLowerCase(),
       email,
@@ -222,6 +249,9 @@ function seedUsers(dataset: string): User[] {
       phone_number: '',
       status: 'disabled',
       role_ids: ROLE_SEED.map(([name]) => roleId(name)),
+      last_login_at: daysAgo(3650),
+      login_count: 1_234_567,
+      created_at: daysAgo(4000),
     },
     {
       id: uuid(2, 901),
@@ -232,6 +262,9 @@ function seedUsers(dataset: string): User[] {
       phone_number: '+256700000000',
       status: 'active',
       role_ids: [],
+      last_login_at: null,
+      login_count: 0,
+      created_at: daysAgo(0),
     },
     ...rows,
   ];
@@ -735,6 +768,12 @@ function userView(user: User) {
     lastname: user.lastname,
     phone_number: user.phone_number,
     status: user.status,
+    last_login_at: user.last_login_at,
+    login_count: user.login_count,
+    active_sessions: (state.userSessions.get(user.id) ?? []).filter(
+      (session) => !session.revoked_at && session.expires_at > new Date().toISOString(),
+    ).length,
+    created_at: user.created_at,
     role: roles[0] ?? null,
     roles,
   };
@@ -815,6 +854,9 @@ function handleUsers(
       phone_number: text(body.phone_number),
       status: 'active',
       role_ids: roleIds,
+      last_login_at: null,
+      login_count: 0,
+      created_at: new Date().toISOString(),
     };
     state.users.push(user);
     const names = state.roles.filter((role) => roleIds.includes(role.id)).map((role) => role.name);

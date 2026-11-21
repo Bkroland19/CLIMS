@@ -21,19 +21,21 @@ function useRoleList(): string {
   return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1) ?? ''}`;
 }
 
-const NO_WORKSPACE_COPY: Record<NoWorkspaceReason, { title: string; body: (roles: string) => string }> =
-  {
-    mobile: {
-      title: 'Use the CLIMS mobile app',
-      body: (roles) =>
-        `Your role (${roles}) does its work in the field app: reporting stockouts, confirming deliveries and recording drops. Sign in on your phone with this same account.`,
-    },
-    unassigned: {
-      title: 'Your account has no web workspace yet',
-      body: (roles) =>
-        `Your role (${roles}) does not open any screen on the web. Ask an administrator to give you a role that does, such as District focal person, NMS or JMS.`,
-    },
-  };
+const NO_WORKSPACE_COPY: Record<
+  NoWorkspaceReason,
+  { title: string; body: (roles: string) => string }
+> = {
+  mobile: {
+    title: 'Use the CLIMS mobile app',
+    body: (roles) =>
+      `Your role (${roles}) does its work in the field app: reporting stockouts, confirming deliveries and recording drops. Sign in on your phone with this same account.`,
+  },
+  unassigned: {
+    title: 'Your account has no web workspace yet',
+    body: (roles) =>
+      `Your role (${roles}) does not open any screen on the web. Ask an administrator to give you a role that does, such as District focal person, NMS or JMS.`,
+  },
+};
 
 /**
  * Shown instead of the app to someone signed in whose roles open no web
@@ -130,8 +132,8 @@ export function ReadOnlyNotice({ workspace }: { workspace: Workspace }) {
       <Eye aria-hidden="true" />
       <AlertTitle>You are viewing the {workspace.label} workspace read-only</AlertTitle>
       <AlertDescription>
-        You can open every page and export what you see. Actions such as confirming, dispatching
-        or submitting are for the team that works here.
+        You can open every page and export what you see. Actions such as confirming, dispatching or
+        submitting are for the team that works here.
       </AlertDescription>
     </Alert>
   );
