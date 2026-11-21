@@ -1773,9 +1773,7 @@
     },
     "/api/v1/locations/regions": {
       "get": {
-        "tags": [
-          "Locations"
-        ],
+        "tags": ["Locations"],
         "operationId": "listLocationRegions",
         "summary": "List regions",
         "description": "Lists regions by name.",
@@ -1801,9 +1799,7 @@
     },
     "/api/v1/locations/districts": {
       "get": {
-        "tags": [
-          "Locations"
-        ],
+        "tags": ["Locations"],
         "operationId": "listLocationDistricts",
         "summary": "List districts",
         "description": "Lists districts by name, optionally filtered by region_id.",
@@ -1842,9 +1838,7 @@
     },
     "/api/v1/locations/subcounties": {
       "get": {
-        "tags": [
-          "Locations"
-        ],
+        "tags": ["Locations"],
         "operationId": "listLocationSubcounties",
         "summary": "List subcounties",
         "description": "Lists subcounties by name for the required district_id.",
