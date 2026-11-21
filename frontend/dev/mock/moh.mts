@@ -664,8 +664,8 @@ function orderDetail(id: string): Reply {
   return ok({ order: target, warehouse_request: linked, held_at: heldAt, trail });
 }
 
-function summary(): Reply {
-  const orders = allOrders();
+function summary(keeps: (name: string | null) => boolean): Reply {
+  const orders = allOrders().filter((order) => keeps(order.hotspot.district));
   const byStatus = Object.fromEntries(ORDER_STATUSES.map((status) => [status, 0])) as Record<
     OrderStatus,
     number
@@ -718,16 +718,29 @@ export function handleMoh(
     case 'warehouse-requests':
       return ok(newestFirst(allRequests().filter((entry) => keeps(entry.district))));
     case 'summary':
-      return summary();
+      return summary(keeps);
     case 'district-stores':
       return ok(allStores());
-    case 'activity':
+    case 'activity': {
+      const references = new Set([
+        ...allOrders()
+          .filter((order) => keeps(order.hotspot.district))
+          .map((order) => order.id),
+        ...allRequests()
+          .filter((request) => keeps(request.district))
+          .map((request) => request.id),
+      ]);
       return ok(
         allActivity()
-          .filter((event) => event.role !== 'system')
+          .filter(
+            (event) =>
+              event.role !== 'system' &&
+              (!district || (event.reference !== null && references.has(event.reference))),
+          )
           .sort((a, b) => b.at.localeCompare(a.at))
           .slice(0, 20),
       );
+    }
     default:
       return fail(404, 'Not found');
   }

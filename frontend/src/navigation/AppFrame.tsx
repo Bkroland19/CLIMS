@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useCurrentUser } from '@/features/auth/hooks';
 import { useCan, useCurrentUserSync } from '@/features/auth/queries';
+import { DistrictContextProvider } from '@/features/district/DistrictContext';
 import { useDcfpCounts } from '@/features/fulfilment/useDcfpCounts';
 import { useWarehouseCounts } from '@/features/warehouse/useWarehouseCounts';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
@@ -107,7 +108,8 @@ function SignedInShell({ children }: AppFrameProps) {
       >
         {readOnly ? <ReadOnlyNotice workspace={target.workspace} /> : null}
         {hasNoPermissions && blocked === null ? <NoPermissionsNotice /> : null}
-        {content}
+        {/* A blocked screen gets no district picker: its lookups would only 403. */}
+        {blocked === null ? <DistrictContextProvider>{content}</DistrictContextProvider> : content}
       </AppShell>
     </ReadOnlyProvider>
   );

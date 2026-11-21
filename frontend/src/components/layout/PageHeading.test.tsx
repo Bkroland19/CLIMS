@@ -51,13 +51,14 @@ const table: readonly Workspace[] = [
   },
 ];
 
-const breadcrumb = () => screen.getByRole('navigation', { name: 'Breadcrumb' });
+const breadcrumb = () => screen.queryByRole('navigation', { name: /breadcrumb/i });
 
 describe('PageHeading', () => {
-  it('shows the breadcrumb, title, description and tabs of a section page', () => {
+  it('shows the title, description and tabs of a section page, with no breadcrumb', () => {
     render(<PageHeading location={locate(table, '/dcfp/orders')} />);
 
-    expect(breadcrumb()).toHaveTextContent('District focal person/Orders');
+    expect(breadcrumb()).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Back to/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Orders' })).toBeInTheDocument();
     expect(screen.getByText('Stockout notifications from hotspots.')).toBeInTheDocument();
 
@@ -87,8 +88,8 @@ describe('PageHeading', () => {
   it('names the record on a detail page, links back to its section and shows no tabs', () => {
     render(<PageHeading location={locate(table, '/dcfp/orders/ORD-1042')} />);
 
-    expect(breadcrumb()).toHaveTextContent('District focal person/Orders/Review order');
-    expect(within(breadcrumb()).getByRole('link', { name: 'Orders' })).toHaveAttribute(
+    expect(breadcrumb()).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to Orders' })).toHaveAttribute(
       'href',
       '/dcfp/orders',
     );
@@ -96,10 +97,11 @@ describe('PageHeading', () => {
     expect(screen.queryByRole('navigation', { name: 'Orders pages' })).not.toBeInTheDocument();
   });
 
-  it('titles an unknown address "Page not found", keeping its workspace', () => {
+  it('titles an unknown address "Page not found"', () => {
     render(<PageHeading location={locate(table, '/dcfp/nothing')} />);
 
-    expect(breadcrumb()).toHaveTextContent(/^District focal person$/);
+    expect(breadcrumb()).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Back to/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
   });
 });

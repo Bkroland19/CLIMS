@@ -1,4 +1,4 @@
-import { Ellipsis, type LucideIcon } from 'lucide-react';
+import { EllipsisVertical, type LucideIcon } from 'lucide-react';
 import type { Ref } from 'react';
 
 import { useReadOnly } from '@/navigation/useAccess';
@@ -56,7 +56,7 @@ export function RowActions({ label, actions, triggerRef }: RowActionsProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button ref={triggerRef} variant="ghost" size="icon-sm" aria-label={label}>
-          <Ellipsis aria-hidden="true" />
+          <EllipsisVertical aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       {/* The menu sizes to its labels; the default, the 32px trigger's width, wraps each one. */}

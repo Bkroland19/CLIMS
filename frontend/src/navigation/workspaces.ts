@@ -21,7 +21,7 @@ import { HOME_PATH } from './paths';
 
 /*
  * Every signed-in screen, by workspace. This table drives the sidebar, the
- * heading band (breadcrumb, title, description, tabs), the loading skeleton
+ * heading band (title, description, tabs), the loading skeleton
  * and each page's browser title. The screens themselves are the `page.tsx`
  * files under `src/app/(app)`: a page missing from this table fails the
  * build, and a test fails if the table names a path that has no page.

@@ -28,9 +28,9 @@ describe('place lookups', () => {
       { id: 's1', name: 'Bungatira Subcounty' },
     ]);
     expect(requests.map((request) => request.url)).toEqual([
-      '/hotspots/regions',
-      '/hotspots/districts?region_id=r1',
-      '/hotspots/subcounties?district_id=d1',
+      '/locations/regions',
+      '/locations/districts?region_id=r1',
+      '/locations/subcounties?district_id=d1',
     ]);
   });
 

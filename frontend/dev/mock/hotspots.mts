@@ -61,7 +61,7 @@ const placeId = (g: number, n: number) =>
 
 /*
  * A slice of Uganda's regions, districts and subcounties, named as the Go API's
- * tables name them, for `GET /hotspots/regions`, `/districts?region_id=` and
+ * tables name them, for `GET /locations/regions`, `/districts?region_id=` and
  * `/subcounties?district_id=`. The three districts the hotspot screens have
  * always used keep their ids.
  */
@@ -308,32 +308,40 @@ function listHotspots(query: URLSearchParams): Reply {
   return ok(matching.slice(offset, offset + limit));
 }
 
-/** Answers `/hotspots…`, or returns null for any other path. */
-export function handleHotspots(
-  method: string,
-  parts: string[],
-  body: Body,
-  query: URLSearchParams = new URLSearchParams(),
-): Reply | null {
-  const [resource, id, segment, action] = parts;
-  if (resource !== 'hotspots') return null;
-  if (method === 'GET' && id === undefined) return listHotspots(query);
-  if (method === 'GET' && id === 'regions') return ok(REGIONS);
-  if (method === 'GET' && id === 'subcounties') {
+/** Answers `GET /locations/regions`, `/districts?region_id=` and `/subcounties?district_id=`. */
+function lookupLocations(kind: string | undefined, query: URLSearchParams): Reply {
+  if (kind === 'regions') return ok(REGIONS);
+  if (kind === 'districts') {
+    const regionId = query.get('region_id');
+    if (!regionId) return ok(DISTRICTS);
+    return ok(
+      DISTRICTS_BY_REGION.filter((place) => place.region_id === regionId).map(({ id, name }) => ({
+        id,
+        name,
+      })),
+    );
+  }
+  if (kind === 'subcounties') {
     const districtId = query.get('district_id');
     if (!districtId) return fail(400, 'district_id is required and must be a nonzero UUID');
     return ok(SUBCOUNTIES.filter((place) => place.district_id === districtId));
   }
-  if (method === 'GET' && id === 'districts' && query.get('region_id')) {
-    return ok(
-      DISTRICTS_BY_REGION.filter((place) => place.region_id === query.get('region_id')).map(
-        ({ id: districtId, name }) => ({ id: districtId, name }),
-      ),
-    );
-  }
+  return fail(404, 'Not found');
+}
+
+/** Answers `/hotspots…` and `/locations…`, or returns null for any other path. */
+export function handleHotspots(
+  method: string,
+  parts: string[],
+  body: Body,
+  query: URLSearchParams,
+): Reply | null {
+  const [resource, id, segment, action] = parts;
+  if (resource === 'locations' && method === 'GET') return lookupLocations(id, query);
+  if (resource !== 'hotspots') return null;
+  if (method === 'GET' && id === undefined) return listHotspots(query);
   if (method === 'POST' && id === undefined) return submit(body);
   if (method === 'GET' && id === 'notifications') return ok(state.events);
-  if (method === 'GET' && id === 'districts') return ok(DISTRICTS);
   if (method === 'POST' && id && segment === 'actions' && action) return act(id, action, body);
   return fail(404, 'Not found');
 }

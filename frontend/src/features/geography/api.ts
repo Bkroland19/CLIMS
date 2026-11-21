@@ -4,15 +4,15 @@ import { parseList, type HttpClient } from '@/lib/api';
 
 /*
  * Uganda's administrative places as the Go API knows them: regions, their
- * districts and the districts' subcounties, as UUID tables served under the
- * hotspot feature (`backend/internal/features/hotspots`, which needs
- * `hotspots:submit`). There is no parish or village table: hotspots record
+ * districts and the districts' subcounties, as UUID tables served by the shared
+ * location lookups (`backend/internal/features/locations`, open to any active
+ * signed-in user). There is no parish or village table: hotspots record
  * their village as text, so villages are suggested from the hotspots already
  * mapped in a subcounty, and hotspot managers pick their hotspot from a district's.
  *
- *   GET /hotspots/regions                         [{ id, name }]
- *   GET /hotspots/districts?region_id=            [{ id, name }]
- *   GET /hotspots/subcounties?district_id=        [{ id, name }]
+ *   GET /locations/regions                        [{ id, name }]
+ *   GET /locations/districts?region_id=           [{ id, name }]
+ *   GET /locations/subcounties?district_id=       [{ id, name }]
  *   GET /hotspots?district_id=&limit=&offset=     [{ id, name, village, subcounty, review_status }]
  */
 
@@ -21,7 +21,7 @@ const placeSchema = z.object({ id: z.string().min(1), name: z.string().trim().mi
 export type Place = z.infer<typeof placeSchema>;
 
 export async function listRegions(http: HttpClient, signal?: AbortSignal): Promise<Place[]> {
-  return parseList(placeSchema, await http.get('/hotspots/regions', { signal }), 'regions');
+  return parseList(placeSchema, await http.get('/locations/regions', { signal }), 'regions');
 }
 
 export async function listDistrictsIn(
@@ -32,7 +32,7 @@ export async function listDistrictsIn(
   const query = new URLSearchParams({ region_id: regionId }).toString();
   return parseList(
     placeSchema,
-    await http.get(`/hotspots/districts?${query}`, { signal }),
+    await http.get(`/locations/districts?${query}`, { signal }),
     'districts',
   );
 }
@@ -45,7 +45,7 @@ export async function listSubcounties(
   const query = new URLSearchParams({ district_id: districtId }).toString();
   return parseList(
     placeSchema,
-    await http.get(`/hotspots/subcounties?${query}`, { signal }),
+    await http.get(`/locations/subcounties?${query}`, { signal }),
     'subcounties',
   );
 }

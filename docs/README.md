@@ -19,6 +19,7 @@ See [creating PostgreSQL migrations](migrations.md) for pinned CLI scaffolding, 
 | [Users](modules/users.md)                | Accounts, creation service, administration, and account status                   |
 | [RBAC](modules/rbac.md)                  | Legacy roles, permissions, and administrator protections                         |
 | [Hotspots](modules/hotspots.md)          | Hotspot submission, review, activation and deactivation                          |
+| [Locations](modules/locations.md)        | Region, district and subcounty lookups shared across the system                  |
 | [Inventory](modules/inventory.md)        | Stock reports for the warehouse, districts and hotspots, and recording stock     |
 | [API / Swagger](api/README.md)           | Endpoint reference, authentication examples, OpenAPI maintenance, and validation |
 

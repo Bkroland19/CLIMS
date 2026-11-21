@@ -1,7 +1,6 @@
 package hotspots
 
 import (
-	"clims-backend/internal/features/locations"
 	"clims-backend/internal/features/rbac"
 
 	"github.com/gofiber/fiber/v3"
@@ -17,10 +16,6 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwtMiddleware, active
 	group.Get("/", read, h.list)
 	group.Post("/", submit, h.submit)
 	group.Get("/notifications", read, h.notifications)
-	locationHandler := locations.NewHandler(repo.db)
-	group.Get("/regions", submit, locationHandler.Regions)
-	group.Get("/districts", submit, locationHandler.Districts)
-	group.Get("/subcounties", submit, locationHandler.Subcounties)
 	group.Get("/:id", read, h.get)
 	group.Put("/:id", submit, h.update)
 	group.Get("/:id/events", read, h.events)

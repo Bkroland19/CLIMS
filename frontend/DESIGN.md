@@ -109,8 +109,10 @@ solid ring: `focus-visible:ring-2 focus-visible:ring-ring`.
 Top bar (menu toggle, product name, notifications bell, theme, account), then the sidebar and the
 page. The sidebar shows the current workspace's labelled sections; an item with things waiting
 carries a count pill (a red dot when collapsed to icons), and the foot names the workspace. Under
-the top bar, the heading band holds the breadcrumb (workspace / section / record), the page title,
-one line on what the page is for and, when a section has several pages, its tabs. Tabs are links,
+the top bar, the heading band holds the page title, one line on what the page is for and, when a
+section has several pages, its tabs. There is no breadcrumb: the sidebar shows where you are. A
+record (a detail page) gets a "Back to <section>" link above its title instead. The band and the
+page fill the width beside the sidebar; there is no maximum width. Tabs are links,
 each to its own address. All of it comes from `navigation/workspaces.ts`; a page supplies only its
 content and, at the top of it, its `PageActions`.
 

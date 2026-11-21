@@ -83,9 +83,9 @@ const ok = (data: unknown): Reply => ({ status: 200, body: { success: true, data
 
 function geography(request: RecordedRequest): Reply | null {
   if (request.method !== 'GET') return null;
-  if (request.url === '/hotspots/regions') return ok([REGION]);
-  if (request.url === `/hotspots/districts?region_id=${REGION.id}`) return ok([DISTRICT]);
-  if (request.url === `/hotspots/subcounties?district_id=${DISTRICT.id}`) return ok([SUBCOUNTY]);
+  if (request.url === '/locations/regions') return ok([REGION]);
+  if (request.url === `/locations/districts?region_id=${REGION.id}`) return ok([DISTRICT]);
+  if (request.url === `/locations/subcounties?district_id=${DISTRICT.id}`) return ok([SUBCOUNTY]);
   if (request.url.startsWith(`/hotspots?district_id=${DISTRICT.id}`)) return ok(HOTSPOTS_IN_WAKISO);
   return null;
 }
