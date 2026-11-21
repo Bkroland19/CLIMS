@@ -23,6 +23,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -52,6 +53,8 @@ func main() {
 
 	app := fiber.New()
 	app.Use(recover.New())
+	// Sets X-Request-ID so a logged failure can be matched to the request that caused it.
+	app.Use(requestid.New())
 	app.Use(middleware.NewSlogLogger())
 
 	app.Use(helmet.New())
