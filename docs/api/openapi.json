@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "CLIMS API",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, inventory reporting, the condom catalogue, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
   },
   "servers": [
@@ -50,11 +50,120 @@
   ],
   "paths": {
     "/api/v1/orders/stockouts": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listStockoutReports",
+        "summary": "List stockout reports",
+        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutReportListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      },
       "post": {
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
-        "summary": "Raise a hotspot stockout alert",
-        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
+        "summary": "Report a hotspot stockout to its district's DCFPs",
+        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a product, with an optional message, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the product, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStockoutRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/warehouse-requests": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "createWarehouseRequest",
+        "summary": "Order stock from NMS or JMS",
+        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the product (`condom_id`, which fixes the condom type, e.g. female) and the `quantity`. `unit_of_measure_id` defaults to the product's catalogue unit; a product without one returns 422 with `error.unit_of_measure_id`. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
         "responses": {
           "201": {
             "description": "Success",
@@ -75,12 +184,6 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
@@ -93,7 +196,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OrderStockoutRequest"
+                "$ref": "#/components/schemas/WarehouseRequestRequest"
               }
             }
           }
@@ -220,20 +323,10 @@
       "post": {
         "tags": ["Orders"],
         "operationId": "transitionOrder",
-        "summary": "Advance an order workflow",
-        "description": "On a stockout alert (queued, or on_hold while the warehouse fills a request) the DCFP either sends stock or asks the warehouse. dispatch takes rider_id (an active rider with orders:deliver at the district store), unit_of_measure_id and quantity_issued, and takes the quantity from the district's available stock; too little returns 409. request-replenishment (orders:replenish) takes warehouse_store_id, unit_of_measure_id and quantity, creates a linked warehouse request, notifies the warehouse and puts the alert on hold; an alert has one open request at a time. review and check-stock do not apply to alerts. A warehouse request is reviewed, stock-checked (which reserves it, or holds it) and dispatched by warehouse staff with orders:process; dispatch may give a smaller quantity_issued. The district then runs receive (orders:receive) with quantity_received, and a mismatch needs discrepancy_note. deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. review and check-stock accept an empty body.",
+        "summary": "Advance a warehouse order",
+        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body.",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "201": {
             "description": "Success",
             "content": {
               "application/json": {
@@ -281,14 +374,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "review",
-                "check-stock",
-                "dispatch",
-                "request-replenishment",
-                "receive",
-                "deliver"
-              ]
+              "enum": ["review", "check-stock", "dispatch", "receive"]
             }
           }
         ],
@@ -3325,51 +3411,31 @@
           "comment": {
             "type": "string",
             "nullable": true,
-            "maxLength": 4000
+            "maxLength": 4000,
+            "description": "The message the DCFP reads in the notification."
           }
         },
-        "description": "A stockout alert names the product only. The DCFP chooses the unit and quantity when sending stock or requesting it from the warehouse."
+        "description": "A stockout report names the hotspot and product, with an optional message for the DCFP. It carries no quantity: the DCFP decides what to order from the warehouse."
       },
       "OrderActionRequest": {
         "type": "object",
         "properties": {
-          "warehouse_store_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "rider_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity_received": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "discrepancy_note": {
-            "type": "string",
-            "maxLength": 4000
-          },
-          "delivery_note": {
-            "type": "string",
-            "maxLength": 4000
-          },
           "quantity_issued": {
             "type": "integer",
             "format": "int32",
             "minimum": 1,
-            "description": "dispatch: for a stockout alert, the quantity sent to the hotspot (required); for a warehouse request, an optional smaller quantity than requested, releasing the rest of the reservation."
+            "description": "dispatch only: a smaller quantity than ordered, releasing the rest of the reservation."
           },
-          "unit_of_measure_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "dispatch of a stockout alert and request-replenishment: the unit the DCFP sends or requests."
-          },
-          "quantity": {
+          "quantity_received": {
             "type": "integer",
             "format": "int32",
-            "minimum": 1,
-            "description": "request-replenishment only: the quantity to request from the warehouse."
+            "minimum": 0,
+            "description": "receive only (required): the quantity counted on arrival."
+          },
+          "discrepancy_note": {
+            "type": "string",
+            "maxLength": 4000,
+            "description": "receive only: required when quantity_received differs from quantity_issued."
           }
         },
         "additionalProperties": false
@@ -5810,6 +5876,163 @@
                 "type": "integer",
                 "format": "int64"
               }
+            }
+          }
+        }
+      },
+      "WarehouseRequestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["warehouse_store_id", "condom_id", "quantity"],
+        "properties": {
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A national store: NMS or JMS."
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The product, which fixes the condom type (male or female), brand and channel."
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Defaults to the product's catalogue unit."
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000
+          }
+        }
+      },
+      "StockoutReport": {
+        "type": "object",
+        "required": [
+          "id",
+          "hot_spot_id",
+          "hot_spot",
+          "condom_id",
+          "product",
+          "district_store_id",
+          "reported_by_id",
+          "reported_by",
+          "comment",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot": {
+            "type": "object",
+            "required": [
+              "name",
+              "village",
+              "subcounty",
+              "district",
+              "contact_name",
+              "contact_phone"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "village": {
+                "type": "string",
+                "nullable": true
+              },
+              "subcounty": {
+                "type": "string",
+                "nullable": true
+              },
+              "district": {
+                "type": "string",
+                "nullable": true
+              },
+              "contact_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "contact_phone": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "description": "The hotspot's current details, and its latest contact person."
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string",
+            "example": "Engabu Free Female"
+          },
+          "district_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The district store the report went to."
+          },
+          "reported_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reported_by": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockoutReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockoutReport"
+          }
+        }
+      },
+      "StockoutReportListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockoutReport"
             }
           }
         }

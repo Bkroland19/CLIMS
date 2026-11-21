@@ -271,28 +271,19 @@ export const workspaces: readonly Workspace[] = [
         label: 'Fulfilment',
         items: [
           {
-            id: 'orders',
-            label: 'Orders',
+            id: 'stockouts',
+            label: 'Stockouts',
             icon: Inbox,
             pages: [
               {
-                path: '/dcfp/orders',
-                tab: 'Queue',
-                title: 'Orders',
+                path: '/dcfp/stockouts',
+                tab: 'Stockouts',
+                title: 'Stockout notifications',
                 description:
-                  'Stockout notifications from hotspots. Review each one, check stock, then confirm or hold.',
-                layout: 'table',
-              },
-              {
-                path: '/dcfp/orders/held',
-                tab: 'Held for stock',
-                title: 'Orders',
-                description:
-                  'Orders waiting for stock, checked against what is in the district store now.',
+                  'Hotspots in your district that have run out, with their message and who to call. Order stock from NMS or JMS when it is needed.',
                 layout: 'table',
               },
             ],
-            details: [{ path: '/dcfp/orders/[id]', label: 'Review order', layout: 'detail' }],
           },
           {
             id: 'restock',
@@ -301,10 +292,10 @@ export const workspaces: readonly Workspace[] = [
             pages: [
               {
                 path: '/dcfp/restock',
-                tab: 'Warehouse requests',
+                tab: 'Warehouse orders',
                 title: 'Restock',
                 description:
-                  'Stock ordered from NMS or JMS, and consignments waiting to be received.',
+                  'Condoms ordered from NMS or JMS, and consignments waiting to be received.',
                 layout: 'table',
               },
               {
@@ -318,25 +309,9 @@ export const workspaces: readonly Workspace[] = [
             ],
             // `new` is listed before `[id]`: a fixed segment wins, as it does in the router.
             details: [
-              { path: '/dcfp/restock/new', label: 'New warehouse request', layout: 'form' },
-              { path: '/dcfp/restock/[id]', label: 'Warehouse request', layout: 'detail' },
+              { path: '/dcfp/restock/new', label: 'New warehouse order', layout: 'form' },
+              { path: '/dcfp/restock/[id]', label: 'Warehouse order', layout: 'detail' },
             ],
-          },
-          {
-            id: 'dispatch',
-            label: 'Dispatch',
-            icon: Truck,
-            pages: [
-              {
-                path: '/dcfp/dispatch',
-                tab: 'Dispatch',
-                title: 'Dispatch',
-                description:
-                  'Confirmed orders ready to go out with a rider, and deliveries in progress.',
-                layout: 'table',
-              },
-            ],
-            details: [{ path: '/dcfp/dispatch/[id]', label: 'Dispatch order', layout: 'form' }],
           },
         ],
       },

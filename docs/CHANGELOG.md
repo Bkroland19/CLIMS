@@ -4,6 +4,37 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- **Stockouts notify the DCFP; the DCFP orders from NMS or JMS.** `POST /api/v1/orders/stockouts` now
+  records a stockout report and notifies the hotspot's district DCFPs (`orders:replenish`) with the
+  hotspot's details, its contact and the message. It creates no order and returns a `StockoutReport`.
+  `GET /api/v1/orders/stockouts` lists reports.
+- The DCFP places an order with a national warehouse through the new
+  `POST /api/v1/orders/warehouse-requests` (warehouse, product, quantity; unit defaults to the
+  product's). The warehouse reviews, checks stock and dispatches, and the district receives.
+
+- **Web DCFP workspace on the Go API.** New **Stockouts** screen lists each hotspot's report with
+  its place, contact, message and reporter, and starts a warehouse order for the product.
+  **Restock** lists the DCFP's orders to NMS and JMS, places a new one (warehouse, product,
+  quantity) and records the receipt, with a note when the count differs. The dashboard and sidebar
+  badges follow the two flows.
+- The top bar's bell reads the central inbox (`/api/v1/notifications`), counts unread items, opens
+  DCFP notifications on their screen and marks them read.
+
+### Removed
+
+- The web DCFP screens for hotspot orders: the order queue, held orders, order review and rider
+  dispatch (`/dcfp/orders…`, `/dcfp/dispatch…`).
+- The hotspot alert actions `request-replenishment`, `deliver` and the DCFP's rider `dispatch`, with
+  the `order.delivery_assigned` and `order.delivered` notifications. Earlier alert orders stay as
+  read-only history (migration 22).
+
+### Fixed
+
+- Two migrations shared version 20, so the API failed at start-up ("duplicate migration file").
+  `vht_district_stockouts` is now migration 21.
+
 ### Added
 
 - **VHT stockout alerts for their district.** A VHT with the new `orders:stockout_district` permission can
@@ -41,6 +72,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   (`users:update`). Migration 20 adds National Medical Stores and fills in missing stores for
   warehouse staff, DCFPs and delivery agents. In the web app, the new-user form sets the store from
   the role and district, and Users has a **Change store** action.
+- The hotspot map runs on OpenStreetMap with MapLibre GL and reads the Go hotspot endpoints.
+  Hotspots cluster into rings split by review status or dispenser state, with heatmap and
+  point views, a key that doubles as a filter, search, status, dispenser, venue and region
+  filters, a list of the hotspots in view, and a detail panel with the contact person,
+  directions, the nearest hotspots, comments and history. A national user's map loads district by
+  district, so the database never pages through the whole table. The view is kept in the page
+  address, and the hotspots shown export to Excel. See `docs/modules/hotspots.md`.
 
 ### Changed
 
@@ -61,6 +99,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - New orders and stockout requests reject inactive products.
 - A product's type is its distribution channel (free, socially marketed or commercial), and its
   brand is chosen from the brand list. The product minimum level is removed.
+- The hotspot map no longer needs a Google Maps key: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is replaced
+  by the optional `NEXT_PUBLIC_MAP_TILES` (empty for OpenStreetMap, `off`, or a tile server's URL)
+  and `NEXT_PUBLIC_MAP_ATTRIBUTION`. The Content-Security-Policy names the tile servers instead of
+  Google, and `Permissions-Policy` allows location on the app's own pages, for "show my location".
 
 ### Removed
 
@@ -74,6 +116,7 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   Excel export.
 - Ant Design, ApexCharts, styled-components, redux-persist, three unused data-grid libraries,
   webpack, and the `xlsx` package (unpatched advisories on npm).
+- `@react-google-maps/api`, with the Google Maps scripts and hosts it needed.
 
 ### Security
 

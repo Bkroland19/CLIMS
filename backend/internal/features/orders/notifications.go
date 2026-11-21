@@ -8,48 +8,39 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// NotificationTypes are the order workflow notifications; register them once at startup.
-// Templates receive hotspot, product, unit, quantity, from_store and to_store.
+// NotificationTypes are the order notifications; register them once at startup. A stockout report's
+// template receives the keys of stockoutData; the warehouse steps receive product, unit, quantity,
+// from_store and to_store.
 func NotificationTypes() []notifications.Type {
 	inApp := []string{notifications.ChannelInApp}
 	return []notifications.Type{
 		{Name: "order.stockout_reported", Channels: inApp,
 			Title: "Stockout at {{.hotspot}}",
-			Body:  "{{.hotspot}} reported a stockout of {{.product}}. Send stock or request it from the warehouse."},
+			Body: "{{.hotspot}}{{with .place}}, {{.}},{{end}} is out of {{.product}}." +
+				"{{with .message}} Message: \"{{.}}\"{{end}} Reported by {{.reporter}}.{{with .contact}} Contact: {{.}}.{{end}}"},
 		{Name: "order.replenishment_requested", Channels: inApp,
-			Title: "Stock request from {{.to_store}}",
-			Body:  "{{.to_store}} requested {{.quantity}} {{.unit}} of {{.product}}."},
+			Title: "Stock order from {{.to_store}}",
+			Body:  "{{.to_store}} ordered {{.quantity}} {{.unit}} of {{.product}}."},
 		{Name: "order.shipment_dispatched", Channels: inApp,
 			Title: "Stock on the way from {{.from_store}}",
 			Body:  "{{.from_store}} dispatched {{.quantity}} {{.unit}} of {{.product}}. Record the receipt when it arrives."},
 		{Name: "order.shipment_received", Channels: inApp,
 			Title: "Stock received at {{.to_store}}",
-			Body:  "{{.quantity}} {{.unit}} of {{.product}} arrived at {{.to_store}}. Held stockouts can now be sent."},
-		{Name: "order.delivery_assigned", Channels: inApp,
-			Title: "Delivery to {{.hotspot}}",
-			Body:  "Deliver {{.quantity}} {{.unit}} of {{.product}} from {{.from_store}} to {{.hotspot}}."},
-		{Name: "order.delivered", Channels: inApp,
-			Title: "Stock delivered to {{.hotspot}}",
-			Body:  "{{.quantity}} {{.unit}} of {{.product}} were delivered to {{.hotspot}}."},
+			Body:  "{{.quantity}} {{.unit}} of {{.product}} from {{.from_store}} arrived at {{.to_store}}."},
 	}
 }
 
-// notification picks the type for a workflow step and the permission that acts on
-// it at the notified store. The second result is false for steps that notify nobody.
-func notification(action string, toStore bool) (string, string, bool) {
-	switch {
-	case action == "stockout_reported":
-		return "order.stockout_reported", "orders:process", true
-	case action == "replenishment_requested":
+// notification picks the type for a warehouse request step and the permission that acts on it at
+// the notified store. The second result is false for steps that notify nobody.
+func notification(action string) (string, string, bool) {
+	switch action {
+	case "replenishment_requested":
 		return "order.replenishment_requested", "orders:process", true
-	case action == "dispatch" && toStore:
+	case "dispatch":
 		return "order.shipment_dispatched", "orders:receive", true
-	case action == "dispatch":
-		return "order.delivery_assigned", "", true
-	case action == "receive":
-		return "order.shipment_received", "orders:process", true
-	case action == "deliver":
-		return "order.delivered", "", true
+	case "receive":
+		// The DCFPs who order from the warehouse learn their stock is in.
+		return "order.shipment_received", "orders:replenish", true
 	}
 	return "", "", false
 }
@@ -61,57 +52,43 @@ const productLabel = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id 
 		WHEN 'commercial' THEN 'Commercial' END,
 	CASE c.category WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female' END)`
 
-// record writes a workflow step to order_events, the order's history, and notifies
-// the people concerned. A store is notified through the people holding the permission
-// that acts on the step there, rather than everyone assigned to it.
-func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, notifyStore, notifyUser *string) error {
+// record writes a workflow step to order_events, the order's history, and notifies the people
+// holding the permission that acts on the step at the notified store, rather than everyone assigned to it.
+func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, notifyStore *string) error {
 	// The notify columns keep the deprecated /orders/notifications inbox working until
 	// clients use the central one.
 	var eventID string
-	if err := tx.QueryRow(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, notify_store_id, notify_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		order.ID, actorID, action, order.Status, notifyStore, notifyUser).Scan(&eventID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, notify_store_id)
+		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		order.ID, actorID, action, order.Status, notifyStore).Scan(&eventID); err != nil {
 		return err
 	}
-	typeName, permission, notifies := notification(action, notifyStore != nil)
-	if !notifies || (notifyStore == nil && notifyUser == nil) {
+	typeName, permission, notifies := notification(action)
+	if !notifies || notifyStore == nil {
 		return nil
 	}
-	var target notifications.Target
-	if notifyStore != nil {
-		target = notifications.Target{Permission: permission, StoreID: *notifyStore}
-	} else {
-		target = notifications.Target{UserIDs: []string{*notifyUser}}
-	}
-
-	// A replenishment request names its alert's hotspot through the parent order.
-	var hotspot, product, fromStore, toStore string
+	var product, fromStore, toStore string
 	var unit *string
-	if err := tx.QueryRow(ctx, `SELECT coalesce(h.name, ph.name, 'a hotspot'),
-			`+productLabel+`,
-			um.name, fs.name, ts.name
+	if err := tx.QueryRow(ctx, `SELECT `+productLabel+`, um.name, fs.name, ts.name
 		FROM orders o
 		JOIN condoms c ON c.id = o.condom_id
 		JOIN stores fs ON fs.id = o.ordered_from_store_id
 		JOIN stores ts ON ts.id = o.ordered_for_store_id
 		LEFT JOIN unit_of_measures um ON um.id = o.unit_of_measure_id
-		LEFT JOIN hot_spots h ON h.id = o.hot_spot_id
-		LEFT JOIN orders p ON p.id = o.parent_order_id
-		LEFT JOIN hot_spots ph ON ph.id = p.hot_spot_id
-		WHERE o.id = $1`, order.ID).Scan(&hotspot, &product, &unit, &fromStore, &toStore); err != nil {
+		WHERE o.id = $1`, order.ID).Scan(&product, &unit, &fromStore, &toStore); err != nil {
 		return err
 	}
 	if product == "" {
 		product = "condoms"
 	}
-	data := map[string]any{"hotspot": hotspot, "product": product, "from_store": fromStore, "to_store": toStore,
+	data := map[string]any{"product": product, "from_store": fromStore, "to_store": toStore,
 		"unit": "units", "quantity": quantityFor(order, action)}
 	if unit != nil {
 		data["unit"] = *unit
 	}
 	return r.notifier.Notify(ctx, tx, notifications.Message{
 		Type:           typeName,
-		Targets:        []notifications.Target{target},
+		Targets:        []notifications.Target{{Permission: permission, StoreID: *notifyStore}},
 		ActorID:        &actorID,
 		Resource:       &notifications.Resource{Type: "order", ID: order.ID},
 		Data:           data,
@@ -119,11 +96,11 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID
 	})
 }
 
-// quantityFor is the quantity a step is about: requested, issued or counted on arrival.
+// quantityFor is the quantity a step is about: ordered, issued or counted on arrival.
 func quantityFor(order Order, action string) int32 {
 	value := order.QuantityNeeded
 	switch action {
-	case "dispatch", "deliver":
+	case "dispatch":
 		value = order.QuantityIssued
 	case "receive":
 		value = order.QuantityReceived
