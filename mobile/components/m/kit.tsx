@@ -144,30 +144,22 @@ export function List({
             borderRadius: T.listR,
             overflow: "hidden",
             gap: T.listGap,
+            backgroundColor: T.rowBg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: T.cardBd,
           }}
         >
           {kids.map((k, i) => (
-            <View
-              key={i}
-              style={
-                T.ios
-                  ? undefined
-                  : {
-                      borderTopLeftRadius: i === 0 ? T.listR : 4,
-                      borderTopRightRadius: i === 0 ? T.listR : 4,
-                      borderBottomLeftRadius: i === kids.length - 1 ? T.listR : 4,
-                      borderBottomRightRadius: i === kids.length - 1 ? T.listR : 4,
-                      overflow: "hidden",
-                    }
-              }
-            >
+            <View key={i}>
               {k}
-              {T.ios && i < kids.length - 1 ? (
+              {i < kids.length - 1 ? (
                 <View
                   style={{
                     height: StyleSheet.hairlineWidth,
                     backgroundColor: T.sep,
-                    marginLeft: 16,
+                    // Rows with a leading icon start their divider at the text, as native lists do.
+                    marginLeft:
+                      React.isValidElement<{ ic?: unknown }>(k) && k.props.ic ? 28 + T.icBox : 16,
                   }}
                 />
               ) : null}
@@ -181,6 +173,8 @@ export function List({
             padding: 20,
             borderRadius: T.listR,
             backgroundColor: T.rowBg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: T.cardBd,
           }}
         >
           <Txt style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}>{empty}</Txt>
@@ -310,6 +304,11 @@ export interface Stat {
   value: string;
   fg?: string;
   note?: string;
+  /**
+   * How full the stock is, 0–1, with a tick where "running low" starts, so a glance at the bar
+   * says how close a hotspot is to needing a delivery.
+   */
+  meter?: { fill: number; mark: number; color: string };
 }
 export interface StepItem {
   label: string;
@@ -344,6 +343,8 @@ export function Hero({
           marginHorizontal: 16,
           backgroundColor: T.cardBg,
           borderRadius: T.cardR,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: T.cardBd,
           padding: 16,
           gap: 12,
         }}
@@ -389,6 +390,7 @@ export function Hero({
                 >
                   {x.value}
                 </Txt>
+                {x.meter ? <Meter {...x.meter} label={`${x.label}: ${x.note ?? x.value}`} /> : null}
                 {x.note ? (
                   <Txt style={{ ...TYPE.footnote, color: x.fg ?? T.fg2 }}>{x.note}</Txt>
                 ) : null}
@@ -404,13 +406,78 @@ export function Hero({
   );
 }
 
+/** A stock level bar: filled to `fill`, with a tick at `mark` (both 0–1). */
+export function Meter({
+  fill,
+  mark,
+  color,
+  label,
+}: {
+  fill: number;
+  mark: number;
+  color: string;
+  label: string;
+}) {
+  const T = useT();
+  const pct = (v: number) => `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%` as const;
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(Math.min(1, fill) * 100) }}
+      style={{ height: 6, borderRadius: 3, backgroundColor: T.meterBg, marginVertical: 6 }}
+    >
+      <View
+        style={{
+          width: pct(fill),
+          minWidth: fill > 0 ? 6 : 0,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          left: pct(mark),
+          top: -2,
+          width: 2,
+          height: 10,
+          marginLeft: -1,
+          borderRadius: 1,
+          backgroundColor: T.fg3,
+        }}
+      />
+    </View>
+  );
+}
+
+/**
+ * Three thin bands in the colours of the Uganda flag, as on Ministry of Health letterheads. Used
+ * once per screen at most, under the header band and on sign-in, as the app's identity mark.
+ */
+export function FlagStripe({ width, band = 2 }: { width?: number; band?: number }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ width, alignSelf: width ? "center" : "stretch" }}
+    >
+      <View style={{ height: band, backgroundColor: "#000000" }} />
+      <View style={{ height: band, backgroundColor: "#fcdc04" }} />
+      <View style={{ height: band, backgroundColor: "#d90000" }} />
+    </View>
+  );
+}
+
 export function Steps({ items }: { items: StepItem[] }) {
   const T = useT();
   return (
     <View>
       {items.map((it, i) => {
         const S = {
-          done: [T.tint, T.tint, T.b1Fg, "✓", T.fg, "500", T.tint],
+          done: [T.b1Bg, T.b1Bg, T.b1Fg, "✓", T.fg, "500", T.b1Bg],
           cur: [T.cardBg, T.tint, T.tint, String(i + 1), T.fg, "600", T.sep],
           warn: [T.stepWarnBg, T.warnBd, T.warnBd, "!", T.warnFg, "600", T.sep],
           todo: ["transparent", T.sep, T.fg3, String(i + 1), T.fg2, "400", T.sep],
@@ -483,15 +550,33 @@ export function Banner({
         accessibilityRole="alert"
         style={{
           marginHorizontal: 16,
-          backgroundColor: tn.bg,
+          backgroundColor: T.cardBg,
           borderRadius: T.cardR,
-          padding: 14,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: T.cardBd,
+          // A coloured edge says the kind of message before it is read.
+          borderLeftWidth: 4,
+          borderLeftColor: tn.fg,
+          paddingVertical: 14,
+          paddingLeft: 12,
+          paddingRight: 14,
           gap: 8,
         }}
       >
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Icon name={tn.icon as IconName} size={20} color={tn.fg} />
-          <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: tn.bg,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name={tn.icon as IconName} size={18} color={tn.fg} />
+          </View>
+          <View style={{ flex: 1, gap: 2, paddingTop: 5 }}>
             <Txt style={{ color: tn.fg, fontWeight: "600", ...TYPE.subhead }}>{title}</Txt>
             {body ? <Txt style={{ color: T.fg, ...TYPE.subhead }}>{body}</Txt> : null}
           </View>
@@ -500,7 +585,7 @@ export function Banner({
           <Pressable
             key={e.where + e.msg}
             onPress={e.onPress}
-            style={{ marginLeft: 30, paddingVertical: 4 }}
+            style={{ marginLeft: 44, paddingVertical: 4 }}
           >
             <Txt style={{ ...TYPE.subhead, fontWeight: "600", color: tn.fg }}>{e.where}</Txt>
             <Txt style={{ ...TYPE.footnote, color: T.fg }}>{e.msg}</Txt>
@@ -509,7 +594,7 @@ export function Banner({
         {act ? (
           <Pressable
             onPress={act.onPress}
-            style={{ marginLeft: 30, paddingVertical: 4 }}
+            style={{ marginLeft: 44, paddingVertical: 4 }}
             accessibilityRole="button"
           >
             <Txt style={{ color: T.tint, fontWeight: "600", ...TYPE.subhead }}>{act.label}</Txt>
@@ -686,7 +771,14 @@ export function Fields({
           overflow: "hidden",
           gap: T.fGap,
           backgroundColor: mdCard ? T.rowBg : T.fRowBg,
-          ...(mdCard ? { paddingHorizontal: 16, paddingVertical: 12 } : null),
+          ...(mdCard
+            ? {
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: T.cardBd,
+              }
+            : null),
         }}
       >
         {kids.map((k, i) => (
@@ -780,6 +872,7 @@ const inputStyle = (
   borderWidth: focused && !T.ios ? 2 : err ? 1.5 : T.inBw,
   borderColor: err ? T.danger : focused && !T.ios ? T.tint : T.inBd,
   borderRadius: T.inR,
+  backgroundColor: T.inBg,
   paddingHorizontal: T.ios ? 0 : 12,
   paddingVertical: multiline ? (T.ios ? 4 : 10) : 0,
   fontSize: 16,
@@ -1199,6 +1292,7 @@ export function Pick({
           borderWidth: T.inBw,
           borderColor: T.inBd,
           borderRadius: T.inR,
+          backgroundColor: T.inBg,
           paddingHorizontal: T.ios ? 0 : 14,
           paddingVertical: T.ios ? 0 : 8,
         }}
@@ -1397,32 +1491,57 @@ export function PhotoView({ uri, h = 200 }: { uri: string; h?: number }) {
 export function Sheet({
   visible,
   title,
+  sub,
+  icon,
+  tone = "success",
   onClose,
   children,
 }: {
   visible: boolean;
   title: string;
+  /** One line under the title saying what the sheet is for. */
+  sub?: string;
+  /** Alert-style sheets lead with a tinted icon badge in the tone's colour. */
+  icon?: IconName;
+  tone?: Tone;
   onClose: () => void;
   children?: React.ReactNode;
 }) {
   const T = useT();
   const insets = useSafeAreaInsets();
   const { isShort } = useResponsive();
+  const tn = T.tones[tone];
+  // The scrim fades while the sheet rises on a soft spring, rather than both sliding together.
+  const [rise] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!visible) return;
+    rise.setValue(0);
+    Animated.spring(rise, {
+      toValue: 1,
+      damping: 22,
+      stiffness: 220,
+      mass: 0.9,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, rise]);
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
     >
       <View style={{ flex: 1, backgroundColor: T.scrim }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
-        <View
+        <Animated.View
           style={{
             backgroundColor: T.sheetBg,
             borderTopLeftRadius: T.sheetR,
             borderTopRightRadius: T.sheetR,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderBottomWidth: 0,
+            borderColor: T.cardBd,
             // Centred and capped on tablets; taller on short windows so content still fits.
             width: "100%",
             maxWidth: MAX_SHEET_WIDTH,
@@ -1431,59 +1550,82 @@ export function Sheet({
             paddingBottom: insets.bottom + 12,
             paddingLeft: insets.left,
             paddingRight: insets.right,
+            transform: [
+              { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [64, 0] }) },
+            ],
+            opacity: rise.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
           }}
         >
           <View style={{ alignItems: "center", paddingTop: 8 }}>
             <View
               style={{
-                width: T.ios ? 36 : 32,
-                height: T.ios ? 5 : 4,
-                borderRadius: 3,
+                width: 36,
+                height: 4,
+                borderRadius: 2,
                 backgroundColor: T.grab,
+                opacity: 0.5,
               }}
             />
           </View>
           <View
             style={{
               flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 10,
+              alignItems: icon || sub ? "flex-start" : "center",
+              gap: 12,
+              paddingLeft: 20,
+              paddingRight: 12,
+              paddingTop: 12,
+              paddingBottom: 14,
             }}
           >
-            <Txt
-              accessibilityRole="header"
-              style={{
-                flex: 1,
-                fontSize: T.ios ? 17 : 22,
-                fontWeight: T.ios ? "600" : "400",
-                textAlign: T.ios ? "center" : "left",
-                marginLeft: T.ios ? 48 : 0,
-              }}
-            >
-              {title}
-            </Txt>
+            {icon ? (
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: tn.bg,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon name={icon} size={20} color={tn.fg} />
+              </View>
+            ) : null}
+            <View style={{ flex: 1, gap: 2, paddingTop: icon ? 1 : 0 }}>
+              <Txt
+                accessibilityRole="header"
+                style={{ fontSize: 18, lineHeight: 24, fontWeight: "600" }}
+              >
+                {title}
+              </Txt>
+              {sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{sub}</Txt> : null}
+            </View>
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
+              accessibilityLabel="Close"
               hitSlop={8}
-              style={{ minWidth: 48, alignItems: "flex-end" }}
+              style={({ pressed }) => ({
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? T.rowPress : T.meterBg,
+              })}
             >
-              <Txt
-                style={{
-                  color: T.tint,
-                  fontSize: T.ios ? 17 : 14,
-                  fontWeight: T.ios ? "600" : "500",
-                }}
-              >
-                {T.ios ? "Done" : "Close"}
-              </Txt>
+              <Icon name="x" size={16} color={T.fg2} />
             </Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8 }}>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: T.sep }} />
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingTop: 12 }}
+          >
             {children}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

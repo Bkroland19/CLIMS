@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Animated, Pressable, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "@/lib/theme";
 import { useMe } from "@/lib/session";
@@ -77,6 +77,8 @@ export default function PushBanner() {
           padding: 14,
           borderRadius: T.ios ? 22 : 18,
           backgroundColor: T.pushBg,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: T.cardBd,
           shadowColor: "#000",
           shadowOpacity: 0.18,
           shadowRadius: 16,
@@ -89,18 +91,21 @@ export default function PushBanner() {
             width: 38,
             height: 38,
             borderRadius: T.ios ? 9 : 19,
-            backgroundColor: T.b1Bg,
+            backgroundColor: T.brand,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Icon name="bell" size={20} color={T.b1Fg} />
+          <Icon name="bell" size={20} color={T.brandFg} />
         </View>
         <View style={{ flex: 1 }}>
-          <Txt
-            style={{ ...TYPE.footnote, color: T.fg2 }}
-            numberOfLines={1}
-          >{`CLIMS · ${orgOf(ev)}`}</Txt>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Txt style={{ ...TYPE.footnote, color: T.fg2, flex: 1 }} numberOfLines={1}>
+              <Txt style={{ ...TYPE.footnote, color: T.fg, fontWeight: "600" }}>CLIMS</Txt>
+              {` · ${orgOf(ev)}`}
+            </Txt>
+            <Txt style={{ ...TYPE.footnote, color: T.fg3 }}>now</Txt>
+          </View>
           <Txt style={{ ...TYPE.subhead, fontWeight: "500" }} numberOfLines={2}>
             {ev.text}
           </Txt>

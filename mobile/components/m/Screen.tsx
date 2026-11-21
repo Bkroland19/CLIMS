@@ -9,12 +9,13 @@ import {
   type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { useT } from "@/lib/theme";
 import { useNav } from "@/lib/nav";
 import { useStore, useUnread } from "@/lib/store";
 import { useColumn, useResponsive } from "@/hooks/useResponsive";
 import Icon, { type IconName } from "./Icon";
-import { Txt } from "./kit";
+import { FlagStripe, Txt } from "./kit";
 import { TYPE } from "@/lib/fonts";
 
 export interface ScreenAction {
@@ -58,6 +59,11 @@ export default function Screen({
   const action = T.ios ? fab : undefined;
   const unread = useUnread();
   const showBell = !!root && !noHeader;
+  // Tab roots sit under the Ministry green band with the flag stripe; detail pages keep a plain
+  // header so the band marks "you are at the top of a section".
+  const band = !!root && !noHeader;
+  const hdrBg = band ? T.brand : T.hdrBg;
+  const hdrFg = band ? T.brandFg : T.fg;
   const { isCompact, isShort, width } = useResponsive();
   const col = useColumn();
   // Short windows (split screen) get an inline title instead of the 52dp large title.
@@ -75,12 +81,12 @@ export default function Screen({
         borderRadius: 24,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: pressed && !T.ios ? T.rowPress : "transparent",
+        backgroundColor: pressed && !T.ios ? (band ? T.brandPress : T.rowPress) : "transparent",
         opacity: pressed && T.ios ? 0.5 : 1,
         zIndex: 1,
       })}
     >
-      <Icon name="bell" size={T.ios ? 24 : 24} color={T.ios ? T.tint : T.fg} />
+      <Icon name="bell" size={24} color={band ? T.brandFg : T.ios ? T.tint : T.fg} />
       {unread > 0 ? (
         <View
           style={{
@@ -95,7 +101,7 @@ export default function Screen({
             alignItems: "center",
             justifyContent: "center",
             borderWidth: 2,
-            borderColor: T.hdrBg,
+            borderColor: hdrBg,
           }}
         >
           <Txt style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>
@@ -112,7 +118,7 @@ export default function Screen({
     <View
       style={{
         paddingTop: insets.top,
-        backgroundColor: T.hdrBg,
+        backgroundColor: hdrBg,
         borderBottomWidth: hasBack ? StyleSheet.hairlineWidth : 0,
         borderBottomColor: T.hdrBd,
       }}
@@ -158,7 +164,7 @@ export default function Screen({
             <Txt
               accessibilityRole={hasBack ? undefined : "header"}
               numberOfLines={1}
-              style={{ fontSize: 17, fontWeight: "600" }}
+              style={{ fontSize: 17, fontWeight: "600", color: hdrFg }}
             >
               {title}
             </Txt>
@@ -179,7 +185,7 @@ export default function Screen({
                 zIndex: 1,
               }}
             >
-              <Icon name="plus" size={26} color={T.tint} />
+              <Icon name="plus" size={26} color={band ? T.brandFg : T.tint} />
             </Pressable>
           ) : null}
         </View>
@@ -197,6 +203,7 @@ export default function Screen({
               fontSize: isCompact ? 26 : 30,
               fontWeight: "700",
               lineHeight: isCompact ? 32 : 36,
+              color: hdrFg,
             }}
           >
             {title}
@@ -205,7 +212,7 @@ export default function Screen({
       ) : null}
     </View>
   ) : (
-    <View style={{ paddingTop: insets.top, backgroundColor: T.hdrBg }}>
+    <View style={{ paddingTop: insets.top, backgroundColor: hdrBg }}>
       <View
         style={[
           col.style,
@@ -237,7 +244,13 @@ export default function Screen({
         <Txt
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ flex: 1, fontSize: isCompact ? 19 : 20, lineHeight: 28 }}
+          style={{
+            flex: 1,
+            fontSize: isCompact ? 19 : 20,
+            lineHeight: 28,
+            color: hdrFg,
+            fontWeight: band ? "600" : "400",
+          }}
         >
           {title}
         </Txt>
@@ -249,7 +262,9 @@ export default function Screen({
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
+      <StatusBar style={band || T.dark ? "light" : "dark"} />
       {header}
+      {band ? <FlagStripe /> : null}
       {offline ? (
         <View style={{ backgroundColor: T.offBg }}>
           <View
