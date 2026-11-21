@@ -98,9 +98,9 @@ describe('route guard', () => {
   it('keeps the workspace of a mistyped address inside it', async () => {
     renderApp(routes, { route: '/dcfp/no-such-page', signedIn: true });
     await screen.findByText('There is no page at this address');
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
-      'District focal person',
-    );
+    expect(
+      screen.getByRole('button', { name: /Workspace\s*District focal person/ }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -188,12 +188,11 @@ describe('app shell', () => {
     );
   });
 
-  it('heads the page with its breadcrumb, title and description', async () => {
+  it('heads the page with its title and description, and no breadcrumb', async () => {
     renderApp(routes, { route: '/moh/users', signedIn: true });
     await screen.findByRole('heading', { level: 1, name: 'User management' });
 
-    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(crumbs).toHaveTextContent('Ministry of Health/Users & access');
+    expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).not.toBeInTheDocument();
     expect(
       screen.getByText('Everyone who can sign in to CLIMS, and the roles they hold.'),
     ).toBeInTheDocument();
@@ -232,12 +231,6 @@ describe('app shell', () => {
         name: 'Map',
       }),
     ).toHaveAttribute('aria-current', 'page');
-    // The breadcrumb's section now leads back to the first tab.
-    expect(
-      within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', {
-        name: 'Hotspots',
-      }),
-    ).toHaveAttribute('href', '/dcfp/hotspots');
   });
 
   it('switches workspace from the foot of the sidebar', async () => {

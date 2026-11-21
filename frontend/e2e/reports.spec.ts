@@ -86,10 +86,7 @@ test.describe('MOH', () => {
       page.getByRole('definition').filter({ hasText: /^Dr\. Ruth Akello · Today, / }),
     ).toBeVisible();
 
-    await page
-      .getByRole('navigation', { name: 'Breadcrumb' })
-      .getByRole('link', { name: 'Reports' })
-      .click();
+    await page.getByRole('link', { name: 'Back to Reports', exact: true }).click();
     await expect(row).toContainText('Reviewed');
     await page.reload();
     await expect(row).toContainText('Reviewed');

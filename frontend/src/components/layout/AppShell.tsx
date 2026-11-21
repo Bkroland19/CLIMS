@@ -60,7 +60,7 @@ export function AppShell({ workspaces, storage, counts, notifications, children 
           className="bg-canvas min-w-0 outline-none"
         >
           <PageHeading location={location} counts={counts} />
-          <div className="mx-auto w-full max-w-360 flex-1 px-4 pt-4 pb-10 md:px-5">
+          <div className="w-full flex-1 px-4 pt-4 pb-10 md:px-5">
             <ErrorBoundary resetKey={pathname}>
               <div className="flex w-full flex-col gap-6">{children}</div>
             </ErrorBoundary>
