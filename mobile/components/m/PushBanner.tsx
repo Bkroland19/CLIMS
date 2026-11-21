@@ -9,6 +9,7 @@ import { orgOf, useOpenNote } from "@/screens/shared";
 import { MAX_SHEET_WIDTH } from "@/hooks/useResponsive";
 import Icon from "./Icon";
 import { Txt } from "./kit";
+import { TYPE } from "@/lib/fonts";
 
 /**
  * Heads-up banner for the newest unread notification, shown once per app launch
@@ -97,10 +98,10 @@ export default function PushBanner() {
         </View>
         <View style={{ flex: 1 }}>
           <Txt
-            style={{ fontSize: 13, color: T.fg2 }}
+            style={{ ...TYPE.footnote, color: T.fg2 }}
             numberOfLines={1}
           >{`CLIMS · ${orgOf(ev)}`}</Txt>
-          <Txt style={{ fontSize: 15, fontWeight: "500" }} numberOfLines={2}>
+          <Txt style={{ ...TYPE.subhead, fontWeight: "500" }} numberOfLines={2}>
             {ev.text}
           </Txt>
         </View>
