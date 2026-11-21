@@ -299,6 +299,10 @@ function seedUsers(dataset: string): User[] {
 const BRAND = (n: number) => uuid(21, n);
 const UNIT = (n: number) => uuid(22, n);
 
+/** A seeded catalogue product's or unit's id, for other mocks that refer to them. */
+export const mockProductId = (n: number) => uuid(20, n);
+export const mockUnitId = UNIT;
+
 function lookup(id: string, name: string, note: string | null, active = true, age = 400): Lookup {
   return { id, name, note, active, created_at: daysAgo(age), updated_at: daysAgo(age / 2) };
 }

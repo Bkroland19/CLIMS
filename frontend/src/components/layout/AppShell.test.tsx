@@ -10,10 +10,10 @@ import { renderApp } from '@/test/renderApp';
 
 import { AppShell } from './AppShell';
 
-/** A page whose link to the order queue disappears once it has been followed. */
+/** A page whose link to the stockouts disappears once it has been followed. */
 function Page() {
   const pathname = usePathname();
-  return pathname === '/dcfp' ? <Link href="/dcfp/orders">Open the order queue</Link> : null;
+  return pathname === '/dcfp' ? <Link href="/dcfp/stockouts">Open the stockouts</Link> : null;
 }
 
 function renderShell() {
@@ -44,12 +44,12 @@ describe('AppShell', () => {
     const user = userEvent.setup();
     renderShell();
 
-    await user.click(screen.getByRole('link', { name: 'Open the order queue' }));
+    await user.click(screen.getByRole('link', { name: 'Open the stockouts' }));
 
     await waitFor(() => {
       expect(screen.getByRole('main')).toHaveFocus();
     });
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Orders');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Stockout notifications');
   });
 
   it('leaves focus on a sidebar link that stays on screen', async () => {

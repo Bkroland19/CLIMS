@@ -1,4 +1,6 @@
 import { Bell } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -14,6 +16,17 @@ export interface AppNotification {
   meta: string;
   /** Sets the colour of the dot beside it. */
   tone: StatusTone;
+  /** False once read; read notifications stay listed but leave the count. Defaults to unread. */
+  unread?: boolean;
+  /** The screen it opens, if it has one. */
+  href?: string;
+}
+
+/** What the bell can do with the feed, when the feed supports it. */
+export interface NotificationActions {
+  /** Called when a notification is opened, e.g. to mark it read. */
+  onOpen: (notification: AppNotification) => void;
+  onMarkAllRead: () => void;
 }
 
 const DOT_CLASSES: Record<StatusTone, string> = {
@@ -34,6 +47,7 @@ interface NotificationsBellProps {
    * than claiming there is nothing new.
    */
   notifications?: readonly AppNotification[];
+  actions?: NotificationActions;
 }
 
 /**
@@ -42,12 +56,14 @@ interface NotificationsBellProps {
  * Usage: `<NotificationsBell notifications={items} />`. Leave `notifications`
  * out while no feed exists.
  */
-export function NotificationsBell({ notifications }: NotificationsBellProps) {
-  const count = notifications?.length ?? 0;
+export function NotificationsBell({ notifications, actions }: NotificationsBellProps) {
+  const [open, setOpen] = useState(false);
+  const count = notifications?.filter((notification) => notification.unread !== false).length ?? 0;
   const countLabel = count > MAX_COUNT ? `${MAX_COUNT}+` : String(count);
+  const isEmpty = notifications?.length === 0;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -73,33 +89,82 @@ export function NotificationsBell({ notifications }: NotificationsBellProps) {
       >
         <div className="flex items-center justify-between border-b px-3 py-3.5">
           <h2 className="text-sm font-semibold">Notifications</h2>
-          <span className="text-muted-foreground text-xs">In-app</span>
+          {actions && count > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={actions.onMarkAllRead}
+            >
+              Mark all read
+            </Button>
+          ) : (
+            <span className="text-muted-foreground text-xs">In-app</span>
+          )}
         </div>
         {notifications === undefined ? (
           <p className="text-muted-foreground px-4 py-8 text-center text-sm text-pretty">
             Notifications are not connected yet.
           </p>
-        ) : count === 0 ? (
+        ) : isEmpty ? (
           <p className="text-muted-foreground px-4 py-8 text-center text-sm">
             You&apos;re all caught up.
           </p>
         ) : (
           <ul className="max-h-[min(28rem,70vh)] overflow-y-auto">
-            {notifications.map((notification) => (
-              <li key={notification.id} className="flex gap-3 border-b px-3 py-3 last:border-b-0">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'mt-1.5 size-2 shrink-0 rounded-full',
-                    DOT_CLASSES[notification.tone],
+            {notifications.map((notification) => {
+              const read = notification.unread === false;
+              const content = (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'mt-1.5 size-2 shrink-0 rounded-full',
+                      read ? 'bg-border' : DOT_CLASSES[notification.tone],
+                    )}
+                  />
+                  <div className="min-w-0">
+                    {read ? null : <span className="sr-only">Unread:</span>}
+                    <p
+                      className={cn(
+                        'text-sm leading-snug text-pretty',
+                        read && 'text-muted-foreground',
+                      )}
+                    >
+                      {notification.text}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">{notification.meta}</p>
+                  </div>
+                </>
+              );
+              const openItem = () => {
+                actions?.onOpen(notification);
+                setOpen(false);
+              };
+              return (
+                <li key={notification.id} className="border-b last:border-b-0">
+                  {notification.href ? (
+                    <Link
+                      href={notification.href}
+                      onClick={openItem}
+                      className="hover:bg-accent focus-visible:bg-accent flex gap-3 px-3 py-3 outline-none"
+                    >
+                      {content}
+                    </Link>
+                  ) : actions && !read ? (
+                    <button
+                      type="button"
+                      onClick={openItem}
+                      className="hover:bg-accent focus-visible:bg-accent flex w-full gap-3 px-3 py-3 text-left outline-none"
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <div className="flex gap-3 px-3 py-3">{content}</div>
                   )}
-                />
-                <div className="min-w-0">
-                  <p className="text-sm leading-snug text-pretty">{notification.text}</p>
-                  <p className="text-muted-foreground mt-1 text-xs">{notification.meta}</p>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </PopoverContent>

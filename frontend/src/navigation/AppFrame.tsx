@@ -7,7 +7,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useCurrentUser } from '@/features/auth/hooks';
 import { useCan, useCurrentUserSync } from '@/features/auth/queries';
 import { DistrictContextProvider } from '@/features/district/DistrictContext';
-import { useDcfpCounts } from '@/features/fulfilment/useDcfpCounts';
+import { useDcfpCounts } from '@/features/dcfp/useDcfpCounts';
+import { useNotificationFeed } from '@/features/notifications/useNotificationFeed';
 import { useWarehouseCounts } from '@/features/warehouse/useWarehouseCounts';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
 
@@ -59,7 +60,9 @@ function SignedInShell({ children }: AppFrameProps) {
   const can = useCan();
   const home = useHomeWorkspace();
 
-  const dcfpCounts = useDcfpCounts(inside(pathname, '/dcfp') && accessTo(access, 'dcfp') !== null);
+  const canOpenDcfp = accessTo(access, 'dcfp') !== null;
+  const feed = useNotificationFeed(canOpenDcfp);
+  const dcfpCounts = useDcfpCounts(inside(pathname, '/dcfp') && canOpenDcfp, feed.inbox);
   const warehouseCounts = useWarehouseCounts(
     inside(pathname, '/warehouse') && accessTo(access, 'warehouse') !== null,
   );
@@ -104,6 +107,8 @@ function SignedInShell({ children }: AppFrameProps) {
         workspaces={navigation}
         storage={storage}
         counts={dcfpCounts ?? warehouseCounts}
+        notifications={feed.notifications}
+        notificationActions={feed.actions}
         fallbackTitle={fallbackTitle}
       >
         {readOnly ? <ReadOnlyNotice workspace={target.workspace} /> : null}
