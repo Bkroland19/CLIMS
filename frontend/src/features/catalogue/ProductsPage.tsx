@@ -1,138 +1,290 @@
 'use client';
 
-import { Ban, CircleCheck, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Ban, CircleCheck, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { useMemo, useRef, useState } from 'react';
 
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { RowActions } from '@/components/data-table/RowActions';
+import {
+  ROW_ACTION_SEPARATOR,
+  RowActions,
+  type RowActionItem,
+} from '@/components/data-table/RowActions';
 import { ExportButton } from '@/components/ExportButton';
+import { FilterTabs } from '@/components/FilterTabs';
 import { PageActions } from '@/components/PageActions';
-import { SampleDataNotice } from '@/components/SampleData';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { useCan } from '@/features/auth/queries';
 import { formatNumber } from '@/lib/format';
 
-import { categoryLabel, productName, type Product } from './api';
+import {
+  CATALOGUE_PERMISSION,
+  categoryLabel,
+  isComplete,
+  packLabel,
+  productName,
+  typeLabel,
+  type Product,
+} from './api';
 import { ProductFormDialog } from './ProductFormDialog';
-import { useProducts, useSetProductActive, useUnits } from './queries';
+import { useDeleteProduct, useLookups, useProducts, useSetProductActive } from './queries';
+import { activeFilters, filterFrom, statusHref, type StatusFilter } from './statusFilters';
 
-/** Condom products: one entry per brand, type and unit. NOT YET IN THE GO API (mock data). */
+const PATH = '/moh/catalogue';
+
+const FILTERS: readonly StatusFilter<Product>[] = [
+  ...activeFilters<Product>(),
+  { value: 'incomplete', label: 'Incomplete', keeps: (product) => !isComplete(product) },
+];
+
+type Dialog = { kind: 'add' } | { kind: 'edit'; product: Product } | null;
+
+/** Names a product's row actions; the pack tells apart products that differ only by unit. */
+function actionsLabel(product: Product): string {
+  const pack = packLabel(product);
+  return `Actions for ${productName(product)}${pack ? ` (${pack})` : ''}`;
+}
+
+/** Condom products: one entry per brand, category, type and unit. */
 export default function ProductsPage() {
   const products = useProducts();
-  const units = useUnits();
+  const brands = useLookups('brands');
+  const units = useLookups('units');
   const setActive = useSetProductActive();
-  const [isAdding, setIsAdding] = useState(false);
+  const deleteProduct = useDeleteProduct();
+  const can = useCan();
+  const canManage = can(CATALOGUE_PERMISSION);
+  const searchParams = useSearchParams();
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  // Each row's actions button, so a dialog opened from its menu can hand focus back to it.
+  const actionButtons = useRef(new Map<string, HTMLButtonElement>());
+
+  const filter = filterFrom(FILTERS, searchParams.get('status'));
+  const rows = useMemo(() => products.data?.filter(filter.keeps), [products.data, filter]);
+  const incomplete = products.data?.filter((product) => !isComplete(product)).length ?? 0;
+  const tabs = FILTERS.filter((option) => option.value !== 'incomplete' || incomplete > 0);
+
+  /** Sends focus back to a row's actions button as a dialog closes, if the row is still shown. */
+  function focusRowActions(productId: string, event: Event) {
+    const button = actionButtons.current.get(productId);
+    if (!button?.isConnected) return;
+    event.preventDefault();
+    button.focus();
+  }
 
   const columns = useMemo<DataTableColumn<Product>[]>(
     () => [
       {
-        id: 'product',
-        header: 'Product',
-        value: productName,
+        id: 'brand',
+        header: 'Brand',
+        value: (product) => product.brand?.name ?? null,
         cell: (product) => (
-          <div className="min-w-0">
-            <div className="truncate font-medium">{productName(product)}</div>
-            <div className="text-muted-foreground font-mono text-xs">{product.id}</div>
-          </div>
+          <span
+            className="block max-w-40 truncate font-medium sm:max-w-64"
+            title={product.brand?.name}
+          >
+            {product.brand?.name ?? '—'}
+          </span>
         ),
       },
-      { id: 'category', header: 'Category', value: (product) => categoryLabel(product.category) },
-      { id: 'unit', header: 'Unit', value: (product) => product.unit.name },
+      {
+        id: 'category',
+        header: 'Category',
+        value: (product) => (product.category ? categoryLabel(product.category) : null),
+      },
+      {
+        id: 'type',
+        header: 'Type',
+        value: (product) => (product.type ? typeLabel(product.type) : null),
+      },
+      { id: 'unit', header: 'Unit', value: (product) => product.unit?.name ?? null },
       {
         id: 'per',
         header: 'Condoms per unit',
         numeric: true,
         value: (product) => product.pieces_per_unit,
-        cell: (product) => formatNumber(product.pieces_per_unit),
-      },
-      {
-        id: 'minimum',
-        header: 'Minimum (pieces)',
-        numeric: true,
-        value: (product) => product.minimum_level,
         cell: (product) =>
-          product.minimum_level === null ? '—' : formatNumber(product.minimum_level),
+          product.pieces_per_unit === null ? '—' : formatNumber(product.pieces_per_unit),
       },
       {
         id: 'status',
         header: 'Status',
-        value: (product) => (product.active ? 'Active' : 'Inactive'),
+        value: (product) =>
+          [product.active ? 'Active' : 'Inactive', isComplete(product) ? null : 'Incomplete']
+            .filter(Boolean)
+            .join(', '),
         cell: (product) => (
-          <StatusBadge
-            status={product.active ? 'Active' : 'Inactive'}
-            tone={product.active ? 'positive' : 'neutral'}
-          />
+          <div className="flex flex-wrap gap-1.5">
+            <StatusBadge
+              status={product.active ? 'Active' : 'Inactive'}
+              tone={product.active ? 'positive' : 'neutral'}
+            />
+            {isComplete(product) ? null : <StatusBadge status="Incomplete" tone="caution" />}
+          </div>
         ),
       },
     ],
     [],
   );
 
-  const addButton = (
+  function rowActions(product: Product): RowActionItem[] {
+    const complete = isComplete(product);
+    const actions: RowActionItem[] = [
+      {
+        label: complete ? 'Edit' : 'Complete details',
+        icon: Pencil,
+        onSelect: () => {
+          setDialog({ kind: 'edit', product });
+        },
+      },
+    ];
+    if (product.active) {
+      actions.push({
+        label: 'Deactivate',
+        icon: Ban,
+        onSelect: () => {
+          setActive.mutate({ product, active: false });
+        },
+      });
+    } else if (complete) {
+      // An incomplete product is completed in the form before it can be activated.
+      actions.push({
+        label: 'Activate',
+        icon: CircleCheck,
+        onSelect: () => {
+          setActive.mutate({ product, active: true });
+        },
+      });
+    }
+    if (!product.in_use) {
+      actions.push(ROW_ACTION_SEPARATOR, {
+        label: 'Delete',
+        icon: Trash2,
+        destructive: true,
+        onSelect: () => {
+          setProductToDelete(product);
+        },
+      });
+    }
+    return actions;
+  }
+
+  const addButton = canManage ? (
     <Button
       onClick={() => {
-        setIsAdding(true);
+        setDialog({ kind: 'add' });
       }}
     >
       <Plus data-icon="inline-start" />
       Add product
     </Button>
-  );
+  ) : null;
 
+  const filtered = filter.value !== 'all';
   return (
     <div className="flex flex-col gap-4">
-      <SampleDataNotice subject="The products" />
       <PageActions>
-        <ExportButton name="Products" columns={columns} rows={products.data} />
+        <ExportButton name="Products" columns={columns} rows={rows} />
         {addButton}
       </PageActions>
+      {canManage && incomplete > 0 ? (
+        <Alert variant="warning">
+          <AlertTitle>
+            {incomplete === 1
+              ? '1 product is missing details'
+              : `${formatNumber(incomplete)} products are missing details`}
+          </AlertTitle>
+          <AlertDescription>
+            Products from the previous system can lack a brand, type, unit or pack size. Complete
+            their details before editing or reactivating them.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <FilterTabs
+        label="Filter products by status"
+        value={filter.value}
+        hrefFor={(value) => statusHref(PATH, value)}
+        tabs={tabs.map((option) => ({
+          value: option.value,
+          label: option.label,
+          ...(products.data ? { count: products.data.filter(option.keeps).length } : {}),
+        }))}
+      />
       <DataTable
         label="Products"
         columns={columns}
-        rows={products.data}
+        rows={rows}
         getRowId={(product) => product.id}
         isLoading={products.isPending}
         error={products.error}
         onRetry={() => void products.refetch()}
         isRetrying={products.isRefetching}
         searchPlaceholder="Search products…"
-        emptyTitle="No products yet"
-        emptyDescription="Add the condom products that are stocked, ordered and distributed."
-        emptyAction={addButton}
-        rowActions={(product) => (
-          <RowActions
-            label={`Actions for ${product.id}`}
-            actions={[
-              product.active
-                ? {
-                    label: 'Deactivate',
-                    icon: Ban,
-                    destructive: true,
-                    onSelect: () => {
-                      setActive.mutate({ id: product.id, active: false });
-                    },
-                  }
-                : {
-                    label: 'Activate',
-                    icon: CircleCheck,
-                    onSelect: () => {
-                      setActive.mutate({ id: product.id, active: true });
-                    },
-                  },
-            ]}
-          />
-        )}
+        emptyTitle={filtered ? `No ${filter.label.toLowerCase()} products` : 'No products yet'}
+        emptyDescription={
+          filtered
+            ? 'Choose All to see every product.'
+            : 'Add the condom products that are stocked, ordered and distributed.'
+        }
+        emptyAction={filtered ? undefined : addButton}
+        rowActions={
+          canManage
+            ? (product) => (
+                <RowActions
+                  label={actionsLabel(product)}
+                  triggerRef={(button) => {
+                    if (button) actionButtons.current.set(product.id, button);
+                    else actionButtons.current.delete(product.id);
+                  }}
+                  actions={rowActions(product)}
+                />
+              )
+            : undefined
+        }
       />
-      {isAdding ? (
+      {dialog ? (
         <ProductFormDialog
-          units={units.data}
-          isLoadingUnits={units.isPending}
-          unitsError={units.error}
+          key={dialog.kind === 'edit' ? dialog.product.id : 'add'}
+          product={dialog.kind === 'edit' ? dialog.product : undefined}
+          brands={brands}
+          units={units}
           onClose={() => {
-            setIsAdding(false);
+            setDialog(null);
           }}
+          onCloseAutoFocus={
+            dialog.kind === 'edit'
+              ? (event) => {
+                  focusRowActions(dialog.product.id, event);
+                }
+              : undefined
+          }
         />
       ) : null}
+      <ConfirmDialog
+        open={productToDelete !== null}
+        onOpenChange={(open) => {
+          if (open) return;
+          setProductToDelete(null);
+          deleteProduct.reset();
+        }}
+        title={productToDelete ? `Delete ${productName(productToDelete)}?` : 'Delete product?'}
+        description="It is removed from the catalogue for good. This cannot be undone."
+        confirmLabel="Delete product"
+        isPending={deleteProduct.isPending}
+        error={deleteProduct.error}
+        onConfirm={() => {
+          if (!productToDelete) return;
+          deleteProduct.mutate(productToDelete, {
+            onSuccess: () => {
+              setProductToDelete(null);
+            },
+          });
+        }}
+      />
     </div>
   );
 }

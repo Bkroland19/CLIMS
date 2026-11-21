@@ -72,11 +72,12 @@ export function userRoleLabels(user: Pick<User, 'roles' | 'role'>): string[] {
 }
 
 /*
- * Every permission the Go API defines (its migrations 2, 6, 8 and 13), worded
+ * Every permission the Go API defines (its migrations 2, 6, 8, 13 and 17), worded
  * from the server's own descriptions. "Assigned" store, hotspot or district
  * means the one on the user's account; the `all_*` codes lift that limit.
  */
 const PERMISSION_LABELS: Readonly<Record<string, string>> = {
+  'catalogue:manage': 'Create, edit and retire condom products, brands and units of measure',
   'users:read': 'List users and view user accounts',
   'users:create': 'Create user accounts',
   'users:update': 'Activate or disable user accounts',
@@ -101,6 +102,7 @@ const PERMISSION_LABELS: Readonly<Record<string, string>> = {
 };
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
+  catalogue: 'Catalogue',
   users: 'Users',
   roles: 'Roles',
   orders: 'Orders',

@@ -2,14 +2,14 @@
  * MOH administration resources for the mock API: users, roles and
  * permissions, the product catalogue, stores, geography and the audit log.
  *
- * Users, roles and permissions mirror the Go API exactly
- * (`backend/internal/features/{users,rbac}`): the same paths, UUID ids, the
- * `{ users, limit, offset }` page, role objects with permission codes, and
- * validation failures reported under Go field names
- * (`{ "Username": "failed on validation rule: min" }`).
+ * Users, roles, permissions and the catalogue mirror the Go API exactly
+ * (`backend/internal/features/{users,rbac,catalogue}`): the same paths, UUID ids,
+ * the `{ users, limit, offset }` page, role objects with permission codes, and
+ * validation failures under JSON field names with the validator's messages
+ * (`{ "username": "Use at least 3 characters." }`).
  *
- * The catalogue, stores, geography and audit log are NOT YET IN THE GO API.
- * Their paths and shapes are the contract in `src/features/{catalogue,stores,audit}/api.ts`
+ * Stores, geography and the audit log are NOT YET IN THE GO API.
+ * Their paths and shapes are the contract in `src/features/{stores,audit}/api.ts`
  * (Phase 7 of `design/IMPLEMENTATION_PLAN.md`). Replies use the Go API's
  * `{ success, data }` envelope and `{ success: false, message, error }` failures.
  */
@@ -42,21 +42,32 @@ interface User {
   created_at: string;
 }
 
-interface Unit {
+/** A brand or a unit of measure (`catalogue.Lookup` in the Go API). */
+interface Lookup {
   id: string;
   name: string;
   note: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
+type ProductCategory = 'male' | 'female';
+type ProductType = 'free' | 'socially_marketed' | 'commercial';
+
+/** A product as stored. Legacy products may lack any of the nullable fields. */
 interface Product {
   id: string;
-  category: 'male' | 'female';
-  brand: string;
-  type: string;
-  unit_id: string;
-  pieces_per_unit: number;
-  minimum_level: number | null;
+  category: ProductCategory | null;
+  type: ProductType | null;
+  brand_id: string | null;
+  unit_id: string | null;
+  pieces_per_unit: number | null;
   active: boolean;
+  /** Stands in for orders and stock records that reference the product. */
+  referenced: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Store {
@@ -128,6 +139,7 @@ const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).
 
 /** The Go API's permission catalogue, in the order `GET /permissions` lists it. */
 export const PERMISSIONS = [
+  'catalogue:manage',
   'hotspots:activate',
   'hotspots:all_districts',
   'hotspots:read',
@@ -153,7 +165,7 @@ export const PERMISSIONS = [
 
 const ROLE_SEED: readonly [string, string[]][] = [
   ['admin', PERMISSIONS],
-  ['moh', ['users:read', 'roles:read']],
+  ['moh', ['catalogue:manage', 'users:read', 'roles:read']],
   ['nms', []],
   ['jms', []],
   ['dfcp', ['users:read']],
@@ -270,16 +282,41 @@ function seedUsers(dataset: string): User[] {
   ];
 }
 
-function seedUnits(dataset: string): Unit[] {
+const BRAND = (n: number) => uuid(21, n);
+const UNIT = (n: number) => uuid(22, n);
+
+function lookup(id: string, name: string, note: string | null, active = true, age = 400): Lookup {
+  return { id, name, note, active, created_at: daysAgo(age), updated_at: daysAgo(age / 2) };
+}
+
+function seedBrands(dataset: string): Lookup[] {
+  if (dataset === 'empty') return [];
+  const rows = [
+    lookup(BRAND(1), 'Engabu', 'Free public-sector brand'),
+    lookup(BRAND(2), 'FC2', 'Female condom'),
+    lookup(BRAND(3), 'Protector Plus', 'Socially marketed'),
+    lookup(BRAND(4), 'Trust', null),
+    lookup(BRAND(5), 'Lifeguard', 'No longer supplied', false),
+  ];
+  if (dataset === 'worst') {
+    rows.unshift(
+      lookup(
+        BRAND(99),
+        'A brand name long enough to fill the whole sixty-character li',
+        'x'.repeat(120),
+      ),
+    );
+  }
+  return rows;
+}
+
+function seedUnits(dataset: string): Lookup[] {
   if (dataset === 'empty') return [];
   return [
-    {
-      id: 'unit-piece',
-      name: 'Piece',
-      note: 'A single condom. Every order and stock count uses this.',
-    },
-    { id: 'unit-box', name: 'Box', note: 'Retail box' },
-    { id: 'unit-carton', name: 'Carton', note: 'Shipping carton from the warehouse' },
+    lookup(UNIT(1), 'Piece', 'A single condom. Every order and stock count uses this.'),
+    lookup(UNIT(2), 'Box', 'Retail box'),
+    lookup(UNIT(3), 'Carton', 'Shipping carton from the warehouse'),
+    lookup(UNIT(4), 'Strip', 'Retired in favour of boxes', false),
   ];
 }
 
@@ -287,44 +324,38 @@ function seedProducts(dataset: string): Product[] {
   if (dataset === 'empty') return [];
   const product = (
     n: number,
-    category: Product['category'],
-    brand: string,
-    unit_id: string,
-    pieces_per_unit: number,
-    minimum_level: number | null,
-    active = true,
-    type = 'Standard',
+    category: ProductCategory | null,
+    type: ProductType | null,
+    brand: number | null,
+    unit: number | null,
+    pieces_per_unit: number | null,
+    { active = true, referenced = false } = {},
   ): Product => ({
-    id: `CND-${String(n).padStart(3, '0')}`,
+    id: uuid(20, n),
     category,
-    brand,
     type,
-    unit_id,
+    brand_id: brand === null ? null : BRAND(brand),
+    unit_id: unit === null ? null : UNIT(unit),
     pieces_per_unit,
-    minimum_level,
     active,
+    referenced,
+    created_at: daysAgo(300 - n),
+    updated_at: daysAgo(100 - n),
   });
   const rows = [
-    product(1, 'male', 'Engabu', 'unit-piece', 1, 5000),
-    product(2, 'male', 'Engabu', 'unit-box', 144, null),
-    product(3, 'male', 'Engabu', 'unit-carton', 4320, null),
-    product(4, 'female', 'FC2', 'unit-piece', 1, 500),
-    product(5, 'female', 'FC2', 'unit-box', 100, null),
-    product(6, 'male', 'Protector Plus', 'unit-piece', 1, null, false, 'Studded'),
+    product(1, 'male', 'free', 1, 1, 1, { referenced: true }),
+    product(2, 'male', 'free', 1, 2, 144, { referenced: true }),
+    product(3, 'male', 'free', 1, 3, 4320),
+    product(4, 'female', 'free', 2, 1, 1, { referenced: true }),
+    product(5, 'female', 'free', 2, 2, 100),
+    product(6, 'male', 'socially_marketed', 3, 1, 1, { active: false }),
+    // Converted from the legacy system: no unit or pack size, so it must be completed.
+    product(7, 'male', 'commercial', 4, null, null, { referenced: true }),
+    // Legacy with an unrecognised category and type, so it was deactivated.
+    product(8, null, null, 4, null, null, { active: false, referenced: true }),
   ];
   if (dataset === 'worst') {
-    rows.unshift(
-      product(
-        99,
-        'female',
-        'A brand name long enough to wrap the cell several',
-        'unit-carton',
-        99999,
-        9999999,
-        true,
-        'Ultra-thin extra-lubricated',
-      ),
-    );
+    rows.unshift(product(99, 'female', 'socially_marketed', 99, 3, 99_999));
   }
   return rows;
 }
@@ -710,7 +741,8 @@ const state = {
   users: [] as User[],
   mySessions: [] as DeviceSession[],
   userSessions: new Map<string, DeviceSession[]>(),
-  units: [] as Unit[],
+  brands: [] as Lookup[],
+  units: [] as Lookup[],
   products: [] as Product[],
   stores: [] as Store[],
   geography: seedGeography('demo'),
@@ -723,6 +755,7 @@ export function seedAdmin(dataset: string): void {
   state.users = seedUsers(dataset);
   state.mySessions = seedMySessions(dataset);
   state.userSessions = seedUserSessions(state.users, dataset);
+  state.brands = seedBrands(dataset);
   state.units = seedUnits(dataset);
   state.products = seedProducts(dataset);
   state.stores = seedStores(dataset);
@@ -783,31 +816,33 @@ const adminRoleId = () => state.roles.find((role) => role.name === 'admin')?.id 
 const activeAdmins = () =>
   state.users.filter((user) => user.status === 'active' && user.role_ids.includes(adminRoleId()));
 
-/** Mirrors `validator.Validate.Struct` on `CreateUserRequest`. */
+/** Mirrors `validator.Validate.Struct` on `CreateUserRequest` and its messages. */
 function validateNewUser(body: Body): Record<string, string> {
   const errors: Record<string, string> = {};
-  const rule = (field: string, tag: string) => {
-    errors[field] ??= `failed on validation rule: ${tag}`;
+  const report = (field: string, message: string) => {
+    errors[field] ??= message;
   };
+  const required = 'This field is required.';
   const username = text(body.username).trim();
   const email = text(body.email).trim();
   const password = text(body.password);
-  if (!username) rule('Username', 'required');
-  else if (username.length < 3) rule('Username', 'min');
-  else if (username.length > 50) rule('Username', 'max');
-  if (!email) rule('Email', 'required');
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) rule('Email', 'email');
-  else if (email.length > 255) rule('Email', 'max');
-  if (!password) rule('Password', 'required');
-  else if (password.length < 8) rule('Password', 'min');
-  else if (password.length > 72) rule('Password', 'max');
-  if (text(body.firstname).length > 20) rule('Firstname', 'max');
-  if (text(body.lastname).length > 20) rule('Lastname', 'max');
-  if (text(body.phone_number).length > 15) rule('Phone', 'max');
+  if (!username) report('username', required);
+  else if (username.length < 3) report('username', 'Use at least 3 characters.');
+  else if (username.length > 50) report('username', 'Use at most 50 characters.');
+  if (!email) report('email', required);
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    report('email', 'Enter a valid email address, e.g. name@example.org.');
+  else if (email.length > 255) report('email', 'Use at most 255 characters.');
+  if (!password) report('password', required);
+  else if (password.length < 8) report('password', 'Use at least 8 characters.');
+  else if (password.length > 72) report('password', 'Use at most 72 characters.');
+  if (text(body.firstname).length > 20) report('firstname', 'Use at most 20 characters.');
+  if (text(body.lastname).length > 20) report('lastname', 'Use at most 20 characters.');
+  if (text(body.phone_number).length > 15) report('phone_number', 'Use at most 15 characters.');
   const roleIds = body.role_ids;
   if (roleIds !== undefined && roleIds !== null) {
-    if (!Array.isArray(roleIds) || roleIds.length < 1) rule('RoleIDs', 'min');
-    else if (!roleIds.every(isUuid)) rule('RoleIDs', 'uuid_rfc4122');
+    if (!Array.isArray(roleIds) || roleIds.length < 1) report('role_ids', 'Choose at least 1.');
+    else if (!roleIds.every(isUuid)) report('role_ids', 'Choose a valid item from the list.');
   }
   return errors;
 }
@@ -880,9 +915,11 @@ function handleUsers(
   if (sub === 'roles' && method === 'PUT') {
     const roleIds = body.role_ids;
     if (!Array.isArray(roleIds))
-      return fail(422, 'validation failed', { RoleIDs: 'failed on validation rule: required' });
+      return fail(422, 'validation failed', { role_ids: 'This field is required.' });
     if (!roleIds.every(isUuid))
-      return fail(422, 'validation failed', { RoleIDs: 'failed on validation rule: uuid_rfc4122' });
+      return fail(422, 'validation failed', {
+        role_ids: 'Choose a valid item from the list.',
+      });
     const ids = roleIds.filter((value): value is string => typeof value === 'string');
     if (!ids.every((value) => state.roles.some((role) => role.id === value)))
       return fail(422, 'unknown role');
@@ -920,7 +957,7 @@ function handleUsers(
   if (sub === 'status' && method === 'PATCH') {
     const status = body.status;
     if (status !== 'active' && status !== 'disabled') {
-      return fail(422, 'validation failed', { Status: 'failed on validation rule: oneof' });
+      return fail(422, 'validation failed', { status: 'Choose one of: active, disabled.' });
     }
     if (
       status === 'disabled' &&
@@ -971,114 +1008,330 @@ function handleRoles(
   return ok(null);
 }
 
-// ---------------------------------------------------------------- catalogue (NOT YET IN THE GO API)
+// ---------------------------------------------------------------- catalogue (Go shapes)
+
+/** A success with only a message, as the Go API sends for a delete. */
+const done = (message: string): Reply => ({ status: 200, body: { success: true, message } });
+
+const LOOKUP_RULES = {
+  brands: {
+    min: 1,
+    max: 60,
+    noun: 'brand',
+    title: 'Brand',
+    inUse: 'This brand is used by products. Deactivate it instead.',
+    missing: 'Choose an existing brand.',
+    inactive: 'This brand is inactive. Choose an active brand.',
+  },
+  units: {
+    min: 2,
+    max: 40,
+    noun: 'unit of measure',
+    title: 'Unit of measure',
+    inUse: 'This unit of measure is used by products, stock or orders. Deactivate it instead.',
+    missing: 'Choose an existing unit of measure.',
+    inactive: 'This unit of measure is inactive. Choose an active unit.',
+  },
+} as const;
+
+type LookupKind = keyof typeof LOOKUP_RULES;
+
+const ref = (list: readonly Lookup[], id: string | null) => {
+  const found = id ? list.find((candidate) => candidate.id === id) : undefined;
+  return found ? { id: found.id, name: found.name } : null;
+};
 
 function productView(product: Product) {
-  const unit = state.units.find((candidate) => candidate.id === product.unit_id);
-  const { unit_id, ...rest } = product;
-  return { ...rest, unit: { id: unit_id, name: unit?.name ?? unit_id } };
-}
-
-function unitView(unit: Unit) {
+  const { brand_id, unit_id, referenced, ...rest } = product;
   return {
-    ...unit,
-    product_count: state.products.filter((product) => product.unit_id === unit.id).length,
+    ...rest,
+    brand: ref(state.brands, brand_id),
+    unit: ref(state.units, unit_id),
+    in_use: referenced,
   };
 }
 
-const wholeNumber = (value: unknown, min: number, max: number): number | null =>
-  typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
-    ? value
-    : null;
+function lookupView(kind: LookupKind, row: Lookup) {
+  const column = kind === 'brands' ? 'brand_id' : 'unit_id';
+  const product_count = state.products.filter((product) => product[column] === row.id).length;
+  return { ...row, in_use: product_count > 0, product_count };
+}
+
+const label = (value: string | null) => (value ?? '').toLowerCase();
+
+function sortedProducts(rows: readonly Product[]) {
+  return rows
+    .map(productView)
+    .sort(
+      (a, b) =>
+        label(a.category).localeCompare(label(b.category)) ||
+        label(a.brand?.name ?? null).localeCompare(label(b.brand?.name ?? null)) ||
+        label(a.type).localeCompare(label(b.type)),
+    );
+}
+
+/** ?active=true|false, or null for everything; undefined when invalid. */
+function activeParam(query: URLSearchParams): boolean | null | undefined {
+  const value = query.get('active');
+  if (value === null || value === '') return null;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+/** True when the body carries only the given fields, as the Go decoder requires. */
+const onlyFields = (body: Body, fields: readonly string[]) =>
+  Object.keys(body).every((key) => fields.includes(key));
+
+const PRODUCT_FIELDS = ['category', 'type', 'brand_id', 'unit_id', 'pieces_per_unit'] as const;
+
+interface ProductFields {
+  category: unknown;
+  type: unknown;
+  brand_id: unknown;
+  unit_id: unknown;
+  pieces_per_unit: unknown;
+}
+
+/** Mirrors `ProductFields.validate` and its messages. */
+function validateProduct(fields: ProductFields): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const isBlank = (value: unknown) => value === null || value === undefined || value === '';
+  const lower = (value: unknown) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value;
+  const category = lower(fields.category);
+  const type = lower(fields.type);
+  if (isBlank(category)) errors.category = 'Choose a category.';
+  else if (category !== 'male' && category !== 'female') errors.category = 'Choose male or female.';
+  if (isBlank(type)) errors.type = 'Choose a type.';
+  else if (type !== 'free' && type !== 'socially_marketed' && type !== 'commercial')
+    errors.type = 'Choose free, socially marketed or commercial.';
+  if (isBlank(fields.brand_id)) errors.brand_id = 'Choose a brand.';
+  else if (!isUuid(fields.brand_id)) errors.brand_id = 'Choose a brand from the list.';
+  if (isBlank(fields.unit_id)) errors.unit_id = 'Choose a unit of measure.';
+  else if (!isUuid(fields.unit_id)) errors.unit_id = 'Choose a unit of measure from the list.';
+  const pieces = fields.pieces_per_unit;
+  if (isBlank(pieces)) errors.pieces_per_unit = 'Enter how many condoms one unit holds.';
+  else if (typeof pieces !== 'number' || !Number.isInteger(pieces))
+    errors.pieces_per_unit = 'Check this value.';
+  else if (pieces < 1) errors.pieces_per_unit = 'Must be at least 1.';
+  else if (pieces > 100_000) errors.pieces_per_unit = 'Must be at most 100,000.';
+  return errors;
+}
+
+/** Mirrors `checkReference`: a newly chosen brand or unit must exist and be active. */
+function checkReference(
+  kind: LookupKind,
+  field: string,
+  id: unknown,
+  current: string | null,
+  errors: Record<string, string>,
+) {
+  if (typeof id !== 'string' || id === current || errors[field]) return;
+  const found = state[kind].find((candidate) => candidate.id === id);
+  if (!found) errors[field] = LOOKUP_RULES[kind].missing;
+  else if (!found.active) errors[field] = LOOKUP_RULES[kind].inactive;
+}
+
+function describeProduct(product: Product): string {
+  const view = productView(product);
+  return [view.brand?.name, view.category, view.type].filter(Boolean).join(' · ') || product.id;
+}
+
+function handleProducts(
+  method: string,
+  id: string | undefined,
+  body: Body,
+  query: URLSearchParams,
+): Reply {
+  if (!id) {
+    if (method === 'GET') {
+      const active = activeParam(query);
+      if (active === undefined) return fail(400, 'active must be true or false');
+      return ok(
+        sortedProducts(state.products.filter((row) => active === null || row.active === active)),
+      );
+    }
+    if (method !== 'POST') return fail(405, 'Method not allowed');
+    if (!onlyFields(body, PRODUCT_FIELDS)) return fail(400, 'invalid request body');
+    const errors = validateProduct(body as unknown as ProductFields);
+    if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
+    checkReference('brands', 'brand_id', body.brand_id, null, errors);
+    checkReference('units', 'unit_id', body.unit_id, null, errors);
+    if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
+    state.nextId += 1;
+    const now = new Date().toISOString();
+    const product: Product = {
+      id: uuid(20, state.nextId),
+      category: text(body.category).trim().toLowerCase() as ProductCategory,
+      type: text(body.type).trim().toLowerCase() as ProductType,
+      brand_id: text(body.brand_id),
+      unit_id: text(body.unit_id),
+      pieces_per_unit: body.pieces_per_unit as number,
+      active: true,
+      referenced: false,
+      created_at: now,
+      updated_at: now,
+    };
+    state.products.push(product);
+    record('created', 'product', describeProduct(product), 'Added to the catalogue');
+    return ok(productView(product), 201);
+  }
+
+  const index = state.products.findIndex((candidate) => candidate.id === id);
+  const product = state.products[index];
+  if (!product) return fail(404, 'Product not found.');
+  if (method === 'DELETE') {
+    if (product.referenced)
+      return fail(409, 'This product is used by stock or order records. Deactivate it instead.');
+    state.products.splice(index, 1);
+    record('deleted', 'product', describeProduct(product), 'Deleted from the catalogue');
+    return done('product deleted');
+  }
+  if (method !== 'PATCH') return fail(405, 'Method not allowed');
+  if (!onlyFields(body, [...PRODUCT_FIELDS, 'active'])) return fail(400, 'invalid request body');
+  if (Object.keys(body).length === 0) return fail(400, 'Send at least one field to change.');
+  const changesFields = PRODUCT_FIELDS.some(
+    (field) => body[field] !== undefined && body[field] !== null,
+  );
+  const nextActive = typeof body.active === 'boolean' ? body.active : product.active;
+  const merged: ProductFields = {
+    category: body.category ?? product.category,
+    type: body.type ?? product.type,
+    brand_id: body.brand_id ?? product.brand_id,
+    unit_id: body.unit_id ?? product.unit_id,
+    pieces_per_unit: body.pieces_per_unit ?? product.pieces_per_unit,
+  };
+  // Deactivating alone is always allowed; anything else needs a complete product.
+  if (changesFields || (nextActive && !product.active)) {
+    const errors = validateProduct(merged);
+    checkReference('brands', 'brand_id', body.brand_id, product.brand_id, errors);
+    checkReference('units', 'unit_id', body.unit_id, product.unit_id, errors);
+    if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
+    product.category = text(merged.category).trim().toLowerCase() as ProductCategory;
+    product.type = text(merged.type).trim().toLowerCase() as ProductType;
+    product.brand_id = text(merged.brand_id);
+    product.unit_id = text(merged.unit_id);
+    product.pieces_per_unit = merged.pieces_per_unit as number;
+  }
+  if (product.active !== nextActive) {
+    record(
+      'updated',
+      'product',
+      describeProduct(product),
+      nextActive ? 'Activated' : 'Deactivated',
+      [{ field: 'active', old: String(product.active), new: String(nextActive) }],
+    );
+  } else if (changesFields) {
+    record('updated', 'product', describeProduct(product), 'Edited');
+  }
+  product.active = nextActive;
+  product.updated_at = new Date().toISOString();
+  return ok(productView(product));
+}
+
+/** Mirrors the Go lookup rules: a trimmed, unique name and an optional note. */
+function validateLookup(
+  kind: LookupKind,
+  name: string,
+  note: string | null,
+): Record<string, string> {
+  const { min, max } = LOOKUP_RULES[kind];
+  const errors: Record<string, string> = {};
+  if (!name) errors.name = 'Enter a name.';
+  else if (name.length < min) errors.name = `Use at least ${String(min)} characters.`;
+  else if (name.length > max) errors.name = `Use at most ${String(max)} characters.`;
+  if (note !== null && note.length > 120) errors.note = 'Use at most 120 characters.';
+  return errors;
+}
+
+const collapse = (value: unknown) => text(value).trim().split(/\s+/).filter(Boolean).join(' ');
+
+function duplicateName(kind: LookupKind, name: string, exceptId?: string): Reply | null {
+  const taken = state[kind].some(
+    (row) => row.id !== exceptId && row.name.toLowerCase() === name.toLowerCase(),
+  );
+  if (!taken) return null;
+  const message = `A ${LOOKUP_RULES[kind].noun} with this name already exists.`;
+  return fail(409, message, { name: message });
+}
+
+function handleLookups(
+  kind: LookupKind,
+  method: string,
+  id: string | undefined,
+  body: Body,
+  query: URLSearchParams,
+): Reply {
+  const rules = LOOKUP_RULES[kind];
+  const list = state[kind];
+  if (!id) {
+    if (method === 'GET') {
+      const active = activeParam(query);
+      if (active === undefined) return fail(400, 'active must be true or false');
+      return ok(
+        list
+          .filter((row) => active === null || row.active === active)
+          .map((row) => lookupView(kind, row))
+          .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
+      );
+    }
+    if (method !== 'POST') return fail(405, 'Method not allowed');
+    if (!onlyFields(body, ['name', 'note'])) return fail(400, 'invalid request body');
+    const name = collapse(body.name);
+    const note = text(body.note).trim() || null;
+    const errors = validateLookup(kind, name, note);
+    if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
+    const duplicate = duplicateName(kind, name);
+    if (duplicate) return duplicate;
+    state.nextId += 1;
+    const row = lookup(uuid(kind === 'brands' ? 21 : 22, state.nextId), name, note, true, 0);
+    row.created_at = row.updated_at = new Date().toISOString();
+    list.push(row);
+    if (kind === 'units') record('created', 'unit', name, `Added unit of measure “${name}”`);
+    return ok(lookupView(kind, row), 201);
+  }
+
+  const index = list.findIndex((candidate) => candidate.id === id);
+  const row = list[index];
+  if (!row) return fail(404, `${rules.title} not found.`);
+  if (method === 'DELETE') {
+    if (lookupView(kind, row).in_use) return fail(409, rules.inUse);
+    list.splice(index, 1);
+    if (kind === 'units') record('deleted', 'unit', row.name, 'Deleted unit of measure');
+    return done(`${rules.noun} deleted`);
+  }
+  if (method !== 'PATCH') return fail(405, 'Method not allowed');
+  if (!onlyFields(body, ['name', 'note', 'active'])) return fail(400, 'invalid request body');
+  if (Object.keys(body).length === 0) return fail(400, 'Send at least one field to change.');
+  const name = body.name === undefined ? row.name : collapse(body.name);
+  const note = body.note === undefined ? row.note : text(body.note).trim() || null;
+  if (body.name !== undefined || body.note !== undefined) {
+    const errors = validateLookup(kind, name, note);
+    if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
+    const duplicate = duplicateName(kind, name, row.id);
+    if (duplicate) return duplicate;
+  }
+  if (kind === 'units' && (name !== row.name || body.active !== undefined)) {
+    record('updated', 'unit', name, 'Edited unit of measure');
+  }
+  row.name = name;
+  row.note = note;
+  if (typeof body.active === 'boolean') row.active = body.active;
+  row.updated_at = new Date().toISOString();
+  return ok(lookupView(kind, row));
+}
 
 function handleCatalogue(
   method: string,
   kind: string | undefined,
   id: string | undefined,
   body: Body,
+  query: URLSearchParams,
 ): Reply {
-  if (kind === 'units') {
-    if (id) return fail(405, 'Method not allowed');
-    if (method === 'GET') return ok(state.units.map(unitView));
-    if (method !== 'POST') return fail(405, 'Method not allowed');
-    const name = text(body.name).trim();
-    const note = text(body.note).trim();
-    const errors: Record<string, string> = {};
-    if (name.length < 2) errors.name = 'Use at least 2 characters.';
-    else if (name.length > 40) errors.name = 'Use at most 40 characters.';
-    if (note.length > 120) errors.note = 'Use at most 120 characters.';
-    if (Object.keys(errors).length > 0) return fail(422, 'validation failed', errors);
-    if (state.units.some((unit) => unit.name.toLowerCase() === name.toLowerCase())) {
-      return fail(409, 'A unit with this name already exists.', {
-        name: 'A unit with this name already exists.',
-      });
-    }
-    state.nextId += 1;
-    const unit: Unit = { id: `unit-${state.nextId}`, name, note: note || null };
-    state.units.push(unit);
-    record('created', 'unit', name, `Added unit of measure “${name}”`);
-    return ok(unitView(unit), 201);
-  }
-
-  if (kind !== 'products') return fail(404, 'Not found');
-  if (!id) {
-    if (method === 'GET') return ok(state.products.map(productView));
-    if (method !== 'POST') return fail(405, 'Method not allowed');
-    const errors: Record<string, string> = {};
-    const brand = text(body.brand).trim();
-    const type = text(body.type).trim();
-    if (body.category !== 'male' && body.category !== 'female')
-      errors.category = 'Choose a category.';
-    if (!brand || brand.length > 60) errors.brand = 'Enter a brand of at most 60 characters.';
-    if (!type || type.length > 60) errors.type = 'Enter a type of at most 60 characters.';
-    if (!state.units.some((unit) => unit.id === body.unit_id))
-      errors.unit_id = 'Choose a unit of measure.';
-    const per = wholeNumber(body.pieces_per_unit, 1, 100_000);
-    if (per === null) errors.pieces_per_unit = 'Use a whole number from 1 to 100,000.';
-    const minimum =
-      body.minimum_level === null ? null : wholeNumber(body.minimum_level, 0, 10_000_000);
-    if (body.minimum_level !== null && minimum === null)
-      errors.minimum_level = 'Use a whole number from 0 to 10,000,000.';
-    if (Object.keys(errors).length > 0 || per === null)
-      return fail(422, 'validation failed', errors);
-    state.nextId += 1;
-    const product: Product = {
-      id: `CND-${String(state.products.length + 1).padStart(3, '0')}`,
-      category: body.category === 'female' ? 'female' : 'male',
-      brand,
-      type,
-      unit_id: text(body.unit_id),
-      pieces_per_unit: per,
-      minimum_level: minimum,
-      active: true,
-    };
-    while (state.products.some((existing) => existing.id === product.id)) {
-      state.nextId += 1;
-      product.id = `CND-${state.nextId}`;
-    }
-    state.products.push(product);
-    const view = productView(product);
-    record(
-      'created',
-      'product',
-      product.id,
-      `${brand} · ${type} (${view.unit.name}, ${per} per unit)`,
-    );
-    return ok(view, 201);
-  }
-
-  const product = state.products.find((candidate) => candidate.id === id);
-  if (!product) return fail(404, 'product not found');
-  if (method !== 'PATCH') return fail(405, 'Method not allowed');
-  if (typeof body.active !== 'boolean')
-    return fail(422, 'validation failed', { active: 'Must be true or false.' });
-  if (product.active !== body.active) {
-    record('updated', 'product', product.id, body.active ? 'Activated' : 'Deactivated', [
-      { field: 'active', old: String(product.active), new: String(body.active) },
-    ]);
-    product.active = body.active;
-  }
-  return ok(productView(product));
+  if (kind === 'products') return handleProducts(method, id, body, query);
+  if (kind === 'brands' || kind === 'units') return handleLookups(kind, method, id, body, query);
+  return fail(404, 'Not found');
 }
 
 // ---------------------------------------------------------------- the signed-in user (Go shapes)
@@ -1165,7 +1418,7 @@ export function handleAdmin(
     case 'permissions':
       return method === 'GET' ? ok(PERMISSIONS) : fail(405, 'Method not allowed');
     case 'catalogue':
-      return handleCatalogue(method, first, second, body);
+      return handleCatalogue(method, first, second, body, query);
     case 'stores':
       return method === 'GET' && !first ? ok(state.stores) : fail(405, 'Method not allowed');
     case 'geography':

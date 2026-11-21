@@ -6,8 +6,9 @@ import { choose, expectToast, open } from './support/ui';
 
 /*
  * MOH administration against the mock: users, roles and permissions, the product catalogue and
- * the geography. The mock seeds 13 users, one of them (Brian Mugisha) deactivated, and six
- * products, one of them (CND-006, Protector Plus) inactive.
+ * the geography. The mock seeds 13 users, one of them (Brian Mugisha) deactivated, and eight
+ * products: Protector Plus is inactive, and two Trust products came from the legacy system
+ * without a unit or pack size (one active, one deactivated). The Lifeguard brand is unused.
  */
 
 test.beforeEach(async ({ request }) => {
@@ -148,56 +149,98 @@ test.describe('catalogue', () => {
     await page.getByRole('button', { name: 'Add product' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add a product' });
 
+    // Nothing is sent until every field is filled in.
+    await dialog.getByRole('button', { name: 'Add product' }).click();
+    await expect(dialog.getByText('Choose a brand.')).toBeVisible();
+
+    await choose(page, 'Brand', 'Protector Plus');
     await choose(page, 'Category', /^Male/);
-    await dialog.getByLabel('Brand').fill('Lifeguard');
-    await dialog.getByLabel('Type').fill('Ribbed');
-    await page.getByRole('combobox', { name: 'Unit of measure' }).click();
-    await page.getByRole('option').first().click();
+    await choose(page, 'Type', 'Socially marketed');
+    await choose(page, 'Unit of measure', 'Box');
     await dialog.getByLabel('Condoms per unit').fill('144');
-    await dialog.getByLabel('Minimum stock (pieces)').fill('2000');
     await dialog.getByRole('button', { name: 'Add product' }).click();
 
-    await expectToast(page, /Lifeguard.*added to the catalogue/);
+    await expectToast(page, 'Protector Plus · Male · Socially marketed added to the catalogue');
     await expect(dialog).toBeHidden();
-    await expect(page.getByRole('cell', { name: /Lifeguard/ }).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', {
+        name: 'Actions for Protector Plus · Male · Socially marketed (Box of 144)',
+      }),
+    ).toBeVisible();
+  });
+
+  test('completes a legacy product, then activates and deactivates products', async ({ page }) => {
+    await open(page, '/moh/catalogue', 'Product catalogue');
+    await expect(page.getByText('2 products are missing details')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Actions for Trust · Male · Commercial' }).click();
+    await page.getByRole('menuitem', { name: 'Complete details' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit Trust · Male · Commercial' });
+    await choose(page, 'Unit of measure', 'Box');
+    await dialog.getByLabel('Condoms per unit').fill('12');
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expectToast(page, 'Trust · Male · Commercial saved');
+    await expect(page.getByText('1 product is missing details')).toBeVisible();
+
+    const inactive = page.getByRole('row', { name: /Protector Plus/ });
+    await expect(inactive).toContainText('Inactive');
+    await page.getByRole('button', { name: /^Actions for Protector Plus/ }).click();
+    await page.getByRole('menuitem', { name: 'Activate' }).click();
+    await expectToast(page, 'Protector Plus · Male · Socially marketed activated');
+    await expect(inactive).not.toContainText('Inactive');
+
+    const fc2Box = 'Actions for FC2 · Female · Free (public sector) (Box of 100)';
+    await page.getByRole('button', { name: fc2Box }).click();
+    await page.getByRole('menuitem', { name: 'Deactivate' }).click();
+    await expectToast(page, 'FC2 · Female · Free (public sector) deactivated');
+
+    await page.reload();
+    await expect(inactive).not.toContainText('Inactive');
+    await page.getByRole('link', { name: /^Inactive/ }).click();
+    await expect(page.getByRole('button', { name: fc2Box })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Actions for Protector Plus/ })).toBeHidden();
+  });
+
+  test('deletes an unused brand after confirming', async ({ page }) => {
+    await open(page, '/moh/catalogue/brands', 'Brands');
+    await page.getByRole('button', { name: 'Actions for Engabu' }).click();
+    // Products use Engabu, so it can only be deactivated.
+    await expect(page.getByRole('menuitem', { name: 'Deactivate' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeHidden();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Actions for Lifeguard' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    const confirm = page.getByRole('alertdialog', { name: 'Delete Lifeguard?' });
+    await confirm.getByRole('button', { name: 'Delete brand' }).click();
+
+    await expectToast(page, 'Lifeguard deleted');
+    await expect(confirm).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Actions for Lifeguard' })).toBeHidden();
   });
 
   test('adds a unit of measure', async ({ page }) => {
     await open(page, '/moh/catalogue/units', 'Units of measure');
     await page.getByRole('button', { name: 'Add unit' }).click();
-    await expect(page.getByRole('textbox', { name: 'Unit name' })).toHaveAttribute(
+    const dialog = page.getByRole('dialog', { name: 'Add a unit' });
+    await dialog.getByRole('button', { name: 'Add unit' }).click();
+    await expect(dialog.getByRole('textbox', { name: 'Unit name' })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
 
-    await page.getByRole('textbox', { name: 'Unit name' }).fill('Dispenser pack');
-    await page.getByRole('textbox', { name: 'Note (optional)' }).fill('Refill for a dispenser');
-    await page.getByRole('button', { name: 'Add unit' }).click();
+    await dialog.getByRole('textbox', { name: 'Unit name' }).fill('BOX');
+    await dialog.getByRole('button', { name: 'Add unit' }).click();
+    await expect(
+      dialog.getByText('A unit of measure with this name already exists.'),
+    ).toBeVisible();
+
+    await dialog.getByRole('textbox', { name: 'Unit name' }).fill('Dispenser pack');
+    await dialog.getByRole('textbox', { name: 'Note (optional)' }).fill('Refill for a dispenser');
+    await dialog.getByRole('button', { name: 'Add unit' }).click();
 
     await expectToast(page, 'Dispenser pack added to units of measure');
     await expect(page.getByRole('cell', { name: /Dispenser pack/ }).first()).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Unit name' })).toHaveValue('');
-  });
-
-  test('activates and deactivates a product', async ({ page }) => {
-    await open(page, '/moh/catalogue', 'Product catalogue');
-    const inactive = page.getByRole('row', { name: /CND-006/ });
-    const active = page.getByRole('row', { name: /CND-001/ });
-    await expect(inactive).toContainText('Inactive');
-
-    await page.getByRole('button', { name: 'Actions for CND-006' }).click();
-    await page.getByRole('menuitem', { name: 'Activate' }).click();
-    await expectToast(page, 'CND-006 activated');
-    await expect(inactive).not.toContainText('Inactive');
-
-    await page.getByRole('button', { name: 'Actions for CND-001' }).click();
-    await page.getByRole('menuitem', { name: 'Deactivate' }).click();
-    await expectToast(page, 'CND-001 deactivated');
-    await expect(active).toContainText('Inactive');
-
-    await page.reload();
-    await expect(inactive).not.toContainText('Inactive');
-    await expect(active).toContainText('Inactive');
   });
 });
 
