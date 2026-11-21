@@ -85,6 +85,44 @@ const DISTRICTS_BY_REGION = [
 
 const DISTRICTS = DISTRICTS_BY_REGION.map(({ id, name }) => ({ id, name }));
 
+/**
+ * Stock-holding points as `GET /locations/stores` lists them: the two national
+ * warehouses, then one store per district, named after it as the Go API does.
+ */
+export const MOCK_STORES = [
+  {
+    id: placeId(9, 1),
+    code: 'jms',
+    name: 'Joint Medical Store',
+    store_type: 'national' as const,
+    district_id: null,
+    district_name: null,
+  },
+  {
+    id: placeId(9, 2),
+    code: 'nms',
+    name: 'National Medical Stores',
+    store_type: 'national' as const,
+    district_id: null,
+    district_name: null,
+  },
+  ...[...DISTRICTS]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((district, index) => ({
+      id: placeId(9, 10 + index),
+      code: district.name.toLowerCase(),
+      name: district.name,
+      store_type: 'district' as const,
+      district_id: district.id,
+      district_name: district.name,
+    })),
+];
+
+/** The store of the district named `name`, for seeding accounts. */
+export function mockDistrictStoreId(name: string): string | null {
+  return MOCK_STORES.find((store) => store.district_name === name)?.id ?? null;
+}
+
 const SUBCOUNTIES = [
   { id: placeId(3, 1), name: 'Makindye Ssabagabo Municipality', district_id: WAKISO },
   { id: placeId(3, 2), name: 'Katabi Town Council', district_id: WAKISO },
@@ -308,7 +346,7 @@ function listHotspots(query: URLSearchParams): Reply {
   return ok(matching.slice(offset, offset + limit));
 }
 
-/** Answers `GET /locations/regions`, `/districts?region_id=` and `/subcounties?district_id=`. */
+/** Answers `GET /locations/regions`, `/districts?region_id=`, `/subcounties?district_id=` and `/stores`. */
 function lookupLocations(kind: string | undefined, query: URLSearchParams): Reply {
   if (kind === 'regions') return ok(REGIONS);
   if (kind === 'districts') {
@@ -319,6 +357,19 @@ function lookupLocations(kind: string | undefined, query: URLSearchParams): Repl
         id,
         name,
       })),
+    );
+  }
+  if (kind === 'stores') {
+    const storeType = query.get('store_type');
+    const districtId = query.get('district_id');
+    if (storeType && storeType !== 'national' && storeType !== 'district')
+      return fail(400, 'store_type must be national or district');
+    return ok(
+      MOCK_STORES.filter(
+        (store) =>
+          (!storeType || store.store_type === storeType) &&
+          (!districtId || store.district_id === districtId),
+      ),
     );
   }
   if (kind === 'subcounties') {

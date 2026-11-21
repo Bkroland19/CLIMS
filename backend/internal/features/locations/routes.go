@@ -7,4 +7,5 @@ func RegisterRoutes(router fiber.Router, handler *Handler, jwtMiddleware, active
 	group.Get("/regions", handler.Regions)
 	group.Get("/districts", handler.Districts)
 	group.Get("/subcounties", handler.Subcounties)
+	group.Get("/stores", handler.Stores)
 }

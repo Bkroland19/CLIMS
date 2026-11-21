@@ -3,7 +3,10 @@ package orders
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
+
+	"clims-backend/internal/features/users"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -53,6 +56,19 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, con
 		return r.record(ctx, tx, order, actorID, "stockout_reported", &order.OrderedFromStoreID, nil)
 	})
 	return order, err
+}
+
+// activeInDistrictOf reports whether a hotspot is active and in the district the user works in
+// (their store's district, else their subcounty's). Inactive hotspots get no stock, so alerts for
+// them are refused (9).
+func (r *Repository) activeInDistrictOf(ctx context.Context, userID, hotSpotID string) (bool, error) {
+	var ok bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM hot_spots h WHERE h.id = $2::uuid
+		AND h.status = 'active' AND h.district_id = `+users.DistrictOfUser+`)`, userID, hotSpotID).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("check hotspot district: %w", err)
+	}
+	return ok, nil
 }
 
 func assigned(id *string, expected string) bool {

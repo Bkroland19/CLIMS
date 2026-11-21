@@ -6,6 +6,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **VHT stockout alerts for their district.** A VHT with the new `orders:stockout_district` permission can
+  raise a stockout alert for any active hotspot in the district they work in (assigned store's district,
+  or else assigned subcounty's). Inactive hotspots and other districts are refused.
+- `hotspots:read_district` lets a VHT list and view their district's active hotspots, to choose one; it
+  does not open those hotspots' comment threads.
+- Migration 21 adds the two permissions (granted to admin). Grant VHTs `hotspots:read`, `hotspots:submit`,
+  `hotspots:read_district`, `orders:stockout` and `orders:stockout_district` through the RBAC API.
 - **Web app** in `frontend/`, imported from the `LMD_FE` prototype and rebuilt on Next.js 16,
   React 19, TypeScript, Tailwind CSS 4 and shadcn/ui, themed after the SalesOps dashboard reference in light
   mode with an optional dark theme. Decisions are recorded in `docs/adr/0001-frontend-stack.md`.
@@ -29,6 +36,11 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - The catalogue screens use that API: edit, activate, deactivate and delete products, brands and
   units, a Brands tab, status filters and an Incomplete badge for legacy products.
 - Every response carries an `X-Request-ID`, which the request log records.
+- Store assignment: `GET /api/v1/locations/stores` lists the national warehouses and district
+  stores, and accounts get a store on creation or through `PATCH /api/v1/users/{id}/store`
+  (`users:update`). Migration 20 adds National Medical Stores and fills in missing stores for
+  warehouse staff, DCFPs and delivery agents. In the web app, the new-user form sets the store from
+  the role and district, and Users has a **Change store** action.
 
 ### Changed
 

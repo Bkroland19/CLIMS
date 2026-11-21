@@ -18,9 +18,11 @@ import {
  *
  *   GET    /users?limit&offset      { users, limit, offset }    users:read
  *   POST   /users                   { user_id }                 users:create + roles:assign
- *          (body may carry `hot_spot_id`: a hotspot manager's hotspot)
+ *          (body may carry `hot_spot_id`: a hotspot manager's hotspot,
+ *          and `store_id`: the store a DCFP, delivery agent or warehouse works at)
  *   PUT    /users/:id/roles         { role_ids }                roles:assign
  *   PATCH  /users/:id/status        { status: active|disabled } users:update
+ *   PATCH  /users/:id/store         { store_id: uuid | null }   users:update
  *   GET    /users/:id/sessions      [session]                   users:read
  *   DELETE /users/:id/sessions      { revoked }                 users:update
  *   GET    /roles                   [{ id, name, permissions }] roles:read
@@ -69,6 +71,8 @@ const userSchema = z
     /** Devices signed in now. */
     active_sessions: optionalNumber,
     created_at: optionalText,
+    /** The store whose orders and stock they work with; null when none. */
+    store_id: optionalText,
   })
   .transform(({ role, roles, ...user }) => {
     const primary = roleRefSchema.safeParse(role);
@@ -90,6 +94,7 @@ export type UserStatus = 'active' | 'disabled';
 /**
  * `POST /users`. `phone_number` is sent normalised (`+256…`) or blank.
  * `hot_spot_id` is the hotspot a hotspot manager runs, stored on the account.
+ * `store_id` is the store the account works at (see `stores.ts`).
  */
 export interface NewUserInput {
   username: string;
@@ -100,6 +105,7 @@ export interface NewUserInput {
   phone_number: string;
   role_ids: string[];
   hot_spot_id?: string;
+  store_id?: string;
 }
 
 /** The API's largest page; the list is read page by page up to this many pages. */
@@ -144,6 +150,15 @@ export async function setUserRoles(
   } catch (error) {
     throw readableUserError(error);
   }
+}
+
+/** Sets the store a user works at, or clears it with `null`. */
+export async function setUserStore(
+  http: HttpClient,
+  id: string,
+  storeId: string | null,
+): Promise<void> {
+  await http.patch(`/users/${encodeURIComponent(id)}/store`, { store_id: storeId });
 }
 
 export async function setUserStatus(

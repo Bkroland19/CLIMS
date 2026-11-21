@@ -25,8 +25,10 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	if err := pool.QueryRow(ctx, `SELECT id FROM hot_spots ORDER BY id LIMIT 1`).Scan(&hotSpot); err != nil {
 		t.Fatal(err)
 	}
-	// Alerts go to the store of the hotspot's district.
-	exec(`UPDATE hot_spots SET district_id = (SELECT district_id FROM stores WHERE id = $2) WHERE id = $1`, hotSpot, district)
+	// Alerts go to the store of the hotspot's district. The hotspot is picked by random UUID, so clear
+	// its subcounty: one from its old district would break the subcounty/district foreign key.
+	exec(`UPDATE hot_spots SET district_id = (SELECT district_id FROM stores WHERE id = $2), subcounty_id = NULL
+		WHERE id = $1`, hotSpot, district)
 	account := func(role, name string, store, hotspot *string, permissions ...string) (string, string) {
 		t.Helper()
 		var roleID string

@@ -44,7 +44,13 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 }
 
 func scopeFor(user *users.User) scope {
-	return scope{storeID: user.StoreID, hotSpotID: user.HotSpotID, userID: user.ID, allStores: user.HasPermission("orders:all_stores")}
+	return scope{
+		storeID:          user.StoreID,
+		hotSpotID:        user.HotSpotID,
+		userID:           user.ID,
+		allStores:        user.HasPermission("orders:all_stores"),
+		stockoutDistrict: user.HasPermission("orders:stockout_district"),
+	}
 }
 
 func (h *Handler) list(c fiber.Ctx) error {

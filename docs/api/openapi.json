@@ -54,7 +54,7 @@
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Raise a hotspot stockout alert",
-        "description": "Requires orders:stockout and the assigned hotspot, or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
+        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
         "responses": {
           "201": {
             "description": "Success",
@@ -338,7 +338,9 @@
           {
             "name": "status",
             "in": "query",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "limit",
@@ -851,6 +853,80 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/users/{id}/store": {
+      "patch": {
+        "tags": ["Users"],
+        "operationId": "setUserStore",
+        "summary": "Assign a user's store",
+        "description": "Sets the store whose orders and stock the user works with: a DCFP's or delivery agent's district store, or a warehouse's national store. `null` clears it. Requires all permissions: users:update.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserStoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error.store_id` says what to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["users:update"]
       }
     },
     "/api/v1/users/{id}/status": {
@@ -1792,6 +1868,57 @@
         ]
       }
     },
+    "/api/v1/locations/stores": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "listLocationStores",
+        "summary": "List stores",
+        "description": "Stock-holding points: the national warehouses first, then district stores by name. Any active user may read them. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "store_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["national", "district"]
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "Only this district's store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/locations/subcounties": {
       "get": {
         "tags": ["Locations"],
@@ -1837,7 +1964,7 @@
         "tags": ["Hotspots"],
         "operationId": "listHotspots",
         "summary": "List hotspots",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
         "responses": {
           "200": {
             "description": "Success",
@@ -1998,7 +2125,7 @@
         "tags": ["Hotspots"],
         "operationId": "getHotspot",
         "summary": "Get a hotspot",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2111,7 +2238,7 @@
         "tags": ["Hotspots"],
         "operationId": "commentOnHotspot",
         "summary": "Comment on a hotspot",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. A comment from the submitter notifies the district; any other comment notifies the submitter. The status does not change.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. A comment from the submitter notifies the district; any other comment notifies the submitter. The status does not change. District read access (hotspots:read_district) does not open a hotspot's thread.",
         "responses": {
           "201": {
             "description": "Success",
@@ -3648,6 +3775,12 @@
             "format": "uuid",
             "nullable": true
           },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The store whose orders and stock the account works with. Must exist."
+          },
           "hot_spot_id": {
             "type": "string",
             "format": "uuid",
@@ -3699,6 +3832,19 @@
           "role_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "SetUserStoreRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["store_id"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "An existing store, or null to clear it."
           }
         }
       },
@@ -5124,6 +5270,55 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "Store": {
+        "type": "object",
+        "required": ["id", "code", "name", "store_type", "district_id", "district_name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "`jms` or `nms` for a national warehouse; the district's DHIS2 UID for a district store."
+          },
+          "name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district_name": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "StoreListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Store"
+            }
           }
         }
       },

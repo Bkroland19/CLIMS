@@ -126,6 +126,14 @@ describe('toNewUserInput', () => {
     expect(body).not.toHaveProperty('village');
   });
 
+  it('sends the store the role works at, and none when it has none', () => {
+    const values = newUserSchema.parse({ ...valid, region_id: 'r', district_id: 'd' });
+    expect(toNewUserInput(values, locationNeedFor('dfcp'), 'store-1')).toMatchObject({
+      store_id: 'store-1',
+    });
+    expect(toNewUserInput(values, locationNeedFor('dfcp'))).not.toHaveProperty('store_id');
+  });
+
   it('leaves a hotspot chosen earlier behind when the role no longer asks for one', () => {
     const values = newUserSchema.parse({ ...valid, hot_spot_id: 'hotspot-1' });
     expect(toNewUserInput(values, locationNeedFor('vht'))).not.toHaveProperty('hot_spot_id');
