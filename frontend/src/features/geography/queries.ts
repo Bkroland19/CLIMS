@@ -1,6 +1,12 @@
 import { useApiQuery } from '@/lib/api';
 
-import { listDistrictsIn, listRegions, listSubcounties, listDistrictHotspots } from './api';
+import {
+  listDistrictHotspots,
+  listDistrictsIn,
+  listRegions,
+  listStores,
+  listSubcounties,
+} from './api';
 
 /** Places change on the scale of years; one fetch per session is plenty. */
 const PLACES_STALE_TIME = 30 * 60_000;
@@ -40,4 +46,12 @@ export function useDistrictHotspots(districtId: string) {
     (http, signal) => listDistrictHotspots(http, districtId, signal),
     { enabled: districtId !== '', staleTime: 5 * 60_000 },
   );
+}
+
+/** Every store, for choosing where an account works. */
+export function useStores(enabled = true) {
+  return useApiQuery(['geography', 'stores'], listStores, {
+    enabled,
+    staleTime: PLACES_STALE_TIME,
+  });
 }

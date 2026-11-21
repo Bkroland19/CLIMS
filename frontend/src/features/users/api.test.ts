@@ -12,6 +12,7 @@ import {
   revokeUserSessions,
   setRolePermissions,
   setUserRoles,
+  setUserStore,
   setUserStatus,
   summariseUsers,
   type NewUserInput,
@@ -72,6 +73,7 @@ describe('listUsers', () => {
           login_count: 12,
           active_sessions: 2,
           created_at: '2026-01-05T08:00:00Z',
+          store_id: '00000000-0000-4000-8109-000000000001',
         },
       ]),
     );
@@ -93,6 +95,7 @@ describe('listUsers', () => {
         login_count: 12,
         active_sessions: 2,
         created_at: '2026-01-05T08:00:00Z',
+        store_id: '00000000-0000-4000-8109-000000000001',
       },
     ]);
   });
@@ -203,6 +206,21 @@ describe('createUser', () => {
       kind: 'conflict',
       fieldErrors: { email: ['An account with this email address already exists.'] },
     });
+  });
+});
+
+describe('setUserStore', () => {
+  it('sets a store, and clears it with null', async () => {
+    const { http, requests } = setup(
+      { status: 200, body: { success: true } },
+      { status: 200, body: { success: true } },
+    );
+    await setUserStore(http, 'u-7', 's-1');
+    await setUserStore(http, 'u-7', null);
+    expect(requests.map(({ method, url, body }) => ({ method, url, body }))).toEqual([
+      { method: 'PATCH', url: '/users/u-7/store', body: { store_id: 's-1' } },
+      { method: 'PATCH', url: '/users/u-7/store', body: { store_id: null } },
+    ]);
   });
 });
 

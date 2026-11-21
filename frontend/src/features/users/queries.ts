@@ -14,6 +14,7 @@ import {
   revokeUserSessions,
   setRolePermissions,
   setUserRoles,
+  setUserStore,
   setUserStatus,
   type NewUserInput,
   type User,
@@ -65,6 +66,22 @@ export function useSetUserRoles(userId: string) {
       toast.success('Roles updated');
       await queryClient.invalidateQueries({ queryKey: accessKeys.users });
       // Administrators can edit their own roles; their permissions follow.
+      await queryClient.invalidateQueries({ queryKey: authKeys.me });
+    },
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+/** Sets or clears a user's store. The dialog places a refusal beside the store field. */
+export function useSetUserStore(userId: string) {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (storeId: string | null) => setUserStore(http, userId, storeId),
+    onSuccess: async () => {
+      toast.success('Store updated');
+      await queryClient.invalidateQueries({ queryKey: accessKeys.users });
+      // Someone changing their own store sees a different set of orders and stock.
       await queryClient.invalidateQueries({ queryKey: authKeys.me });
     },
     meta: { handlesOwnErrors: true },
