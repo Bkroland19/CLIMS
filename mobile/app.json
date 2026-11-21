@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "last_mile_condom_distribution",
-    "slug": "lmd",
+    "name": "CLIMS",
+    "slug": "clims-app",
     "version": "2.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -65,7 +65,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "8002756e-1d09-44a9-a0dc-877d382b2e89"
+        "projectId": "d680bffa-d623-48a1-b8b8-aea07cfc200c"
       },
       "releaseVersion": "2.2.0"
     },
