@@ -61,6 +61,8 @@ export interface Tokens {
   cardBg: string;
   cardR: number;
   tileBg: string;
+  /** Skeleton loader placeholder. */
+  skelBg: string;
   tileR: number;
   imgBg: string;
   secGap: number;
@@ -183,6 +185,7 @@ export const iosLight: Tokens = {
   cardBg: "#ffffff",
   cardR: 12,
   tileBg: "#f2f2f7",
+  skelBg: "rgba(60,60,67,0.13)",
   tileR: 10,
   imgBg: "#dddddd",
   secGap: 22,
@@ -252,6 +255,7 @@ export const iosDark: Tokens = {
   switchOff: "rgba(120,120,128,0.32)",
   cardBg: "#1c1c1e",
   tileBg: "#2c2c2e",
+  skelBg: "rgba(235,235,245,0.13)",
   imgBg: "#2c2c2e",
   srBg: "rgba(118,118,128,0.24)",
   b1Bg: "#1f7a35",
@@ -328,6 +332,7 @@ export const mdLight: Tokens = {
   cardBg: "#eaefe5",
   cardR: 18,
   tileBg: "#f7faf3",
+  skelBg: "rgba(66,73,63,0.13)",
   tileR: 12,
   imgBg: "#dddddd",
   secGap: 20,
@@ -398,6 +403,7 @@ export const mdDark: Tokens = {
   switchThumbOff: "#8c9388",
   cardBg: "#1c201b",
   tileBg: "#10140f",
+  skelBg: "rgba(194,200,189,0.14)",
   imgBg: "#2a2f28",
   srBg: "#272b25",
   b1Bg: "#8bd88a",

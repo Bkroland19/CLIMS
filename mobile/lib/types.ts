@@ -1,8 +1,8 @@
 /**
  * Domain model for the field app (VHT, hotspot manager, rider).
  *
- * The Go API does not serve hotspots, orders, deliveries or reports yet, so these
- * shapes follow the CLIMS prototype. Keep them in step with the API once it lands.
+ * Hotspots are submitted to the Go API (lib/hotspots.ts). Orders and deliveries have no
+ * mobile endpoints yet, so those shapes follow the CLIMS prototype.
  */
 
 export type AppRole = "vht" | "hm" | "rider";
@@ -23,11 +23,17 @@ export type OrderStatus =
 export interface Hotspot {
   id: string;
   name: string;
-  kind: "Permanent" | "Temporary";
+  /** Free text, as the API stores it: "Bar", "Lodge", "Landing site"… */
+  type: string;
   village: string;
   subcounty: string;
   district: string;
+  region?: string;
   status: "Active" | "Inactive";
+  /** "api" for hotspots loaded from or submitted to the backend; absent on sample data. */
+  source?: "api";
+  /** The DCFP review step (docs/modules/hotspots.md); absent on sample hotspots. */
+  reviewStatus?: "submitted" | "rejected" | "active" | "deactivated";
   contact: string;
   phone: string;
   vhts: string[];
@@ -36,7 +42,6 @@ export interface Hotspot {
   lng?: number;
   dispenser: boolean;
   dispCond?: string;
-  dispPhoto?: string;
   comment?: string;
   mappedAt?: number;
   lastDelivery?: number;
@@ -77,6 +82,10 @@ export interface Receipt {
 
 export interface Order {
   id: string;
+  /** "api" for stockout alerts sent to the backend; absent on sample data. */
+  source?: "api";
+  /** Product named by an API stockout alert (alerts carry no quantities). */
+  product?: string;
   hotspotId: string;
   hotspot: string;
   status: OrderStatus;
@@ -91,34 +100,6 @@ export interface Order {
   confirmedAt?: number;
   delivery?: Delivery;
   receipt?: Receipt;
-}
-
-export type ReportStatus = "draft" | "errors" | "validated" | "sent";
-export type ReportForm = "hotspot" | "vht";
-
-export interface ReportError {
-  type: "req" | "num" | "bal" | "range";
-  field: string;
-  where: string;
-  msg: string;
-}
-
-/** Stock rows keyed by product, then scalar fields such as `daysOut`, `comment`. */
-export type ReportValues = Record<string, any>;
-
-export interface Report {
-  id: string;
-  own: AppRole;
-  form: ReportForm;
-  period: string; // YYYY-MM
-  status: ReportStatus;
-  values: ReportValues;
-  errors: ReportError[];
-  runs: number;
-  savedAt?: number;
-  sentAt?: number;
-  receipt?: string;
-  reporter?: string;
 }
 
 export type EventRole =
@@ -145,12 +126,11 @@ export interface OutboxItem {
 }
 
 export type ActionType =
-  "notify" | "mapHotspot" | "confirmReceipt" | "pickup" | "deliver" | "rptSave" | "rptSend";
+  "notify" | "stockout" | "mapHotspot" | "confirmReceipt" | "pickup" | "deliver";
 
 export interface DomainState {
   hotspots: Hotspot[];
   orders: Order[];
-  reports: Report[];
   events: AppEvent[];
   outbox: OutboxItem[];
   read: Partial<Record<AppRole, number>>;

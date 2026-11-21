@@ -1,4 +1,4 @@
-import type { AppEvent, DomainState, Hotspot, Order, Report } from "./types";
+import type { AppEvent, DomainState, Hotspot, Order } from "./types";
 
 /**
  * Starting data for the field app while the API has no domain endpoints.
@@ -26,18 +26,6 @@ export const HM_HOTSPOT = "HS-0231";
 const MALE = { k: "male" as const, batch: "EG-24117", exp: "Mar 2028" };
 const FEMALE = { k: "female" as const, batch: "FC-2309", exp: "Aug 2027" };
 
-/** Last completed month as YYYY-MM: the period whose report is due now. */
-export const currentPeriod = (now = Date.now()) => {
-  const d = new Date(now);
-  const p = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-  return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}`;
-};
-const prevPeriod = (p: string) => {
-  const [y, m] = p.split("-").map(Number);
-  const d = new Date(y, m - 2, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
-
 export function createSeed(me: Personas, now = Date.now()): DomainState {
   const min = 60_000;
   const h = 60 * min;
@@ -48,7 +36,7 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
     {
       id: "HS-0231",
       name: "Kasenyi Landing Site",
-      kind: "Permanent",
+      type: "Landing site",
       village: "Kasenyi",
       subcounty: "Katabi TC",
       district: "Wakiso",
@@ -60,7 +48,7 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
       lat: 0.05982,
       lng: 32.47195,
       dispenser: true,
-      dispCond: "Working",
+      dispCond: "Good",
       comment: "Busiest on Friday and Saturday nights.",
       mappedAt: ago(140 * day),
       lastDelivery: ago(26 * day),
@@ -68,7 +56,7 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
     {
       id: "HS-0218",
       name: "Bwebajja Nite Spot",
-      kind: "Permanent",
+      type: "Bar",
       village: "Bwebajja",
       subcounty: "Kajjansi TC",
       district: "Wakiso",
@@ -80,14 +68,14 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
       lat: 0.20143,
       lng: 32.53021,
       dispenser: true,
-      dispCond: "Needs repair",
+      dispCond: "Poor",
       mappedAt: ago(210 * day),
       lastDelivery: ago(1 * day),
     },
     {
       id: "HS-0244",
       name: "Kajjansi Weekly Market",
-      kind: "Temporary",
+      type: "Market",
       village: "Kajjansi",
       subcounty: "Kajjansi TC",
       district: "Wakiso",
@@ -106,7 +94,7 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
     {
       id: "HS-0209",
       name: "Kigungu Lodge",
-      kind: "Permanent",
+      type: "Lodge",
       village: "Kigungu",
       subcounty: "Katabi TC",
       district: "Wakiso",
@@ -118,14 +106,14 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
       lat: 0.03011,
       lng: 32.44523,
       dispenser: true,
-      dispCond: "Working",
+      dispCond: "Good",
       mappedAt: ago(300 * day),
       lastDelivery: ago(41 * day),
     },
     {
       id: "HS-0197",
       name: "Abaita Taxi Stage",
-      kind: "Permanent",
+      type: "Taxi park",
       village: "Abaita Ababiri",
       subcounty: "Katabi TC",
       district: "Wakiso",
@@ -277,75 +265,6 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
     },
   ];
 
-  const period = currentPeriod(now);
-  const prev = prevPeriod(period);
-  const reports: Report[] = [
-    {
-      id: `RPT-HM-${period}`,
-      own: "hm",
-      form: "hotspot",
-      period,
-      status: "draft",
-      runs: 0,
-      errors: [],
-      values: { male: { open: 1560, recv: 1500 }, female: { open: 100, recv: 100 } },
-    },
-    {
-      id: `RPT-HM-${prev}`,
-      own: "hm",
-      form: "hotspot",
-      period: prev,
-      status: "sent",
-      runs: 1,
-      errors: [],
-      values: {
-        male: { open: 900, recv: 2000, dist: 1340, loss: 0, close: 1560 },
-        female: { open: 40, recv: 100, dist: 40, loss: 0, close: 100 },
-        daysOut: "0",
-        dispenser: "Working",
-      },
-      savedAt: ago(44 * day),
-      sentAt: ago(44 * day),
-      receipt: "MOH-2611-0083",
-      reporter: me.hm,
-    },
-    {
-      id: `RPT-VHT-${period}`,
-      own: "vht",
-      form: "vht",
-      period,
-      status: "draft",
-      runs: 0,
-      errors: [],
-      values: {
-        male: { open: 400, recv: 1000, dist: 900 },
-        female: { open: 30, recv: 50 },
-        visited: "4",
-      },
-      savedAt: ago(2 * day),
-    },
-    {
-      id: `RPT-VHT-${prev}`,
-      own: "vht",
-      form: "vht",
-      period: prev,
-      status: "sent",
-      runs: 2,
-      errors: [],
-      values: {
-        male: { open: 250, recv: 1000, dist: 850, loss: 0, close: 400 },
-        female: { open: 10, recv: 50, dist: 30, loss: 0, close: 30 },
-        visited: "5",
-        sessions: "6",
-        reached: "214",
-      },
-      savedAt: ago(41 * day),
-      sentAt: ago(41 * day),
-      receipt: "MOH-2611-0121",
-      reporter: me.vht,
-    },
-  ];
-
   let n = 0;
   const ev = (o: Omit<AppEvent, "id">): AppEvent => ({ id: `EV-${++n}`, ...o });
   const events: AppEvent[] = [
@@ -413,29 +332,12 @@ export function createSeed(me: Personas, now = Date.now()): DomainState {
       text: "Confirmed receipt at Kasenyi Landing Site · counts matched",
       to: ["rider"],
     }),
-    ev({
-      t: ago(41 * day),
-      ref: `RPT-VHT-${prev}`,
-      role: "MOH",
-      actor: "Ministry of Health",
-      text: "Received your outreach report",
-      to: ["vht"],
-    }),
-    ev({
-      t: ago(44 * day),
-      ref: `RPT-HM-${prev}`,
-      role: "MOH",
-      actor: "Ministry of Health",
-      text: "Received your monthly hotspot report",
-      to: ["hm"],
-    }),
   ];
 
   const seen = ago(3 * h);
   return {
     hotspots,
     orders,
-    reports,
     events,
     outbox: [],
     read: { vht: seen, hm: seen, rider: seen },

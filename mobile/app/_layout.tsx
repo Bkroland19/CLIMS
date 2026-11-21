@@ -8,6 +8,9 @@ import { ThemeProvider, useTheme } from "@/lib/theme";
 import { SessionProvider, useSession } from "@/lib/session";
 
 SplashScreen.preventAutoHideAsync();
+// Fade into the first screen instead of cutting; the splash uses the same background and crest
+// tile as sign-in (see the expo-splash-screen plugin in app.json).
+SplashScreen.setOptions({ fade: true, duration: 300 });
 
 function Shell() {
   const { T, scheme } = useTheme();

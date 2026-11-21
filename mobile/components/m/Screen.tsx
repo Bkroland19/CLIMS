@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "@/lib/theme";
 import { useNav } from "@/lib/nav";
 import { useStore, useUnread } from "@/lib/store";
+import { useColumn, useResponsive } from "@/hooks/useResponsive";
 import Icon, { type IconName } from "./Icon";
 import { Txt } from "./kit";
 
@@ -35,6 +36,7 @@ export default function Screen({
   children,
   scrollRef,
   noHeader,
+  onEndReached,
 }: {
   title: string;
   root?: boolean;
@@ -43,6 +45,8 @@ export default function Screen({
   children: React.ReactNode;
   scrollRef?: React.Ref<ScrollViewInstance>;
   noHeader?: boolean;
+  /** Called when the user scrolls near the end, to load the next page of a list. */
+  onEndReached?: () => void;
 }) {
   const T = useT();
   const insets = useSafeAreaInsets();
@@ -53,6 +57,10 @@ export default function Screen({
   const action = T.ios ? fab : undefined;
   const unread = useUnread();
   const showBell = !!root && !noHeader;
+  const { isCompact, isShort, width } = useResponsive();
+  const col = useColumn();
+  // Short windows (split screen) get an inline title instead of the 52dp large title.
+  const largeTitle = T.ios && !hasBack && !isShort;
 
   const bell = showBell ? (
     <Pressable
@@ -109,13 +117,16 @@ export default function Screen({
       }}
     >
       <View
-        style={{
-          height: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 8,
-        }}
+        style={[
+          col.style,
+          {
+            height: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 8,
+          },
+        ]}
       >
         {hasBack ? (
           <Pressable
@@ -138,12 +149,16 @@ export default function Screen({
         ) : (
           <View />
         )}
-        {hasBack ? (
+        {!largeTitle ? (
           <View
             pointerEvents="none"
             style={{ position: "absolute", left: "28%", right: "28%", alignItems: "center" }}
           >
-            <Txt numberOfLines={1} style={{ fontSize: 17, fontWeight: "600" }}>
+            <Txt
+              accessibilityRole={hasBack ? undefined : "header"}
+              numberOfLines={1}
+              style={{ fontSize: 17, fontWeight: "600" }}
+            >
               {title}
             </Txt>
           </View>
@@ -168,33 +183,40 @@ export default function Screen({
           ) : null}
         </View>
       </View>
-      {!hasBack ? (
-        <Txt
-          accessibilityRole="header"
-          style={{
-            paddingHorizontal: 16,
-            paddingBottom: 8,
-            fontSize: 34,
-            fontWeight: "700",
-            lineHeight: 40,
-          }}
-        >
-          {title}
-        </Txt>
+      {largeTitle ? (
+        <View style={col.style}>
+          <Txt
+            accessibilityRole="header"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={{
+              paddingHorizontal: 16,
+              paddingBottom: 8,
+              fontSize: isCompact ? 30 : 34,
+              fontWeight: "700",
+              lineHeight: isCompact ? 36 : 40,
+            }}
+          >
+            {title}
+          </Txt>
+        </View>
       ) : null}
     </View>
   ) : (
     <View style={{ paddingTop: insets.top, backgroundColor: T.hdrBg }}>
       <View
-        style={{
-          height: 64,
-          flexDirection: "row",
-          alignItems: "center",
-          paddingLeft: hasBack ? 4 : 16,
-          paddingRight: 4,
-          gap: 4,
-        }}
+        style={[
+          col.style,
+          {
+            height: isShort ? 56 : 64,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+          },
+        ]}
       >
+        <View style={{ width: hasBack ? 0 : 12 }} />
         {hasBack ? (
           <Pressable
             onPress={nav.back}
@@ -214,11 +236,12 @@ export default function Screen({
         <Txt
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ flex: 1, fontSize: 22, lineHeight: 28 }}
+          style={{ flex: 1, fontSize: isCompact ? 20 : 22, lineHeight: 28 }}
         >
           {title}
         </Txt>
         {bell}
+        <View style={{ width: 0 }} />
       </View>
     </View>
   );
@@ -227,22 +250,26 @@ export default function Screen({
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       {header}
       {offline ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            backgroundColor: T.offBg,
-          }}
-        >
-          <Icon name="wifiOff" size={16} color={T.warnFg} />
-          <Txt style={{ color: T.warnFg, fontSize: 13, fontWeight: "500" }}>
-            {nq
-              ? `Offline · ${nq} action${nq > 1 ? "s" : ""} saved on this phone`
-              : "Offline · your work is saved on this phone"}
-          </Txt>
+        <View style={{ backgroundColor: T.offBg }}>
+          <View
+            style={[
+              col.style,
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+              },
+            ]}
+          >
+            <Icon name="wifiOff" size={16} color={T.warnFg} />
+            <Txt style={{ flex: 1, color: T.warnFg, fontSize: 13, fontWeight: "500" }}>
+              {nq
+                ? `Offline · ${nq} action${nq > 1 ? "s" : ""} saved on this phone`
+                : "Offline · your work is saved on this phone"}
+            </Txt>
+          </View>
         </View>
       ) : null}
       <KeyboardAvoidingView
@@ -252,10 +279,27 @@ export default function Screen({
         <ScrollView
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            paddingTop: T.ios ? 6 : 4,
-            paddingBottom: fab && !T.ios ? 96 : 28,
-          }}
+          scrollEventThrottle={250}
+          onScroll={
+            onEndReached
+              ? (e) => {
+                  const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                  // Start loading a screen's height before the end, so scrolling rarely waits.
+                  if (
+                    layoutMeasurement.height + contentOffset.y >=
+                    contentSize.height - layoutMeasurement.height
+                  )
+                    onEndReached();
+                }
+              : undefined
+          }
+          contentContainerStyle={[
+            col.style,
+            {
+              paddingTop: T.ios ? 6 : 4,
+              paddingBottom: fab && !T.ios ? 96 : 28,
+            },
+          ]}
         >
           {children}
         </ScrollView>
@@ -267,9 +311,11 @@ export default function Screen({
           accessibilityLabel={fab.label}
           style={({ pressed }) => ({
             position: "absolute",
-            right: 16,
+            right: col.right + 16,
             bottom: 16,
-            height: 56,
+            maxWidth: Math.max(0, width - col.right * 2 - 32),
+            minHeight: 56,
+            paddingVertical: 8,
             borderRadius: 16,
             paddingHorizontal: 18,
             backgroundColor: pressed ? T.fabPress : T.fabBg,
@@ -284,7 +330,12 @@ export default function Screen({
           })}
         >
           <Icon name={fab.icon ?? "plus"} size={22} color={T.fabFg} />
-          <Txt style={{ color: T.fabFg, fontSize: 15, fontWeight: "500" }}>{fab.label}</Txt>
+          <Txt
+            numberOfLines={1}
+            style={{ flexShrink: 1, color: T.fabFg, fontSize: 15, fontWeight: "500" }}
+          >
+            {fab.label}
+          </Txt>
         </Pressable>
       ) : null}
     </View>

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  AccessibilityInfo,
+  Animated,
   Image,
   Modal,
   Pressable,
@@ -19,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import type { Tokens } from "@/constants/design";
 import { useT } from "@/lib/theme";
+import { MAX_SHEET_WIDTH, useResponsive } from "@/hooks/useResponsive";
 import type { ChipDef, Tone } from "@/lib/format";
 import Icon, { type IconName } from "./Icon";
 
@@ -265,7 +268,9 @@ export function Row({
       </View>
       {sig ? <SigPreview d={sig} /> : null}
       {v ? (
-        <Txt style={{ color: vfg ?? T.fg2, maxWidth: "55%", textAlign: "right" }}>{v}</Txt>
+        <Txt style={{ color: vfg ?? T.fg2, maxWidth: "55%", flexShrink: 1, textAlign: "right" }}>
+          {v}
+        </Txt>
       ) : null}
       {chev ? <Icon name="chevR" size={20} color={T.fg3} /> : null}
     </Pressable>
@@ -329,12 +334,15 @@ export function Hero({
           ) : null}
         </View>
         {stats?.length ? (
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {stats.map((x) => (
               <View
                 key={x.label}
                 style={{
-                  flex: 1,
+                  // Tiles share a row while each gets 112dp; below that they wrap.
+                  flexGrow: 1,
+                  flexBasis: 112,
+                  minWidth: 0,
                   backgroundColor: T.tileBg,
                   borderRadius: T.tileR,
                   padding: 12,
@@ -342,7 +350,12 @@ export function Hero({
                 }}
               >
                 <Txt style={{ fontSize: 13, color: T.fg2 }}>{x.label}</Txt>
-                <Txt style={{ fontSize: 26, fontWeight: "700", color: x.fg ?? T.fg }}>
+                <Txt
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                  style={{ fontSize: 26, fontWeight: "700", color: x.fg ?? T.fg }}
+                >
                   {x.value}
                 </Txt>
                 {x.note ? <Txt style={{ fontSize: 13, color: x.fg ?? T.fg2 }}>{x.note}</Txt> : null}
@@ -568,7 +581,9 @@ export function Btn({
       accessibilityRole="button"
       accessibilityState={{ disabled: !!dis }}
       style={({ pressed }) => ({
-        height: small ? 40 : T.btnH,
+        // minHeight, not height: large system text wraps the label instead of clipping it.
+        minHeight: small ? 40 : T.btnH,
+        paddingVertical: 6,
         borderRadius: T.btnR,
         backgroundColor: K[0],
         borderWidth: K[2],
@@ -582,7 +597,15 @@ export function Btn({
       })}
     >
       {icon ? <Icon name={icon} size={18} color={K[1]} /> : null}
-      <Txt style={{ color: K[1], fontSize: small ? 15 : T.btnFs, fontWeight: T.btnFw }}>
+      <Txt
+        style={{
+          flexShrink: 1,
+          textAlign: "center",
+          color: K[1],
+          fontSize: small ? 15 : T.btnFs,
+          fontWeight: T.btnFw,
+        }}
+      >
         {label}
       </Txt>
     </Pressable>
@@ -801,7 +824,7 @@ export function Seg<K extends string>({
         accessibilityRole="radiogroup"
         style={{
           flexDirection: "row",
-          height: T.segH,
+          minHeight: T.segH,
           borderRadius: T.segR,
           backgroundColor: T.ios ? T.segBg : "transparent",
           padding: T.ios ? 2 : 0,
@@ -825,6 +848,8 @@ export function Seg<K extends string>({
                 justifyContent: "center",
                 flexDirection: "row",
                 gap: 6,
+                paddingHorizontal: 6,
+                paddingVertical: 4,
                 borderRadius: T.ios ? 7 : 0,
                 backgroundColor: on ? T.segOn : T.ios ? "transparent" : T.segBg,
                 borderLeftWidth: !T.ios && i > 0 ? 1 : 0,
@@ -841,7 +866,18 @@ export function Seg<K extends string>({
               }}
             >
               {!T.ios && on ? <Icon name="check" size={16} color={T.icFg} /> : null}
-              <Txt style={{ fontSize: 14, fontWeight: on ? "600" : "500", color: T.fg }}>{l}</Txt>
+              <Txt
+                numberOfLines={2}
+                style={{
+                  flexShrink: 1,
+                  textAlign: "center",
+                  fontSize: 14,
+                  fontWeight: on ? "600" : "500",
+                  color: T.fg,
+                }}
+              >
+                {l}
+              </Txt>
             </Pressable>
           );
         })}
@@ -866,6 +902,9 @@ export function Stepper({
   err?: string;
 }) {
   const T = useT();
+  const { isCompact, largeText } = useResponsive();
+  // On narrow phones or with large text, the 170dp of controls go under the label.
+  const stack = isCompact || largeText;
   const n = parseInt(value.replace(/[^0-9]/g, ""), 10) || 0;
   const btn = (icon: IconName, next: number, a11y: string) => (
     <Pressable
@@ -888,8 +927,15 @@ export function Stepper({
     </Pressable>
   );
   return (
-    <FieldBox label={label} sub={sub} err={err} row>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+    <FieldBox label={label} sub={sub} err={err} row={!stack}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          marginTop: stack ? 6 : 0,
+        }}
+      >
         {btn("minus", n - step, "Decrease")}
         <TextInput
           value={value}
@@ -899,8 +945,9 @@ export function Stepper({
           placeholder="0"
           placeholderTextColor={T.fg3}
           style={{
-            width: 76,
-            height: T.ios ? 34 : 40,
+            width: stack ? undefined : 76,
+            flex: stack ? 1 : undefined,
+            minHeight: T.ios ? 34 : 40,
             textAlign: "center",
             fontSize: 17,
             fontWeight: "600",
@@ -1037,16 +1084,25 @@ export function Select({
   options,
   onChange,
   err,
+  loading,
 }: {
   label: string;
   value: string;
   options: { v: string; l: string }[];
   onChange: (v: string) => void;
   err?: string;
+  /** Show a skeleton in place of the field while its options load. */
+  loading?: boolean;
 }) {
   const T = useT();
   const [open, setOpen] = useState(false);
   const cur = options.find((o) => o.v === value);
+  if (loading)
+    return (
+      <FieldBox label={label}>
+        <Skeleton h={T.inH - 12} style={{ marginVertical: 6 }} />
+      </FieldBox>
+    );
   return (
     <>
       <FieldBox label={label} err={err}>
@@ -1213,6 +1269,7 @@ export function Sheet({
 }) {
   const T = useT();
   const insets = useSafeAreaInsets();
+  const { isShort } = useResponsive();
   return (
     <Modal
       visible={visible}
@@ -1221,71 +1278,160 @@ export function Sheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Pressable
-        style={{ flex: 1, backgroundColor: T.scrim }}
-        onPress={onClose}
-        accessibilityLabel="Close"
-      />
-      <View
-        style={{
-          backgroundColor: T.sheetBg,
-          borderTopLeftRadius: T.sheetR,
-          borderTopRightRadius: T.sheetR,
-          maxHeight: "82%",
-          paddingBottom: insets.bottom + 12,
-        }}
-      >
-        <View style={{ alignItems: "center", paddingTop: 8 }}>
-          <View
-            style={{
-              width: T.ios ? 36 : 32,
-              height: T.ios ? 5 : 4,
-              borderRadius: 3,
-              backgroundColor: T.grab,
-            }}
-          />
-        </View>
+      <View style={{ flex: 1, backgroundColor: T.scrim }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 16,
-            paddingVertical: 10,
+            backgroundColor: T.sheetBg,
+            borderTopLeftRadius: T.sheetR,
+            borderTopRightRadius: T.sheetR,
+            // Centred and capped on tablets; taller on short windows so content still fits.
+            width: "100%",
+            maxWidth: MAX_SHEET_WIDTH,
+            alignSelf: "center",
+            maxHeight: isShort ? "94%" : "82%",
+            paddingBottom: insets.bottom + 12,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
           }}
         >
-          <Txt
-            accessibilityRole="header"
+          <View style={{ alignItems: "center", paddingTop: 8 }}>
+            <View
+              style={{
+                width: T.ios ? 36 : 32,
+                height: T.ios ? 5 : 4,
+                borderRadius: 3,
+                backgroundColor: T.grab,
+              }}
+            />
+          </View>
+          <View
             style={{
-              flex: 1,
-              fontSize: T.ios ? 17 : 22,
-              fontWeight: T.ios ? "600" : "400",
-              textAlign: T.ios ? "center" : "left",
-              marginLeft: T.ios ? 48 : 0,
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 16,
+              paddingVertical: 10,
             }}
           >
-            {title}
-          </Txt>
-          <Pressable
-            onPress={onClose}
-            accessibilityRole="button"
-            hitSlop={8}
-            style={{ minWidth: 48, alignItems: "flex-end" }}
-          >
             <Txt
+              accessibilityRole="header"
               style={{
-                color: T.tint,
-                fontSize: T.ios ? 17 : 14,
-                fontWeight: T.ios ? "600" : "500",
+                flex: 1,
+                fontSize: T.ios ? 17 : 22,
+                fontWeight: T.ios ? "600" : "400",
+                textAlign: T.ios ? "center" : "left",
+                marginLeft: T.ios ? 48 : 0,
               }}
             >
-              {T.ios ? "Done" : "Close"}
+              {title}
             </Txt>
-          </Pressable>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={{ minWidth: 48, alignItems: "flex-end" }}
+            >
+              <Txt
+                style={{
+                  color: T.tint,
+                  fontSize: T.ios ? 17 : 14,
+                  fontWeight: T.ios ? "600" : "500",
+                }}
+              >
+                {T.ios ? "Done" : "Close"}
+              </Txt>
+            </Pressable>
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8 }}>
+            {children}
+          </ScrollView>
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8 }}>
-          {children}
-        </ScrollView>
       </View>
     </Modal>
+  );
+}
+
+/* ───────────── Skeleton loaders ───────────── */
+
+/** Pulses while content loads; holds still when the phone asks for reduced motion. */
+function usePulse() {
+  const [v] = useState(() => new Animated.Value(0.55));
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | null = null;
+    let live = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .catch(() => false)
+      .then((reduce) => {
+        if (!live || reduce) return;
+        loop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(v, { toValue: 1, duration: 650, useNativeDriver: true }),
+            Animated.timing(v, { toValue: 0.55, duration: 650, useNativeDriver: true }),
+          ]),
+        );
+        loop.start();
+      });
+    return () => {
+      live = false;
+      loop?.stop();
+    };
+  }, [v]);
+  return v;
+}
+
+/** A placeholder bar shaped like the content that is loading. */
+export function Skeleton({
+  w = "100%",
+  h = 14,
+  r = 6,
+  style,
+}: {
+  w?: number | `${number}%`;
+  h?: number;
+  r?: number;
+  style?: ViewStyle;
+}) {
+  const T = useT();
+  const opacity = usePulse();
+  return (
+    <Animated.View
+      style={[{ width: w, height: h, borderRadius: r, backgroundColor: T.skelBg, opacity }, style]}
+    />
+  );
+}
+
+/** List rows that hold the place of a list while it loads: icon, title and subtitle. */
+export function SkeletonList({ rows = 4, h }: { rows?: number; h?: string }) {
+  const T = useT();
+  return (
+    <Section h={h}>
+      <View
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel="Loading"
+        style={{ marginHorizontal: 16, borderRadius: T.listR, overflow: "hidden", gap: T.listGap }}
+      >
+        {Array.from({ length: rows }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              backgroundColor: T.rowBg,
+              minHeight: T.rowMin,
+              paddingVertical: T.rowPy,
+              paddingHorizontal: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <Skeleton w={T.icBox} h={T.icBox} r={T.icR} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <Skeleton w={i % 2 ? "55%" : "70%"} h={14} />
+              <Skeleton w={i % 2 ? "40%" : "48%"} h={12} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </Section>
   );
 }
