@@ -3,7 +3,6 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import "react-native-reanimated";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { SessionProvider, useSession } from "@/lib/session";
 
