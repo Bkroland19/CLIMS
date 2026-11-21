@@ -11,7 +11,7 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   or else assigned subcounty's). Inactive hotspots and other districts are refused.
 - `hotspots:read_district` lets a VHT list and view their district's active hotspots, to choose one; it
   does not open those hotspots' comment threads.
-- Migration 20 adds the two permissions (granted to admin). Grant VHTs `hotspots:read`, `hotspots:submit`,
+- Migration 21 adds the two permissions (granted to admin). Grant VHTs `hotspots:read`, `hotspots:submit`,
   `hotspots:read_district`, `orders:stockout` and `orders:stockout_district` through the RBAC API.
 - **Web app** in `frontend/`, imported from the `LMD_FE` prototype and rebuilt on Next.js 16,
   React 19, TypeScript, Tailwind CSS 4 and shadcn/ui, themed after the SalesOps dashboard reference in light

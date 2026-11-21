@@ -5,7 +5,8 @@ BEGIN;
 -- district, or else their assigned subcounty's (users.DistrictOfUser).
 INSERT INTO permissions (name, description) VALUES
     ('orders:stockout_district', 'Report stockouts for active hotspots in the district you work in'),
-    ('hotspots:read_district', 'View the active hotspots in the district you work in');
+    ('hotspots:read_district', 'View the active hotspots in the district you work in')
+ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO role_permission (role_id, permission_id)
 SELECT roles.id, permissions.id FROM roles CROSS JOIN permissions

@@ -29,11 +29,11 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 		}
 	}
 
-	// Migration 20 adds the permissions; administrators grant them, as with every other role.
+	// Migration 21 adds the permissions; administrators grant them, as with every other role.
 	var added int
 	scalar(&added, `SELECT count(*) FROM permissions WHERE name IN ('orders:stockout_district', 'hotspots:read_district')`)
 	if added != 2 {
-		t.Fatalf("migration 20 should add both district permissions, found %d", added)
+		t.Fatalf("migration 21 should add both district permissions, found %d", added)
 	}
 
 	// A district with a district store (alerts go there) and a subcounty, and another district.
