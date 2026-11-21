@@ -18,9 +18,11 @@ import {
   DISPENSER_SHORT_LABELS,
   DISPENSER_TONES,
   REVIEW_HINTS,
+  POSITION_LABELS,
   REVIEW_LABELS,
   isPlaced,
   type MapHotspot,
+  type PositionCheck,
 } from './records';
 
 /*
@@ -59,6 +61,16 @@ function Pending({ lines = 2 }: { lines?: number }) {
 }
 
 const coordinate = (value: number) => value.toFixed(6);
+
+/** Why a hotspot is not on the map, and what to do about it. */
+const POSITION_NOTES: Record<PositionCheck, string> = {
+  placed: '',
+  missing: 'No position is recorded, so this hotspot is not on the map.',
+  swapped:
+    'Its latitude and longitude are recorded the wrong way round, so it is not on the map. Correct them where the hotspot was recorded.',
+  outside:
+    'Its recorded position is outside Uganda, so it is not on the map. Correct it where the hotspot was recorded.',
+};
 
 interface HotspotDetailProps {
   id: string;
@@ -151,9 +163,7 @@ export function HotspotDetail({
                   </Button>
                 </>
               ) : (
-                <p className="text-muted-foreground text-xs">
-                  No position is recorded, so this hotspot is not on the map.
-                </p>
+                <p className="text-muted-foreground text-xs">{POSITION_NOTES[hotspot.position]}</p>
               )}
             </div>
           </>
@@ -206,13 +216,20 @@ export function HotspotDetail({
                 },
                 {
                   label: 'Position',
-                  value: isPlaced(hotspot) ? (
-                    <span className="tabular-nums">
-                      {coordinate(hotspot.latitude)}, {coordinate(hotspot.longitude)}
-                    </span>
-                  ) : (
-                    EMPTY_VALUE
-                  ),
+                  value:
+                    hotspot.recordedLatitude !== null && hotspot.recordedLongitude !== null ? (
+                      <span className="tabular-nums">
+                        {coordinate(hotspot.recordedLatitude)},{' '}
+                        {coordinate(hotspot.recordedLongitude)}
+                        {isPlaced(hotspot) ? null : (
+                          <span className="text-warning block text-xs font-normal">
+                            {POSITION_LABELS[hotspot.position]}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      EMPTY_VALUE
+                    ),
                 },
                 { label: 'Added', value: formatDate(hotspot.createdAt) },
                 { label: 'Last updated', value: formatDate(hotspot.updatedAt) },

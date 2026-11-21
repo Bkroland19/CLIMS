@@ -15,9 +15,11 @@ import {
   type CircleLayerSpecification,
   type ExpressionSpecification,
   type GeoJSONSource,
+  type IControl,
   type MapGeoJSONFeature,
+  type SymbolLayerSpecification,
 } from 'maplibre-gl';
-import type { Feature, FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection, Position } from 'geojson';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 
 import type { Basemap } from '@/config/env';
@@ -33,20 +35,23 @@ import {
   type Category,
   type MapPalette,
 } from './palette';
+import { HOME_ICON_PATHS, PIN_TIP_SHIFT, drawPin, parsePinImageId } from './pins';
 import type { PlacedHotspot } from './records';
+import { UGANDA_BORDER, UGANDA_BOUNDS } from './uganda';
 
 /*
  * The hotspot map itself: OpenStreetMap raster tiles under the hotspots, drawn
  * with MapLibre GL (WebGL), so twelve thousand points pan smoothly.
  *
  *   clusters  nearby hotspots merge into rings split by category, with the count
- *             inside; a single hotspot is a dot
- *   heatmap   where hotspots are dense, turning into dots as you zoom in
- *   points    every hotspot as a dot
+ *             inside; a single hotspot is a pin with its venue's glyph
+ *   heatmap   where hotspots are dense, turning into pins as you zoom in
+ *   points    every hotspot: dots across the country, pins from town level
  *
- * The base map is desaturated so the hotspots carry the colour, and inverted in
- * the dark theme. Everything this component knows comes in as props; the page
- * owns the filters and the selection.
+ * The map stays on Uganda: it cannot be panned far past the border, and
+ * everything outside the border is dimmed. The base map is desaturated so the
+ * hotspots carry the colour, and inverted in the dark theme. Everything this
+ * component knows comes in as props; the page owns the filters and selection.
  */
 
 // MapLibre runs its tiling in a worker. Bundlers cannot follow the URL it builds
@@ -76,7 +81,7 @@ interface HotspotMapCanvasProps {
   colourBy: ColourBy;
   hotspots: readonly PlacedHotspot[];
   selected: PlacedHotspot | null;
-  /** A hotspot pointed at in the list, ringed on the map. */
+  /** A hotspot pointed at in the list, raised on the map. */
   highlightedId: string | null;
   initialBounds: Bounds;
   /** The words shown when the pointer rests on a hotspot. */
@@ -95,17 +100,29 @@ interface HotspotMapCanvasProps {
 const SOURCE = 'hotspots';
 const FLAT_SOURCE = 'hotspots-flat';
 const FOCUS_SOURCE = 'focus';
+const UGANDA_SOURCE = 'uganda';
 const BASEMAP = 'basemap';
 const LAYERS = {
+  ugandaMask: 'uganda-mask',
+  ugandaBorder: 'uganda-border',
   heat: 'hotspot-heat',
-  flatPoints: 'hotspot-points-flat',
-  points: 'hotspot-points',
+  flatDots: 'hotspot-dots-flat',
+  flatPins: 'hotspot-pins-flat',
+  pins: 'hotspot-pins',
+  selectedSpot: 'hotspot-selected-spot',
   highlight: 'hotspot-highlight',
-  selectedHalo: 'hotspot-selected-halo',
   selected: 'hotspot-selected',
 } as const;
-const POINT_LAYERS = [LAYERS.points, LAYERS.flatPoints];
+const POINT_LAYERS = [LAYERS.pins, LAYERS.flatPins, LAYERS.flatDots];
 const CLUSTER_MAX_ZOOM = 14;
+/** Below this zoom the points style draws dots; from it, pins. */
+const PIN_ZOOM = 11;
+
+/** Uganda with room around it: the map cannot be panned or zoomed out past this. */
+const MAX_BOUNDS: [[number, number], [number, number]] = [
+  [UGANDA_BOUNDS.west - 1.6, UGANDA_BOUNDS.south - 1.5],
+  [UGANDA_BOUNDS.east + 1.6, UGANDA_BOUNDS.north + 1.5],
+];
 
 const reviewKey = (key: string) => `r_${key}`;
 const dispenserKey = (key: string) => `d_${key}`;
@@ -122,14 +139,62 @@ const CLUSTER_PROPERTIES = Object.fromEntries([
   ]),
 ]) as Record<string, unknown>;
 
+function properties(hotspot: PlacedHotspot) {
+  return { id: hotspot.id, r: hotspot.review, d: hotspot.dispenser, v: hotspot.venue };
+}
+
 function toFeatures(hotspots: readonly PlacedHotspot[]): FeatureCollection {
   return {
     type: 'FeatureCollection',
     features: hotspots.map((hotspot) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [hotspot.longitude, hotspot.latitude] },
-      properties: { id: hotspot.id, r: hotspot.review, d: hotspot.dispenser },
+      properties: properties(hotspot),
     })),
+  };
+}
+
+/** Twice the signed area of a ring: positive when it runs anticlockwise. */
+function signedArea(ring: readonly Position[]): number {
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi = 0, yi = 0] = ring[i] ?? [];
+    const [xj = 0, yj = 0] = ring[j] ?? [];
+    sum += (xj - xi) * (yj + yi);
+  }
+  return -sum;
+}
+
+/**
+ * The world with Uganda cut out of it, to dim everything outside the country,
+ * and the border itself. A hole must wind the other way from its outer ring.
+ */
+function ugandaShapes(): FeatureCollection {
+  const border: Position[] = UGANDA_BORDER.map(([x, y]) => [x, y]);
+  const [first] = border;
+  if (first) border.push(first);
+  const hole = signedArea(border) > 0 ? [...border].reverse() : border;
+  const world: Position[] = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
+  ];
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [world, hole] },
+        properties: { kind: 'mask' },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: border },
+        properties: { kind: 'border' },
+      },
+    ],
   };
 }
 
@@ -145,6 +210,11 @@ function colourExpression(colourBy: ColourBy, palette: MapPalette): ExpressionSp
     ...pairs,
     palette.mutedForeground,
   ] as unknown as ExpressionSpecification;
+}
+
+/** `pin|<colour>|<venue>`: the name of the pin image each hotspot needs (see `pins.ts`). */
+function pinImage(colourBy: ColourBy, palette: MapPalette): ExpressionSpecification {
+  return ['concat', 'pin|', colourExpression(colourBy, palette), '|', ['get', 'v']];
 }
 
 function withAlpha(colour: string, alpha: number): string {
@@ -164,9 +234,32 @@ const DOT_RADIUS: ExpressionSpecification = [
   4.5,
   13,
   6.5,
-  17,
-  9,
 ];
+
+/** Pins grow a little as you zoom in, from country to street level. */
+const pinSize = (scale: number): ExpressionSpecification => [
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  6,
+  0.72 * scale,
+  11,
+  0.85 * scale,
+  15,
+  1 * scale,
+];
+
+function pinLayout(image: ExpressionSpecification, scale = 1): SymbolLayerSpecification['layout'] {
+  return {
+    'icon-image': image,
+    'icon-size': pinSize(scale),
+    'icon-anchor': 'bottom',
+    'icon-offset': [0, PIN_TIP_SHIFT],
+    // Every hotspot is drawn: hiding pins that overlap would hide hotspots.
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true,
+  };
+}
 
 function basemapPaint(dark: boolean) {
   // Dark: invert the light tiles and turn the hues back, so water stays blue.
@@ -200,7 +293,7 @@ function applyBasemap(map: MapLibre, basemap: Basemap | null, dark: boolean) {
   });
   map.addLayer(
     { id: BASEMAP, type: 'raster', source: BASEMAP, paint: basemapPaint(dark) },
-    map.getLayer(LAYERS.heat) ? LAYERS.heat : undefined,
+    map.getLayer(LAYERS.ugandaMask) ? LAYERS.ugandaMask : undefined,
   );
 }
 
@@ -220,9 +313,47 @@ function sliceCounts(
   });
 }
 
+/** A map button that brings the whole country back into view. */
+class UgandaControl implements IControl {
+  private container: HTMLDivElement | null = null;
+
+  constructor(private readonly onClick: () => void) {}
+
+  onAdd(): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'hotspot-map__home';
+    button.title = 'Show all of Uganda';
+    button.setAttribute('aria-label', 'Show all of Uganda');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of HOME_ICON_PATHS) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      svg.append(path);
+    }
+    button.append(svg);
+    button.addEventListener('click', this.onClick);
+    container.append(button);
+    this.container = container;
+    return container;
+  }
+
+  onRemove(): void {
+    this.container?.remove();
+    this.container = null;
+  }
+}
+
 function prefersCoarsePointer(): boolean {
   return window.matchMedia('(pointer: coarse)').matches;
 }
+
+/** Room left around a framed area, clear of the style card, the controls and the key. */
+const FRAME_PADDING = { top: 96, right: 56, bottom: 170, left: 40 };
 
 export default function HotspotMapCanvas({
   handleRef,
@@ -287,8 +418,7 @@ export default function HotspotMapCanvas({
             [bounds.west, bounds.south],
             [bounds.east, bounds.north],
           ],
-          // Clear of the style card (top left), the controls (right) and the key (bottom).
-          { padding: { top: 96, right: 56, bottom: 170, left: 40 }, maxZoom },
+          { padding: FRAME_PADDING, maxZoom },
         );
       },
       flyTo: (point, zoom = 14) => {
@@ -329,6 +459,7 @@ export default function HotspotMapCanvas({
           [start.initialBounds.east, start.initialBounds.north],
         ],
         fitBoundsOptions: { padding: 24 },
+        maxBounds: MAX_BOUNDS,
         maxZoom: 18,
         attributionControl: false,
         dragRotate: false,
@@ -351,6 +482,18 @@ export default function HotspotMapCanvas({
 
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(
+      new UgandaControl(() => {
+        map.fitBounds(
+          [
+            [UGANDA_BOUNDS.west, UGANDA_BOUNDS.south],
+            [UGANDA_BOUNDS.east, UGANDA_BOUNDS.north],
+          ],
+          { padding: FRAME_PADDING },
+        );
+      }),
+      'top-right',
+    );
+    map.addControl(
       new GeolocateControl({
         positionOptions: { enableHighAccuracy: true, timeout: 10_000 },
         fitBoundsOptions: { maxZoom: 14 },
@@ -367,8 +510,38 @@ export default function HotspotMapCanvas({
       if (tileErrors === 4) tilesFailing();
     });
 
+    // Pins are drawn the first time a layer asks for one; the name says how.
+    map.setMissingStyleImageResolver((id) => {
+      const pin = parsePinImageId(id);
+      if (!pin || map.hasImage(id)) return;
+      const image = drawPin(pin.fill, pin.venue, 2);
+      if (image) map.addImage(id, image, { pixelRatio: 2 });
+    });
+
     map.on('load', () => {
+      const { colourBy: initialColour, palette: initialPalette } = look.current;
+      map.addSource(UGANDA_SOURCE, { type: 'geojson', data: ugandaShapes() });
+      map.addLayer({
+        id: LAYERS.ugandaMask,
+        type: 'fill',
+        source: UGANDA_SOURCE,
+        filter: ['==', ['get', 'kind'], 'mask'],
+        paint: { 'fill-color': initialPalette.background, 'fill-opacity': 0.6 },
+      });
+      map.addLayer({
+        id: LAYERS.ugandaBorder,
+        type: 'line',
+        source: UGANDA_SOURCE,
+        filter: ['==', ['get', 'kind'], 'border'],
+        layout: { 'line-join': 'round' },
+        paint: {
+          'line-color': initialPalette.foreground,
+          'line-opacity': 0.4,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1, 10, 2.5],
+        },
+      });
       applyBasemap(map, start.basemap, start.dark);
+
       const empty = toFeatures([]);
       map.addSource(SOURCE, {
         type: 'geojson',
@@ -381,12 +554,12 @@ export default function HotspotMapCanvas({
       map.addSource(FLAT_SOURCE, { type: 'geojson', data: empty });
       map.addSource(FOCUS_SOURCE, { type: 'geojson', data: empty });
 
-      const { colourBy: initialColour, palette: initialPalette } = look.current;
+      const image = pinImage(initialColour, initialPalette);
       const dotPaint: CircleLayerSpecification['paint'] = {
         'circle-radius': DOT_RADIUS,
         'circle-color': colourExpression(initialColour, initialPalette),
-        'circle-stroke-color': initialPalette.card,
-        'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 12, 1.5],
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 0.75, 10, 1.25],
       };
 
       map.addLayer({
@@ -397,56 +570,55 @@ export default function HotspotMapCanvas({
         layout: { visibility: 'none' },
       });
       map.addLayer({
-        id: LAYERS.flatPoints,
+        id: LAYERS.flatDots,
         type: 'circle',
         source: FLAT_SOURCE,
+        maxzoom: PIN_ZOOM,
         layout: { visibility: 'none' },
         paint: dotPaint,
       });
       map.addLayer({
-        id: LAYERS.points,
-        type: 'circle',
+        id: LAYERS.flatPins,
+        type: 'symbol',
+        source: FLAT_SOURCE,
+        minzoom: PIN_ZOOM,
+        layout: { ...pinLayout(image), visibility: 'none' },
+      });
+      map.addLayer({
+        id: LAYERS.pins,
+        type: 'symbol',
         source: SOURCE,
         filter: ['!', ['has', 'point_count']],
-        paint: dotPaint,
+        layout: pinLayout(image),
+      });
+      // The selected hotspot: a soft spot on its exact position under a larger pin.
+      map.addLayer({
+        id: LAYERS.selectedSpot,
+        type: 'circle',
+        source: FOCUS_SOURCE,
+        filter: ['==', ['get', 'kind'], 'selected'],
+        paint: {
+          'circle-radius': 9,
+          'circle-color': initialPalette.foreground,
+          'circle-opacity': 0.18,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': initialPalette.foreground,
+          'circle-stroke-opacity': 0.6,
+        },
       });
       map.addLayer({
         id: LAYERS.highlight,
-        type: 'circle',
+        type: 'symbol',
         source: FOCUS_SOURCE,
         filter: ['==', ['get', 'kind'], 'highlight'],
-        paint: {
-          'circle-radius': 11,
-          'circle-color': 'transparent',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': initialPalette.foreground,
-          'circle-stroke-opacity': 0.55,
-        },
-      });
-      map.addLayer({
-        id: LAYERS.selectedHalo,
-        type: 'circle',
-        source: FOCUS_SOURCE,
-        filter: ['==', ['get', 'kind'], 'selected'],
-        paint: {
-          'circle-radius': 14,
-          'circle-color': initialPalette.foreground,
-          'circle-opacity': 0.12,
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': initialPalette.foreground,
-        },
+        layout: pinLayout(image, 1.2),
       });
       map.addLayer({
         id: LAYERS.selected,
-        type: 'circle',
+        type: 'symbol',
         source: FOCUS_SOURCE,
         filter: ['==', ['get', 'kind'], 'selected'],
-        paint: {
-          'circle-radius': 7,
-          'circle-color': colourExpression(initialColour, initialPalette),
-          'circle-stroke-color': initialPalette.card,
-          'circle-stroke-width': 2,
-        },
+        layout: pinLayout(image, 1.4),
       });
       setReady(true);
       loaded();
@@ -470,10 +642,12 @@ export default function HotspotMapCanvas({
     });
 
     // Hover: the hotspot's name and status, written as text (names are user input).
+    // It sits above the pin, whose tip is on the position.
     const hover = new Popup({
       closeButton: false,
       closeOnClick: false,
-      offset: 10,
+      anchor: 'bottom',
+      offset: [0, -34],
       className: 'hotspot-hover',
       maxWidth: '260px',
     });
@@ -481,9 +655,10 @@ export default function HotspotMapCanvas({
       features?: MapGeoJSONFeature[];
       lngLat: { lng: number; lat: number };
     }) => {
-      const id: unknown = event.features?.[0]?.properties.id;
+      const feature = event.features?.[0];
+      const id: unknown = feature?.properties.id;
       const words = typeof id === 'string' ? label(id) : null;
-      if (!words) return;
+      if (!words || feature?.geometry.type !== 'Point') return;
       map.getCanvas().style.cursor = 'pointer';
       const body = document.createElement('div');
       const title = document.createElement('p');
@@ -493,7 +668,8 @@ export default function HotspotMapCanvas({
       detail.className = 'hotspot-hover__detail';
       detail.textContent = words.detail;
       body.append(title, detail);
-      hover.setLngLat(event.lngLat).setDOMContent(body).addTo(map);
+      const [lng = event.lngLat.lng, lat = event.lngLat.lat] = feature.geometry.coordinates;
+      hover.setLngLat([lng, lat]).setDOMContent(body).addTo(map);
     };
     const hideHover = () => {
       map.getCanvas().style.cursor = '';
@@ -597,17 +773,16 @@ export default function HotspotMapCanvas({
     const map = mapRef.current;
     look.current = { view, colourBy, palette };
     if (!ready || !map) return;
-    const colour = colourExpression(colourBy, palette);
-    for (const layer of [LAYERS.points, LAYERS.flatPoints, LAYERS.selected]) {
-      map.setPaintProperty(layer, 'circle-color', colour);
+    const image = pinImage(colourBy, palette);
+    for (const layer of [LAYERS.pins, LAYERS.flatPins, LAYERS.highlight, LAYERS.selected]) {
+      map.setLayoutProperty(layer, 'icon-image', image);
     }
-    for (const layer of [LAYERS.points, LAYERS.flatPoints, LAYERS.selected]) {
-      map.setPaintProperty(layer, 'circle-stroke-color', palette.card);
-    }
-    map.setPaintProperty(LAYERS.highlight, 'circle-stroke-color', palette.foreground);
-    map.setPaintProperty(LAYERS.selectedHalo, 'circle-color', palette.foreground);
-    map.setPaintProperty(LAYERS.selectedHalo, 'circle-stroke-color', palette.foreground);
+    map.setPaintProperty(LAYERS.flatDots, 'circle-color', colourExpression(colourBy, palette));
+    map.setPaintProperty(LAYERS.selectedSpot, 'circle-color', palette.foreground);
+    map.setPaintProperty(LAYERS.selectedSpot, 'circle-stroke-color', palette.foreground);
     map.setPaintProperty('background', 'background-color', palette.muted);
+    map.setPaintProperty(LAYERS.ugandaMask, 'fill-color', palette.background);
+    map.setPaintProperty(LAYERS.ugandaBorder, 'line-color', palette.foreground);
     map.setPaintProperty(LAYERS.heat, 'heatmap-color', [
       'interpolate',
       ['linear'],
@@ -655,23 +830,18 @@ export default function HotspotMapCanvas({
       0.25,
     ]);
 
-    map.setLayoutProperty(LAYERS.points, 'visibility', view === 'clusters' ? 'visible' : 'none');
-    map.setLayoutProperty(LAYERS.heat, 'visibility', view === 'heatmap' ? 'visible' : 'none');
-    map.setLayoutProperty(
-      LAYERS.flatPoints,
-      'visibility',
-      view === 'clusters' ? 'none' : 'visible',
-    );
-    // On the heatmap, the dots fade in as the heat fades out.
+    const show = (layer: string, visible: boolean) => {
+      map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+    };
+    show(LAYERS.pins, view === 'clusters');
+    show(LAYERS.heat, view === 'heatmap');
+    show(LAYERS.flatDots, view === 'points');
+    show(LAYERS.flatPins, view !== 'clusters');
+    // On the heatmap, pins fade in at town level as the heat fades out.
     map.setPaintProperty(
-      LAYERS.flatPoints,
-      'circle-opacity',
-      view === 'heatmap' ? ['interpolate', ['linear'], ['zoom'], 11, 0, 13.5, 1] : 1,
-    );
-    map.setPaintProperty(
-      LAYERS.flatPoints,
-      'circle-stroke-opacity',
-      view === 'heatmap' ? ['interpolate', ['linear'], ['zoom'], 11, 0, 13.5, 1] : 1,
+      LAYERS.flatPins,
+      'icon-opacity',
+      view === 'heatmap' ? ['interpolate', ['linear'], ['zoom'], PIN_ZOOM, 0, PIN_ZOOM + 2, 1] : 1,
     );
     resetClusters();
   }, [ready, view, colourBy, palette]);
@@ -680,6 +850,8 @@ export default function HotspotMapCanvas({
     const map = mapRef.current;
     if (!ready || !map) return;
     applyBasemap(map, basemap, dark);
+    // The dimmed world is lighter in the dark theme, where the background is near black.
+    map.setPaintProperty(LAYERS.ugandaMask, 'fill-opacity', dark ? 0.5 : 0.6);
   }, [ready, basemap, dark]);
 
   useEffect(() => {
@@ -691,14 +863,14 @@ export default function HotspotMapCanvas({
       features.push({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [highlighted.longitude, highlighted.latitude] },
-        properties: { kind: 'highlight' },
+        properties: { ...properties(highlighted), kind: 'highlight' },
       });
     }
     if (selected) {
       features.push({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [selected.longitude, selected.latitude] },
-        properties: { kind: 'selected', r: selected.review, d: selected.dispenser },
+        properties: { ...properties(selected), kind: 'selected' },
       });
     }
     void map
@@ -710,7 +882,7 @@ export default function HotspotMapCanvas({
     <div
       ref={containerRef}
       role="region"
-      aria-label="Hotspot map. Use the list beside it to browse hotspots by keyboard."
+      aria-label="Hotspot map of Uganda. Use the list beside it to browse hotspots by keyboard."
       className={cn('hotspot-map size-full', className)}
     />
   );

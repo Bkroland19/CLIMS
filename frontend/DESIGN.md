@@ -8,9 +8,11 @@ The look follows the [SalesOps Dashboard](https://v0.app/templates/salesops-dash
 reference: a 260px sidebar with a green active marker, uppercase table headers, tinted status
 chips, DM Sans. Components are shadcn/ui (`radix-nova` style, Radix primitives) on Tailwind CSS 4.
 
-The CLIMS prototype refines it, and wins where the two differ: a 56px top bar, flat 10px cards, a
-green-tinted table header, pill status chips and role colours. Its visual spec is
-`design/prototype/CLIMS Theme.dc.html` (see `design/IMPLEMENTATION_PLAN.md`).
+The CLIMS prototype refines it, and wins where the two differ: flat 10px cards, a green-tinted
+table header, pill status chips and role colours. Its visual spec is
+`design/prototype/CLIMS Theme.dc.html` (see `design/IMPLEMENTATION_PLAN.md`). The app is denser
+than the prototype: people work through long lists all day, so controls, rows and gaps are a step
+smaller than its 56px top bar and 36px controls (see Sizes).
 
 The reference ships in dark mode only. **Light is this product's theme**: its hues re-pitched for
 a white surface. Dark is available from the header toggle and uses the reference's own values. The
@@ -51,13 +53,21 @@ numbers that are compared use `tabular-nums`.
 
 ### Sizes
 
-| Thing        | Size                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------ |
-| Sidebar      | 248px; 56px collapsed to icons; a sheet below 768px                                  |
-| Top bar      | 56px (`h-header`), full width above the sidebar and the page                         |
-| Controls     | 36px standard (`default`); 32px compact (`sm`, `icon-sm`) in tables and toolbars     |
-| Table cells  | 9 × 12px (header 8 × 12px), 16px at the table's outer edges                          |
-| Status chips | 22px pill (`status-chip`), 10.5px bold capitals, a dot, a hairline of its own colour |
+| Thing        | Size                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------- |
+| Sidebar      | 224px, 32px items; 48px collapsed to icons; a sheet below 768px                       |
+| Top bar      | 48px (`h-header`), full width above the sidebar and the page                          |
+| Heading band | 18px title, 13px description, 32px tabs                                               |
+| Controls     | 32px standard (`default`, `icon`); 28px compact (`sm`, `icon-sm`) in tables, toolbars |
+| Table cells  | 6 × 12px (2px in the View menu's compact rows; header 6 × 12px), 16px at the edges    |
+| Status chips | 22px pill (`status-chip`), 10.5px bold capitals, a dot, a hairline of its own colour  |
+
+Spacing runs on a 4px scale with three steps that carry the rhythm: 16px between a page's
+sections and side-by-side columns (`gap-section`), 16px padding inside a card (`Card`,
+`StatCard`, `ChartCard`), and 12px between groups inside a card. Density comes from spacing and
+control height, not from shrinking what people read: body text, table cells and inputs stay
+14px. Only supporting text steps down (13px sidebar items and page descriptions, 11px table
+header capitals).
 
 ### Three rules that are easy to get wrong
 
@@ -106,8 +116,8 @@ solid ring: `focus-visible:ring-2 focus-visible:ring-ring`.
 
 ### The shell
 
-Top bar (menu toggle, product name, notifications bell, theme, account), then the sidebar and the
-page. The sidebar shows the current workspace's labelled sections; an item with things waiting
+Top bar (menu toggle, ministry seal and product name, notifications bell, theme, account), then
+the sidebar and the page. The sidebar shows the current workspace's labelled sections; an item with things waiting
 carries a count pill (a red dot when collapsed to icons), and the foot names the workspace. Under
 the top bar, the heading band holds the page title, one line on what the page is for and, when a
 section has several pages, its tabs. There is no breadcrumb: the sidebar shows where you are. A
@@ -118,6 +128,15 @@ content and, at the top of it, its `PageActions`.
 
 `accent` is deliberately neutral. The reference names its green "accent", but shadcn components
 use `accent` for hover backgrounds, which must stay quiet. Its green is this system's `primary`.
+
+### The seal
+
+The Ministry of Health seal (`src/assets/moh-seal.png`, cut from the ministry's artwork) is the
+only mark. It sits at 28px in the top bar and at 44px in `Brand`, on the sign-in, onboarding and
+access screens; the favicon and touch icon are made from the same artwork. Show it as supplied:
+never recolour, crop or outline it, and put it on no plate (its outer black ring is its edge in
+both themes). Beside the ministry's name it is decorative (`alt=""`); on its own its alt text is
+"Ministry of Health, Uganda".
 
 ## Building blocks
 
@@ -180,10 +199,15 @@ The hotspot map (`features/hotspots/map`) is the one map. Extend it rather than 
 - **The base map is context, not content.** OpenStreetMap tiles are desaturated in light and
   inverted (with the hue turned back, so water stays blue) in dark, so the hotspots carry the
   colour.
-- **Markers are fills.** Active and a working dispenser take `primary`; the other states take the
-  status colours (`warning`, `destructive`, `info`, neutral `role-system`). WebGL cannot read CSS,
-  so `map/palette.ts` reads the tokens and reads them again when the theme changes. Never write a
-  hex value for a marker.
+- **Uganda is the subject.** The map is held to the country, everything outside the border is
+  dimmed with `background`, and the border is a `foreground` line.
+- **A hotspot is a pin.** A white-edged teardrop in its category colour, tip on the position, with
+  the venue's lucide glyph inside (`map/pins.ts`; a dot when the type is unknown). The glyph takes
+  white or near-black, whichever contrasts more with the fill. Pins are fills: active and a
+  working dispenser take `primary`; the other states take the status colours (`warning`,
+  `destructive`, `info`, neutral `role-system`). WebGL cannot read CSS, so `map/palette.ts` reads
+  the tokens and reads them again when the theme changes. Never write a hex value for a marker.
+  Across the whole country the points style uses small dots; pins take over at town level.
 - **Clusters are rings** split by the same categories, with the count inside. Each is a real
   button whose name says what it holds in words.
 - **The key is a filter.** Its tabs choose what colour means; each entry switches its hotspots on

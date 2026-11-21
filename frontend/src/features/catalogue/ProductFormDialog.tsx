@@ -12,9 +12,7 @@ import {
   categoryLabel,
   isComplete,
   PRODUCT_CATEGORIES,
-  PRODUCT_TYPES,
   productName,
-  typeLabel,
   type CatalogueRef,
   type Lookup,
   type Product,
@@ -38,6 +36,7 @@ interface LookupOptions {
 interface ProductFormDialogProps {
   /** The product to edit; leave out to add one. */
   product?: Product;
+  types: LookupOptions;
   brands: LookupOptions;
   units: LookupOptions;
   onClose: () => void;
@@ -49,10 +48,8 @@ const CATEGORY_OPTIONS = PRODUCT_CATEGORIES.map((category) => ({
   label: categoryLabel(category),
 }));
 
-const TYPE_OPTIONS = PRODUCT_TYPES.map((type) => ({ value: type, label: typeLabel(type) }));
-
 /**
- * Active brands or units to choose from. One the product already has stays listed,
+ * Active types, brands or units to choose from. One the product already has stays listed,
  * marked inactive, so editing other fields does not force a change.
  */
 function lookupOptions(lookups: readonly Lookup[] | undefined, current: CatalogueRef | null) {
@@ -71,6 +68,7 @@ function lookupOptions(lookups: readonly Lookup[] | undefined, current: Catalogu
 /** Adds a product, or edits `product`. Mount it to open; `onClose` unmounts it. */
 export function ProductFormDialog({
   product,
+  types,
   brands,
   units,
   onClose,
@@ -168,7 +166,7 @@ export function ProductFormDialog({
       />
       <Controller
         control={control}
-        name="type"
+        name="type_id"
         render={({ field, fieldState }) => (
           <SelectField
             label="Type"
@@ -177,9 +175,11 @@ export function ProductFormDialog({
             onValueChange={field.onChange}
             onBlur={field.onBlur}
             triggerRef={field.ref}
-            options={TYPE_OPTIONS}
+            options={lookupOptions(types.data, product?.type ?? null)}
             placeholder="Choose a type…"
-            description="How the product reaches people."
+            description="How the product reaches people. Add a missing type on the Types tab."
+            isLoading={types.isPending}
+            loadError={types.error ? getErrorMessage(types.error) : undefined}
             error={fieldState.error?.message}
           />
         )}

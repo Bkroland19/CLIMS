@@ -48,8 +48,7 @@ func notification(action string) (string, string, bool) {
 // productLabel names a product the same way as the inventory reports: brand,
 // distribution channel and category, e.g. "Engabu Free Male".
 const productLabel = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id = c.brand_id),
-	CASE c.type WHEN 'free' THEN 'Free' WHEN 'socially_marketed' THEN 'Socially marketed'
-		WHEN 'commercial' THEN 'Commercial' END,
+	(SELECT pt.name FROM product_types pt WHERE pt.id = c.type_id),
 	CASE c.category WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female' END)`
 
 // record writes a workflow step to order_events, the order's history, and notifies the people

@@ -73,13 +73,16 @@ import {
 import {
   DISPENSER_LABELS,
   DISPENSER_STATES,
+  POSITION_LABELS,
   REVIEW_LABELS,
   VENUE_KINDS,
   VENUE_LABELS,
   isPlaced,
   type MapHotspot,
 } from './map/records';
+import { UGANDA_BOUNDS } from './map/uganda';
 import { useMapHotspots, type MapScope } from './map/useMapHotspots';
+import { VENUE_ICONS } from './map/venueIcons';
 import { mapSummary } from './mapSummary';
 import { useLocationDistricts } from './queries';
 
@@ -99,9 +102,6 @@ const HotspotMapCanvas = dynamic(() => import('./map/HotspotMapCanvas'), {
   loading: () => <Skeleton className="size-full rounded-none" />,
 });
 
-/** Uganda, with a little margin. */
-const UGANDA: Bounds = { west: 29.4, south: -1.6, east: 35.1, north: 4.3 };
-
 const VIEW_OPTIONS = (['clusters', 'heatmap', 'points'] as const).map((value) => ({
   value,
   label: VIEW_LABELS[value],
@@ -116,8 +116,10 @@ const EXPORT_COLUMNS: readonly ExportColumn<MapHotspot>[] = [
   { header: 'Subcounty', value: (hotspot) => hotspot.subcounty?.name ?? null },
   { header: 'District', value: (hotspot) => hotspot.district?.name ?? null },
   { header: 'Region', value: (hotspot) => hotspot.region?.name ?? null },
-  { header: 'Latitude', value: (hotspot) => hotspot.latitude },
-  { header: 'Longitude', value: (hotspot) => hotspot.longitude },
+  // As recorded, so a position left off the map can be found and corrected.
+  { header: 'Latitude', value: (hotspot) => hotspot.recordedLatitude },
+  { header: 'Longitude', value: (hotspot) => hotspot.recordedLongitude },
+  { header: 'Position check', value: (hotspot) => POSITION_LABELS[hotspot.position] },
   { header: 'Dispenser', value: (hotspot) => DISPENSER_LABELS[hotspot.dispenser] },
   { header: 'Dispenser condition', value: (hotspot) => hotspot.dispenserCondition },
   { header: 'Contact person', value: (hotspot) => hotspot.contactName },
@@ -240,7 +242,15 @@ export default function HotspotMapPage({
   const shown = matches ?? filtered;
   const placed = useMemo(() => shown.filter(isPlaced), [shown]);
   const allPlaced = useMemo(() => loaded.filter(isPlaced), [loaded]);
-  const unplaced = useMemo(() => filtered.filter((hotspot) => !isPlaced(hotspot)), [filtered]);
+  // A wrong position (swapped, or outside Uganda) is listed before a missing one:
+  // those are the records with something to correct. Each group stays in name order.
+  const unplaced = useMemo(
+    () =>
+      filtered
+        .filter((hotspot) => !isPlaced(hotspot))
+        .sort((a, b) => Number(a.position === 'missing') - Number(b.position === 'missing')),
+    [filtered],
+  );
 
   // Colours.
   const palette = useMapPalette();
@@ -273,6 +283,7 @@ export default function HotspotMapPage({
         key,
         label: VENUE_LABELS[key],
         count: venue.get(key) ?? 0,
+        icon: VENUE_ICONS[key],
       })).filter((option) => option.count > 0 || state.venue?.includes(option.key)),
     };
   }, [loaded, filters, palette, state.venue]);
@@ -343,9 +354,12 @@ export default function HotspotMapPage({
       mapRef.current?.flyTo(linked, 14);
       return;
     }
-    const bounds = boundsOf(filtered.filter(isPlaced));
+    // The national map opens on the whole country; a region, a district or a
+    // user's own hotspots open on where those hotspots are.
+    const national = scope?.kind === 'national' && state.regionId === null;
+    const bounds = national ? UGANDA_BOUNDS : boundsOf(filtered.filter(isPlaced));
     if (bounds) mapRef.current?.fitTo(bounds, 13);
-  }, [frameKey, filtered, byId]);
+  }, [frameKey, filtered, byId, scope?.kind, state.regionId]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -421,10 +435,10 @@ export default function HotspotMapPage({
         }
       : listMode === 'unplaced'
         ? {
-            title: 'Without a position',
+            title: 'Not on the map',
             items: unplaced,
-            emptyTitle: 'Every hotspot has a position',
-            emptyHint: 'All the hotspots shown are on the map.',
+            emptyTitle: 'Every hotspot is on the map',
+            emptyHint: 'All the hotspots shown have a position in Uganda.',
           }
         : {
             title: 'In view',
@@ -632,7 +646,7 @@ export default function HotspotMapPage({
                 hotspots={placed}
                 selected={selectedPlaced}
                 highlightedId={highlightedId}
-                initialBounds={UGANDA}
+                initialBounds={UGANDA_BOUNDS}
                 describe={describe}
                 onSelect={(id) => {
                   select(id);
@@ -885,6 +899,12 @@ export default function HotspotMapPage({
                     </dl>
                   ) : null}
                   {listMode === 'unplaced' && matches === null ? (
+                    <p className="text-muted-foreground text-xs">
+                      Their recorded position is missing, has latitude and longitude the wrong way
+                      round, or is outside Uganda. Correct it where the hotspot was recorded.
+                    </p>
+                  ) : null}
+                  {listMode === 'unplaced' && matches === null ? (
                     <Button
                       variant="link"
                       size="sm"
@@ -902,6 +922,7 @@ export default function HotspotMapPage({
                   hotspots={listing.items}
                   colourBy={state.colourBy}
                   colourOf={colourFor}
+                  showPosition={listMode === 'unplaced' && matches === null}
                   emptyTitle={listing.emptyTitle}
                   emptyHint={listing.emptyHint}
                   onSelect={(id) => {
@@ -919,7 +940,11 @@ export default function HotspotMapPage({
             <p className="text-muted-foreground tabular-nums" aria-live="polite">
               {isLoading
                 ? `${formatNumber(loaded.length)} hotspots loaded so far.`
-                : mapSummary(filtered.length - unplaced.length, filtered.length)}
+                : mapSummary(
+                    filtered.length - unplaced.length,
+                    filtered.length,
+                    unplaced.filter((hotspot) => hotspot.position !== 'missing').length,
+                  )}
               {filterCount > 0 && !isLoading
                 ? ` Filters hide ${formatNumber(loaded.length - filtered.length)}.`
                 : ''}
@@ -937,7 +962,7 @@ export default function HotspotMapPage({
                   });
                 }}
               >
-                List the {formatNumber(unplaced.length)} without a position
+                List the {formatNumber(unplaced.length)} not on the map
               </Button>
             ) : null}
           </div>

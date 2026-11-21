@@ -2729,6 +2729,256 @@
         "x-required-permissions": ["catalogue:manage"]
       }
     },
+    "/api/v1/catalogue/types": {
+      "get": {
+        "tags": ["Catalogue"],
+        "operationId": "listCatalogueTypes",
+        "summary": "List product types",
+        "description": "Any active user may read the catalogue. Sorted by name. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "description": "true lists only active records (for pickers), false only inactive ones.",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Catalogue"],
+        "operationId": "createCatalogueType",
+        "summary": "Create a product type",
+        "description": "New types are active. Requires all permissions: catalogue:manage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "A type with this name already exists; `error.name` repeats the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/types/{id}": {
+      "patch": {
+        "tags": ["Catalogue"],
+        "operationId": "updateCatalogueType",
+        "summary": "Rename, describe, activate or deactivate a product type",
+        "description": "Renaming updates every product that uses it. Deactivating does not change its products; it only stops the type being newly chosen. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Product type not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A type with this name already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      },
+      "delete": {
+        "tags": ["Catalogue"],
+        "operationId": "deleteCatalogueType",
+        "summary": "Delete an unused product type",
+        "description": "Only a type that no products reference can be deleted; deactivate the others. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Product type not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The type is used by products.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
     "/api/v1/catalogue/brands": {
       "get": {
         "tags": ["Catalogue"],
@@ -5447,10 +5697,12 @@
             "nullable": true
           },
           "type": {
-            "type": "string",
-            "enum": ["free", "socially_marketed", "commercial"],
-            "nullable": true,
-            "description": "Distribution channel."
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogueRef"
+              }
+            ],
+            "nullable": true
           },
           "brand": {
             "allOf": [
@@ -5531,15 +5783,16 @@
       "CreateProductRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["category", "type", "brand_id", "unit_id", "pieces_per_unit"],
+        "required": ["category", "type_id", "brand_id", "unit_id", "pieces_per_unit"],
         "properties": {
           "category": {
             "type": "string",
             "enum": ["male", "female"]
           },
-          "type": {
+          "type_id": {
             "type": "string",
-            "enum": ["free", "socially_marketed", "commercial"]
+            "format": "uuid",
+            "description": "An active product type."
           },
           "brand_id": {
             "type": "string",
@@ -5562,15 +5815,16 @@
         "type": "object",
         "additionalProperties": false,
         "minProperties": 1,
-        "description": "Any subset of fields. Deactivating alone is always allowed; any other change, or activating, must leave the product complete. A brand or unit already on the product may stay even if it has since been deactivated.",
+        "description": "Any subset of fields. Deactivating alone is always allowed; any other change, or activating, must leave the product complete. A type, brand or unit already on the product may stay even if it has since been deactivated.",
         "properties": {
           "category": {
             "type": "string",
             "enum": ["male", "female"]
           },
-          "type": {
+          "type_id": {
             "type": "string",
-            "enum": ["free", "socially_marketed", "commercial"]
+            "format": "uuid",
+            "description": "An active product type."
           },
           "brand_id": {
             "type": "string",
@@ -5594,7 +5848,7 @@
       },
       "CatalogueLookup": {
         "type": "object",
-        "description": "A brand or a unit of measure.",
+        "description": "A product type, a brand or a unit of measure.",
         "required": [
           "id",
           "name",
@@ -5619,7 +5873,7 @@
           },
           "active": {
             "type": "boolean",
-            "description": "Inactive brands and units cannot be newly chosen for a product."
+            "description": "Inactive types, brands and units cannot be newly chosen for a product."
           },
           "in_use": {
             "type": "boolean",
@@ -5671,6 +5925,45 @@
             "items": {
               "$ref": "#/components/schemas/CatalogueLookup"
             }
+          }
+        }
+      },
+      "CreateTypeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          }
+        }
+      },
+      "UpdateTypeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          },
+          "active": {
+            "type": "boolean"
           }
         }
       },

@@ -4,7 +4,6 @@ import { wholeNumber } from '@/lib/validation';
 
 import {
   PRODUCT_CATEGORIES,
-  PRODUCT_TYPES,
   type Lookup,
   type LookupInput,
   type LookupKind,
@@ -21,7 +20,7 @@ import {
 export const productSchema = z.object({
   // Strings first, so a form can start with nothing chosen ('').
   category: z.string().pipe(z.enum(PRODUCT_CATEGORIES, 'Choose a category.')),
-  type: z.string().pipe(z.enum(PRODUCT_TYPES, 'Choose a type.')),
+  type_id: z.string().min(1, 'Choose a type.'),
   brand_id: z.string().min(1, 'Choose a brand.'),
   unit_id: z.string().min(1, 'Choose a unit of measure.'),
   pieces_per_unit: wholeNumber('how many condoms one unit holds', { min: 1, max: 100_000 }),
@@ -32,7 +31,7 @@ export type ProductFormOutput = z.output<typeof productSchema>;
 
 export const PRODUCT_FIELDS = [
   'category',
-  'type',
+  'type_id',
   'brand_id',
   'unit_id',
   'pieces_per_unit',
@@ -42,7 +41,7 @@ export const PRODUCT_FIELDS = [
 export function productDefaults(product?: Product): ProductFormInput {
   return {
     category: product ? (product.category ?? '') : 'male',
-    type: product?.type ?? '',
+    type_id: product?.type?.id ?? '',
     brand_id: product?.brand?.id ?? '',
     unit_id: product?.unit?.id ?? '',
     pieces_per_unit: product?.pieces_per_unit?.toString() ?? '',
@@ -54,11 +53,12 @@ export function toProductInput(values: ProductFormOutput): ProductInput {
 }
 
 const NAME_RULES: Record<LookupKind, { min: number; max: number }> = {
+  types: { min: 2, max: 40 },
   brands: { min: 1, max: 60 },
   units: { min: 2, max: 40 },
 };
 
-/** Brands and units share a form; only the name's length differs. */
+/** Types, brands and units share a form; only the name's length differs. */
 export function lookupSchema(kind: LookupKind) {
   const { min, max } = NAME_RULES[kind];
   return z.object({

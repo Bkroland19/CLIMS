@@ -460,18 +460,19 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	// Migration 18 deliberately grants catalogue:manage to moh; every other non-admin grant is the custom one.
-	var mohManagesCatalogue bool
+	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms; every other
+	// non-admin grant is the custom one.
+	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'),
-		EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
-			JOIN permissions p ON p.id = rp.permission_id WHERE r.name='moh' AND p.name='catalogue:manage')`).Scan(
-		&userCount, &roleCount, &mohManagesCatalogue); err != nil {
+		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
+			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
+		&userCount, &roleCount, &catalogueManagers); err != nil {
 		t.Fatal(err)
 	}
-	if userCount != 455 || roleCount != 1 || !mohManagesCatalogue {
-		t.Fatal("upgrade changed user count, lost custom permission grants or did not grant moh the catalogue")
+	if userCount != 455 || roleCount != 1 || catalogueManagers != "jms,moh,nms" {
+		t.Fatalf("upgrade changed user count, lost custom permission grants or granted the catalogue to %q", catalogueManagers)
 	}
 	// Upgrading a database that already holds the backup resolves the same duplicates.
 	assertUniqueIdentifiers(t, upgrade)

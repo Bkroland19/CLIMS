@@ -58,6 +58,7 @@ export function categoriesFor(colourBy: ColourBy): readonly Category<string>[] {
 
 /** The surface and ink colours the map draws with, besides the categories. */
 const SURFACE_TOKENS = {
+  background: '--background',
   card: '--card',
   foreground: '--foreground',
   muted: '--muted',

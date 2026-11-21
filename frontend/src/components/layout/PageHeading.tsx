@@ -26,7 +26,7 @@ function PageTabs({ item, currentPath, counts }: PageTabsProps) {
   return (
     <nav
       aria-label={`${item.label} pages`}
-      className="-mb-px flex [scrollbar-width:none] gap-7 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+      className="-mb-px flex [scrollbar-width:none] gap-5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
     >
       {item.pages.map((page) => {
         const isCurrent = page.path === currentPath;
@@ -37,7 +37,7 @@ function PageTabs({ item, currentPath, counts }: PageTabsProps) {
             href={page.path}
             aria-current={isCurrent ? 'page' : undefined}
             className={cn(
-              'focus-visible:ring-ring flex h-9 shrink-0 items-center gap-2 rounded-t-md border-b-2 px-0.5 text-sm outline-none focus-visible:ring-2',
+              'focus-visible:ring-ring flex h-8 shrink-0 items-center gap-2 rounded-t-md border-b-2 px-0.5 text-sm outline-none focus-visible:ring-2',
               isCurrent
                 ? 'border-foreground text-foreground font-semibold'
                 : 'text-muted-foreground hover:text-foreground border-transparent font-medium',
@@ -85,24 +85,24 @@ export function PageHeading({ location, counts, fallbackTitle }: PageHeadingProp
 
   return (
     <div className="bg-card border-b">
-      <div className={cn('px-4 pt-3.5 md:px-5', tabbedItem ? 'pb-0' : 'pb-3.5')}>
+      <div className={cn('px-4 pt-2.5', tabbedItem ? 'pb-0' : 'pb-2.5')}>
         {backItem ? (
           <Link
             href={backItem.pages[0].path}
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mb-1 -ml-0.5 inline-flex items-center gap-1 rounded-md text-[0.8125rem] font-medium outline-none focus-visible:ring-2"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mb-0.5 -ml-0.5 inline-flex items-center gap-1 rounded-md text-[0.8125rem] font-medium outline-none focus-visible:ring-2"
           >
-            <ChevronLeftIcon className="size-4" aria-hidden="true" />
+            <ChevronLeftIcon className="size-3.5" aria-hidden="true" />
             {`${BACK_PREFIX} ${backItem.label}`}
           </Link>
         ) : null}
-        <h1 className="text-xl font-semibold tracking-tight text-balance">{title}</h1>
+        <h1 className="text-lg leading-snug font-semibold tracking-tight text-balance">{title}</h1>
         {page?.description ? (
-          <p className="text-muted-foreground mt-1 max-w-190 text-sm text-pretty">
+          <p className="text-muted-foreground max-w-190 text-[0.8125rem] text-pretty">
             {page.description}
           </p>
         ) : null}
         {tabbedItem ? (
-          <div className="mt-2">
+          <div className="mt-1.5">
             <PageTabs item={tabbedItem} currentPath={page?.path} counts={counts} />
           </div>
         ) : null}

@@ -192,6 +192,12 @@ describe('HotspotMapPage', () => {
     latitude: null,
     longitude: null,
   });
+  const abroad = goHotspot({
+    id: '9b9b9b9b-0000-4000-8000-00000000000b',
+    name: 'Emulator bar',
+    latitude: 37.4221,
+    longitude: -122.0839,
+  });
   const api =
     (hotspots: object[] = [goHotspot()]) =>
     (request: { url: string }) => {
@@ -281,23 +287,28 @@ describe('HotspotMapPage', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'In view' })).toHaveFocus();
   });
 
-  it('lists the hotspots that have no position, so they can be fixed', async () => {
+  it('lists the hotspots it leaves off the map, and why, so they can be fixed', async () => {
     const user = userEvent.setup();
     renderApp(<HotspotMapPage canSwitchDistrict />, {
       route: '/moh/hotspot-map',
       signedIn: true,
-      replies: [api([goHotspot(), unplaced])],
+      replies: [api([goHotspot(), unplaced, abroad])],
     });
 
     expect(
-      await screen.findByText('1 of 2 hotspots are on the map. 1 has no position recorded.'),
+      await screen.findByText(
+        '1 of 3 hotspots are on the map. 1 has no position recorded and 1 has one outside Uganda.',
+      ),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'List the 1 without a position' }));
+    await user.click(screen.getByRole('button', { name: 'List the 2 not on the map' }));
 
+    expect(screen.getByRole('heading', { level: 2, name: 'Not on the map' })).toBeInTheDocument();
+    const outside = screen.getByRole('button', { name: /Emulator bar/ });
+    expect(within(outside).getByText('Outside Uganda')).toBeInTheDocument();
+    expect(within(outside).getByText('Wakiso · 37.4221, -122.0839')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Without a position' }),
+      within(screen.getByRole('button', { name: /Nowhere lodge/ })).getByText('No position'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Nowhere lodge/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Lake view bar/ })).not.toBeInTheDocument();
   });
 

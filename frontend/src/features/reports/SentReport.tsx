@@ -33,14 +33,14 @@ export function SentReport({ report, viewer, actions }: SentReportProps) {
   const sentAt = formatTimestamp(report.submitted_at, now);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <ReportHeader
         report={report}
         viewer={viewer}
         steps={reportSteps(report, { problems: null, isSending: false }, now)}
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="gap-section flex min-w-0 flex-col">
           <Alert variant="success">
             {viewer === 'moh' ? (
               <>
@@ -64,7 +64,7 @@ export function SentReport({ report, viewer, actions }: SentReportProps) {
           <CommentCard comment={report.comment} />
           <HistoryCard report={report} />
         </div>
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <FactsCard
             title="Submission"
             items={[

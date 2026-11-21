@@ -329,6 +329,31 @@ function mapHotspots(): Hotspot[] {
   // Points cluster around the town and a few trading centres near it.
   const spread = () => (random() + random() + random() - 1.5) * 0.09;
 
+  // Two positions the map must not draw, as seen in real data: latitude and
+  // longitude swapped, and a phone emulator's default location in California.
+  const misplaced = [
+    hotspot({
+      name: 'Walukuba Lodge 111',
+      type: 'Lodge',
+      village: 'Walukuba',
+      district_id: placeId(2, 4),
+      latitude: 33.2042,
+      longitude: 0.4244,
+      status: 'active',
+      created_at: daysAgo(90),
+    }),
+    hotspot({
+      name: 'Kakira Market 112',
+      type: 'Market',
+      village: 'Kakira',
+      district_id: placeId(2, 4),
+      latitude: 37.4221,
+      longitude: -122.0839,
+      status: 'submitted',
+      created_at: daysAgo(6),
+    }),
+  ];
+
   return MAP_TOWNS.flatMap((town) => {
     const centres = Array.from({ length: 4 }, () => [
       town.centre[0] + spread() * 2,
@@ -360,7 +385,7 @@ function mapHotspots(): Hotspot[] {
         created_at: daysAgo(10 + Math.floor(random() * 700)),
       });
     });
-  });
+  }).concat(misplaced);
 }
 
 const state = { hotspots: [] as Hotspot[], events: [] as HotspotEvent[] };

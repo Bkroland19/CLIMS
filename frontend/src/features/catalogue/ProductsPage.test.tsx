@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
+import { ReadOnlyProvider } from '@/navigation/useAccess';
 import type { RecordedRequest } from '@/test/fakeAdapter';
 import { renderApp, sessionWith } from '@/test/renderApp';
 
@@ -24,11 +25,18 @@ const brands = [
   lookup('b-trust', 'Trust', false),
 ];
 const units = [lookup('u-piece', 'Piece'), lookup('u-box', 'Box')];
+const types = [
+  lookup('t-free', 'Free'),
+  lookup('t-social', 'Socially marketed', true, 0),
+  lookup('t-commercial', 'Commercial'),
+  lookup('t-donated', 'Donated', false, 0),
+];
+const FREE = { id: 't-free', name: 'Free' };
 
 const engabu = {
   id: 'p-engabu',
   category: 'male',
-  type: 'free',
+  type: FREE,
   brand: { id: 'b-engabu', name: 'Engabu' },
   unit: { id: 'u-piece', name: 'Piece' },
   pieces_per_unit: 1,
@@ -39,7 +47,7 @@ const engabu = {
 const fc2 = {
   id: 'p-fc2',
   category: 'female',
-  type: 'free',
+  type: FREE,
   brand: { id: 'b-fc2', name: 'FC2' },
   unit: { id: 'u-box', name: 'Box' },
   pieces_per_unit: 100,
@@ -51,7 +59,7 @@ const fc2 = {
 const legacy = {
   id: 'p-legacy',
   category: 'male',
-  type: 'commercial',
+  type: { id: 't-commercial', name: 'Commercial' },
   brand: { id: 'b-trust', name: 'Trust' },
   unit: null,
   pieces_per_unit: null,
@@ -73,6 +81,8 @@ function api(write: (request: RecordedRequest) => Reply = () => ({ status: 200, 
       return { status: 200, body: { success: true, data: brands } };
     if (request.url === '/catalogue/units')
       return { status: 200, body: { success: true, data: units } };
+    if (request.url === '/catalogue/types')
+      return { status: 200, body: { success: true, data: types } };
     return { status: 200, body: { success: true, data: products } };
   };
 }
@@ -95,7 +105,7 @@ describe('ProductsPage', () => {
     renderApp(<ProductsPage />, { signedIn: true, replies: [api()] });
 
     const row = await rowOf('Engabu');
-    expect(within(row).getByText('Free (public sector)')).toBeInTheDocument();
+    expect(within(row).getByText('Free')).toBeInTheDocument();
     expect(within(row).getByText('Active')).toBeInTheDocument();
     const legacyRow = await rowOf('Trust');
     expect(within(legacyRow).getByText('Incomplete')).toBeInTheDocument();
@@ -136,7 +146,7 @@ describe('ProductsPage', () => {
     expect(writes(requests)).toEqual([]);
   });
 
-  it('adds a product from active brands and units, sending numbers as numbers', async () => {
+  it('adds a product from active types, brands and units, sending numbers as numbers', async () => {
     const user = userEvent.setup();
     const { requests } = renderApp(<ProductsPage />, {
       signedIn: true,
@@ -152,6 +162,7 @@ describe('ProductsPage', () => {
     expect(screen.queryByRole('option', { name: /Trust/ })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('option', { name: 'Engabu' }));
     await user.click(within(dialog).getByRole('combobox', { name: 'Type' }));
+    expect(screen.queryByRole('option', { name: /Donated/ })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('option', { name: 'Socially marketed' }));
     await user.click(within(dialog).getByRole('combobox', { name: 'Unit of measure' }));
     await user.click(await screen.findByRole('option', { name: 'Box' }));
@@ -167,7 +178,7 @@ describe('ProductsPage', () => {
         url: '/catalogue/products',
         body: {
           category: 'male',
-          type: 'socially_marketed',
+          type_id: 't-social',
           brand_id: 'b-engabu',
           unit_id: 'u-box',
           pieces_per_unit: 144,
@@ -210,7 +221,7 @@ describe('ProductsPage', () => {
         url: '/catalogue/products/p-engabu',
         body: {
           category: 'male',
-          type: 'free',
+          type_id: 't-free',
           brand_id: 'b-engabu',
           unit_id: 'u-piece',
           pieces_per_unit: 3,
@@ -278,7 +289,7 @@ describe('ProductsPage', () => {
     await openActions(user, /^Actions for FC2/);
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const confirm = await screen.findByRole('alertdialog', {
-      name: 'Delete FC2 · Female · Free (public sector)?',
+      name: 'Delete FC2 · Female · Free?',
     });
     await user.click(within(confirm).getByRole('button', { name: 'Delete product' }));
 
@@ -299,5 +310,32 @@ describe('ProductsPage', () => {
     expect(screen.queryByRole('button', { name: 'Add product' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
     expect(screen.queryByText('1 product is missing details')).not.toBeInTheDocument();
+  });
+
+  it('leaves out every change in a workspace opened read-only, even with catalogue:manage', async () => {
+    renderApp(
+      <ReadOnlyProvider value={true}>
+        <ProductsPage />
+      </ReadOnlyProvider>,
+      { signedIn: true, replies: [api()] },
+    );
+
+    await rowOf('Engabu');
+    expect(screen.queryByRole('button', { name: 'Add product' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the filter links on the page it is shown on', async () => {
+    renderApp(<ProductsPage />, {
+      signedIn: true,
+      route: '/warehouse/catalogue',
+      replies: [api()],
+    });
+
+    await rowOf('Engabu');
+    expect(screen.getByRole('link', { name: /Inactive/ })).toHaveAttribute(
+      'href',
+      '/warehouse/catalogue?status=inactive',
+    );
   });
 });
