@@ -1,9 +1,12 @@
 'use client';
 
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { GoogleMap, InfoWindowF, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 import { MapPinOff } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
+import { FilterSelect } from '@/components/FilterSelect';
 import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorState } from '@/components/states/ErrorState';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -14,7 +17,7 @@ import { formatText } from '@/lib/format';
 import { mappableHotspots, type MappableHotspot } from './api';
 import { mapSummary } from './mapSummary';
 import { hotspotLabel } from './hotspotForm';
-import { useHotspots } from './queries';
+import { useHotspots, useLocationDistricts } from './queries';
 
 /** Roughly the centre of Uganda, at a zoom that shows the whole country. */
 const DEFAULT_CENTER = { lat: 1.3733, lng: 32.2903 };
@@ -24,9 +27,10 @@ const MAP_CLASS = 'h-[min(650px,70vh)] w-full';
 interface HotspotMapProps {
   apiKey: string;
   hotspots: readonly MappableHotspot[];
+  focusDistrict: boolean;
 }
 
-function HotspotMap({ apiKey, hotspots }: HotspotMapProps) {
+function HotspotMap({ apiKey, hotspots, focusDistrict }: HotspotMapProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'clims-google-maps',
     googleMapsApiKey: apiKey,
@@ -47,6 +51,19 @@ function HotspotMap({ apiKey, hotspots }: HotspotMapProps) {
       center={DEFAULT_CENTER}
       zoom={DEFAULT_ZOOM}
       options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}
+      onLoad={(map) => {
+        if (!focusDistrict || hotspots.length === 0) return;
+        const bounds = new google.maps.LatLngBounds();
+        for (const hotspot of hotspots) {
+          bounds.extend({ lat: hotspot.latitude, lng: hotspot.longitude });
+        }
+        if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
+          map.setCenter(bounds.getCenter());
+          map.setZoom(13);
+        } else {
+          map.fitBounds(bounds, 48);
+        }
+      }}
       onClick={() => {
         setSelectedId(null);
       }}
@@ -86,19 +103,68 @@ function HotspotMap({ apiKey, hotspots }: HotspotMapProps) {
   );
 }
 
-export default function HotspotMapPage() {
+export default function HotspotMapPage({
+  canSwitchDistrict = false,
+}: {
+  canSwitchDistrict?: boolean;
+}) {
   const { googleMapsApiKey } = useAppConfig();
-  const hotspots = useHotspots();
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const context = useDistrictContext();
+  const districtId = canSwitchDistrict
+    ? context
+      ? context.districtId
+      : params.get('district_id') || null
+    : null;
+  const districts = useLocationDistricts(canSwitchDistrict && !context);
+  const missingDistrictId = Boolean(canSwitchDistrict && context?.district && !districtId);
+  const hotspots = useHotspots(districtId, !missingDistrictId);
+  const options = (districts.data ?? []).map(({ id, name }) => ({ value: id, label: name }));
+  if (districtId && !options.some(({ value }) => value === districtId)) {
+    options.unshift({ value: districtId, label: 'Selected district' });
+  }
   const onMap = hotspots.data ? mappableHotspots(hotspots.data) : [];
 
   return (
     <>
+      {canSwitchDistrict && !context && (
+        <div className="mb-3">
+          <FilterSelect
+            label="District"
+            value={districtId ?? 'all'}
+            options={[{ value: 'all', label: 'All districts' }, ...options]}
+            disabled={districts.isPending}
+            onValueChange={(next) => {
+              const query = new URLSearchParams(params.toString());
+              if (next === 'all') query.delete('district_id');
+              else query.set('district_id', next);
+              router.push(query.size ? `${pathname}?${query}` : pathname);
+            }}
+          />
+          {districts.isError && (
+            <ErrorState
+              title="Could not load the districts"
+              error={districts.error}
+              onRetry={() => void districts.refetch()}
+              isRetrying={districts.isRefetching}
+            />
+          )}
+        </div>
+      )}
       <div className="bg-card rounded-card overflow-hidden border">
         {googleMapsApiKey === null ? (
           <EmptyState
             icon={MapPinOff}
             title="The map is not set up"
             description="No Google Maps key is configured for this deployment. Ask whoever deploys CLIMS to set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY."
+          />
+        ) : missingDistrictId ? (
+          <EmptyState
+            icon={MapPinOff}
+            title="No map data for this district"
+            description="Choose a district from the location directory to view its hotspots."
           />
         ) : hotspots.isError && !hotspots.data ? (
           <ErrorState
@@ -110,11 +176,16 @@ export default function HotspotMapPage() {
         ) : hotspots.isPending ? (
           <Skeleton className={`${MAP_CLASS} rounded-none`} />
         ) : (
-          <HotspotMap apiKey={googleMapsApiKey} hotspots={onMap} />
+          <HotspotMap
+            key={districtId ?? 'all'}
+            apiKey={googleMapsApiKey}
+            hotspots={onMap}
+            focusDistrict={districtId !== null}
+          />
         )}
       </div>
 
-      {hotspots.data && googleMapsApiKey !== null ? (
+      {!missingDistrictId && hotspots.data && googleMapsApiKey !== null ? (
         <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
           {mapSummary(onMap.length, hotspots.data.length)}
         </p>

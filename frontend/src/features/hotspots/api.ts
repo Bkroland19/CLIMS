@@ -66,8 +66,14 @@ const districtSchema = z.object({ id: uuidSchema, name: z.string() });
 export type District = z.infer<typeof districtSchema>;
 
 // shortcut: one page of the 100 most recent hotspots; page through the API when a district has more.
-export async function listHotspots(http: HttpClient, signal?: AbortSignal): Promise<Hotspot[]> {
-  return parseList(hotspotSchema, await http.get('/hotspots?limit=100', { signal }), 'hotspots');
+export async function listHotspots(
+  http: HttpClient,
+  signal?: AbortSignal,
+  districtId: string | null = null,
+): Promise<Hotspot[]> {
+  const query = new URLSearchParams({ limit: '100' });
+  if (districtId) query.set('district_id', districtId);
+  return parseList(hotspotSchema, await http.get(`/hotspots?${query}`, { signal }), 'hotspots');
 }
 
 export async function submitHotspot(http: HttpClient, input: HotspotSubmission): Promise<void> {
@@ -98,6 +104,13 @@ export async function listHotspotNotifications(
 }
 
 export async function listDistricts(http: HttpClient, signal?: AbortSignal): Promise<District[]> {
+  return parseList(districtSchema, await http.get('/locations/districts', { signal }), 'districts');
+}
+
+export async function listLocationDistricts(
+  http: HttpClient,
+  signal?: AbortSignal,
+): Promise<District[]> {
   return parseList(districtSchema, await http.get('/locations/districts', { signal }), 'districts');
 }
 

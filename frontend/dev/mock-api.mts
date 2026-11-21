@@ -195,7 +195,12 @@ async function route(request: IncomingMessage): Promise<Reply> {
     new URL(request.url ?? '/', 'http://mock').searchParams,
   );
   if (reports) return reports;
-  const hotspots = handleHotspots(request.method ?? 'GET', parts, body);
+  const hotspots = handleHotspots(
+    request.method ?? 'GET',
+    parts,
+    body,
+    new URL(request.url ?? '/', 'http://mock').searchParams,
+  );
   if (hotspots) return hotspots;
 
   return reply(404, { message: 'Not found' });

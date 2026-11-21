@@ -16,6 +16,7 @@ import { filterFrom } from '@/features/fulfilment/orderFilters';
 import { EMPTY_VALUE, formatTimestamp } from '@/lib/format';
 
 import { copyText } from '@/lib/copyText';
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { DistrictFilter } from './DistrictFilter';
 import { listHref, MOH_PATHS, REQUEST_FILTERS } from './filters';
 import { useNationalRequests } from './queries';
@@ -24,7 +25,8 @@ import { useNationalRequests } from './queries';
 export default function MohRequestsPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const district = params.get('district') || null;
+  const context = useDistrictContext();
+  const district = context ? context.district : params.get('district') || null;
   const filter = filterFrom(REQUEST_FILTERS, params.get('status'));
   const requests = useNationalRequests(district);
 
@@ -121,10 +123,14 @@ export default function MohRequestsPage() {
             ...(requests.data ? { count: requests.data.filter(option.keeps).length } : {}),
           }))}
         />
-        <DistrictFilter
-          value={district}
-          hrefFor={(next) => listHref(MOH_PATHS.requests, { status: filter.value, district: next })}
-        />
+        {!context && (
+          <DistrictFilter
+            value={district}
+            hrefFor={(next) =>
+              listHref(MOH_PATHS.requests, { status: filter.value, district: next })
+            }
+          />
+        )}
       </div>
       <DataTable
         label="Warehouse requests"

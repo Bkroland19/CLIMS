@@ -1,5 +1,6 @@
 'use client';
 
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { ClipboardList, Eye, Megaphone, Store, Users, Warehouse, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -204,14 +205,19 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
     [],
   );
 
-  const all = reports.data ?? [];
+  const district = useDistrictContext()?.district;
+  const all = (reports.data ?? []).filter(
+    (report) => !district || report.unit.district === district,
+  );
   const rows = reports.data
-    ?.filter(keeps({ type, status }))
-    .sort((a, b) =>
-      status === 'submitted'
-        ? (b.submitted_at ?? '').localeCompare(a.submitted_at ?? '')
-        : a.unit.name.localeCompare(b.unit.name),
-    );
+    ? all
+        .filter(keeps({ type, status }))
+        .sort((a, b) =>
+          status === 'submitted'
+            ? (b.submitted_at ?? '').localeCompare(a.submitted_at ?? '')
+            : a.unit.name.localeCompare(b.unit.name),
+        )
+    : undefined;
   const countOf = (filters: Omit<Filters, 'month'>) =>
     reports.data ? all.filter(keeps(filters)).length : undefined;
 
@@ -233,7 +239,7 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
       </PageActions>
       <SampleDataNotice subject="The reports and reporting rates" />
 
-      {coverage.isError ? (
+      {district ? null : coverage.isError ? (
         <p className="text-destructive text-sm" role="alert">
           Could not load how many units have reported: {getErrorMessage(coverage.error)}
         </p>

@@ -18,6 +18,7 @@ import { EMPTY_VALUE, formatTimestamp } from '@/lib/format';
 
 import { formatLeadTime, leadTimeMs } from './audit';
 import { copyText } from '@/lib/copyText';
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { DistrictFilter } from './DistrictFilter';
 import { listHref, MOH_PATHS } from './filters';
 import { useNationalOrders } from './queries';
@@ -26,7 +27,8 @@ import { useNationalOrders } from './queries';
 export default function MohOrdersPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const district = params.get('district') || null;
+  const context = useDistrictContext();
+  const district = context ? context.district : params.get('district') || null;
   const filter = filterFrom(ORDER_FILTERS, params.get('status'));
   const orders = useNationalOrders(district);
 
@@ -112,10 +114,12 @@ export default function MohOrdersPage() {
             ...(orders.data ? { count: orders.data.filter(option.keeps).length } : {}),
           }))}
         />
-        <DistrictFilter
-          value={district}
-          hrefFor={(next) => listHref(MOH_PATHS.orders, { status: filter.value, district: next })}
-        />
+        {!context && (
+          <DistrictFilter
+            value={district}
+            hrefFor={(next) => listHref(MOH_PATHS.orders, { status: filter.value, district: next })}
+          />
+        )}
       </div>
       <DataTable
         label="Hotspot orders"

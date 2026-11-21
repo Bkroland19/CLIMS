@@ -243,10 +243,19 @@ function act(id: string, action: string, body: Body): Reply {
 }
 
 /** Answers `/hotspots…`, or returns null for any other path. */
-export function handleHotspots(method: string, parts: string[], body: Body): Reply | null {
+export function handleHotspots(
+  method: string,
+  parts: string[],
+  body: Body,
+  query: URLSearchParams,
+): Reply | null {
   const [resource, id, segment, action] = parts;
+  if (resource === 'locations' && id === 'districts' && method === 'GET') return ok(DISTRICTS);
   if (resource !== 'hotspots') return null;
-  if (method === 'GET' && id === undefined) return ok(state.hotspots);
+  if (method === 'GET' && id === undefined) {
+    const district = query.get('district_id');
+    return ok(state.hotspots.filter((hotspot) => !district || hotspot.district_id === district));
+  }
   if (method === 'POST' && id === undefined) return submit(body);
   if (method === 'GET' && id === 'notifications') return ok(state.events);
   if (method === 'GET' && id === 'districts') return ok(DISTRICTS);

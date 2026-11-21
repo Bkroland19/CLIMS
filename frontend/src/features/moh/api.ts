@@ -104,8 +104,13 @@ export async function listNationalRequests(
 export async function getNationalSummary(
   http: HttpClient,
   signal?: AbortSignal,
+  scope: DistrictScope = {},
 ): Promise<NationalSummary> {
-  return parseBody(summarySchema, await http.get('/national/summary', { signal }), 'summary');
+  return parseBody(
+    summarySchema,
+    await http.get(scoped('/national/summary', scope), { signal }),
+    'summary',
+  );
 }
 
 export async function listDistrictStores(
@@ -120,7 +125,8 @@ export async function listDistrictStores(
 export async function listNationalActivity(
   http: HttpClient,
   signal?: AbortSignal,
+  scope: DistrictScope = {},
 ): Promise<Activity[]> {
-  const body = await http.get('/national/activity', { signal });
+  const body = await http.get(scoped('/national/activity', scope), { signal });
   return parseList(activitySchema, body, 'activity');
 }

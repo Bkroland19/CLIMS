@@ -1,5 +1,6 @@
 'use client';
 
+import { useDistrictContext } from '@/features/district/DistrictContext';
 import { Clock, Inbox, ListChecks, Truck } from 'lucide-react';
 import Link from 'next/link';
 
@@ -52,9 +53,17 @@ function countOf(requests: readonly WarehouseRequest[] | undefined, value: Filte
 
 export default function WarehouseDashboardPage() {
   const { store, href } = useWarehouseStore();
+  const district = useDistrictContext()?.district;
   const requests = useWarehouseRequests(store);
+  const visibleRequests = district
+    ? requests.data?.filter((request) => request.district === district)
+    : requests.data;
   const stock = useWarehouseStock(store);
   const activity = useWarehouseActivity(store);
+  const requestIds = new Set(visibleRequests?.map((request) => request.id));
+  const visibleActivity = district
+    ? activity.data?.filter((event) => event.reference !== null && requestIds.has(event.reference))
+    : activity.data;
   const filtered = (value: FilterValue) => href(WAREHOUSE_PATHS.requestsWithStatus(value));
 
   return (
@@ -67,7 +76,7 @@ export default function WarehouseDashboardPage() {
       <StatCardGrid>
         <StatCard
           label="New requests"
-          value={countOf(requests.data, 'new')}
+          value={countOf(visibleRequests, 'new')}
           icon={Inbox}
           accent="info"
           href={filtered('new')}
@@ -75,7 +84,7 @@ export default function WarehouseDashboardPage() {
         />
         <StatCard
           label="Queued"
-          value={countOf(requests.data, 'queued')}
+          value={countOf(visibleRequests, 'queued')}
           icon={ListChecks}
           accent="positive"
           href={filtered('queued')}
@@ -83,7 +92,7 @@ export default function WarehouseDashboardPage() {
         />
         <StatCard
           label="On hold"
-          value={countOf(requests.data, 'on_hold')}
+          value={countOf(visibleRequests, 'on_hold')}
           icon={Clock}
           accent="caution"
           href={filtered('on_hold')}
@@ -91,7 +100,7 @@ export default function WarehouseDashboardPage() {
         />
         <StatCard
           label="In transit"
-          value={countOf(requests.data, 'dispatched')}
+          value={countOf(visibleRequests, 'dispatched')}
           icon={Truck}
           accent="violet"
           href={filtered('dispatched')}
@@ -103,8 +112,8 @@ export default function WarehouseDashboardPage() {
         <TaskList
           title="Needs your action"
           tasks={
-            requests.data && stock.data
-              ? warehouseTasks(requests.data, stock.data.batches, new Date(), (iso) =>
+            visibleRequests && stock.data
+              ? warehouseTasks(visibleRequests, stock.data.batches, new Date(), (iso) =>
                   formatTimestamp(iso),
                 ).map((task) => ({ ...task, href: href(task.href) }))
               : undefined
@@ -172,12 +181,12 @@ export default function WarehouseDashboardPage() {
                   onRetry={() => void activity.refetch()}
                   isRetrying={activity.isRefetching}
                 />
-              ) : activity.data.length === 0 ? (
+              ) : !visibleActivity?.length ? (
                 <p className="text-muted-foreground text-sm">Nothing has happened yet.</p>
               ) : (
                 <ActivityTimeline
                   variant="compact"
-                  entries={timelineEntries(activity.data.slice(0, RECENT_EVENTS), { feed: true })}
+                  entries={timelineEntries(visibleActivity.slice(0, RECENT_EVENTS), { feed: true })}
                 />
               )}
             </CardContent>
@@ -185,26 +194,28 @@ export default function WarehouseDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ColumnChart
-          title="Male condoms dispatched"
-          description="Pieces dispatched to district stores per week, last 8 weeks"
-          categoryLabel="Week"
-          series={{ key: 'male', label: 'Male condoms', color: 'var(--chart-1)' }}
-          rows={SAMPLE_WEEKLY_DISPATCHES}
-          isSample
-        />
-        <ShareList
-          title="Requests by district"
-          description="District requests received in the last 30 days"
-          totalLabel="Requests"
-          shares={SAMPLE_REQUESTS_BY_DISTRICT.map((share, index) => ({
-            ...share,
-            color: SHARE_COLOURS[index % SHARE_COLOURS.length] ?? 'var(--chart-1)',
-          }))}
-          isSample
-        />
-      </div>
+      {!district && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ColumnChart
+            title="Male condoms dispatched"
+            description="Pieces dispatched to district stores per week, last 8 weeks"
+            categoryLabel="Week"
+            series={{ key: 'male', label: 'Male condoms', color: 'var(--chart-1)' }}
+            rows={SAMPLE_WEEKLY_DISPATCHES}
+            isSample
+          />
+          <ShareList
+            title="Requests by district"
+            description="District requests received in the last 30 days"
+            totalLabel="Requests"
+            shares={SAMPLE_REQUESTS_BY_DISTRICT.map((share, index) => ({
+              ...share,
+              color: SHARE_COLOURS[index % SHARE_COLOURS.length] ?? 'var(--chart-1)',
+            }))}
+            isSample
+          />
+        </div>
+      )}
     </div>
   );
 }
