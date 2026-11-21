@@ -1,13 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { authKeys } from '@/features/auth/queries';
 import { useApiQuery, useHttp } from '@/lib/api';
 
 import {
   createUser,
   listPermissions,
   listRoles,
+  listUserSessions,
   listUsers,
+  revokeUserSessions,
   setRolePermissions,
   setUserRoles,
   setUserStatus,
@@ -19,6 +22,7 @@ export const accessKeys = {
   users: ['users'] as const,
   roles: ['access', 'roles'] as const,
   permissions: ['access', 'permissions'] as const,
+  userSessions: (userId: string) => ['users', userId, 'sessions'] as const,
 };
 
 /** Roles and permissions change rarely; keep them for a few minutes rather than refetching per page. */
@@ -58,6 +62,8 @@ export function useSetUserRoles(userId: string) {
     onSuccess: async () => {
       toast.success('Roles updated');
       await queryClient.invalidateQueries({ queryKey: accessKeys.users });
+      // Administrators can edit their own roles; their permissions follow.
+      await queryClient.invalidateQueries({ queryKey: authKeys.me });
     },
     meta: { handlesOwnErrors: true },
   });
@@ -90,10 +96,33 @@ export function useSetRolePermissions() {
     onSuccess: async () => {
       toast.success('Permissions updated');
       await queryClient.invalidateQueries({ queryKey: accessKeys.roles });
-      // A user's role objects carry the role's permissions too.
+      // A user's role objects carry the role's permissions too, the signed-in user's included.
       await queryClient.invalidateQueries({ queryKey: accessKeys.users });
+      await queryClient.invalidateQueries({ queryKey: authKeys.me });
     },
     // The roles page shows the failure next to the switches.
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+/** Where a user is signed in. Read only while `enabled`, e.g. while its dialog is open. */
+export function useUserSessions(userId: string, enabled = true) {
+  return useApiQuery(
+    accessKeys.userSessions(userId),
+    (http, signal) => listUserSessions(http, userId, signal),
+    { enabled, staleTime: 0 },
+  );
+}
+
+/** Signs a user out everywhere. The confirmation shows a failure itself. */
+export function useRevokeUserSessions(userId: string) {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => revokeUserSessions(http, userId),
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: accessKeys.userSessions(userId) });
+    },
     meta: { handlesOwnErrors: true },
   });
 }

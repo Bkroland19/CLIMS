@@ -71,6 +71,11 @@ export function userRoleLabels(user: Pick<User, 'roles' | 'role'>): string[] {
   return user.role ? [roleLabel({ id: '', name: user.role })] : [];
 }
 
+/*
+ * Every permission the Go API defines (its migrations 2, 6, 8 and 13), worded
+ * from the server's own descriptions. "Assigned" store, hotspot or district
+ * means the one on the user's account; the `all_*` codes lift that limit.
+ */
 const PERMISSION_LABELS: Readonly<Record<string, string>> = {
   'users:read': 'List users and view user accounts',
   'users:create': 'Create user accounts',
@@ -78,11 +83,29 @@ const PERMISSION_LABELS: Readonly<Record<string, string>> = {
   'roles:read': 'List roles and their permissions',
   'roles:assign': 'Assign roles to users',
   'roles:manage': 'Change the permissions of roles',
+  'orders:read': 'View orders involving their store',
+  'orders:create': 'Request stock for their store',
+  'orders:stockout': 'Report stockouts at their hotspot',
+  'orders:process': 'Review, check and dispatch orders their store supplies',
+  'orders:replenish': 'Request warehouse stock for an order held for stock',
+  'orders:fulfill': 'Record quantities their store issued',
+  'orders:receive': 'Check and record stock their store received',
+  'orders:deliver': 'Record deliveries for orders assigned to them',
+  'orders:all_stores': 'Use their order permissions for every store',
+  'inventory:read': 'View stock balances, movements and hotspot deliveries',
+  'inventory:manage': 'Record stock received and stock adjustments at their store',
+  'hotspots:read': 'View hotspots they submitted or in their district',
+  'hotspots:submit': 'Submit newly identified hotspots for activation',
+  'hotspots:activate': 'Verify and activate hotspots in their district',
+  'hotspots:all_districts': 'Use their hotspot permissions in every district',
 };
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
   users: 'Users',
   roles: 'Roles',
+  orders: 'Orders',
+  inventory: 'Inventory',
+  hotspots: 'Hotspots',
 };
 
 export function permissionLabel(code: string): string {

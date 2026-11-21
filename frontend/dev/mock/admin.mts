@@ -122,7 +122,23 @@ function uuid(prefix: number, n: number): string {
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
-const PERMISSIONS = [
+/** The Go API's permission catalogue, in the order `GET /permissions` lists it. */
+export const PERMISSIONS = [
+  'hotspots:activate',
+  'hotspots:all_districts',
+  'hotspots:read',
+  'hotspots:submit',
+  'inventory:manage',
+  'inventory:read',
+  'orders:all_stores',
+  'orders:create',
+  'orders:deliver',
+  'orders:fulfill',
+  'orders:process',
+  'orders:read',
+  'orders:receive',
+  'orders:replenish',
+  'orders:stockout',
   'roles:assign',
   'roles:manage',
   'roles:read',
@@ -578,9 +594,89 @@ function seedAudit(dataset: string): AuditEntry[] {
   ];
 }
 
+/** One server session, in the shape `GET /auth/sessions` and `GET /users/:id/sessions` reply with. */
+interface DeviceSession {
+  id: string;
+  user_agent: string | null;
+  ip_address: string | null;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  refreshed_at: string | null;
+  refresh_count: number;
+  current: boolean;
+}
+
+const AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'okhttp/4.12.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15',
+  'Mozilla/5.0 (Linux; Android 14; SM-A145F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+] as const;
+
+const DAY_MS = 24 * 60 * 60_000;
+
+function deviceSession(
+  n: number,
+  agent: string | null,
+  ip: string | null,
+  startedMinutesAgo: number,
+  seenMinutesAgo: number,
+  current = false,
+): DeviceSession {
+  const created = Date.now() - startedMinutesAgo * 60_000;
+  return {
+    id: uuid(3, n),
+    user_agent: agent,
+    ip_address: ip,
+    created_at: new Date(created).toISOString(),
+    last_seen_at: minutesAgo(seenMinutesAgo),
+    expires_at: new Date(created + 30 * DAY_MS).toISOString(),
+    revoked_at: null,
+    refreshed_at: null,
+    refresh_count: 0,
+    current,
+  };
+}
+
+/** The signed-in mock user's own devices: this browser, a phone, and one already signed out. */
+function seedMySessions(dataset: string): DeviceSession[] {
+  const current = deviceSession(1, null, '127.0.0.1', 5, 0, true);
+  if (dataset === 'empty') return [current];
+  const signedOut = deviceSession(3, AGENTS[2], '102.85.14.7', 4 * 1440, 3 * 1440);
+  signedOut.revoked_at = minutesAgo(3 * 1440);
+  return [current, deviceSession(2, AGENTS[1], '41.210.143.92', 2 * 1440, 95), signedOut];
+}
+
+/** Other users' devices: active accounts hold up to two, by position in the list. */
+function seedUserSessions(users: readonly User[], dataset: string): Map<string, DeviceSession[]> {
+  const sessions = new Map<string, DeviceSession[]>();
+  users.forEach((user, index) => {
+    if (user.status !== 'active' || index % 3 === 2) return;
+    const count = index % 3 === 0 ? 2 : 1;
+    const list = Array.from({ length: count }, (_, k) => {
+      const n = 100 + index * 2 + k;
+      const agent =
+        dataset === 'worst' && k === 0 ? 'x'.repeat(300) : AGENTS[(index + k) % AGENTS.length];
+      return deviceSession(
+        n,
+        agent ?? null,
+        k === 0 ? `41.210.${index}.${k + 10}` : null,
+        (index + 1) * 300,
+        (index + 1) * 17,
+      );
+    });
+    sessions.set(user.id, list);
+  });
+  return sessions;
+}
+
 const state = {
   roles: seedRoles(),
   users: [] as User[],
+  mySessions: [] as DeviceSession[],
+  userSessions: new Map<string, DeviceSession[]>(),
   units: [] as Unit[],
   products: [] as Product[],
   stores: [] as Store[],
@@ -592,6 +688,8 @@ const state = {
 export function seedAdmin(dataset: string): void {
   state.roles = seedRoles();
   state.users = seedUsers(dataset);
+  state.mySessions = seedMySessions(dataset);
+  state.userSessions = seedUserSessions(state.users, dataset);
   state.units = seedUnits(dataset);
   state.products = seedProducts(dataset);
   state.stores = seedStores(dataset);
@@ -762,6 +860,21 @@ function handleUsers(
     return ok(null);
   }
 
+  if (sub === 'sessions') {
+    const now = new Date().toISOString();
+    const sessions = state.userSessions.get(user.id) ?? [];
+    if (method === 'GET') return ok(sessions.filter((session) => session.expires_at > now));
+    if (method !== 'DELETE') return fail(405, 'Method not allowed');
+    const live = sessions.filter((session) => !session.revoked_at && session.expires_at > now);
+    for (const session of live) session.revoked_at = now;
+    if (live.length > 0) {
+      record('updated', 'user', name, 'Signed out everywhere', [
+        { field: 'sessions', old: String(live.length), new: '0' },
+      ]);
+    }
+    return ok({ revoked: live.length });
+  }
+
   if (sub === 'status' && method === 'PATCH') {
     const status = body.status;
     if (status !== 'active' && status !== 'disabled') {
@@ -924,6 +1037,57 @@ function handleCatalogue(
     product.active = body.active;
   }
   return ok(productView(product));
+}
+
+// ---------------------------------------------------------------- the signed-in user (Go shapes)
+
+/**
+ * The account every mock sign-in opens: an administrator holding every
+ * permission, in the shape `POST /auth/login` and `GET /auth/me` send.
+ * `email` is what the visitor typed when it looks like an address.
+ */
+export function signedInUser(email: string | null = null) {
+  const admin = state.roles.find((role) => role.name === 'admin') ?? null;
+  return {
+    id: 1,
+    username: 'sarah.nakato',
+    firstname: 'Sarah',
+    lastname: 'Nakato',
+    email,
+    status: 'active',
+    role: admin,
+    roles: admin ? [admin] : [],
+  };
+}
+
+/**
+ * `GET /auth/me`, `GET /auth/sessions` and `DELETE /auth/sessions/:id`; null for any other path.
+ * `userAgent` is the request's, recorded on the current session as the server does at sign-in.
+ */
+export function handleAuth(
+  method: string,
+  parts: readonly string[],
+  userAgent: string | null = null,
+): Reply | null {
+  const [resource, first, second] = parts;
+  if (resource !== 'auth') return null;
+  if (first === 'me' && method === 'GET') return ok(signedInUser());
+  if (first !== 'sessions') return null;
+  const now = new Date().toISOString();
+  if (!second) {
+    if (method !== 'GET') return fail(405, 'Method not allowed');
+    const current = state.mySessions.find((session) => session.current);
+    if (current && userAgent) current.user_agent = userAgent;
+    return ok(state.mySessions.filter((session) => session.expires_at > now));
+  }
+  if (method !== 'DELETE') return fail(405, 'Method not allowed');
+  if (!isUuid(second)) return fail(400, 'invalid id');
+  const session = state.mySessions.find(
+    (candidate) => candidate.id === second && !candidate.revoked_at && candidate.expires_at > now,
+  );
+  if (!session) return fail(404, 'session not found');
+  session.revoked_at = now;
+  return ok(null);
 }
 
 // ---------------------------------------------------------------- entry point

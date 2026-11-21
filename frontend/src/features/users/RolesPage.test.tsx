@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import type { RecordedRequest } from '@/test/fakeAdapter';
-import { renderApp } from '@/test/renderApp';
+import { renderApp, sessionWith } from '@/test/renderApp';
 
 import RolesPage from './RolesPage';
 
@@ -95,5 +95,43 @@ describe('RolesPage', () => {
 
     expect(await screen.findByText('This role cannot be changed')).toBeInTheDocument();
     for (const toggle of screen.getAllByRole('switch')) expect(toggle).toBeDisabled();
+  });
+
+  it('shows the permissions read-only to someone without roles:manage', async () => {
+    renderApp(<RolesPage />, {
+      route: '/moh/users/roles?role=role-dcfp',
+      session: sessionWith(['roles:read', 'users:read']),
+      replies: [api()],
+    });
+
+    expect(
+      await screen.findByText('You can view these permissions but not change them'),
+    ).toBeInTheDocument();
+    for (const toggle of screen.getAllByRole('switch')) expect(toggle).toBeDisabled();
+    expect(screen.queryByText(/Changes apply as soon as you switch them/)).not.toBeInTheDocument();
+  });
+
+  it('labels every permission the API defines in words, grouped by area', async () => {
+    const all = ['hotspots:activate', 'inventory:manage', 'orders:fulfill', 'users:read'];
+    renderApp(<RolesPage />, {
+      route: '/moh/users/roles?role=role-dcfp',
+      signedIn: true,
+      replies: [
+        (request: RecordedRequest) =>
+          request.url === '/permissions'
+            ? { status: 200, body: { success: true, data: all } }
+            : api()(request),
+      ],
+    });
+
+    expect(
+      await screen.findByRole('switch', { name: /Verify and activate hotspots in their district/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: /Record quantities their store issued/ }),
+    ).toBeInTheDocument();
+    for (const area of ['Hotspots', 'Inventory', 'Orders', 'Users']) {
+      expect(screen.getByRole('region', { name: area })).toBeInTheDocument();
+    }
   });
 });

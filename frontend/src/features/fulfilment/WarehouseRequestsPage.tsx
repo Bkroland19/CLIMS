@@ -12,6 +12,7 @@ import { SampleDataNotice } from '@/components/SampleData';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { formatTimestamp } from '@/lib/format';
+import { WriteAction } from '@/components/WriteAction';
 
 import type { WarehouseRequest } from './api';
 import { formatQuantities, totalPieces } from './products';
@@ -84,12 +85,14 @@ export default function WarehouseRequestsPage() {
   );
 
   const newRequest = (
-    <Button asChild>
-      <Link href={DCFP_PATHS.newRequest}>
-        <Plus data-icon="inline-start" />
-        New request
-      </Link>
-    </Button>
+    <WriteAction>
+      <Button asChild>
+        <Link href={DCFP_PATHS.newRequest}>
+          <Plus data-icon="inline-start" />
+          New request
+        </Link>
+      </Button>
+    </WriteAction>
   );
 
   return (

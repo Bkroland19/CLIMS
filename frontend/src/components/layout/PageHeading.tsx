@@ -72,6 +72,8 @@ interface PageHeadingProps {
   location: NavLocation;
   /** Tab badge counts by page path. */
   counts?: NavCounts;
+  /** The title when the address has no page or record, instead of "Page not found". */
+  fallbackTitle?: string;
 }
 
 /**
@@ -79,9 +81,9 @@ interface PageHeadingProps {
  * page title, one line on what the page is for, and the section's tabs.
  * Everything comes from the navigation table.
  */
-export function PageHeading({ location, counts }: PageHeadingProps) {
+export function PageHeading({ location, counts, fallbackTitle }: PageHeadingProps) {
   const { workspace, item, page, detail } = location;
-  const title = page?.title ?? detail?.label ?? NOT_FOUND_TITLE;
+  const title = page?.title ?? detail?.label ?? fallbackTitle ?? NOT_FOUND_TITLE;
   const tabbedItem = page && item && item.pages.length > 1 ? item : null;
   const sectionHref = item?.pages[0].path;
   const isOnSectionHome = page !== null && page.path === sectionHref;

@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleAlert, Lock, ShieldCheck } from 'lucide-react';
+import { CircleAlert, Eye, Lock, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useCan } from '@/features/auth/queries';
 import { getErrorMessage } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -118,7 +119,10 @@ export default function RolesPage() {
 
 function RolePermissions({ role, codes }: { role: Role; codes: readonly string[] }) {
   const save = useSetRolePermissions();
+  const can = useCan();
   const locked = isAdminRole(role);
+  // Without `roles:manage` the API refuses every change, so the switches only show the state.
+  const readOnly = !locked && !can('roles:manage');
   const description = roleDescription(role);
 
   function toggle(code: string, granted: boolean) {
@@ -133,7 +137,7 @@ function RolePermissions({ role, codes }: { role: Role; codes: readonly string[]
       <CardHeader>
         <CardTitle>{roleLabel(role)}</CardTitle>
         <CardDescription>
-          {description ? `${description}. ` : ''}
+          {description ? `${description.replace(/\.$/, '')}. ` : ''}
           {formatNumber(role.permissions.filter((code) => codes.includes(code)).length)} of{' '}
           {formatNumber(codes.length)} permissions.
         </CardDescription>
@@ -146,6 +150,15 @@ function RolePermissions({ role, codes }: { role: Role; codes: readonly string[]
             <AlertDescription>
               The administrator role always holds every permission, so someone can always manage
               access.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {readOnly ? (
+          <Alert variant="info">
+            <Eye aria-hidden="true" />
+            <AlertTitle>You can view these permissions but not change them</AlertTitle>
+            <AlertDescription>
+              Changing them needs the “{permissionLabel('roles:manage')}” permission.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -176,7 +189,7 @@ function RolePermissions({ role, codes }: { role: Role; codes: readonly string[]
                     <Switch
                       id={id}
                       checked={granted}
-                      disabled={locked || save.isPending}
+                      disabled={locked || readOnly || save.isPending}
                       onCheckedChange={() => {
                         toggle(code, granted);
                       }}
@@ -187,9 +200,11 @@ function RolePermissions({ role, codes }: { role: Role; codes: readonly string[]
             </ul>
           </section>
         ))}
-        <p className="text-muted-foreground text-sm">
-          Changes apply as soon as you switch them, for everyone who holds this role.
-        </p>
+        {readOnly ? null : (
+          <p className="text-muted-foreground text-sm">
+            Changes apply as soon as you switch them, for everyone who holds this role.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

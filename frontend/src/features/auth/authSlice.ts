@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { RefreshedTokens, Session } from './session';
+import type { AuthUser, RefreshedTokens, Session } from './session';
 
 export interface AuthState {
   session: Session | null;
@@ -28,6 +28,15 @@ export const authSlice = createSlice({
       state.session.token = action.payload.token;
       state.session.refresh_token = action.payload.refresh_token;
     },
+    /**
+     * Replaces the user with the server's current copy (`GET /auth/me`), so a
+     * role or permission change made by an administrator applies without
+     * signing in again. Ignored once signed out.
+     */
+    userRefreshed(state, action: PayloadAction<AuthUser>) {
+      if (!state.session) return;
+      state.session.user = action.payload;
+    },
   },
   selectors: {
     selectSession: (state) => state.session,
@@ -36,5 +45,5 @@ export const authSlice = createSlice({
   },
 });
 
-export const { sessionStarted, sessionEnded, tokensRefreshed } = authSlice.actions;
+export const { sessionStarted, sessionEnded, tokensRefreshed, userRefreshed } = authSlice.actions;
 export const { selectSession, selectCurrentUser, selectToken } = authSlice.selectors;

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { deviceSessionSchema, type DeviceSession } from '@/features/auth/deviceSessions';
 import {
   ApiError,
+  optionalNumber,
   optionalText,
   parseBody,
   parseList,
@@ -14,16 +16,22 @@ import {
  * Users, roles and permissions: the Go API's `users` and `rbac` features
  * (`backend/internal/features/{users,rbac}`). Every path here exists there.
  *
- *   GET   /users?limit&offset      { users, limit, offset }   users:read
- *   POST  /users                   { user_id }                users:create + roles:assign
- *   PUT   /users/:id/roles         { role_ids }               roles:assign
- *   PATCH /users/:id/status        { status: active|disabled } users:update
- *   GET   /roles                   [{ id, name, permissions }] roles:read
- *   PUT   /roles/:id/permissions   { permissions }            roles:manage
- *   GET   /permissions             [code]                     roles:read
+ *   GET    /users?limit&offset      { users, limit, offset }    users:read
+ *   POST   /users                   { user_id }                 users:create + roles:assign
+ *   PUT    /users/:id/roles         { role_ids }                roles:assign
+ *   PATCH  /users/:id/status        { status: active|disabled } users:update
+ *   GET    /users/:id/sessions      [session]                   users:read
+ *   DELETE /users/:id/sessions      { revoked }                 users:update
+ *   GET    /roles                   [{ id, name, permissions }] roles:read
+ *   PUT    /roles/:id/permissions   { permissions }             roles:manage
+ *   GET    /permissions             [code]                      roles:read
  *
  * The API has no endpoint to edit a user's name, email or phone, and none to
  * delete a user: an account is switched off by disabling it.
+ *
+ * Not used: `PATCH /users/:id/role` sets a single role and is superseded by
+ * `PUT /users/:id/roles`, which sets them all; `GET /users/:id` returns what
+ * the list already holds.
  */
 
 /** Ids are UUIDs in the Go API; anything else is kept as text rather than guessed at. */
@@ -54,6 +62,12 @@ const userSchema = z
     status: optionalText,
     role: z.unknown().optional(),
     roles: z.array(roleRefSchema).nullish(),
+    /** When they last signed in; null for an account never used. */
+    last_login_at: optionalText,
+    login_count: optionalNumber,
+    /** Devices signed in now. */
+    active_sessions: optionalNumber,
+    created_at: optionalText,
   })
   .transform(({ role, roles, ...user }) => {
     const primary = roleRefSchema.safeParse(role);
@@ -133,6 +147,23 @@ export async function setUserStatus(
   status: UserStatus,
 ): Promise<void> {
   await http.patch(`/users/${encodeURIComponent(id)}/status`, { status });
+}
+
+/** Every unexpired session of a user, including ones already signed out. */
+export async function listUserSessions(
+  http: HttpClient,
+  userId: string,
+  signal?: AbortSignal,
+): Promise<DeviceSession[]> {
+  const body = await http.get(`/users/${encodeURIComponent(userId)}/sessions`, { signal });
+  return parseList(deviceSessionSchema, body, 'user sessions');
+}
+
+/** Signs a user out on every device. Resolves to how many sessions that ended. */
+export async function revokeUserSessions(http: HttpClient, userId: string): Promise<number> {
+  const body = await http.delete(`/users/${encodeURIComponent(userId)}/sessions`);
+  return parseBody(z.object({ revoked: z.number().int().nonnegative() }), body, 'revoke sessions')
+    .revoked;
 }
 
 export async function listRoles(http: HttpClient, signal?: AbortSignal): Promise<Role[]> {

@@ -1,8 +1,8 @@
 'use client';
 
-import { Ban, CircleCheck, Plus, ShieldCheck } from 'lucide-react';
+import { Ban, CircleCheck, MonitorSmartphone, Plus, ShieldCheck } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -20,6 +20,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/features/auth/hooks';
+import { useCan } from '@/features/auth/queries';
 import { getErrorMessage } from '@/lib/api';
 import { initialsOf } from '@/lib/format';
 
@@ -28,6 +29,7 @@ import { isActive, roleLabel, userRoleLabels, userStatusLabel } from './access';
 import { EditRolesDialog } from './EditRolesDialog';
 import { useAccessRoles, useSetUserStatus, useUsers } from './queries';
 import { UserFormDialog } from './UserFormDialog';
+import { UserSessionsDialog } from './UserSessionsDialog';
 import { userDisplayName } from './userForm';
 
 export const USERS_PATH = '/moh/users';
@@ -54,17 +56,29 @@ export function usersHref({ status, role }: { status: StatusFilter; role: string
   return query ? `${USERS_PATH}?${query}` : USERS_PATH;
 }
 
-type Dialog = { kind: 'create' } | { kind: 'roles'; user: User } | null;
+type Dialog =
+  { kind: 'create' } | { kind: 'roles'; user: User } | { kind: 'sessions'; user: User } | null;
 
 export default function UsersPage() {
   const users = useUsers();
   const roles = useAccessRoles();
   const currentUser = useCurrentUser();
+  const can = useCan();
   const setStatus = useSetUserStatus();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
+  // Each row's actions button, so a dialog opened from its menu can hand focus back to it.
+  const actionButtons = useRef(new Map<string, HTMLButtonElement>());
+
+  /** Sends focus back to a row's actions button as a dialog closes, if the row is still shown. */
+  function focusRowActions(userId: string, event: Event) {
+    const button = actionButtons.current.get(userId);
+    if (!button?.isConnected) return;
+    event.preventDefault();
+    button.focus();
+  }
 
   const statusFilter = statusFilterFrom(searchParams.get('status'));
   const roleParam = searchParams.get('role') ?? 'all';
@@ -134,8 +148,12 @@ export default function UsersPage() {
   );
   const rows = byRole?.filter(statusFilter.keeps);
   const isFiltered = statusFilter.value !== 'all' || role !== 'all';
+  // Actions the API would refuse are left out, matching each endpoint's permission.
+  const canCreate = can('users:create', 'roles:assign');
+  const canAssignRoles = can('roles:assign');
+  const canUpdate = can('users:update');
 
-  const addButton = (
+  const addButton = canCreate ? (
     <Button
       onClick={() => {
         setDialog({ kind: 'create' });
@@ -144,7 +162,7 @@ export default function UsersPage() {
       <Plus data-icon="inline-start" />
       Add user
     </Button>
-  );
+  ) : null;
 
   function reactivate(user: User) {
     setStatus.mutate(
@@ -206,7 +224,9 @@ export default function UsersPage() {
         emptyDescription={
           isFiltered
             ? 'Choose another status or role to see the rest.'
-            : 'Add the first account so someone else can sign in.'
+            : canCreate
+              ? 'Add the first account so someone else can sign in.'
+              : 'Accounts appear here once an administrator adds them.'
         }
         emptyAction={isFiltered ? undefined : addButton}
         rowActions={(user) => {
@@ -215,15 +235,30 @@ export default function UsersPage() {
           return (
             <RowActions
               label={`Actions for ${userDisplayName(user)}`}
+              triggerRef={(button) => {
+                if (button) actionButtons.current.set(user.id, button);
+                else actionButtons.current.delete(user.id);
+              }}
               actions={[
+                ...(canAssignRoles
+                  ? ([
+                      {
+                        label: 'Edit roles',
+                        icon: ShieldCheck,
+                        onSelect: () => {
+                          setDialog({ kind: 'roles', user });
+                        },
+                      },
+                    ] satisfies RowActionItem[])
+                  : []),
                 {
-                  label: 'Edit roles',
-                  icon: ShieldCheck,
+                  label: 'Signed-in devices',
+                  icon: MonitorSmartphone,
                   onSelect: () => {
-                    setDialog({ kind: 'roles', user });
+                    setDialog({ kind: 'sessions', user });
                   },
                 },
-                ...(isSelf
+                ...(isSelf || !canUpdate
                   ? []
                   : ([
                       ROW_ACTION_SEPARATOR,
@@ -260,6 +295,20 @@ export default function UsersPage() {
           }}
         />
       ) : null}
+      {dialog?.kind === 'sessions' ? (
+        <UserSessionsDialog
+          key={dialog.user.id}
+          user={dialog.user}
+          // Signing yourself out everywhere is done from your own account menu, one device at a time.
+          canSignOut={canUpdate && currentUser?.id !== dialog.user.id}
+          onClose={() => {
+            setDialog(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowActions(dialog.user.id, event);
+          }}
+        />
+      ) : null}
       {dialog?.kind === 'roles' ? (
         <EditRolesDialog
           key={dialog.user.id}
@@ -269,6 +318,9 @@ export default function UsersPage() {
           rolesError={roles.error}
           onClose={() => {
             setDialog(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowActions(dialog.user.id, event);
           }}
         />
       ) : null}

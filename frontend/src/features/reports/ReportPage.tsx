@@ -16,6 +16,7 @@ import { RecordView } from '@/components/RecordView';
 import type { ProductKey } from '@/features/fulfilment/products';
 import { toApiError } from '@/lib/api';
 import { formatDate, formatTimestamp } from '@/lib/format';
+import { WriteAction } from '@/components/WriteAction';
 
 import type { FigureKey, MonthlyReport } from './api';
 import {
@@ -354,20 +355,24 @@ function ReportEditor({ report }: { report: MonthlyReport }) {
                 <AlertDescription>{failure}</AlertDescription>
               </Alert>
             ) : null}
-            <div className="flex flex-col gap-2">
-              <Button onClick={send} disabled={isBusy}>
-                {submit.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
-                {submit.isPending
-                  ? 'Sending…'
-                  : report.status === 'errors' || problems.length > 0
-                    ? 'Re-check and send'
-                    : 'Validate and send'}
-              </Button>
-              <Button variant="outline" onClick={saveDraft} disabled={!isDirty || isBusy}>
-                {save.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
-                Save draft
-              </Button>
-            </div>
+            <WriteAction>
+              <div className="flex flex-col gap-2">
+                <Button onClick={send} disabled={isBusy}>
+                  {submit.isPending ? (
+                    <Spinner data-icon="inline-start" aria-hidden="true" />
+                  ) : null}
+                  {submit.isPending
+                    ? 'Sending…'
+                    : report.status === 'errors' || problems.length > 0
+                      ? 'Re-check and send'
+                      : 'Validate and send'}
+                </Button>
+                <Button variant="outline" onClick={saveDraft} disabled={!isDirty || isBusy}>
+                  {save.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
+                  Save draft
+                </Button>
+              </div>
+            </WriteAction>
             <p className="text-muted-foreground text-xs">
               CLIMS checks the report before it leaves. If something is wrong it comes back to you
               to fix: nothing reaches MOH until it passes.

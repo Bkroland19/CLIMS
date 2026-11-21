@@ -53,6 +53,22 @@ test.describe('users', () => {
     await expect(dialog).toBeHidden();
   });
 
+  test('signs a user out everywhere after confirming', async ({ page }) => {
+    await open(page, '/moh/users', 'User management');
+    await page.getByRole('button', { name: 'Actions for Harriet Achieng' }).click();
+    await page.getByRole('menuitem', { name: 'Signed-in devices' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Signed-in devices' });
+    await expect(dialog.getByRole('listitem')).toHaveCount(2);
+    await dialog.getByRole('button', { name: 'Sign out everywhere' }).click();
+    const confirm = page.getByRole('alertdialog', { name: 'Sign Harriet Achieng out everywhere?' });
+    await confirm.getByRole('button', { name: 'Sign out everywhere' }).click();
+
+    await expectToast(page, 'Signed Harriet Achieng out of 2 devices');
+    await expect(confirm).toBeHidden();
+    await expect(dialog.getByText('Not signed in anywhere')).toBeVisible();
+  });
+
   test('deactivates a user after confirming', async ({ page }) => {
     await open(page, '/moh/users', 'User management');
     await expect(page.getByRole('link', { name: /^Deactivated 1/ })).toBeVisible();

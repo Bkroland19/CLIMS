@@ -154,7 +154,7 @@ function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProps) {
               </span>
               <span className="flex min-w-0 flex-1 flex-col text-left leading-tight">
                 <span className="text-muted-foreground text-[0.6875rem] font-semibold tracking-[0.06em] uppercase">
-                  Workspace
+                  {current.readOnly ? 'Workspace · read-only' : 'Workspace'}
                 </span>
                 <span className="truncate text-[0.84375rem] font-semibold">{current.label}</span>
               </span>
@@ -183,6 +183,9 @@ function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProps) {
                   >
                     <WorkspaceIcon aria-hidden="true" />
                     <span className="flex-1 truncate">{workspace.label}</span>
+                    {workspace.readOnly ? (
+                      <span className="text-muted-foreground text-xs">Read-only</span>
+                    ) : null}
                     {isCurrent ? <Check className="text-success" aria-hidden="true" /> : null}
                   </Link>
                 </DropdownMenuItem>

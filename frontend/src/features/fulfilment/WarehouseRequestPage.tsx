@@ -51,6 +51,7 @@ import { requestSteps } from './progress';
 import { PRODUCTS, productOf } from './products';
 import { useDistrictStore, useOrders, useReceiveRequest, useRequest } from './queries';
 import { RecordView } from '@/components/RecordView';
+import { WriteAction } from '@/components/WriteAction';
 import {
   defaultDiscrepancyType,
   discrepancySummary,
@@ -516,9 +517,11 @@ function ReceiveForm({ request, dispatch, now }: ReceiveFormProps) {
             ) : null}
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={isBusy} className="w-full sm:w-auto">
-                {isBusy ? 'Confirming…' : 'Confirm receipt and issue GRN'}
-              </Button>
+              <WriteAction>
+                <Button type="submit" disabled={isBusy} className="w-full sm:w-auto">
+                  {isBusy ? 'Confirming…' : 'Confirm receipt and issue GRN'}
+                </Button>
+              </WriteAction>
             </div>
           </div>
         </form>

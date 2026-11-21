@@ -29,7 +29,7 @@ import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
 import { handleWarehouse, seedWarehouse } from './mock/warehouse.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
 import { handleOnboarding, seedOnboarding } from './mock/onboarding.mts';
-import { handleAdmin, seedAdmin } from './mock/admin.mts';
+import { handleAdmin, handleAuth, seedAdmin, signedInUser } from './mock/admin.mts';
 import { handleReports, seedReports } from './mock/reports.mts';
 import { handleHotspots, seedHotspotsMock } from './mock/hotspots.mts';
 
@@ -136,15 +136,9 @@ async function route(request: IncomingMessage): Promise<Reply> {
         refresh_token: REFRESH_TOKEN,
         token_type: 'Bearer',
         expires_in: 86400,
-        user: {
-          id: 1,
-          username: 'sarah.nakato',
-          firstname: 'Sarah',
-          lastname: 'Nakato',
-          email: typeof body.login === 'string' && body.login.includes('@') ? body.login : null,
-          status: 'active',
-          role: { id: 1, name: 'admin', permissions: [] },
-        },
+        user: signedInUser(
+          typeof body.login === 'string' && body.login.includes('@') ? body.login : null,
+        ),
       },
     });
   }
@@ -167,6 +161,9 @@ async function route(request: IncomingMessage): Promise<Reply> {
   if (resource === 'auth' && id === 'logout' && request.method === 'POST') {
     return reply(200, { success: true, message: 'logged out', data: null });
   }
+  // The signed-in user and their devices, in the Go API's shapes.
+  const auth = handleAuth(request.method ?? 'GET', parts, request.headers['user-agent'] ?? null);
+  if (auth) return auth;
   // Users, roles and permissions in the Go API's shapes; answered before the legacy lookups.
   const admin = handleAdmin(
     request.method ?? 'GET',

@@ -46,6 +46,7 @@ import {
   useRequests,
 } from './queries';
 import { RecordView } from '@/components/RecordView';
+import { useReadOnly } from '@/navigation/useAccess';
 import { ORDER_STATUS, REQUEST_STATUS } from './status';
 import { DCFP_PATHS } from './tasks';
 
@@ -448,6 +449,8 @@ function OrderActions({
   onHold,
   onRelease,
 }: OrderActionsProps) {
+  // Every next step changes the order; someone viewing read-only takes none.
+  const readOnly = useReadOnly();
   const buttons = [];
 
   if (order.status === 'queued') {
@@ -530,7 +533,7 @@ function OrderActions({
     );
   }
 
-  if (buttons.length === 0) return null;
+  if (readOnly || buttons.length === 0) return null;
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">{buttons}</div>
   );

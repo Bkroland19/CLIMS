@@ -21,6 +21,8 @@ interface EditRolesDialogProps {
   isLoadingRoles: boolean;
   rolesError: unknown;
   onClose: () => void;
+  /** Where focus goes on close; see `FormDialog`. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /** Replaces the roles a user holds (`PUT /users/:id/roles`). Mount it to open. */
@@ -30,6 +32,7 @@ export function EditRolesDialog({
   isLoadingRoles,
   rolesError,
   onClose,
+  onCloseAutoFocus,
 }: EditRolesDialogProps) {
   const setRoles = useSetUserRoles(user.id);
   const {
@@ -67,6 +70,7 @@ export function EditRolesDialog({
       isDirty={isDirty}
       error={formError}
       onSubmit={onSubmit}
+      onCloseAutoFocus={onCloseAutoFocus}
     >
       <Controller
         control={control}

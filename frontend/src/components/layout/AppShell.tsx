@@ -22,12 +22,21 @@ interface AppShellProps {
   counts?: NavCounts;
   /** The bell's list; leave out while there is no notification feed. */
   notifications?: readonly AppNotification[];
+  /** The heading for an address that has no page in `workspaces`, e.g. one the person may not open. */
+  fallbackTitle?: string;
   /** The routed page. */
   children: ReactNode;
 }
 
 /** The signed-in frame: top bar, sidebar, heading band and the routed page. */
-export function AppShell({ workspaces, storage, counts, notifications, children }: AppShellProps) {
+export function AppShell({
+  workspaces,
+  storage,
+  counts,
+  notifications,
+  fallbackTitle,
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const location = locate(workspaces, pathname);
   const [isSidebarOpen, setIsSidebarOpen] = useStoredBoolean(storage, 'clims.sidebar-open', true);
@@ -59,7 +68,7 @@ export function AppShell({ workspaces, storage, counts, notifications, children 
           tabIndex={-1}
           className="bg-canvas min-w-0 outline-none"
         >
-          <PageHeading location={location} counts={counts} />
+          <PageHeading location={location} counts={counts} fallbackTitle={fallbackTitle} />
           <div className="mx-auto w-full max-w-360 flex-1 px-4 pt-4 pb-10 md:px-5">
             <ErrorBoundary resetKey={pathname}>
               <div className="flex w-full flex-col gap-6">{children}</div>

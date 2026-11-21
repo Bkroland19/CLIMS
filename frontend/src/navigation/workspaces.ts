@@ -169,6 +169,7 @@ export const workspaces: readonly Workspace[] = [
                 title: 'User management',
                 description: 'Everyone who can sign in to CLIMS, and the roles they hold.',
                 layout: 'table',
+                permission: 'users:read',
               },
               {
                 path: '/moh/users/roles',
@@ -176,6 +177,7 @@ export const workspaces: readonly Workspace[] = [
                 title: 'Roles & permissions',
                 description: 'What each role can see and do. A user can hold more than one role.',
                 layout: 'detail',
+                permission: 'roles:read',
               },
             ],
           },

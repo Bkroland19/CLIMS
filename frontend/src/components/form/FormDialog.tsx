@@ -31,6 +31,8 @@ interface FormDialogProps {
    */
   error?: string | null;
   onSubmit: ComponentProps<'form'>['onSubmit'];
+  /** Where focus goes on close, when the element that opened the dialog has gone. */
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
 }
 
@@ -46,6 +48,7 @@ export function FormDialog({
   isDirty = false,
   error,
   onSubmit,
+  onCloseAutoFocus,
   children,
 }: FormDialogProps) {
   return (
@@ -58,6 +61,7 @@ export function FormDialog({
     >
       <DialogContent
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-2xl"
+        onCloseAutoFocus={onCloseAutoFocus}
         onInteractOutside={(event) => {
           // A stray click on the backdrop must not throw away typed input.
           // Cancel, the close button and Escape still dismiss.

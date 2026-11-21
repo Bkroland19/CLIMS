@@ -1,4 +1,7 @@
 import { Ellipsis, type LucideIcon } from 'lucide-react';
+import type { Ref } from 'react';
+
+import { useReadOnly } from '@/navigation/useAccess';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +28,11 @@ interface RowActionsProps {
   /** Identifies the row to assistive technology, e.g. "Actions for nakato". */
   label: string;
   actions: readonly RowActionItem[];
+  /**
+   * The menu's button. A dialog opened from the menu returns focus here when it
+   * closes: the menu item that opened it is gone by then.
+   */
+  triggerRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -39,16 +47,20 @@ interface RowActionsProps {
  * ]} />
  * ```
  */
-export function RowActions({ label, actions }: RowActionsProps) {
+export function RowActions({ label, actions, triggerRef }: RowActionsProps) {
+  // In a workspace opened read-only every row action is a change the person may not make.
+  const readOnly = useReadOnly();
   const items = withoutStraySeparators(actions);
+  if (readOnly) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={label}>
+        <Button ref={triggerRef} variant="ghost" size="icon-sm" aria-label={label}>
           <Ellipsis aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      {/* The menu sizes to its labels; the default, the 32px trigger's width, wraps each one. */}
+      <DropdownMenuContent align="end" className="w-auto min-w-44">
         {items.map((item, index) =>
           item === ROW_ACTION_SEPARATOR ? (
             // A separator has no identity of its own; its position is its key.

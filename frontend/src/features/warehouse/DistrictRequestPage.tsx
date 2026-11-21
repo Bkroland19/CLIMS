@@ -30,6 +30,8 @@ import { StockCheckBadge } from '@/features/inventory/StockCheckBadge';
 import { useFocusWhenLost } from '@/hooks/useFocusWhenLost';
 import { getErrorMessage } from '@/lib/api';
 import { formatDate, formatNumber, formatTimestamp } from '@/lib/format';
+import { WriteAction } from '@/components/WriteAction';
+import { useReadOnly } from '@/navigation/useAccess';
 
 import type { WarehouseStock } from './api';
 import { BATCH_STATUS, checkRequestStock, dispatchableStock, planDispatch } from './dispatch';
@@ -372,11 +374,13 @@ function RequestDetail({ request, store, bannerRef }: RequestDetailProps) {
                       Put on hold instead
                     </Button>
                   )}
-                  <Button onClick={submitDispatch} disabled={isBusy || plan.problems.length > 0}>
-                    {dispatch.isPending
-                      ? 'Dispatching…'
-                      : `Dispatch to ${request.district} district store`}
-                  </Button>
+                  <WriteAction>
+                    <Button onClick={submitDispatch} disabled={isBusy || plan.problems.length > 0}>
+                      {dispatch.isPending
+                        ? 'Dispatching…'
+                        : `Dispatch to ${request.district} district store`}
+                    </Button>
+                  </WriteAction>
                 </div>
               </CardContent>
             </Card>
@@ -402,9 +406,11 @@ function RequestDetail({ request, store, bannerRef }: RequestDetailProps) {
                 />
                 {failureOf('hold')}
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <Button onClick={submitHold} disabled={isBusy}>
-                    {hold.isPending ? 'Putting on hold…' : 'Put on hold and notify district'}
-                  </Button>
+                  <WriteAction>
+                    <Button onClick={submitHold} disabled={isBusy}>
+                      {hold.isPending ? 'Putting on hold…' : 'Put on hold and notify district'}
+                    </Button>
+                  </WriteAction>
                 </div>
               </CardContent>
             </Card>
@@ -507,6 +513,8 @@ function RequestActions({
   onCheck,
   onRequeue,
 }: RequestActionsProps) {
+  // Accepting, checking and re-queueing all move the request on; read-only viewers do none.
+  const readOnly = useReadOnly();
   let button = null;
   if (isNew(request)) {
     button = (
@@ -531,7 +539,7 @@ function RequestActions({
       </Button>
     );
   }
-  if (!button) return null;
+  if (readOnly || !button) return null;
   return <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">{button}</div>;
 }
 
