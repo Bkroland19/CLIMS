@@ -7,7 +7,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useCurrentUser } from '@/features/auth/hooks';
 import { useCan, useCurrentUserSync } from '@/features/auth/queries';
 import { DistrictContextProvider } from '@/features/district/DistrictContext';
-import { useDcfpCounts } from '@/features/fulfilment/useDcfpCounts';
+import { useDcfpCounts } from '@/features/district/useDcfpCounts';
+import { InboxBell } from '@/features/notifications/InboxBell';
 import { useWarehouseCounts } from '@/features/warehouse/useWarehouseCounts';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
 
@@ -47,8 +48,9 @@ const inside = (pathname: string, base: string) =>
  * page outside that is replaced by a short explanation rather than left to
  * fail on the API's 403s, and a workspace opened read-only says so on top.
  *
- * It also keeps the user's roles and permissions current (`GET /auth/me`) and
- * fetches each workspace's badge counts only while that workspace is open.
+ * It also keeps the user's roles and permissions current (`GET /auth/me`),
+ * fetches each workspace's badge counts only while that workspace is open, and
+ * feeds the bell from the user's inbox, whatever their role.
  */
 function SignedInShell({ children }: AppFrameProps) {
   useCurrentUserSync();
@@ -104,6 +106,7 @@ function SignedInShell({ children }: AppFrameProps) {
         workspaces={navigation}
         storage={storage}
         counts={dcfpCounts ?? warehouseCounts}
+        bell={<InboxBell canOpen={(workspace) => accessTo(access, workspace) !== null} />}
         fallbackTitle={fallbackTitle}
       >
         {readOnly ? <ReadOnlyNotice workspace={target.workspace} /> : null}

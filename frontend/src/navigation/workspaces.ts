@@ -277,22 +277,24 @@ export const workspaces: readonly Workspace[] = [
             pages: [
               {
                 path: '/dcfp/orders',
-                tab: 'Queue',
+                tab: 'Stockout alerts',
                 title: 'Orders',
                 description:
-                  'Stockout notifications from hotspots. Review each one, check stock, then confirm or hold.',
+                  'Stockout alerts from hotspots. Send stock from the district store, or ask the warehouse for it.',
                 layout: 'table',
+                permission: 'orders:read',
               },
               {
                 path: '/dcfp/orders/held',
-                tab: 'Held for stock',
+                tab: 'Waiting for warehouse',
                 title: 'Orders',
                 description:
-                  'Orders waiting for stock, checked against what is in the district store now.',
+                  'Alerts waiting for a warehouse shipment, with what the district store can send of each now.',
                 layout: 'table',
+                permission: 'orders:read',
               },
             ],
-            details: [{ path: '/dcfp/orders/[id]', label: 'Review order', layout: 'detail' }],
+            details: [{ path: '/dcfp/orders/[id]', label: 'Stockout alert', layout: 'detail' }],
           },
           {
             id: 'restock',
@@ -304,39 +306,36 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Warehouse requests',
                 title: 'Restock',
                 description:
-                  'Stock ordered from NMS or JMS, and consignments waiting to be received.',
+                  'Stock asked of NMS or JMS for an alert, and shipments on their way to be received.',
                 layout: 'table',
+                permission: 'orders:read',
               },
               {
                 path: '/dcfp/restock/store',
                 tab: 'District store',
                 title: 'Restock',
                 description:
-                  'Condoms in the district store, by batch, and every movement in and out.',
+                  'What the district store holds, by product and unit, and every movement in and out.',
                 layout: 'table',
+                permission: 'inventory:read',
               },
             ],
-            // `new` is listed before `[id]`: a fixed segment wins, as it does in the router.
-            details: [
-              { path: '/dcfp/restock/new', label: 'New warehouse request', layout: 'form' },
-              { path: '/dcfp/restock/[id]', label: 'Warehouse request', layout: 'detail' },
-            ],
+            details: [{ path: '/dcfp/restock/[id]', label: 'Warehouse request', layout: 'detail' }],
           },
           {
             id: 'dispatch',
-            label: 'Dispatch',
+            label: 'Deliveries',
             icon: Truck,
             pages: [
               {
                 path: '/dcfp/dispatch',
-                tab: 'Dispatch',
-                title: 'Dispatch',
-                description:
-                  'Confirmed orders ready to go out with a rider, and deliveries in progress.',
+                tab: 'Deliveries',
+                title: 'Deliveries',
+                description: 'Stock out with riders, and what they have delivered to hotspots.',
                 layout: 'table',
+                permission: 'orders:read',
               },
             ],
-            details: [{ path: '/dcfp/dispatch/[id]', label: 'Dispatch order', layout: 'form' }],
           },
         ],
       },
@@ -353,8 +352,9 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'List',
                 title: 'Hotspots',
                 description:
-                  'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.',
+                  'Hotspots in your district. Review the ones VHTs submit, then activate or reject each with a comment.',
                 layout: 'table',
+                permission: 'hotspots:read',
               },
               {
                 path: '/dcfp/hotspot-map',
@@ -362,8 +362,10 @@ export const workspaces: readonly Workspace[] = [
                 title: 'Hotspot map',
                 description: DESCRIPTIONS.hotspotMap,
                 layout: 'dashboard',
+                permission: 'hotspots:read',
               },
             ],
+            details: [{ path: '/dcfp/hotspots/[id]', label: 'Hotspot', layout: 'detail' }],
           },
         ],
       },

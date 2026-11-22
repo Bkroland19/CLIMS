@@ -263,14 +263,41 @@ describe('app shell', () => {
     expect(storage.getItem('clims.sidebar-open')).toBe('false');
   });
 
-  it('says plainly that notifications are not connected yet', async () => {
+  it('feeds the bell from the signed-in user’s inbox, whatever their workspace', async () => {
     const user = userEvent.setup();
-    renderApp(routes, { route: '/moh/users', signedIn: true });
+    const rejected = {
+      id: 'n1',
+      type: 'hotspot.rejected',
+      title: 'Hotspot rejected: Lake view bar',
+      body: 'Lake view bar in Wakiso was rejected. Reason: No address.',
+      resource_type: 'hotspot',
+      resource_id: 'h1',
+      actor_id: 'u2',
+      data: {},
+      read_at: null,
+      created_at: '2026-11-21T07:00:00Z',
+    };
+    renderApp(routes, {
+      route: '/moh/users',
+      signedIn: true,
+      replies: [
+        (request) => {
+          if (request.url === '/notifications/unread-count') {
+            return { status: 200, body: { success: true, data: { unread: 1 } } };
+          }
+          if (request.url.startsWith('/notifications?')) {
+            return { status: 200, body: { success: true, data: [rejected] } };
+          }
+          return { status: 200, body: [] };
+        },
+      ],
+    });
     await screen.findByRole('heading', { name: 'User management' });
 
-    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(await screen.findByRole('button', { name: 'Notifications, 1 new' }));
 
-    expect(await screen.findByText('Notifications are not connected yet.')).toBeInTheDocument();
+    expect(await screen.findByText('Hotspot rejected: Lake view bar')).toBeInTheDocument();
+    expect(screen.queryByText('Notifications are not connected yet.')).not.toBeInTheDocument();
   });
 });
 
