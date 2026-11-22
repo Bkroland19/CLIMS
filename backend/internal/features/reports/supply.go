@@ -25,7 +25,7 @@ func piecesOf(quantity, unit string) string {
 // to a national warehouse. Parameters: $1 all, $2 store, $3 from, $4 to, $5 warehouse, $6 district,
 // $7 category.
 var requestsCTE = `WITH q AS (
-	SELECT o.id, o.condom_id, c.category, o.unit_of_measure_id, o.order_status, o.created_at,
+	SELECT o.id, o.condom_id, coalesce(o.condom_category, c.category) AS category, o.unit_of_measure_id, o.order_status, o.created_at,
 		o.ordered_from_store_id AS warehouse_id, fs.name AS warehouse, o.ordered_for_store_id AS district_store_id,
 		ts.name AS district_store, ts.district_id, d.name AS district,
 		o.quantity_needed AS requested, coalesce(o.quantity_approved,
@@ -37,7 +37,7 @@ var requestsCTE = `WITH q AS (
 		` + piecesOf("o.quantity_received", "o.unit_of_measure_id") + ` AS received_pieces,
 		(SELECT max(e.created_at) FROM order_events e WHERE e.order_id = o.id AND e.action = 'receive') AS received_at
 	FROM orders o
-	JOIN condoms c ON c.id = o.condom_id
+	LEFT JOIN condoms c ON c.id = o.condom_id
 	JOIN stores fs ON fs.id = o.ordered_from_store_id AND fs.store_type = 'national'
 	JOIN stores ts ON ts.id = o.ordered_for_store_id AND ts.store_type = 'district'
 	LEFT JOIN districts d ON d.id = ts.district_id
@@ -45,7 +45,7 @@ var requestsCTE = `WITH q AS (
 		AND ($1::boolean OR $2::uuid IN (o.ordered_from_store_id, o.ordered_for_store_id))
 		AND o.created_at >= $3 AND o.created_at < $4
 		AND ($5::uuid IS NULL OR o.ordered_from_store_id = $5) AND ($6::uuid IS NULL OR ts.district_id = $6)
-		AND ($7 = '' OR c.category = $7))`
+		AND ($7 = '' OR coalesce(o.condom_category, c.category) = $7))`
 
 func (f SupplyFilter) requestArgs(s scope) []any {
 	return []any{s.all, s.storeID, f.From, f.To, f.WarehouseID, f.DistrictID, f.Category}
@@ -144,7 +144,7 @@ func (r *Repository) supplyReport(ctx context.Context, s scope, f SupplyFilter, 
 // RequestRecord is one warehouse request behind the supply totals.
 type RequestRecord struct {
 	ID              string     `json:"id"`
-	CondomID        string     `json:"condom_id"`
+	CondomID        *string    `json:"condom_id"`
 	Category        *string    `json:"category"`
 	UnitOfMeasureID *string    `json:"unit_of_measure_id"`
 	Status          string     `json:"order_status"`

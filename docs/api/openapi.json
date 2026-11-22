@@ -118,7 +118,7 @@
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Report a hotspot stockout to its district's DCFPs",
-        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a product, with an optional message, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the product, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`. The notification names Male, Female or Both (selection) and no quantity. If the hotspot already has an open notification, the message is counted against it (200): its repeat_count rises and its selection widens when a new type is named (Male then Female is Both), and the history keeps both.",
+        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a condom category (`condom_category`: male, female or both), with an optional `message`, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the category, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. The notification names Male, Female or Both (returned as `selection`) and no product or quantity. If the hotspot already has an open notification, the message is counted against it (200): its repeat_count rises and its selection widens when a new type is named (Male then Female is Both), and the history keeps both.",
         "responses": {
           "201": {
             "description": "Success",
@@ -176,7 +176,7 @@
         "tags": ["Orders"],
         "operationId": "createWarehouseRequest",
         "summary": "Order stock from NMS or JMS",
-        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the product (`condom_id`, which fixes the condom type, e.g. female) and the `quantity`. `unit_of_measure_id` defaults to the product's catalogue unit; a product without one returns 422 with `error.unit_of_measure_id`. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
+        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the condom category (`condom_category`, male or female), the `quantity` and its `unit_of_measure_id`. The warehouse chooses the product (`condom_id`) when it reviews the request; until then the order's `condom_id` is null. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
         "responses": {
           "201": {
             "description": "Success",
@@ -4935,30 +4935,30 @@
       "OrderStockoutRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["hot_spot_id"],
+        "required": ["hot_spot_id", "condom_category"],
         "properties": {
           "hot_spot_id": {
             "type": "string",
             "format": "uuid"
           },
-          "selection": {
+          "condom_category": {
             "type": "string",
             "enum": ["male", "female", "both"],
-            "description": "Male, Female or Both. Required unless condom_id is sent."
+            "description": "The condom category the hotspot is out of; the district chooses what to send."
           },
-          "condom_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Older clients: one product, whose category becomes the selection."
-          },
-          "comment": {
+          "message": {
             "type": "string",
             "nullable": true,
             "maxLength": 4000,
-            "description": "The message the DCFP reads in the notification."
+            "description": "The message the DCFP reads in the notification; returned as comment."
           }
         },
-        "description": "A stockout notification names Male, Female or Both and no quantity."
+        "description": "A stockout notification names a condom category and no product or quantity.",
+        "example": {
+          "hot_spot_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "condom_category": "male",
+          "message": "Dispenser empty since Monday"
+        }
       },
       "OrderActionRequest": {
         "type": "object",
@@ -4991,6 +4991,11 @@
             "maxLength": 1000,
             "nullable": true,
             "description": "dispatch only. Required when stock expiring within one calendar month would leave the store (first expiry first out). Recorded with who authorised it and the rule version."
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "review only: the product the warehouse sends, an active product of the requested condom_category. Required at the first review of a request without a product (422 with error.condom_id); a held request may switch product at a new review."
           }
         },
         "additionalProperties": false
@@ -5134,7 +5139,9 @@
           },
           "condom_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "The product. Null on a warehouse request until the warehouse chooses one at review."
           },
           "quantity_needed": {
             "type": "integer",
@@ -5238,6 +5245,12 @@
             "nullable": true,
             "minimum": 1,
             "description": "What the warehouse approved at review, at most quantity_needed, which keeps the original request."
+          },
+          "condom_category": {
+            "type": "string",
+            "enum": ["male", "female"],
+            "nullable": true,
+            "description": "The condom category requested."
           }
         }
       },
@@ -7499,17 +7512,17 @@
       "WarehouseRequestRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["warehouse_store_id", "condom_id", "quantity"],
+        "required": ["warehouse_store_id", "condom_category", "quantity", "unit_of_measure_id"],
         "properties": {
           "warehouse_store_id": {
             "type": "string",
             "format": "uuid",
             "description": "A national store: NMS or JMS."
           },
-          "condom_id": {
+          "condom_category": {
             "type": "string",
-            "format": "uuid",
-            "description": "The product, which fixes the condom type (male or female), brand and channel."
+            "enum": ["male", "female"],
+            "description": "The condom category requested; the warehouse chooses the product at review."
           },
           "quantity": {
             "type": "integer",
@@ -7518,15 +7531,20 @@
           },
           "unit_of_measure_id": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "Defaults to the product's catalogue unit."
+            "format": "uuid"
           },
           "comment": {
             "type": "string",
             "nullable": true,
             "maxLength": 4000
           }
+        },
+        "example": {
+          "warehouse_store_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "condom_category": "male",
+          "quantity": 1,
+          "unit_of_measure_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "comment": "Two hotspots are out"
         }
       },
       "StockoutReport": {

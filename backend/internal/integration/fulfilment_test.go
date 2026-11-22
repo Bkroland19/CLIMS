@@ -76,16 +76,16 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 		body["hot_spot_id"] = hotSpot
 		return request("POST", "/orders/stockouts", body, managerToken, code)
 	}
-	stockout(map[string]any{"selection": "Male"}, 422)
+	stockout(map[string]any{"condom_category": "Male"}, 422)
 	stockout(map[string]any{}, 422)
 	other := map[any]string{"male": "female", "female": "male"}[detail(managerToken)["selection"]]
 	if other == "" {
 		t.Fatal("the open notification should name one type")
 	}
-	repeated := stockout(map[string]any{"selection": other, "comment": "Still out"}, 200)["data"].(map[string]any)
+	repeated := stockout(map[string]any{"condom_category": other, "message": "Still out"}, 200)["data"].(map[string]any)
 	expect("repeat", repeated, map[string]any{"id": openReport, "selection": "both", "repeat_count": float64(2),
 		"status": "awaiting_supply"})
-	stockout(map[string]any{"selection": "both"}, 200)
+	stockout(map[string]any{"condom_category": "both"}, 200)
 	report := detail(managerToken)
 	var actions []string
 	for _, event := range report["events"].([]any) {
@@ -206,7 +206,7 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/reports/notifications?from=2026-11-05&to=2026-11-01", nil, admin, 400)
 
 	// A fulfilled notification is closed: the next stockout opens a new one.
-	if next := stockout(map[string]any{"selection": "male"}, 201)["data"].(map[string]any); next["id"] == openReport {
+	if next := stockout(map[string]any{"condom_category": "male"}, 201)["data"].(map[string]any); next["id"] == openReport {
 		t.Fatal("a stockout after fulfilment reopened the old notification")
 	}
 }

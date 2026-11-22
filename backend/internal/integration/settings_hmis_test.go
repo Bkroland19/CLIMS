@@ -103,3 +103,13 @@ func districtID(t *testing.T, pool *pgxpool.Pool, store string) string {
 	}
 	return id
 }
+
+// categoryOf is a product's condom category, which warehouse requests name instead of the product.
+func categoryOf(t *testing.T, pool *pgxpool.Pool, product string) string {
+	t.Helper()
+	var category string
+	if err := pool.QueryRow(context.Background(), `SELECT category FROM condoms WHERE id = $1`, product).Scan(&category); err != nil {
+		t.Fatal(err)
+	}
+	return category
+}

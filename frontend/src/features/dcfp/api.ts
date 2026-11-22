@@ -27,8 +27,9 @@ const stockoutReportSchema = z.object({
     contact_name: text,
     contact_phone: text,
   }),
-  /** Null for a notification sent as Male, Female or Both rather than for one product. */
+  /** Null: a notification names a condom category (`selection`), not a product. */
   condom_id: z.string().nullable(),
+  selection: z.enum(['male', 'female', 'both']),
   /** The product as the API names it, e.g. "Engabu Free Female", or the selection, e.g. "male condoms". */
   product: z.string(),
   district_store_id: z.string(),
@@ -55,7 +56,10 @@ export const ORDER_STATUSES = [
 
 const orderSchema = z.object({
   id: z.string(),
-  condom_id: z.string(),
+  /** Null until the warehouse chooses the product at review. */
+  condom_id: z.string().nullable(),
+  /** The condom category the district requested. */
+  condom_category: z.enum(['male', 'female']).nullable(),
   quantity_needed: count.nullable(),
   quantity_issued: count.nullable(),
   quantity_received: count.nullable(),
@@ -134,12 +138,12 @@ export async function listWarehouses(http: HttpClient, signal?: AbortSignal): Pr
 
 /* Writes. */
 
+/** The district names a condom category; the warehouse chooses the product. */
 export interface WarehouseOrderInput {
   warehouse_store_id: string;
-  condom_id: string;
+  condom_category: 'male' | 'female';
   quantity: number;
-  /** Leave out to use the product's catalogue unit. */
-  unit_of_measure_id?: string;
+  unit_of_measure_id: string;
   comment: string | null;
 }
 

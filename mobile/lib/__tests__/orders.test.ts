@@ -1,9 +1,7 @@
 import { AxiosError, type AxiosAdapter } from "axios";
 import { api } from "../api";
 import {
-  listProducts,
-  ProductsUnavailable,
-  productsProblemMessage,
+  currentStockoutRequest,
   stockoutComment,
   stockoutErrorMessage,
   toLocalOrder,
@@ -17,12 +15,22 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 /** Answer GET requests by path; anything else is a 404. */
-function serve(routes: Record<string, { status: number; data?: unknown } | "offline">) {
+function serve(
+  routes: Record<string, { status: number; data?: unknown } | "offline">,
+) {
   const adapter: AxiosAdapter = async (cfg) => {
     const r = routes[cfg.url ?? ""] ?? { status: 404 };
-    if (r === "offline") throw new AxiosError("Network Error", "ERR_NETWORK", cfg);
-    const res = { data: r.data, status: r.status, statusText: "", headers: {}, config: cfg };
-    if (r.status >= 400) throw new AxiosError("fail", String(r.status), cfg, null, res as never);
+    if (r === "offline")
+      throw new AxiosError("Network Error", "ERR_NETWORK", cfg);
+    const res = {
+      data: r.data,
+      status: r.status,
+      statusText: "",
+      headers: {},
+      config: cfg,
+    };
+    if (r.status >= 400)
+      throw new AxiosError("fail", String(r.status), cfg, null, res as never);
     return res;
   };
   api.defaults.adapter = adapter;
@@ -30,85 +38,24 @@ function serve(routes: Record<string, { status: number; data?: unknown } | "offl
 
 beforeEach(() => mockStore.clear());
 
-describe("listProducts", () => {
-  it("uses the catalogue, labelled, without inactive products", async () => {
-    serve({
-      "/catalogue/products": {
-        status: 200,
-        data: {
-          data: [
-            {
-              id: "m",
-              category: "male",
-              type: "free",
-              brand: { id: "b", name: "Engabu" },
-              active: true,
-            },
-            { id: "f", category: "female", type: "commercial", brand: null, active: true },
-            {
-              id: "old",
-              category: "male",
-              type: "free",
-              brand: { id: "b", name: "Lifeguard" },
-              active: false,
-            },
-          ],
-        },
-      },
-    });
-    expect(await listProducts()).toEqual([
-      { id: "m", name: "Engabu male · Free" },
-      { id: "f", name: "female · Commercial" },
-    ]);
-  });
-
-  it("builds a deduplicated, sorted list from inventory rows and caches it", async () => {
-    serve({
-      "/inventory/stock": {
-        status: 200,
-        data: {
-          data: [
-            { condom_id: "m", product: "Male · Orange" },
-            { condom_id: "f", product: "Female · Orange" },
-            { condom_id: "m", product: "Male · Orange" },
-          ],
-        },
-      },
-    });
-    expect(await listProducts()).toEqual([
-      { id: "f", name: "Female · Orange" },
-      { id: "m", name: "Male · Orange" },
-    ]);
-    // Offline later: the cached list is used.
-    serve({ "/inventory/stock": "offline", "/inventory/hotspots": "offline" });
-    expect((await listProducts()).map((p) => p.id)).toEqual(["f", "m"]);
-  });
-
-  it("falls back to hotspot inventory when stock balances are empty", async () => {
-    serve({
-      "/inventory/stock": { status: 200, data: { data: [] } },
-      "/inventory/hotspots": { status: 200, data: { data: [{ condom_id: "m", product: "Male" }] } },
-    });
-    expect(await listProducts()).toEqual([{ id: "m", name: "Male" }]);
-  });
-
-  it("says why when the account can't see products and nothing is cached", async () => {
-    serve({ "/inventory/stock": { status: 403 }, "/inventory/hotspots": { status: 403 } });
-    const err = await listProducts().catch((e) => e);
-    expect(err).toBeInstanceOf(ProductsUnavailable);
-    expect(err.problem).toBe("forbidden");
-    expect(productsProblemMessage(err.problem)).toMatch(/can't see the product list/);
-  });
-});
-
 describe("stockoutErrorMessage", () => {
   const err = (status?: number) =>
-    new AxiosError("x", "x", undefined, null, status ? ({ status } as never) : undefined);
+    new AxiosError(
+      "x",
+      "x",
+      undefined,
+      null,
+      status ? ({ status } as never) : undefined,
+    );
   it("explains a refusal so the VHT knows it isn't their mistake", () => {
-    expect(stockoutErrorMessage(err(403))).toMatch(/isn't allowed to send stock requests/);
+    expect(stockoutErrorMessage(err(403))).toMatch(
+      /isn't allowed to send stock requests/,
+    );
   });
   it("explains a hotspot without a district", () => {
-    expect(stockoutErrorMessage(err(422))).toMatch(/isn't linked to a district/);
+    expect(stockoutErrorMessage(err(422))).toMatch(
+      /isn't linked to a district/,
+    );
   });
   it("promises to send later when offline", () => {
     expect(stockoutErrorMessage(err())).toMatch(/back online/);
@@ -125,7 +72,9 @@ describe("toLocalOrder", () => {
     created_at: "2026-11-21T09:00:00Z",
   };
   it("keeps the API id, names and comment", () => {
-    expect(toLocalOrder(base, { hotspot: "Kazo Lodge", product: "Male" }, "Grace")).toMatchObject({
+    expect(
+      toLocalOrder(base, { hotspot: "Kazo Lodge", product: "Male" }, "Grace"),
+    ).toMatchObject({
       id: "o1",
       source: "api",
       hotspotId: "h1",
@@ -139,7 +88,8 @@ describe("toLocalOrder", () => {
   });
   it("maps the API's workflow statuses onto the app's", () => {
     const st = (order_status: ApiOrder["order_status"]) =>
-      toLocalOrder({ ...base, order_status }, { hotspot: "", product: "" }, "").status;
+      toLocalOrder({ ...base, order_status }, { hotspot: "", product: "" }, "")
+        .status;
     expect(st("on_hold")).toBe("on_hold");
     expect(st("reviewed")).toBe("review");
     expect(st("dispatched")).toBe("dispatched");
@@ -149,7 +99,38 @@ describe("toLocalOrder", () => {
 
 describe("stockoutComment", () => {
   it("leads with what's happening", () => {
-    expect(stockoutComment("Running low", "  Busy weekend ")).toBe("Running low. Busy weekend");
+    expect(stockoutComment("Running low", "  Busy weekend ")).toBe(
+      "Running low. Busy weekend",
+    );
     expect(stockoutComment("Out of stock", "")).toBe("Out of stock");
+  });
+});
+
+describe("currentStockoutRequest", () => {
+  it("keeps a request that already names a category", () => {
+    const request = {
+      hot_spot_id: "h1",
+      condom_category: "male" as const,
+      message: null,
+    };
+    expect(currentStockoutRequest(request, "Male condoms")).toBe(request);
+  });
+  it("converts one saved with a product, reading the category from its name", () => {
+    const saved = {
+      hot_spot_id: "h1",
+      condom_id: "p1",
+      comment: "Out of stock",
+    };
+    expect(currentStockoutRequest(saved, "Engabu female · Free")).toEqual({
+      hot_spot_id: "h1",
+      condom_category: "female",
+      message: "Out of stock",
+    });
+    expect(
+      currentStockoutRequest(saved, "Engabu male · Free").condom_category,
+    ).toBe("male");
+    expect(
+      currentStockoutRequest(saved, "Trust · Commercial").condom_category,
+    ).toBe("both");
   });
 });

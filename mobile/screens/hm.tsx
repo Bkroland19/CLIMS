@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import Screen from "@/components/m/Screen";
 import { Banner, Btn, Hero, List, Row, SkeletonList } from "@/components/m/kit";
 import { isNetworkError } from "@/lib/hotspots";
-import { listOrders, listProducts, toLocalOrder } from "@/lib/orders";
+import { CATEGORY_LABEL, listOrders, toLocalOrder } from "@/lib/orders";
 import { useT } from "@/lib/theme";
 import { ago, chip, items, orderChip } from "@/lib/format";
 import { useNav } from "@/lib/nav";
@@ -46,7 +46,9 @@ function HmHomeSample() {
     .filter((o) => o.hotspotId === h.id)
     .sort((a, b) => b.createdAt - a.createdAt);
   const o = mine.find((x) => x.status !== "received");
-  const queued = s.outbox.some((it) => it.type === "notify" && it.payload.hotspotId === h.id);
+  const queued = s.outbox.some(
+    (it) => it.type === "notify" && it.payload.hotspotId === h.id,
+  );
   return (
     <Screen title="Home" root>
       <Hero
@@ -57,7 +59,11 @@ function HmHomeSample() {
         msg={`Last delivery ${h.lastDelivery != null ? ago(h.lastDelivery) : "none yet"}`}
       >
         {!o ? (
-          <Btn label="Report stockout" icon="megaphone" onPress={() => nav.go("request")} />
+          <Btn
+            label="Report stockout"
+            icon="megaphone"
+            onPress={() => nav.go("request")}
+          />
         ) : null}
       </Hero>
       {queued ? (
@@ -77,9 +83,16 @@ function HmHomeSample() {
           msg={orderMsg(o, true, me.name)}
         >
           {o.status === "delivered" ? (
-            <Btn label="Confirm receipt" onPress={() => nav.go(`order/${o.id}`)} />
+            <Btn
+              label="Confirm receipt"
+              onPress={() => nav.go(`order/${o.id}`)}
+            />
           ) : (
-            <Btn label="View order" kind="secondary" onPress={() => nav.go(`order/${o.id}`)} />
+            <Btn
+              label="View order"
+              kind="secondary"
+              onPress={() => nav.go(`order/${o.id}`)}
+            />
           )}
         </Hero>
       ) : null}
@@ -93,12 +106,18 @@ function HmOrdersSample() {
   const mine = s.orders
     .filter((o) => o.hotspotId === HM_HOTSPOT)
     .sort((a, b) => b.createdAt - a.createdAt);
-  const q0 = s.outbox.filter((it) => it.type === "notify" && it.payload.hotspotId === HM_HOTSPOT);
+  const q0 = s.outbox.filter(
+    (it) => it.type === "notify" && it.payload.hotspotId === HM_HOTSPOT,
+  );
   return (
     <Screen
       title="Orders"
       root
-      fab={{ label: "Report stockout", icon: "megaphone", onPress: () => nav.go("request") }}
+      fab={{
+        label: "Report stockout",
+        icon: "megaphone",
+        onPress: () => nav.go("request"),
+      }}
     >
       {q0.length ? (
         <List h="Waiting to send">
@@ -145,17 +164,21 @@ function useApiOrders() {
   useFocusEffect(
     useCallback(() => {
       let live = true;
-      Promise.all([listOrders(), listProducts().catch(() => [])])
-        .then(([orders, products]) => {
+      listOrders()
+        .then((orders) => {
           if (!live) return;
-          const name = new Map(products.map((p) => [p.id, p.name]));
           syncApiOrders(
             orders
               .filter((o) => o.hot_spot_id)
               .map((o) =>
                 toLocalOrder(
                   o,
-                  { hotspot: "Your hotspot", product: name.get(o.condom_id) ?? "Condoms" },
+                  {
+                    hotspot: "Your hotspot",
+                    product: o.condom_category
+                      ? CATEGORY_LABEL[o.condom_category]
+                      : "Condoms",
+                  },
                   me.name,
                   "Hotspot manager",
                 ),
@@ -195,9 +218,21 @@ function LoadBanner({ load, any }: { load: Load; any: boolean }) {
       />
     );
   if (load === "offline" && any)
-    return <Banner tone="neutral" title="Offline" body="Showing your orders as last loaded." />;
+    return (
+      <Banner
+        tone="neutral"
+        title="Offline"
+        body="Showing your orders as last loaded."
+      />
+    );
   if (load === "error")
-    return <Banner tone="warning" title="Couldn't refresh your orders" body="Try again shortly." />;
+    return (
+      <Banner
+        tone="warning"
+        title="Couldn't refresh your orders"
+        body="Try again shortly."
+      />
+    );
   return null;
 }
 
@@ -205,7 +240,9 @@ function HmHomeLive() {
   const nav = useNav();
   const me = useMe();
   const { orders, queued, load } = useApiOrders();
-  const open = orders.find((o) => o.status !== "delivered" && o.status !== "received");
+  const open = orders.find(
+    (o) => o.status !== "delivered" && o.status !== "received",
+  );
   if (!me.hotspotId)
     return (
       <Screen title="Home" root>
@@ -228,7 +265,11 @@ function HmHomeLive() {
             : "No open requests."
         }
       >
-        <Btn label="Report stockout" icon="megaphone" onPress={() => nav.go("request")} />
+        <Btn
+          label="Report stockout"
+          icon="megaphone"
+          onPress={() => nav.go("request")}
+        />
       </Hero>
       {queued.length ? (
         <Banner
@@ -262,7 +303,11 @@ function HmOrdersLive() {
     <Screen
       title="Orders"
       root
-      fab={{ label: "Report stockout", icon: "megaphone", onPress: () => nav.go("request") }}
+      fab={{
+        label: "Report stockout",
+        icon: "megaphone",
+        onPress: () => nav.go("request"),
+      }}
     >
       <LoadBanner load={load} any={orders.length > 0} />
       {queued.length ? (

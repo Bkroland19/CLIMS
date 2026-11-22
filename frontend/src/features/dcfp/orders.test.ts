@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { anOrder, aReport, DISTRICT_STORE, FEMALE, JMS, NMS } from '@/test/dcfpFixtures';
+import { anOrder, aReport, DISTRICT_STORE, JMS, NMS } from '@/test/dcfpFixtures';
 
 import {
   contactOf,
@@ -116,17 +116,21 @@ describe('dcfpTasks', () => {
     expect(tasks[0]?.href).toBe(DCFP_PATHS.order('arrived'));
     expect(tasks[1]).toMatchObject({
       action: 'Order stock',
-      href: DCFP_PATHS.newOrderFor(FEMALE.id),
-      title: 'Kisenyi Landing is out of Engabu Free Female',
+      href: DCFP_PATHS.newOrderFor('female'),
+      title: 'Kisenyi Landing is out of female condoms',
     });
     expect(tasks[1]?.detail).toContain('Dispenser empty since Monday');
   });
 
-  it('drops a stockout once the product has been ordered since it was reported', () => {
+  it('drops a stockout once its condom type has been ordered since it was reported', () => {
     const answered = anOrder({ created_at: '2026-11-21T09:00:00Z', order_status: 'queued' });
     const earlier = anOrder({ id: 'earlier', created_at: '2026-11-20T09:00:00Z' });
+    const otherType = anOrder({ ...answered, id: 'male', condom_category: 'male' });
     expect(dcfpTasks([aReport()], [answered], names, now, time)).toEqual([]);
     expect(dcfpTasks([aReport()], [earlier], names, now, time)).toHaveLength(1);
+    expect(dcfpTasks([aReport()], [otherType], names, now, time)).toHaveLength(1);
+    // Male and female: an order of either type answers it.
+    expect(dcfpTasks([aReport({ selection: 'both' })], [otherType], names, now, time)).toEqual([]);
   });
 });
 

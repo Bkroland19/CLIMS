@@ -75,9 +75,10 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID
 	}
 	var product, fromStore, toStore string
 	var unit *string
-	if err := tx.QueryRow(ctx, `SELECT `+productLabel+`, um.name, fs.name, ts.name
+	if err := tx.QueryRow(ctx, `SELECT coalesce(nullif(`+productLabel+`, ''), o.condom_category || ' condoms', ''),
+			um.name, fs.name, ts.name
 		FROM orders o
-		JOIN condoms c ON c.id = o.condom_id
+		LEFT JOIN condoms c ON c.id = o.condom_id
 		JOIN stores fs ON fs.id = o.ordered_from_store_id
 		JOIN stores ts ON ts.id = o.ordered_for_store_id
 		LEFT JOIN unit_of_measures um ON um.id = o.unit_of_measure_id
