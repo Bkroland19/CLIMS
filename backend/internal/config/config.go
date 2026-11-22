@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -17,6 +18,11 @@ type Config struct {
 	DBName    string `mapstructure:"DB_NAME"`
 	DBSSLMode string `mapstructure:"DB_SSLMODE"`
 	JWTSecret string `mapstructure:"JWT_SECRET"`
+	// TrustedProxiesSetting is TRUSTED_PROXIES: comma-separated IPs or CIDR ranges allowed to
+	// report the client address. Empty trusts private networks, where nginx reaches the API.
+	TrustedProxiesSetting string `mapstructure:"TRUSTED_PROXIES"`
+	// TrustedProxies is TrustedProxiesSetting parsed and validated.
+	TrustedProxies []string `mapstructure:"-"`
 }
 
 func LoadConfig() (cfg Config, err error) {
@@ -26,7 +32,7 @@ func LoadConfig() (cfg Config, err error) {
 	v.SetDefault("DB_HOST", "localhost")
 	v.SetDefault("DB_SSLMODE", "disable")
 	// Binding includes environment-only keys in Unmarshal.
-	for _, key := range []string{"PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "JWT_SECRET"} {
+	for _, key := range []string{"PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "JWT_SECRET", "TRUSTED_PROXIES"} {
 		if err := v.BindEnv(key); err != nil {
 			return cfg, err
 		}
@@ -41,7 +47,29 @@ func LoadConfig() (cfg Config, err error) {
 			return cfg, fmt.Errorf("%s is required", setting.name)
 		}
 	}
+	if cfg.TrustedProxies, err = parseTrustedProxies(cfg.TrustedProxiesSetting); err != nil {
+		return cfg, err
+	}
 	return cfg, nil
+}
+
+// parseTrustedProxies splits TRUSTED_PROXIES and rejects anything that is not an IP or CIDR,
+// so a typo fails at startup instead of trusting the wrong addresses.
+func parseTrustedProxies(setting string) ([]string, error) {
+	var proxies []string
+	for _, entry := range strings.Split(setting, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if net.ParseIP(entry) == nil {
+			if _, _, err := net.ParseCIDR(entry); err != nil {
+				return nil, fmt.Errorf("TRUSTED_PROXIES: %q is not an IP address or CIDR range", entry)
+			}
+		}
+		proxies = append(proxies, entry)
+	}
+	return proxies, nil
 }
 
 func (cfg *Config) DSN() string {

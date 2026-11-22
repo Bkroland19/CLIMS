@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/notifications"
 
 	"github.com/jackc/pgx/v5"
@@ -19,8 +20,11 @@ type Order struct {
 	DiscrepancyNote  *string `json:"discrepancy_note"`
 	DeliveryNote     *string `json:"delivery_note"`
 	ID               string  `json:"id"`
-	CondomID         string  `json:"condom_id"`
-	QuantityNeeded   *int32  `json:"quantity_needed"`
+	// CondomID is the product; a warehouse request has none until the warehouse chooses one at review.
+	CondomID *string `json:"condom_id"`
+	// CondomCategory is the type requested, male or female.
+	CondomCategory *string `json:"condom_category"`
+	QuantityNeeded *int32  `json:"quantity_needed"`
 	// QuantityApproved is what the warehouse approved at review; the request keeps QuantityNeeded.
 	QuantityApproved   *int32    `json:"quantity_approved"`
 	QuantityIssued     *int32    `json:"quantity_issued"`
@@ -48,17 +52,19 @@ type scope struct {
 type Repository struct {
 	db       *pgxpool.Pool
 	notifier notifications.Notifier
+	audit    audit.Auditor
 }
 
 // NewRepository needs a notifier with NotificationTypes registered.
-func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier) *Repository {
-	return &Repository{db: db, notifier: notifier}
+func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier, auditor audit.Auditor) *Repository {
+	return &Repository{db: db, notifier: notifier, audit: auditor}
 }
 
 const columns = `id, condom_id, quantity_needed, quantity_issued, order_status,
 to_char(order_date, 'YYYY-MM-DD'), ordered_by_id, handled_by_id, ordered_for_store_id,
 ordered_from_store_id, unit_of_measure_id, comment, created_at, updated_at,
-hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note, quantity_approved`
+hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note, quantity_approved,
+condom_category`
 
 func scanOrder(row pgx.Row) (Order, error) {
 	var order Order
@@ -67,7 +73,7 @@ func scanOrder(row pgx.Row) (Order, error) {
 		&order.OrderedForStoreID, &order.OrderedFromStoreID, &order.UnitOfMeasureID,
 		&order.Comment, &order.CreatedAt, &order.UpdatedAt, &order.HotSpotID,
 		&order.ParentOrderID, &order.RiderID, &order.QuantityReceived, &order.DiscrepancyNote, &order.DeliveryNote,
-		&order.QuantityApproved)
+		&order.QuantityApproved, &order.CondomCategory)
 	return order, err
 }
 
@@ -118,17 +124,57 @@ func (r *Repository) create(ctx context.Context, actorID string, input createReq
 	}
 	return scanOrder(r.db.QueryRow(ctx, `
 		INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
-			ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment)
-		VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8)
+			ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment, condom_category)
+		VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8,
+			(SELECT category FROM condoms WHERE id = $1 AND category IN ('male', 'female')))
 		RETURNING `+columns, input.CondomID, input.QuantityNeeded, input.Date, actorID,
 		input.OrderedForStoreID, input.OrderedFromStoreID, input.UnitOfMeasureID, input.Comment))
 }
 
 func (r *Repository) fulfill(ctx context.Context, access scope, id, actorID string, quantity int32) (Order, error) {
-	return scanOrder(r.db.QueryRow(ctx, `
-		UPDATE orders SET quantity_issued = $5, order_status = 'fulfilled',
-			handled_by_id = $4, updated_at = CURRENT_TIMESTAMP
-		WHERE ($1::boolean OR ordered_from_store_id = $2::uuid) AND id = $3
-			AND order_status = 'pending'
-		RETURNING `+columns, access.allStores, access.storeID, id, actorID, quantity))
+	var order Order
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		before, err := scanOrder(tx.QueryRow(ctx, `SELECT `+columns+` FROM orders
+			WHERE ($1::boolean OR ordered_from_store_id = $2::uuid) AND id = $3 AND order_status = 'pending'
+			FOR UPDATE`, access.allStores, access.storeID, id))
+		if err != nil {
+			return err
+		}
+		order, err = scanOrder(tx.QueryRow(ctx, `
+			UPDATE orders SET quantity_issued = $2, order_status = 'fulfilled',
+				handled_by_id = $3, updated_at = CURRENT_TIMESTAMP
+			WHERE id = $1 RETURNING `+columns, id, quantity, actorID))
+		if err != nil {
+			return err
+		}
+		return r.recordAudit(ctx, tx, "order.fulfilled", &before, order)
+	})
+	return order, err
+}
+
+// auditActions names each workflow step in the audit log.
+var auditActions = map[string]string{
+	"replenishment_requested": "order.requested",
+	"review":                  "order.reviewed",
+	"check-stock":             "order.stock_checked",
+	"dispatch":                "order.dispatched",
+	"receive":                 "order.received",
+}
+
+// recordAudit writes an order change to the audit log, findable under the order, both
+// stores, the product and any hotspot. A nil before is a new order.
+func (r *Repository) recordAudit(ctx context.Context, tx pgx.Tx, action string, before *Order, after Order) error {
+	var changes map[string]audit.Change
+	if before == nil {
+		changes = audit.Diff(nil, after)
+	} else {
+		changes = audit.Diff(*before, after)
+	}
+	related := []audit.Subject{{Type: "store", ID: after.OrderedFromStoreID}, {Type: "store", ID: after.OrderedForStoreID},
+		{Type: "product", ID: after.CondomID}}
+	if after.HotSpotID != nil {
+		related = append(related, audit.Subject{Type: "hotspot", ID: *after.HotSpotID})
+	}
+	return r.audit.Record(ctx, tx, audit.Entry{Action: action, Target: &audit.Subject{Type: "order", ID: after.ID},
+		Related: related, Changes: changes})
 }

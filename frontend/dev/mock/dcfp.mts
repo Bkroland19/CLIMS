@@ -3,7 +3,8 @@
  *
  * - `GET/POST /orders/stockouts`: hotspot stockout reports. A report notifies the district's
  *   DCFPs; it is not an order.
- * - `POST /orders/warehouse-requests`: the DCFP orders a product and quantity from NMS or JMS.
+ * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS;
+ *   the warehouse chooses the product.
  * - `GET /orders`, `/orders/:id`, `/orders/:id/events`, and `POST /orders/:id/actions/receive`.
  * - `/notifications`: the signed-in user's central inbox.
  *
@@ -24,7 +25,8 @@ type Status = 'queued' | 'reviewed' | 'on_hold' | 'confirmed' | 'dispatched' | '
 
 interface Order {
   id: string;
-  condom_id: string;
+  condom_id: string | null;
+  condom_category: 'male' | 'female';
   quantity_needed: number;
   quantity_issued: number | null;
   quantity_received: number | null;
@@ -65,7 +67,8 @@ interface Report {
     contact_name: string | null;
     contact_phone: string | null;
   };
-  condom_id: string;
+  condom_id: string | null;
+  selection: 'male' | 'female' | 'both';
   product: string;
   district_store_id: string;
   reported_by_id: string;
@@ -112,6 +115,10 @@ const PRODUCTS: Record<string, { name: string; unit: string | null }> = {
   },
 };
 
+/** The condom category of a seeded product, read from its name. */
+const categoryOf = (product: string | null): 'male' | 'female' =>
+  product && PRODUCTS[product]?.name.endsWith('Female') ? 'female' : 'male';
+
 const state = {
   orders: [] as Order[],
   events: [] as Event[],
@@ -132,9 +139,11 @@ function order(
   hours: number,
 ): Order {
   const quantity = values.quantity_needed ?? 500;
+  const product = values.condom_id === undefined ? mockProductId(5) : values.condom_id;
   return {
     id: id(1, n),
-    condom_id: mockProductId(5),
+    condom_id: product,
+    condom_category: categoryOf(product),
     quantity_needed: quantity,
     quantity_issued: null,
     quantity_received: null,
@@ -190,8 +199,9 @@ function report(n: number, values: Partial<Report>, hours: number): Report {
       contact_name: 'Peter Okello',
       contact_phone: '0772 123456',
     },
-    condom_id: mockProductId(5),
-    product: 'FC2 Free Female',
+    condom_id: null,
+    selection: 'female',
+    product: 'female condoms',
     district_store_id: DISTRICT,
     reported_by_id: id(4, n),
     reported_by: 'Grace Nakato',
@@ -333,9 +343,15 @@ const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 
 function placeWarehouseOrder(body: Body): Reply {
   const warehouse = text(body.warehouse_store_id);
-  const product = text(body.condom_id);
+  const unit = text(body.unit_of_measure_id);
+  const category = text(body.condom_category);
   const quantity = body.quantity;
-  if (!warehouse || !product) return fail(422, 'provide warehouse_store_id and condom_id UUIDs');
+  if (!warehouse || !unit)
+    return fail(422, 'provide warehouse_store_id and unit_of_measure_id UUIDs');
+  if (category !== 'male' && category !== 'female') {
+    const message = 'condom_category must be male or female';
+    return fail(422, message, { condom_category: message });
+  }
   if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) {
     const message = 'quantity must be a positive whole number';
     return fail(422, message, { quantity: message });
@@ -344,18 +360,12 @@ function placeWarehouseOrder(body: Body): Reply {
     const message = 'warehouse_store_id must name a national warehouse (NMS or JMS)';
     return fail(422, message, { warehouse_store_id: message });
   }
-  const known = PRODUCTS[product];
-  if (!known) return fail(422, 'condom_id does not name a product');
-  const unit = text(body.unit_of_measure_id) || known.unit;
-  if (!unit) {
-    const message = 'this product has no default unit; provide unit_of_measure_id';
-    return fail(422, message, { unit_of_measure_id: message });
-  }
   const created = order(
     (state.next += 1),
     {
       order_status: 'queued',
-      condom_id: product,
+      condom_id: null,
+      condom_category: category,
       quantity_needed: quantity,
       ordered_from_store_id: warehouse,
       unit_of_measure_id: unit,
@@ -400,17 +410,20 @@ function receive(o: Order, body: Body): Reply {
 
 function reportStockout(body: Body): Reply {
   const hotSpot = text(body.hot_spot_id);
-  const product = text(body.condom_id);
-  if (!hotSpot || !product) return fail(422, 'provide hotspot and product UUIDs');
+  const selection = text(body.condom_category);
+  if (!hotSpot) return fail(422, "provide the hotspot's UUID");
+  if (selection !== 'male' && selection !== 'female' && selection !== 'both') {
+    return fail(422, 'condom_category must be male, female or both');
+  }
   const created = report(
     (state.next += 1),
     {
       hot_spot_id: hotSpot,
-      condom_id: product,
-      product: PRODUCTS[product]?.name ?? 'condoms',
+      selection,
+      product: selection === 'both' ? 'male and female condoms' : `${selection} condoms`,
       reported_by: 'Sarah Nakato',
       reported_by_id: ME,
-      comment: text(body.comment) || null,
+      comment: text(body.message) || null,
     },
     0,
   );

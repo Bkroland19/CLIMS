@@ -51,6 +51,8 @@ Set `DB_PASSWORD`, a strong `JWT_SECRET`, and `S3_ACCESS_KEY`/`S3_SECRET_KEY` in
 
 Production uses project name `clims-prod` and volume `clims-prod_postgres_data`, separate from development. It starts PostgreSQL, API, frontend, and Nginx. Server services have no source/config bind mounts, and only Nginx publishes a host port. Source and config changes require rebuilding the images. Existing database passwords are not changed by editing the env file: PostgreSQL initialization variables apply only to a new data directory.
 
+The API records the client's address (in login sessions, the request log and the per-IP rate limits) from the `X-Real-IP` header that nginx sets, and trusts that header only from the private container network, where nginx reaches it. Set `TRUSTED_PROXIES` to a comma-separated list of IPs or CIDR ranges to trust specific addresses instead; an invalid entry stops the API at startup. If a load balancer sits in front of nginx, configure nginx's `real_ip` module (`set_real_ip_from` the balancer, `real_ip_header X-Forwarded-For`) so nginx passes on the client's address rather than the balancer's.
+
 `DB_SSLMODE=disable` applies to the bundled database on the private container network. For a separately hosted database, run the API with that server's connection and TLS settings; this Compose stack configures `DB_HOST=postgres` for its bundled service.
 
 ### Mobile release artifacts

@@ -10,6 +10,7 @@ import (
 	"clims-backend/internal/config"
 	"clims-backend/internal/database"
 	"clims-backend/internal/features/apidocs"
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/auth"
 	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/health"
@@ -55,10 +56,15 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	app := fiber.New()
+	// c.IP() is the client's real address behind nginx; see middleware.WithClientIP.
+	app := fiber.New(middleware.WithClientIP(fiber.Config{}, cfg.TrustedProxies))
+	app.Use(middleware.ClientIP())
 	app.Use(recover.New())
 	// Sets X-Request-ID so a logged failure can be matched to the request that caused it.
 	app.Use(requestid.New())
+	// Gives audit entries the request's address, device, request ID, user and session.
+	auditor := audit.NewService(dbPool)
+	app.Use(audit.Middleware(auditor))
 	app.Use(middleware.NewSlogLogger())
 
 	app.Use(helmet.New())
@@ -82,7 +88,7 @@ func main() {
 	v1 := app.Group("/api/v1")
 	jwtAuthMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
-	userRepo := users.NewRepository(dbPool)
+	userRepo := users.NewRepository(dbPool, auditor)
 	if client := os.Getenv("IDENTITY_SYNC_CLIENT_ID"); client != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, os.Getenv("OIDC_ISSUER"), client)
@@ -92,7 +98,7 @@ func main() {
 		}
 	}
 	userService := users.NewService(userRepo)
-	roleRepo := rbac.NewRepository(dbPool)
+	roleRepo := rbac.NewRepository(dbPool, auditor)
 	activeUser := users.ActiveUser(userRepo)
 
 	// One notification service for every feature; each registers its own types.
@@ -100,16 +106,17 @@ func main() {
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
 
-	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret), jwtAuthMiddleware, activeUser)
+	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret, auditor), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
-	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
-	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier, auditor), jwtAuthMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool, notifier, auditor), jwtAuthMiddleware, activeUser)
+	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool, auditor), jwtAuthMiddleware, activeUser)
 	reports.RegisterRoutes(v1, reports.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
-	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser, rbac.RequirePermission("audit:read"))
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool, auditor), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {

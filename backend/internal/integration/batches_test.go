@@ -78,7 +78,7 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 
 	// Expired stock cannot be reserved: 45 unexpired units cannot cover 46.
 	created := request("POST", "/orders/warehouse-requests", map[string]any{"warehouse_store_id": warehouse,
-		"condom_id": product, "quantity": 46}, districtToken, 201)["data"].(map[string]any)
+		"condom_category": categoryOf(t, pool, product), "unit_of_measure_id": unit, "quantity": 46}, districtToken, 201)["data"].(map[string]any)
 	orderID := created["id"].(string)
 	act := func(action string, body any, code int, status string) map[string]any {
 		t.Helper()
@@ -92,7 +92,7 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 		}
 		return data
 	}
-	act("review", nil, 200, "reviewed")
+	act("review", map[string]any{"condom_id": product}, 200, "reviewed")
 	act("check-stock", nil, 200, "on_hold")
 	act("review", map[string]any{"quantity_approved": 40}, 200, "reviewed")
 	act("check-stock", nil, 200, "confirmed")

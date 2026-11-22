@@ -19,7 +19,12 @@ import {
   submitHotspot,
   toLocalHotspot,
 } from "./hotspots";
-import { reportStockout, stockoutErrorMessage, toLocalOrder } from "./orders";
+import {
+  currentStockoutRequest,
+  reportStockout,
+  stockoutErrorMessage,
+  toLocalOrder,
+} from "./orders";
 import { createSeed, DEFAULT_PERSONAS, HM_HOTSPOT } from "./seed";
 import { useMe } from "./session";
 import type {
@@ -86,7 +91,10 @@ const failure = (err: unknown): PageResult => ({
 
 const Ctx = createContext<StoreCtx | null>(null);
 
-const roleOfEvent: Record<string, EventRole> = { VHT: "VHT", "Hotspot manager": "Hotspot manager" };
+const roleOfEvent: Record<string, EventRole> = {
+  VHT: "VHT",
+  "Hotspot manager": "Hotspot manager",
+};
 
 type Applied = { next: DomainState; id?: string };
 
@@ -160,7 +168,10 @@ function apply(
       const order = p.order as DomainState["orders"][number];
       return {
         id: order.id,
-        next: { ...s, orders: [order, ...s.orders.filter((o) => o.id !== order.id)] },
+        next: {
+          ...s,
+          orders: [order, ...s.orders.filter((o) => o.id !== order.id)],
+        },
       };
     }
     case "mapHotspot": {
@@ -195,7 +206,10 @@ function apply(
           })),
           hotspots: setHotspot(o.hotspotId, (h) => ({
             ...h,
-            stock: { male: h.stock.male + qty.male, female: h.stock.female + qty.female },
+            stock: {
+              male: h.stock.male + qty.male,
+              female: h.stock.female + qty.female,
+            },
             lastDelivery: now,
           })),
           events: [
@@ -371,7 +385,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (it.type === "stockout" && it.payload?.request) {
           const { request, hotspot, product } = it.payload;
           try {
-            const res = await reportStockout(request);
+            const res = await reportStockout(currentStockoutRequest(request, product));
             const order = toLocalOrder(res, { hotspot, product }, me.name);
             commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
           } catch (err) {
@@ -465,7 +479,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const h = toLocalHotspot(a, me.name, null);
         const p = prev.get(h.id);
         return p
-          ? { ...h, stock: p.stock, lastDelivery: p.lastDelivery, comment: p.comment, vhts: p.vhts }
+          ? {
+              ...h,
+              stock: p.stock,
+              lastDelivery: p.lastDelivery,
+              comment: p.comment,
+              vhts: p.vhts,
+            }
           : h;
       });
       const ids = new Set(fresh.map((h) => h.id));
@@ -507,7 +527,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const syncApiOrders = useCallback(
     (orders: DomainState["orders"]) => {
       const cur = ref.current;
-      commit({ ...cur, orders: [...orders, ...cur.orders.filter((o) => o.source !== "api")] });
+      commit({
+        ...cur,
+        orders: [...orders, ...cur.orders.filter((o) => o.source !== "api")],
+      });
     },
     [commit],
   );

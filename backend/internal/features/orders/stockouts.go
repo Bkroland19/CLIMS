@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/stock"
 
@@ -15,7 +16,6 @@ import (
 
 var (
 	errReportNotFound   = errors.New("stockout notification not found")
-	errNoCategory       = errors.New("this product has no Male or Female category; send selection instead")
 	errNotSelected      = errors.New("a delivery line's product type is not in the notification's selection")
 	errDeliveryUnit     = errors.New("deliver in the product's catalogue unit, so pieces can be counted")
 	errNotEnoughStock   = errors.New("not enough available stock at the district store for this delivery")
@@ -154,29 +154,10 @@ func getReport(ctx context.Context, q rowQuerier, id string) (StockoutReport, er
 // with an open notification does not raise a second one: the message is counted against the open
 // notification, whose selection widens if a new type is named (Male then Female is Both). The second
 // result is true for such a repeat.
-func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID string, condomID *string, selection string, comment *string) (StockoutReport, bool, error) {
+func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, selection string, comment *string) (StockoutReport, bool, error) {
 	var report StockoutReport
 	var repeated bool
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if condomID != nil {
-			if err := checkOrderable(ctx, tx, *condomID); err != nil {
-				return err
-			}
-			var category *string
-			err := tx.QueryRow(ctx, `SELECT category FROM condoms WHERE id = $1`, *condomID).Scan(&category)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return errUnknownProduct
-			}
-			if err != nil {
-				return err
-			}
-			if category == nil || (*category != SelectionMale && *category != SelectionFemale) {
-				return errNoCategory
-			}
-			if selection == "" {
-				selection = *category
-			}
-		}
 		// Locking the hotspot serialises its notifications, so two sends cannot open two at once.
 		var storeID string
 		err := tx.QueryRow(ctx, `SELECT s.id FROM hot_spots h
@@ -195,9 +176,9 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID stri
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			if err = tx.QueryRow(ctx, `INSERT INTO stockout_reports
-					(hot_spot_id, condom_id, selection, district_store_id, reported_by_id, comment)
-				VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-				hotSpotID, condomID, selection, storeID, actorID, comment).Scan(&id); err != nil {
+					(hot_spot_id, selection, district_store_id, reported_by_id, comment)
+				VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+				hotSpotID, selection, storeID, actorID, comment).Scan(&id); err != nil {
 				return err
 			}
 			if err = addReportEvent(ctx, tx, id, actorID, "raised", selection, map[string]any{"comment": comment}); err != nil {
@@ -222,6 +203,21 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID stri
 			}
 		}
 		if report, err = getReport(ctx, tx, id); err != nil {
+			return err
+		}
+		entry := audit.Entry{Action: "stockout.reported", Target: &audit.Subject{Type: "stockout_report", ID: report.ID},
+			Related: []audit.Subject{{Type: "hotspot", ID: report.HotSpotID}, {Type: "store", ID: report.DistrictStoreID}},
+			Details: map[string]any{"selection": selection, "comment": comment}}
+		if repeated {
+			// A repeat adds to the hotspot's open report rather than raising another.
+			entry.Action = "stockout.repeated"
+			entry.Details["repeat_count"] = report.RepeatCount
+			entry.Details["combined_selection"] = report.Selection
+		}
+		if condomID != nil {
+			entry.Related = append(entry.Related, audit.Subject{Type: "product", ID: *condomID})
+		}
+		if err = r.audit.Record(ctx, tx, entry); err != nil {
 			return err
 		}
 		return r.notifier.Notify(ctx, tx, notifications.Message{

@@ -3,6 +3,7 @@ package hotspots
 import (
 	"context"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/notifications"
 
 	"github.com/jackc/pgx/v5"
@@ -41,7 +42,10 @@ func NotificationTypes() []notifications.Type {
 // notifies the people concerned. With notifyDistrict, the hotspot's district DCFPs
 // (hotspots:activate) are notified; notifyUser adds one person, normally the submitter.
 func (r *Repository) record(ctx context.Context, tx pgx.Tx, hotSpotID, actorID, action string,
-	notifyDistrict bool, notifyUser, comment *string) error {
+	before map[string]any, notifyDistrict bool, notifyUser, comment *string) error {
+	if err := r.recordAudit(ctx, tx, hotSpotID, action, before, comment); err != nil {
+		return err
+	}
 	var eventID, name, district string
 	var districtID *string
 	// The notify columns keep the deprecated /hotspots/notifications inbox working
@@ -82,4 +86,42 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, hotSpotID, actorID, 
 		Data:           data,
 		IdempotencyKey: eventID,
 	})
+}
+
+// auditSnapshot is what a hotspot's audit entry compares: its details, review state and
+// current contact person.
+const auditSnapshot = `SELECT jsonb_build_object('name', h.name, 'type', h.type, 'village', h.village,
+	'district_id', h.district_id, 'subcounty_id', h.subcounty_id, 'latitude', h.latitude, 'longitude', h.longitude,
+	'has_condom_dispenser', h.has_condom_dispenser, 'dispenser_condition', h.dispenser_condition,
+	'status', h.status, 'review_status', h.review_status,
+	'contact_person_name', c.name, 'contact_person_phone', c.phone_number)
+	FROM hot_spots h LEFT JOIN LATERAL (SELECT name, phone_number FROM contact_persons
+		WHERE hot_spot_id = h.id ORDER BY created_at DESC, id DESC LIMIT 1) c ON true
+	WHERE h.id = $1`
+
+func snapshot(ctx context.Context, tx pgx.Tx, id string) (map[string]any, error) {
+	var state map[string]any
+	err := tx.QueryRow(ctx, auditSnapshot, id).Scan(&state)
+	return state, err
+}
+
+// recordAudit writes the step to the audit log with what it changed. The comment is the
+// reason a DCFP gave, or the text of a comment.
+func (r *Repository) recordAudit(ctx context.Context, tx pgx.Tx, id, action string, before map[string]any, comment *string) error {
+	after, err := snapshot(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	// A nil before (a submission) records every field as new.
+	entry := audit.Entry{Action: "hotspot." + action, Target: &audit.Subject{Type: "hotspot", ID: id},
+		Changes: audit.Diff(before, after)}
+	for _, state := range []map[string]any{before, after} {
+		if district, ok := state["district_id"].(string); ok {
+			entry.Related = append(entry.Related, audit.Subject{Type: "district", ID: district})
+		}
+	}
+	if comment != nil {
+		entry.Details = map[string]any{"comment": *comment}
+	}
+	return r.audit.Record(ctx, tx, entry)
 }

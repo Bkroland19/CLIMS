@@ -5,11 +5,12 @@ import { useLookups, useProducts } from '@/features/catalogue/queries';
 import { formatNumber } from '@/lib/format';
 
 import type { Warehouse } from './api';
-import { warehouseLabel } from './orders';
+import { categoryLabel, warehouseLabel } from './orders';
 import { useWarehouses } from './queries';
 
 export interface OrderNames {
-  product: (id: string) => string;
+  /** The product's name, else the category requested until the warehouse chooses a product. */
+  product: (id: string | null, category: string | null) => string;
   warehouse: (id: string) => Warehouse | undefined;
   /** "500 boxes", or the bare number when the unit is unknown. */
   quantity: (value: number | null, unitId: string | null) => string;
@@ -36,7 +37,8 @@ export function useOrderNames(): OrderNames {
     const unitById = new Map((units.data ?? []).map((u) => [u.id, u.name]));
     const warehouseById = new Map((warehouses.data ?? []).map((w) => [w.id, w]));
     return {
-      product: (id) => productById.get(id) || 'Condoms',
+      product: (id, category) =>
+        (id ? productById.get(id) : undefined) || categoryLabel(category) || 'Condoms',
       warehouse: (id) => warehouseById.get(id),
       warehouseLabel: (id) => warehouseLabel(warehouseById.get(id)),
       quantity: (value, unitId) => {

@@ -76,7 +76,7 @@ function OrderDetail({
   return (
     <div className="flex flex-col gap-6">
       <DetailHeader
-        title={`${names.product(order.condom_id)} from ${names.warehouseLabel(order.ordered_from_store_id)}`}
+        title={`${names.product(order.condom_id, order.condom_category)} from ${names.warehouseLabel(order.ordered_from_store_id)}`}
         status={<StatusBadge status={status.label} tone={status.tone} />}
         description={`Ordered ${formatDate(order.order_date)}`}
       >
@@ -124,7 +124,7 @@ function OrderDetail({
           <CardContent>
             <DetailList
               items={[
-                { label: 'Product', value: names.product(order.condom_id) },
+                { label: 'Product', value: names.product(order.condom_id, order.condom_category) },
                 {
                   label: 'Ordered from',
                   value:
