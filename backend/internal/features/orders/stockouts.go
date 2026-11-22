@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/stock"
 
@@ -222,6 +223,21 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID stri
 			}
 		}
 		if report, err = getReport(ctx, tx, id); err != nil {
+			return err
+		}
+		entry := audit.Entry{Action: "stockout.reported", Target: &audit.Subject{Type: "stockout_report", ID: report.ID},
+			Related: []audit.Subject{{Type: "hotspot", ID: report.HotSpotID}, {Type: "store", ID: report.DistrictStoreID}},
+			Details: map[string]any{"selection": selection, "comment": comment}}
+		if repeated {
+			// A repeat adds to the hotspot's open report rather than raising another.
+			entry.Action = "stockout.repeated"
+			entry.Details["repeat_count"] = report.RepeatCount
+			entry.Details["combined_selection"] = report.Selection
+		}
+		if condomID != nil {
+			entry.Related = append(entry.Related, audit.Subject{Type: "product", ID: *condomID})
+		}
+		if err = r.audit.Record(ctx, tx, entry); err != nil {
 			return err
 		}
 		return r.notifier.Notify(ctx, tx, notifications.Message{

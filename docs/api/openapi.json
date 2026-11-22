@@ -43,6 +43,9 @@
       "name": "Reports"
     },
     {
+      "name": "Audit"
+    },
+    {
       "name": "Health"
     }
   ],
@@ -4920,6 +4923,117 @@
           }
         }
       }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "tags": ["Audit"],
+        "operationId": "searchAuditLog",
+        "summary": "Search the audit log",
+        "description": "Requires audit:read. Newest first. Filters combine; subject_type with subject_id matches an entry's target or any related record, which isolates one hotspot, order, district, store or user. Every search is itself recorded as audit.searched.",
+        "x-required-permissions": ["audit:read"],
+        "parameters": [
+          {
+            "name": "actor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "For example auth.login_failed."
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["success", "failure"]
+            }
+          },
+          {
+            "name": "subject_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "For example hotspot; requires subject_id."
+          },
+          {
+            "name": "subject_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "A date (2026-11-21, from its start in UTC) or an RFC 3339 time."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exclusive; a date or an RFC 3339 time."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9396,6 +9510,156 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1000
+          }
+        }
+      },
+      "AuditSubject": {
+        "type": "object",
+        "required": ["type", "id"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "hotspot"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "occurred_at",
+          "action",
+          "outcome",
+          "reason",
+          "actor",
+          "system_actor",
+          "target",
+          "subjects",
+          "changes",
+          "details",
+          "ip_address",
+          "user_agent",
+          "request_id",
+          "session_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "type": "string",
+            "example": "auth.login_failed"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "failure"]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "example": "invalid_credentials"
+          },
+          "actor": {
+            "type": "object",
+            "nullable": true,
+            "required": ["id", "username", "roles"],
+            "description": "The acting user as they were when the entry was written.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "username": {
+                "type": "string",
+                "nullable": true
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "system_actor": {
+            "type": "string",
+            "nullable": true,
+            "description": "The automated job that acted, when no person did."
+          },
+          "target": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuditSubject"
+              }
+            ],
+            "nullable": true
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditSubject"
+            },
+            "description": "The target and the related records the entry concerns."
+          },
+          "changes": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "before": {},
+                "after": {}
+              }
+            },
+            "description": "Changed fields, before and after. Secrets are never recorded."
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_agent": {
+            "type": "string",
+            "nullable": true
+          },
+          "request_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "AuditEntryListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            }
           }
         }
       }

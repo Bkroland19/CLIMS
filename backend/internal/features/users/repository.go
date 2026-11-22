@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/rbac"
 
 	"github.com/jackc/pgx/v5"
@@ -19,9 +20,26 @@ var ErrLastAdmin = errors.New("cannot disable or demote the last active admin")
 // ErrUnknownStore means a store_id names no store.
 var ErrUnknownStore = errors.New("unknown store")
 
-type Repository struct{ DB *pgxpool.Pool }
+type Repository struct {
+	DB    *pgxpool.Pool
+	audit audit.Auditor
+}
 
-func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
+func NewRepository(db *pgxpool.Pool, auditor audit.Auditor) *Repository {
+	return &Repository{DB: db, audit: auditor}
+}
+
+// createdAccount is what a new account's audit entry records; never the password.
+type createdAccount struct {
+	Username  string   `json:"username"`
+	Email     string   `json:"email"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Phone     string   `json:"phone_number"`
+	StoreID   *string  `json:"store_id"`
+	RoleIDs   []string `json:"role_ids"`
+}
+
 func (r *Repository) CreateUser(ctx context.Context, req AccountInput, passwordHash string, roleID string) (string, error) {
 	var roleIDs []string
 	if roleID != "" {
@@ -52,6 +70,19 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 		if err = replaceRoles(ctx, tx, id, roleIDs); err != nil {
 			return "", err
 		}
+	}
+	// Nobody is signed in for a public sign-up, so the new account is its own actor.
+	entry := audit.Entry{Action: "user.created", Target: &audit.Subject{Type: "user", ID: id},
+		Changes: audit.Diff(nil, createdAccount{Username: req.Username, Email: req.Email, FirstName: req.FirstName,
+			LastName: req.LastName, Phone: req.Phone, StoreID: req.StoreID, RoleIDs: roleIDs})}
+	if audit.Anonymous(ctx) {
+		entry.Action, entry.ActorID = "auth.registered", id
+	}
+	if req.StoreID != nil {
+		entry.Related = []audit.Subject{{Type: "store", ID: *req.StoreID}}
+	}
+	if err = r.audit.Record(ctx, tx, entry); err != nil {
+		return "", err
 	}
 	return id, tx.Commit(ctx)
 }
@@ -214,6 +245,10 @@ func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []
 	if status != nil {
 		newStatus = *status
 	}
+	var rolesBefore []string
+	if err = tx.QueryRow(ctx, userRoleNames, id).Scan(&rolesBefore); err != nil {
+		return err
+	}
 	if roleIDs != nil {
 		if err = replaceRoles(ctx, tx, id, roleIDs); err != nil {
 			return err
@@ -223,10 +258,13 @@ func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []
 		return err
 	}
 	// A disabled account is signed out everywhere, so re-enabling it does not revive old tokens.
+	var revokedSessions int64
 	if newStatus != "active" {
-		if _, err = tx.Exec(ctx, revokeAll, id); err != nil {
+		tag, err := tx.Exec(ctx, revokeAll, id)
+		if err != nil {
 			return err
 		}
+		revokedSessions = tag.RowsAffected()
 	}
 	if currentAdmin && currentStatus == "active" && (newStatus != "active" || roleIDs != nil) {
 		var adminRemaining bool
@@ -240,7 +278,42 @@ func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []
 			return ErrLastAdmin
 		}
 	}
+	if err = r.recordAccessChange(ctx, tx, id, rolesBefore, currentStatus, newStatus, revokedSessions); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
+}
+
+// userRoleNames lists a user's role names in order, for audit entries.
+const userRoleNames = `SELECT coalesce(array_agg(r.name ORDER BY r.name), '{}')
+	FROM role_user ru JOIN roles r ON r.id = ru.role_id WHERE ru.user_id = $1`
+
+// recordAccessChange audits a change of roles or status; unchanged values record nothing.
+func (r *Repository) recordAccessChange(ctx context.Context, tx pgx.Tx, id string, rolesBefore []string,
+	statusBefore, statusAfter string, revokedSessions int64) error {
+	target := &audit.Subject{Type: "user", ID: id}
+	var rolesAfter []string
+	if err := tx.QueryRow(ctx, userRoleNames, id).Scan(&rolesAfter); err != nil {
+		return err
+	}
+	if changes := audit.Diff(map[string]any{"roles": rolesBefore}, map[string]any{"roles": rolesAfter}); len(changes) > 0 {
+		if err := r.audit.Record(ctx, tx, audit.Entry{Action: "user.roles_changed", Target: target, Changes: changes}); err != nil {
+			return err
+		}
+	}
+	if statusBefore == statusAfter {
+		return nil
+	}
+	action := "user.disabled"
+	if statusAfter == "active" {
+		action = "user.enabled"
+	}
+	entry := audit.Entry{Action: action, Target: target,
+		Changes: audit.Diff(map[string]any{"status": statusBefore}, map[string]any{"status": statusAfter})}
+	if action == "user.disabled" {
+		entry.Details = map[string]any{"sessions_revoked": revokedSessions}
+	}
+	return r.audit.Record(ctx, tx, entry)
 }
 
 func replaceRoles(ctx context.Context, tx pgx.Tx, userID string, roleIDs []string) error {
@@ -292,12 +365,23 @@ func (r *Repository) SetUserStore(ctx context.Context, id string, storeID *strin
 	if err = checkStore(ctx, tx, storeID); err != nil {
 		return err
 	}
-	tag, err := tx.Exec(ctx, `UPDATE users SET store_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, id, storeID)
-	if err != nil {
+	var before *string
+	if err = tx.QueryRow(ctx, `SELECT store_id FROM users WHERE id = $1 FOR UPDATE`, id).Scan(&before); err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+	if _, err = tx.Exec(ctx, `UPDATE users SET store_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, id, storeID); err != nil {
+		return err
+	}
+	if changes := audit.Diff(map[string]any{"store_id": before}, map[string]any{"store_id": storeID}); len(changes) > 0 {
+		entry := audit.Entry{Action: "user.store_assigned", Target: &audit.Subject{Type: "user", ID: id}, Changes: changes}
+		for _, store := range []*string{before, storeID} {
+			if store != nil {
+				entry.Related = append(entry.Related, audit.Subject{Type: "store", ID: *store})
+			}
+		}
+		if err = r.audit.Record(ctx, tx, entry); err != nil {
+			return err
+		}
 	}
 	return tx.Commit(ctx)
 }

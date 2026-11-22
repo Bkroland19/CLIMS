@@ -49,6 +49,8 @@ services:
       DB_NAME: ${DB_NAME:-clims_db}
       DB_SSLMODE: ${DB_SSLMODE:-disable}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the selected environment file}
+      # Addresses allowed to report the client IP; empty trusts the private container network.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       PORT: 8080
     expose: ["8080"]
     depends_on:

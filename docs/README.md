@@ -21,6 +21,7 @@ See [creating PostgreSQL migrations](migrations.md) for pinned CLI scaffolding, 
 | [Hotspots](modules/hotspots.md)           | Hotspot submission, review, activation and deactivation                                        |
 | [Locations](modules/locations.md)         | Region, district and subcounty lookups shared across the system                                |
 | [Notifications](modules/notifications.md) | Notifying people or groups from any feature, and the inbox API                                 |
+| [Audit log](modules/audit.md)             | Who did what, when and from where; recording and searching entries                             |
 | [Inventory](modules/inventory.md)         | Stock reports for the warehouse, districts and hotspots, and recording stock                   |
 | [Reports](modules/reports.md)             | Programme reports: hotspot notification fulfilment, response times and the records behind them |
 | [API / Swagger](api/README.md)            | Endpoint reference, authentication examples, OpenAPI maintenance, and validation               |

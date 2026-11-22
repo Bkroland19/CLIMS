@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"clims-backend/internal/database"
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/auth"
 	"clims-backend/internal/features/catalogue"
 	"clims-backend/internal/features/hotspots"
@@ -30,6 +31,7 @@ import (
 	"clims-backend/internal/middleware"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -105,7 +107,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	// Importing after migrations resolves the backup's shared usernames and phone numbers.
 	assertUniqueIdentifiers(t, pool)
-	repo := users.NewRepository(pool)
+	auditor := audit.NewService(pool)
+	repo := users.NewRepository(pool, auditor)
 	var legacyAdminID string
 	if err = pool.QueryRow(ctx, `SELECT ru.user_id FROM role_user ru JOIN roles r ON r.id=ru.role_id WHERE r.name='admin' LIMIT 1`).Scan(&legacyAdminID); err != nil {
 		t.Fatal(err)
@@ -140,24 +143,28 @@ func TestAuthRBACIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := fiber.New()
+	// The same request context as the server: a request ID, then the audit middleware.
+	app.Use(requestid.New())
+	app.Use(audit.Middleware(auditor))
 	v1 := app.Group("/api/v1")
 	service := users.NewService(repo)
-	roleRepo := rbac.NewRepository(pool)
+	roleRepo := rbac.NewRepository(pool, auditor)
 	jwtMiddleware := middleware.NewJWTMiddleware("test-secret")
 	activeUser := users.ActiveUser(repo)
-	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret"), jwtMiddleware, activeUser)
+	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret", auditor), jwtMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtMiddleware, activeUser)
 	notifier := notifications.NewService()
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
-	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier), jwtMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier), jwtMiddleware, activeUser)
-	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier, auditor), jwtMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier, auditor), jwtMiddleware, activeUser)
+	inventory.RegisterRoutes(v1, inventory.NewRepository(pool, auditor), jwtMiddleware, activeUser)
 	reports.RegisterRoutes(v1, reports.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
-	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool, auditor), jwtMiddleware, activeUser)
+	audit.RegisterRoutes(v1, audit.NewRepository(pool), auditor, jwtMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
 		t.Helper()
@@ -380,9 +387,11 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testDistrictStockouts(t, pool, request, login, adminToken, condomID)
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
 	testNotifications(t, pool, request, login, adminToken, destinationID)
+	testAudit(t, pool, repo, service, auditor, adminToken)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
 	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
 	testStoreAssignment(t, pool, request, adminToken, userToken)
+	testFeatureAudit(t, pool)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)

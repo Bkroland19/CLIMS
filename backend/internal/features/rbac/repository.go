@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"clims-backend/internal/features/audit"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -11,9 +13,19 @@ var ErrUnknownPermission = errors.New("unknown permission")
 
 var ErrAdminRole = errors.New("admin permissions cannot be changed")
 
-type Repository struct{ DB *pgxpool.Pool }
+type Repository struct {
+	DB    *pgxpool.Pool
+	audit audit.Auditor
+}
 
-func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
+func NewRepository(db *pgxpool.Pool, auditor audit.Auditor) *Repository {
+	return &Repository{DB: db, audit: auditor}
+}
+
+// rolePermissions lists a role's permission names in order, for its audit entry.
+const rolePermissions = `SELECT coalesce(array_agg(p.name ORDER BY p.name), '{}')
+	FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = $1`
+
 func (r *Repository) ListRoles(ctx context.Context) ([]Role, error) {
 	rows, err := r.DB.Query(ctx, `SELECT r.id, r.name, ARRAY(
 SELECT p.name FROM role_permission rp JOIN permissions p ON p.id = rp.permission_id
@@ -60,6 +72,10 @@ func (r *Repository) SetRolePermissions(ctx context.Context, id string, codes []
 	if err = tx.QueryRow(ctx, `SELECT name FROM roles WHERE id=$1 FOR UPDATE`, id).Scan(&name); err != nil {
 		return err
 	}
+	var before []string
+	if err = tx.QueryRow(ctx, rolePermissions, id).Scan(&before); err != nil {
+		return err
+	}
 	if name == AdminRoleName {
 		return ErrAdminRole
 	}
@@ -79,6 +95,17 @@ func (r *Repository) SetRolePermissions(ctx context.Context, id string, codes []
 	if _, err = tx.Exec(ctx, `INSERT INTO role_permission (role_id, permission_id)
 		SELECT $1, id FROM permissions WHERE name = ANY($2) ON CONFLICT DO NOTHING`, id, codes); err != nil {
 		return err
+	}
+	var after []string
+	if err = tx.QueryRow(ctx, rolePermissions, id).Scan(&after); err != nil {
+		return err
+	}
+	if changes := audit.Diff(map[string]any{"permissions": before}, map[string]any{"permissions": after}); len(changes) > 0 {
+		if err = r.audit.Record(ctx, tx, audit.Entry{Action: "role.permissions_changed",
+			Target: &audit.Subject{Type: "role", ID: id}, Changes: changes,
+			Details: map[string]any{"role": name}}); err != nil {
+			return err
+		}
 	}
 	return tx.Commit(ctx)
 }
