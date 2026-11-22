@@ -9,11 +9,21 @@ for (const user of ['clims-sso-linked', 'clims-sso-unlinked', 'clims-sso-norole'
   await page.fill('#username', user);
   await page.fill('#password', process.env.SSO_CHECK_PASSWORD);
   await page.click('#kc-login');
-  await page.waitForURL((u) => u.pathname === '/moh' || u.pathname === '/sign-in', { timeout: 60000 });
+  await page.waitForURL((u) => u.pathname === '/moh' || u.pathname === '/sign-in', {
+    timeout: 60000,
+  });
   await page.waitForLoadState('networkidle');
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('clims.session') ?? 'null'));
-  const alert = await page.locator('[role="alert"]').first().textContent().catch(() => null);
-  console.log(JSON.stringify({ user, url: page.url(), sessionUser: stored?.user?.username ?? null, alert }));
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('clims.session') ?? 'null'),
+  );
+  const alert = await page
+    .locator('[role="alert"]')
+    .first()
+    .textContent()
+    .catch(() => null);
+  console.log(
+    JSON.stringify({ user, url: page.url(), sessionUser: stored?.user?.username ?? null, alert }),
+  );
   await page.screenshot({ path: `${shots}/${user}.png` });
 }
 await browser.close();
