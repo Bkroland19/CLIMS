@@ -109,7 +109,7 @@ const goSession = {
 };
 
 describe('getCurrentUser', () => {
-  it('reads GET /auth/me with the permissions of every role held', async () => {
+  it('reads GET /auth/me with the permissions of every role held and the assigned store', async () => {
     const { http, requests } = setup({
       status: 200,
       body: {
@@ -120,6 +120,7 @@ describe('getCurrentUser', () => {
           firstname: 'James',
           lastname: 'Okello',
           email: 'okello@example.org',
+          store_id: '5d1c2b3a-0000-4000-8000-000000000001',
           active_sessions: 2,
           role: { id: 'r-1', name: 'dfcp', permissions: ['orders:read'] },
           roles: [
@@ -146,6 +147,7 @@ describe('getCurrentUser', () => {
       role: 'dfcp',
       permissions: ['hotspots:submit', 'orders:read'],
       roleNames: ['dfcp', 'vht'],
+      store_id: '5d1c2b3a-0000-4000-8000-000000000001',
     });
   });
 

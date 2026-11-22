@@ -171,8 +171,7 @@ var auditActions = map[string]string{
 }
 
 // recordAudit writes an order change to the audit log, findable under the order, both
-// stores, the product once the warehouse has chosen one, and any hotspot. A nil before is a new
-// order.
+// stores, the product and any hotspot. A nil before is a new order.
 func (r *Repository) recordAudit(ctx context.Context, tx pgx.Tx, action string, before *Order, after Order) error {
 	var changes map[string]audit.Change
 	if before == nil {
@@ -181,6 +180,7 @@ func (r *Repository) recordAudit(ctx context.Context, tx pgx.Tx, action string, 
 		changes = audit.Diff(*before, after)
 	}
 	related := []audit.Subject{{Type: "store", ID: after.OrderedFromStoreID}, {Type: "store", ID: after.OrderedForStoreID}}
+	// A category request has no product until the warehouse chooses one at review.
 	if after.CondomID != nil {
 		related = append(related, audit.Subject{Type: "product", ID: *after.CondomID})
 	}

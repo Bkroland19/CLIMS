@@ -4,7 +4,7 @@ import type { ApiError } from './errors';
 import type { HttpClient } from './http';
 import { useHttp } from './HttpProvider';
 
-interface ApiQueryOptions {
+export interface ApiQueryOptions {
   /** How long a result is served from cache before it is refetched. */
   staleTime?: number;
   /** False holds the request back, e.g. until the screen that needs it is open. Defaults to true. */

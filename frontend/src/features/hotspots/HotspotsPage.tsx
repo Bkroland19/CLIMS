@@ -1,159 +1,110 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { BadgeCheck, CircleCheck, Plus, XCircle } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { Plus } from 'lucide-react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { RowActions, type RowAction } from '@/components/data-table/RowActions';
 import { ExportButton } from '@/components/ExportButton';
-import { FormDialog } from '@/components/form/FormDialog';
-import { TextField } from '@/components/form/TextField';
+import { FilterTabs } from '@/components/FilterTabs';
 import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { getErrorMessage } from '@/lib/api';
 import { WriteAction } from '@/components/WriteAction';
+import { DCFP_PATHS } from '@/features/dcfp/orders';
 
-import type { Hotspot, HotspotEvent } from './api';
+import { DECISIONS_FROM, REVIEW_STATUSES, type Hotspot, type HotspotDecision } from './api';
 import { dispenserSummary, hotspotLabel } from './hotspotForm';
+import { DECISION_TEXT, DecisionDialog } from './HotspotDecisionDialog';
 import { HotspotFormDialog } from './HotspotFormDialog';
-import { useHotspotAction, useHotspotNotifications, useHotspots } from './queries';
+import { useAllHotspots, useHotspots } from './queries';
 
-/** `review` is the DCFP's verification queue; `submit` is a VHT's own submissions. */
+/** `review` is the DCFP's review queue; `submit` is a VHT's own submissions. */
 type Workspace = 'review' | 'submit';
 
-const UPDATE_TEXT: Record<string, string> = {
-  submitted: 'was submitted for verification',
-  verify: 'was verified',
-  activate: 'was activated',
-  reject: 'was rejected',
+/** The review queue's filters, by review status. */
+const REVIEW_FILTERS = ['all', ...REVIEW_STATUSES] as const;
+type ReviewFilter = (typeof REVIEW_FILTERS)[number];
+
+const REVIEW_LABELS: Record<ReviewFilter, string> = {
+  all: 'All',
+  submitted: 'To review',
+  active: 'Active',
+  deactivated: 'Deactivated',
+  rejected: 'Rejected',
 };
 
-function RecentUpdates({ events, hotspots }: { events: HotspotEvent[]; hotspots: Hotspot[] }) {
-  if (events.length === 0) return null;
-  const names = new Map(hotspots.map((hotspot) => [hotspot.id, hotspotLabel(hotspot)]));
-  return (
-    <section aria-labelledby="hotspot-updates" className="bg-card rounded-xl border p-4">
-      <h2 id="hotspot-updates" className="text-sm font-semibold">
-        Recent updates
-      </h2>
-      <ul className="text-muted-foreground mt-2 flex flex-col gap-1 text-sm">
-        {events.slice(0, 5).map((event) => (
-          <li key={event.id}>
-            <span className="text-foreground font-medium">
-              {names.get(event.hot_spot_id) ?? 'A hotspot'}
-            </span>{' '}
-            {UPDATE_TEXT[event.action] ?? event.action}{' '}
-            <time dateTime={event.created_at}>
-              {new Date(event.created_at).toLocaleDateString('en-GB')}
-            </time>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
+const reviewFilterFrom = (value: string | null): ReviewFilter =>
+  REVIEW_FILTERS.find((filter) => filter === value) ?? 'all';
 
-const rejectSchema = z.object({
-  reason: z
-    .string()
-    .trim()
-    .min(1, 'Say why the hotspot is rejected.')
-    .max(1000, 'Use at most 1000 characters.'),
-});
-
-function RejectDialog({ hotspot, onClose }: { hotspot: Hotspot; onClose: () => void }) {
-  const action = useHotspotAction();
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isDirty },
-  } = useForm<z.input<typeof rejectSchema>, unknown, z.output<typeof rejectSchema>>({
-    resolver: zodResolver(rejectSchema),
-    defaultValues: { reason: '' },
-  });
-  return (
-    <FormDialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title={`Reject ${hotspotLabel(hotspot)}?`}
-      description="The VHT who submitted it is notified and sees your reason."
-      submitLabel="Reject hotspot"
-      pendingLabel="Rejecting…"
-      isPending={action.isPending}
-      isDirty={isDirty}
-      error={action.error ? getErrorMessage(action.error) : null}
-      onSubmit={handleSubmit(({ reason }) => {
-        action.mutate({ id: hotspot.id, action: 'reject', reason }, { onSuccess: onClose });
-      })}
-    >
-      <TextField
-        label="Reason"
-        required
-        autoComplete="off"
-        error={errors.reason?.message}
-        {...register('reason')}
-      />
-    </FormDialog>
-  );
-}
+const reviewHref = (filter: ReviewFilter) =>
+  filter === 'all' ? DCFP_PATHS.hotspots : `${DCFP_PATHS.hotspots}?review=${filter}`;
 
 export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
-  const hotspots = useHotspots();
-  const notifications = useHotspotNotifications();
-  const action = useHotspotAction();
+  const isReview = workspace === 'review';
+  // A VHT sees their own submissions, one page; the DCFP's queue reads the whole district.
+  const own = useHotspots(null, !isReview);
+  const district = useAllHotspots({}, { enabled: isReview });
+  const hotspots = isReview ? district : own;
+  const filter = reviewFilterFrom(useSearchParams().get('review'));
   const [submitting, setSubmitting] = useState(false);
-  const [rejecting, setRejecting] = useState<Hotspot | null>(null);
+  const [deciding, setDeciding] = useState<{
+    hotspot: Hotspot;
+    decision: HotspotDecision;
+  } | null>(null);
 
-  const columns = useMemo<DataTableColumn<Hotspot>[]>(
-    () => [
-      { id: 'name', header: 'Hotspot', value: (hotspot) => hotspot.name },
-      { id: 'type', header: 'Type', value: (hotspot) => hotspot.type },
-      { id: 'village', header: 'Village', value: (hotspot) => hotspot.village },
-      { id: 'contact', header: 'Contact person', value: (hotspot) => hotspot.contact_person_name },
-      {
-        id: 'phone',
-        header: 'Contact phone',
-        value: (hotspot) => hotspot.contact_person_telephone,
-      },
-      { id: 'dispenser', header: 'Dispenser', value: dispenserSummary },
-      {
-        id: 'status',
-        header: 'Status',
-        value: (hotspot) => hotspot.status,
-        cell: (hotspot) => <StatusBadge status={hotspot.status} />,
-      },
-      { id: 'reason', header: 'Rejection reason', value: (hotspot) => hotspot.rejection_reason },
-    ],
-    [],
-  );
+  const all = isReview ? district.data?.items : own.data;
 
-  const reviewActions = (hotspot: Hotspot): RowAction[] => {
-    const act = (name: 'verify' | 'activate') => () => {
-      action.mutate({ id: hotspot.id, action: name });
-    };
-    const actions: RowAction[] = [];
-    if (hotspot.status === 'submitted')
-      actions.push({ label: 'Verify', icon: BadgeCheck, onSelect: act('verify') });
-    if (hotspot.status === 'verified')
-      actions.push({ label: 'Activate', icon: CircleCheck, onSelect: act('activate') });
-    if (hotspot.status === 'submitted' || hotspot.status === 'verified') {
-      actions.push({
-        label: 'Reject',
-        icon: XCircle,
-        destructive: true,
-        onSelect: () => {
-          setRejecting(hotspot);
-        },
-      });
-    }
-    return actions;
-  };
+  const columns: DataTableColumn<Hotspot>[] = [
+    {
+      id: 'name',
+      header: 'Hotspot',
+      value: (hotspot) => hotspot.name,
+      cell: (hotspot) =>
+        isReview ? (
+          <Link
+            href={DCFP_PATHS.hotspot(hotspot.id)}
+            className="text-foreground font-medium underline-offset-4 hover:underline"
+          >
+            {hotspotLabel(hotspot)}
+          </Link>
+        ) : (
+          hotspotLabel(hotspot)
+        ),
+    },
+    { id: 'type', header: 'Type', value: (hotspot) => hotspot.type },
+    { id: 'subcounty', header: 'Subcounty', value: (hotspot) => hotspot.subcounty?.name },
+    { id: 'village', header: 'Village', value: (hotspot) => hotspot.village },
+    {
+      id: 'contact',
+      header: 'Hotspot manager',
+      value: (hotspot) => hotspot.contact_person?.name,
+    },
+    {
+      id: 'phone',
+      header: 'Manager phone',
+      value: (hotspot) => hotspot.contact_person?.phone_number,
+    },
+    { id: 'dispenser', header: 'Dispenser', value: dispenserSummary },
+    {
+      id: 'status',
+      header: 'Status',
+      value: (hotspot) => hotspot.review_status,
+      cell: (hotspot) => <StatusBadge status={hotspot.review_status} />,
+    },
+  ];
+
+  const reviewActions = (hotspot: Hotspot): RowAction[] =>
+    DECISIONS_FROM[hotspot.review_status].map((decision) => ({
+      label: DECISION_TEXT[decision].verb,
+      icon: DECISION_TEXT[decision].icon,
+      destructive: DECISION_TEXT[decision].destructive,
+      onSelect: () => {
+        setDeciding({ hotspot, decision });
+      },
+    }));
 
   const submitButton = (
     <Button
@@ -165,32 +116,62 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
       Submit hotspot
     </Button>
   );
-  const isReview = workspace === 'review';
+  const rows =
+    isReview && filter !== 'all' ? all?.filter((hotspot) => hotspot.review_status === filter) : all;
 
   return (
     <>
       <PageActions>
-        <ExportButton name="Hotspots" columns={columns} rows={hotspots.data} />
+        <ExportButton name="Hotspots" columns={columns} rows={rows} />
         {isReview ? null : <WriteAction>{submitButton}</WriteAction>}
       </PageActions>
 
-      <RecentUpdates events={notifications.data ?? []} hotspots={hotspots.data ?? []} />
+      {isReview ? (
+        <FilterTabs
+          label="Filter hotspots by review status"
+          value={filter}
+          hrefFor={reviewHref}
+          tabs={REVIEW_FILTERS.map((value) => ({
+            value,
+            label: REVIEW_LABELS[value],
+            ...(all
+              ? {
+                  count:
+                    value === 'all'
+                      ? all.length
+                      : all.filter((hotspot) => hotspot.review_status === value).length,
+                }
+              : {}),
+          }))}
+        />
+      ) : null}
 
       <DataTable
+        key={filter}
         label="Hotspots"
         columns={columns}
-        rows={hotspots.data}
+        rows={rows}
         getRowId={(hotspot) => hotspot.id}
         isLoading={hotspots.isPending}
         error={hotspots.error}
         onRetry={() => void hotspots.refetch()}
         isRetrying={hotspots.isRefetching}
         searchPlaceholder="Search hotspots…"
-        emptyTitle={isReview ? 'No hotspots to review' : 'No hotspots yet'}
+        emptyTitle={
+          !isReview
+            ? 'No hotspots yet'
+            : filter === 'all'
+              ? 'No hotspots in your district yet'
+              : filter === 'submitted'
+                ? 'No hotspots to review'
+                : `No ${REVIEW_LABELS[filter].toLowerCase()} hotspots`
+        }
         emptyDescription={
-          isReview
-            ? 'Hotspots that VHTs submit in your district appear here.'
-            : 'Submit a hotspot you identified so the district can activate it.'
+          !isReview
+            ? 'Submit a hotspot you identified so the district can activate it.'
+            : filter === 'all' || filter === 'submitted'
+              ? 'Hotspots that VHTs submit in your district appear here.'
+              : 'Choose another filter to see the rest of the hotspots.'
         }
         emptyAction={isReview ? undefined : submitButton}
         rowActions={
@@ -212,11 +193,12 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
           }}
         />
       ) : null}
-      {rejecting ? (
-        <RejectDialog
-          hotspot={rejecting}
+      {deciding ? (
+        <DecisionDialog
+          hotspot={deciding.hotspot}
+          decision={deciding.decision}
           onClose={() => {
-            setRejecting(null);
+            setDeciding(null);
           }}
         />
       ) : null}

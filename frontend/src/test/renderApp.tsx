@@ -50,6 +50,7 @@ export const testSession: Session = {
     email: 'sarah@example.org',
     permissions: ADMIN_PERMISSIONS,
     roleNames: ['admin'],
+    store_id: null,
   },
 };
 
