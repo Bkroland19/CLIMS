@@ -150,6 +150,12 @@ func (r *Repository) sessionActive(ctx context.Context, userID, sessionID string
 	return active, err
 }
 
+// SessionActive reports whether the user's session is live: the same check every authenticated
+// request passes through ActiveUser.
+func (r *Repository) SessionActive(ctx context.Context, userID, sessionID string) (bool, error) {
+	return r.sessionActive(ctx, userID, sessionID)
+}
+
 // ListSessions returns the user's unexpired sessions, newest first, marking currentID.
 func (r *Repository) ListSessions(ctx context.Context, userID, currentID string) ([]Session, error) {
 	rows, err := r.DB.Query(ctx, `SELECT id, user_agent, ip_address, created_at, last_seen_at, expires_at,

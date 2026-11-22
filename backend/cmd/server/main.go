@@ -79,7 +79,13 @@ func main() {
 	userRepo := users.NewRepository(dbPool)
 	if cfg.IdentitySyncClientID != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, cfg.OIDCIssuer, cfg.IdentitySyncClientID)
+		probe := cfg.IdentitySyncTestProbe == "1"
+		if probe {
+			log.Printf("WARNING: identity-sync test session probe is on (IDENTITY_SYNC_TEST_PROBE=1); never use this outside a test environment")
+		}
+		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, auth.IdentitySyncConfig{
+			Issuer: cfg.OIDCIssuer, ServiceClient: cfg.IdentitySyncClientID, TestProbe: probe, JWTSecret: cfg.JWTSecret,
+		})
 		cancel()
 		if err != nil {
 			log.Fatalf("CLIMS identity sync configuration: %v", err)
