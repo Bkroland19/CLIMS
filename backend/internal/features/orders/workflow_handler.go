@@ -307,19 +307,15 @@ func validActionInput(action string, input *ActionInput) bool {
 	return input.QuantityReceived == nil || *input.QuantityReceived >= 0
 }
 
-func (h *Handler) notifications(c fiber.Ctx) error {
-	return h.eventList(c, nil)
-}
-
 func (h *Handler) events(c fiber.Ctx) error {
 	id, err := request.UUIDParam(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
-	return h.eventList(c, &id)
+	return h.eventList(c, id)
 }
 
-func (h *Handler) eventList(c fiber.Ctx, id *string) error {
+func (h *Handler) eventList(c fiber.Ctx, id string) error {
 	offset, err := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
 	if err != nil || offset < 0 {
 		return response.Error(c, 400, "offset must be nonnegative", nil)
@@ -349,7 +345,10 @@ func workflowError(c fiber.Ctx, err error) error {
 		return response.Error(c, 422, err.Error(), map[string]string{"reason": err.Error()})
 	case errors.Is(err, errNotWarehouse):
 		return response.Error(c, 422, err.Error(), map[string]string{"warehouse_store_id": err.Error()})
-	case errors.Is(err, errChooseProduct), errors.Is(err, errWrongCategory), errors.Is(err, errInactiveProduct):
+	case errors.Is(err, errInactiveProduct):
+		const message = "This product is inactive and cannot be ordered."
+		return response.Error(c, 422, message, map[string]string{"condom_id": message})
+	case errors.Is(err, errChooseProduct), errors.Is(err, errWrongCategory):
 		return response.Error(c, 422, err.Error(), map[string]string{"condom_id": err.Error()})
 	default:
 		return orderError(c, err)

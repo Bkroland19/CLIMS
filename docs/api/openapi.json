@@ -219,60 +219,6 @@
         }
       }
     },
-    "/api/v1/orders/notifications": {
-      "get": {
-        "tags": ["Orders"],
-        "operationId": "listOrderNotifications",
-        "summary": "List order notifications",
-        "description": "Deprecated: use GET /api/v1/notifications, which carries every order notification with read state. This endpoint is removed once the web and mobile clients have switched. Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderEventListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "parameters": [
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0,
-              "default": 0
-            }
-          }
-        ],
-        "deprecated": true
-      }
-    },
     "/api/v1/orders/{id}/events": {
       "get": {
         "tags": ["Orders"],
@@ -467,49 +413,6 @@
             }
           }
         ]
-      },
-      "post": {
-        "tags": ["Orders"],
-        "operationId": "createOrder",
-        "summary": "Request stock",
-        "description": "Requires orders:create. The requesting store must match the current user’s store unless they have orders:all_stores. The date defaults to the database current date. Inactive products are rejected with 422 and `error.condom_id`.",
-        "responses": {
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrderRequest"
-              }
-            }
-          }
-        }
       }
     },
     "/api/v1/orders/{id}": {
@@ -556,68 +459,6 @@
             }
           }
         ]
-      }
-    },
-    "/api/v1/orders/{id}/fulfill": {
-      "patch": {
-        "tags": ["Orders"],
-        "operationId": "fulfillOrder",
-        "summary": "Record quantities issued",
-        "description": "Requires orders:fulfill and the supplying store, or orders:all_stores in addition to orders:fulfill. Fulfillment records a single issuance up to the quantity requested.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FulfillOrderRequest"
-              }
-            }
-          }
-        }
       }
     },
     "/api/v1/auth/register": {
@@ -5199,60 +5040,6 @@
           }
         },
         "required": ["success", "data"]
-      },
-      "CreateOrderRequest": {
-        "type": "object",
-        "required": [
-          "condom_id",
-          "quantity_needed",
-          "ordered_for_store_id",
-          "ordered_from_store_id",
-          "unit_of_measure_id"
-        ],
-        "properties": {
-          "condom_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity_needed": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          },
-          "order_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "ordered_for_store_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "ordered_from_store_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "unit_of_measure_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "FulfillOrderRequest": {
-        "type": "object",
-        "required": ["quantity_issued"],
-        "properties": {
-          "quantity_issued": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          }
-        },
-        "additionalProperties": false
       },
       "Order": {
         "type": "object",

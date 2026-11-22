@@ -24,6 +24,12 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Removed
 
+- **Generic store-to-store orders and the orders-only inbox.** `POST /api/v1/orders`,
+  `PATCH /api/v1/orders/{id}/fulfill` and `GET /api/v1/orders/notifications` had no client: the web
+  and mobile apps use warehouse orders and the central inbox. Migration 32 deletes `orders:create`,
+  `orders:fulfill` and the unused `orders:deliver` with their grants, and the inbox's routing
+  columns on `order_events`. Orders already recorded that way stay readable.
+
 - The web DCFP screens for hotspot orders: the order queue, held orders, order review and rider
   dispatch (`/dcfp/orders…`, `/dcfp/dispatch…`).
 - The hotspot alert actions `request-replenishment`, `deliver` and the DCFP's rider `dispatch`, with

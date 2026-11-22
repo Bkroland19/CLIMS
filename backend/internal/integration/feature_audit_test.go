@@ -27,7 +27,7 @@ func testFeatureAudit(t *testing.T, pool *pgxpool.Pool) {
 	for _, action := range []string{
 		"hotspot.submitted", "hotspot.updated", "hotspot.resubmitted", "hotspot.commented",
 		"hotspot.activated", "hotspot.rejected", "hotspot.deactivated",
-		"order.created", "order.fulfilled", "order.requested", "order.reviewed", "order.stock_checked", "order.rejected",
+		"order.requested", "order.reviewed", "order.stock_checked", "order.rejected",
 		"order.dispatched", "order.received", "stockout.reported", "inventory.movement_recorded",
 		"product.created", "product.updated", "product.deleted",
 		"brand.created", "brand.updated", "brand.deleted", "product_type.created", "product_type.deleted",
@@ -68,8 +68,6 @@ func testFeatureAudit(t *testing.T, pool *pgxpool.Pool) {
 		FROM audit_log a WHERE action = 'order.requested'`)
 	check("a rejection records its reason", `SELECT bool_and(changes->'order_status'->>'after' = 'rejected'
 		AND length(changes->'rejection_reason'->>'after') > 0) FROM audit_log WHERE action = 'order.rejected'`)
-	check("a fulfilment is recorded once per order, refused retries are not", `SELECT bool_and(n = 1) FROM (
-		SELECT count(*) AS n FROM audit_log WHERE action = 'order.fulfilled' GROUP BY target_id) per_order`)
 	check("a stockout report is found under its hotspot", `SELECT bool_and(EXISTS (SELECT 1 FROM audit_log_subjects s
 		WHERE s.audit_id = a.id AND s.subject_type = 'hotspot')) FROM audit_log a WHERE action = 'stockout.reported'`)
 

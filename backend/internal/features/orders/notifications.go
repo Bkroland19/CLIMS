@@ -88,20 +88,18 @@ const productLabel = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id 
 
 // record writes a workflow step to order_events, the order's history, and notifies the people
 // holding the permission that acts on the step at the notified store, rather than everyone assigned to it.
-func (r *Repository) record(ctx context.Context, tx pgx.Tx, before *Order, order Order, actorID, action string, notifyStore *string) error {
+func (r *Repository) record(ctx context.Context, tx pgx.Tx, before *Order, order Order, actorID, action string) error {
 	if err := r.recordAudit(ctx, tx, auditActions[action], before, order); err != nil {
 		return err
 	}
-	// The notify columns keep the deprecated /orders/notifications inbox working until
-	// clients use the central one.
 	var eventID string
-	if err := tx.QueryRow(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, notify_store_id, quantity)
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		order.ID, actorID, action, order.Status, notifyStore, quantityFor(order, action)).Scan(&eventID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, quantity)
+		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		order.ID, actorID, action, order.Status, quantityFor(order, action)).Scan(&eventID); err != nil {
 		return err
 	}
 	typeName, recipients := notification(action)
-	if typeName == "" || notifyStore == nil {
+	if typeName == "" {
 		return nil
 	}
 	var product, fromStore, toStore string

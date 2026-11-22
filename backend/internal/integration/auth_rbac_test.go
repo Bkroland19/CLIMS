@@ -347,41 +347,37 @@ func TestAuthRBACIntegration(t *testing.T) {
 	`).Scan(&sourceID, &destinationID, &condomID, &unitID); err != nil {
 		t.Fatal(err)
 	}
-	orderBody := map[string]any{
-		"condom_id": condomID, "quantity_needed": 100, "order_date": "2026-11-19",
-		"ordered_from_store_id": sourceID, "ordered_for_store_id": destinationID,
-		"unit_of_measure_id": unitID,
+	// Orders are visible to the stores they involve. Generic store-to-store orders can no longer be
+	// placed (migration 32), but those already recorded stay readable.
+	var orderID string
+	if err = pool.QueryRow(ctx, `INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
+			ordered_for_store_id, ordered_from_store_id, unit_of_measure_id)
+		VALUES ($1, 100, '2026-11-19', $2, $3, $4, $5) RETURNING id`,
+		condomID, adminID, destinationID, sourceID, unitID).Scan(&orderID); err != nil {
+		t.Fatal(err)
 	}
 	request("GET", "/orders", nil, "", 401)
 	request("GET", "/orders", nil, userToken, 403)
 	request("PUT", rolePath, map[string]any{"role_ids": []string{hotspotRole}}, adminToken, 200)
 	request("PUT", "/roles/"+hotspotRole+"/permissions",
-		map[string]any{"permissions": []string{"orders:read", "orders:create", "orders:fulfill"}}, adminToken, 200)
+		map[string]any{"permissions": []string{"orders:read"}}, adminToken, 200)
 	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=$1 WHERE id=$2`, sourceID, id); err != nil {
 		t.Fatal(err)
 	}
-	request("POST", "/orders", orderBody, userToken, 403)
-	order := request("POST", "/orders", orderBody, adminToken, 201)["data"].(map[string]any)
-	if order["ordered_by_id"] != adminID || order["order_status"] != "pending" ||
-		order["order_date"] != "2026-11-19" || order["quantity_issued"] != nil || order["handled_by_id"] != nil {
-		t.Fatalf("unexpected new order: %v", order)
+	orderPath := "/orders/" + orderID
+	if order := request("GET", orderPath, nil, userToken, 200)["data"].(map[string]any); order["order_status"] != "pending" ||
+		order["order_date"] != "2026-11-19" || order["ordered_by_id"] != adminID {
+		t.Fatalf("unexpected generic order: %v", order)
 	}
-	orderPath := "/orders/" + order["id"].(string)
-	request("GET", orderPath, nil, userToken, 200)
-	request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 101}, userToken, 422)
-	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=$1 WHERE id=$2`, destinationID, id); err != nil {
-		t.Fatal(err)
+	// POST /orders and PATCH /orders/{id}/fulfill are gone (TestOpenAPIRouteCoverage checks no route is
+	// left undocumented); the orders-only inbox's path now reads as an order ID.
+	request("GET", "/orders/notifications", nil, adminToken, 400)
+	request("POST", orderPath+"/actions/review", nil, adminToken, 409) // generic orders have no workflow
+	var removed int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM permissions
+		WHERE name IN ('orders:create', 'orders:fulfill', 'orders:deliver')`).Scan(&removed); err != nil || removed != 0 {
+		t.Fatalf("unused order permissions remain: %d %v", removed, err)
 	}
-	request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 80}, userToken, 403)
-	request("POST", "/orders", orderBody, userToken, 201)
-	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=$1 WHERE id=$2`, sourceID, id); err != nil {
-		t.Fatal(err)
-	}
-	issued := request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 80}, userToken, 200)["data"].(map[string]any)
-	if issued["handled_by_id"] != id || issued["quantity_issued"] != float64(80) || issued["order_status"] != "fulfilled" {
-		t.Fatalf("unexpected fulfillment: %v", issued)
-	}
-	request("PATCH", orderPath+"/fulfill", map[string]any{"quantity_issued": 80}, userToken, 409)
 	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=NULL WHERE id=$1`, id); err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +391,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testAudit(t, pool, repo, service, auditor, adminToken)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
-	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
+	testCatalogue(t, pool, request, adminToken, userToken, sourceID, destinationID)
 	testStoreAssignment(t, pool, request, adminToken, userToken)
 	testFeatureAudit(t, pool)
 

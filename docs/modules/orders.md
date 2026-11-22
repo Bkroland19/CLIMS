@@ -1,17 +1,15 @@
 # Orders
 
-CLIMS records stock requests between two distinct stores. Orders use UUIDs for the product, unit of measure, stores and users. The request records the authenticated account as `ordered_by_id` and starts with status `pending`.
+CLIMS records stock orders between stores: a district store's orders to NMS or JMS (below). Orders use UUIDs for the product, unit of measure, stores and users, and record the authenticated account as `ordered_by_id`.
 
-| Method | Route                         | Permission       |
-| ------ | ----------------------------- | ---------------- |
-| GET    | `/api/v1/orders`              | `orders:read`    |
-| GET    | `/api/v1/orders/{id}`         | `orders:read`    |
-| POST   | `/api/v1/orders`              | `orders:create`  |
-| PATCH  | `/api/v1/orders/{id}/fulfill` | `orders:fulfill` |
+| Method | Route                 | Permission    |
+| ------ | --------------------- | ------------- |
+| GET    | `/api/v1/orders`      | `orders:read` |
+| GET    | `/api/v1/orders/{id}` | `orders:read` |
 
-Either store can view the order. The receiving store creates it and the supplying store fulfills it. `orders:all_stores` extends the assigned operation permissions across stores. Lists use `limit` (default 50, maximum 100) and `offset` (default 0).
+Either store can view the order. `orders:all_stores` extends the assigned operation permissions across stores. Lists use `limit` (default 50, maximum 100), `offset` (default 0) and an optional `status`.
 
-Fulfillment records the signed-in handler and one positive issue quantity up to the requested quantity. It closes the order as `fulfilled`, including when the quantity issued is smaller than the quantity requested. A second fulfillment returns HTTP 409. Inventory balances, stock movement transactions and notifications are outside this first API slice.
+The first API slice also had generic store-to-store requests (`POST /api/v1/orders`, `PATCH /api/v1/orders/{id}/fulfill`, statuses `pending` and `fulfilled`). No client used them, and migration 32 removed them with the `orders:create` and `orders:fulfill` permissions. Orders already recorded that way stay readable; no workflow step applies to them (409).
 
 Migration 6 creates the store and geography tables and seeds the national JMS store. Before district staff can use orders, provision their region, district and store with the relevant DHIS2 UIDs, set their account's `store_id` to the store UUID, and assign orders permissions through RBAC. Store and assignment setup currently requires database provisioning. Use existing `condoms` and `unit_of_measures` UUIDs when placing orders.
 
@@ -65,7 +63,7 @@ Every step notifies people through the shared [notification service](notificatio
 | `order.shipment_dispatched`     | `orders:receive` at the district store                                          | order    |
 | `order.shipment_received`       | `orders:replenish` at the district store, and `orders:process` at the warehouse | order    |
 
-`order.stockout_reported` also carries the report's details in `data`: `report_id`, `hotspot_id`, `hotspot`, `village`, `subcounty`, `district`, `place`, `contact_name`, `contact_phone`, `contact`, `condom_id`, `product`, `reporter` and `message`. Empty details are empty strings. The warehouse steps carry `product`, `unit`, `quantity` (the step's own: ordered, approved, dispatched or counted), `quantity_ordered`, `quantity_dispatched`, `from_store`, `to_store`, `note` (the rejection reason or discrepancy note) and `transport` (e.g. "Waybill WB-104, vehicle UAX 123B"). `review` sends `order.replenishment_approved` with the product chosen and says when less than the order was approved; a rejection quotes its reason; a receipt with a discrepancy quotes the note to the warehouse. The type names keep their earlier spelling so existing notifications stay grouped with new ones. `check-stock` and orders outside the workflow notify nobody. `GET /api/v1/orders/notifications`, the earlier orders-only inbox, is deprecated and does not include stockout reports: it keeps working until the web and mobile clients use the central inbox, and is then removed.
+`order.stockout_reported` also carries the report's details in `data`: `report_id`, `hotspot_id`, `hotspot`, `village`, `subcounty`, `district`, `place`, `contact_name`, `contact_phone`, `contact`, `condom_id`, `product`, `reporter` and `message`. Empty details are empty strings. The warehouse steps carry `product`, `unit`, `quantity` (the step's own: ordered, approved, dispatched or counted), `quantity_ordered`, `quantity_dispatched`, `from_store`, `to_store`, `note` (the rejection reason or discrepancy note) and `transport` (e.g. "Waybill WB-104, vehicle UAX 123B"). `review` sends `order.replenishment_approved` with the product chosen and says when less than the order was approved; a rejection quotes its reason; a receipt with a discrepancy quotes the note to the warehouse. The type names keep their earlier spelling so existing notifications stay grouped with new ones. `check-stock` and orders outside the workflow notify nobody. The earlier orders-only inbox, `GET /api/v1/orders/notifications`, was removed in migration 32: no client used it.
 
 ### Permissions
 
@@ -78,6 +76,6 @@ Migration 21 adds `orders:stockout_district` and `hotspots:read_district`; migra
 | DCFP                 | `orders:read`, `orders:replenish`, `orders:receive`, `orders:supply_hotspots`, `reports:read`, `inventory:read`, `inventory:manage` |
 | Warehouse (NMS, JMS) | `orders:read`, `orders:process`, `inventory:read`, `inventory:manage`                                                               |
 
-A VHT without `orders:read` can send reports but not list them. `orders:deliver` is no longer used. Assign the corresponding hotspot or store to each user. Record verified opening balances per store, product and unit as receipts with `POST /api/v1/inventory/movements` before warehouses check stock (see [inventory](inventory.md)). Dispatch and receipt add their own entries to the inventory ledger.
+A VHT without `orders:read` can send reports but not list them. Migration 32 removed the unused `orders:deliver`, `orders:create` and `orders:fulfill`, with their grants. Assign the corresponding hotspot or store to each user. Record verified opening balances per store, product and unit as receipts with `POST /api/v1/inventory/movements` before warehouses check stock (see [inventory](inventory.md)). Dispatch and receipt add their own entries to the inventory ledger.
 
-These operations are exposed in Swagger. Generic store-to-store requests continue to use `POST /api/v1/orders` and the fulfillment endpoint.
+These operations are exposed in Swagger.

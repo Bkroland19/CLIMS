@@ -92,7 +92,7 @@ func (r *Repository) createWarehouseRequest(ctx context.Context, access scope, i
 		if err != nil {
 			return err
 		}
-		return r.record(ctx, tx, nil, order, access.userID, "replenishment_requested", &input.WarehouseID)
+		return r.record(ctx, tx, nil, order, access.userID, "replenishment_requested")
 	})
 	return order, err
 }
@@ -145,7 +145,6 @@ func (r *Repository) act(ctx context.Context, access scope, id, action string, i
 func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
 	before := order
 	next := order.Status
-	var notifyStore *string
 	switch action {
 	case "review":
 		if order.Status != "queued" && order.Status != "on_hold" {
@@ -170,8 +169,6 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		if order.CondomID == nil {
 			return Order{}, errChooseProduct
 		}
-		// The district hears what was approved: the product and how much of the request.
-		notifyStore = &order.OrderedForStoreID
 		next = "reviewed"
 	case "check-stock":
 		// A held request is rechecked directly once stock arrives.
@@ -206,7 +203,6 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 			}
 		}
 		order.RejectionReason = input.Reason
-		notifyStore = &order.OrderedForStoreID
 		next = "rejected"
 	case "dispatch":
 		// The warehouse ships what check-stock reserved, or less, releasing the rest.
@@ -251,7 +247,6 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		order.HandledByID = &actorID
 		order.WaybillNumber, order.VehicleRegistration = input.WaybillNumber, input.VehicleRegistration
 		order.DriverName, order.DriverPhone = input.DriverName, input.DriverPhone
-		notifyStore = &order.OrderedForStoreID
 		next = "dispatched"
 	case "receive":
 		if order.Status != "dispatched" {
@@ -283,7 +278,6 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		}
 		order.QuantityReceived = input.QuantityReceived
 		order.DiscrepancyNote = input.DiscrepancyNote
-		notifyStore = &order.OrderedForStoreID
 		next = "received"
 	}
 	result, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = $2, quantity_issued = $3,
@@ -296,7 +290,7 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 	if err != nil {
 		return Order{}, err
 	}
-	return result, r.record(ctx, tx, &before, result, actorID, action, notifyStore)
+	return result, r.record(ctx, tx, &before, result, actorID, action)
 }
 
 // chooseProduct sets the product the warehouse sends: an active product of the category requested.
@@ -357,18 +351,13 @@ type Event struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (r *Repository) listEvents(ctx context.Context, access scope, id *string, offset int32) ([]Event, error) {
-	if id != nil {
-		if _, err := r.get(ctx, access, *id); err != nil {
-			return nil, err
-		}
+// listEvents is an order's history, newest first, for a user who may see the order.
+func (r *Repository) listEvents(ctx context.Context, access scope, id string, offset int32) ([]Event, error) {
+	if _, err := r.get(ctx, access, id); err != nil {
+		return nil, err
 	}
 	rows, err := r.db.Query(ctx, `SELECT id, order_id, actor_id, action, status, created_at FROM order_events
-		WHERE ($1::uuid IS NOT NULL AND order_id = $1) OR
-			($1 IS NULL AND (notify_store_id = $2::uuid OR notify_user_id = $3::uuid
-				OR ($4::boolean AND (notify_store_id IS NOT NULL OR notify_user_id IS NOT NULL))))
-		ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $5`, id, access.storeID,
-		access.userID, access.allStores, offset)
+		WHERE order_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $2`, id, offset)
 	if err != nil {
 		return nil, err
 	}
