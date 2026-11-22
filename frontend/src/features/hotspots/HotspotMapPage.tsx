@@ -90,11 +90,11 @@ function HotspotMap({ apiKey, hotspots, focusDistrict }: HotspotMapProps) {
           <div className="flex max-w-56 flex-col gap-1 text-sm text-neutral-900">
             <p className="font-semibold break-words">{hotspotLabel(selected)}</p>
             <p className="break-words text-neutral-600">
-              {formatText(selected.contact_person_name)} ·{' '}
-              {formatText(selected.contact_person_telephone)}
+              {formatText(selected.contact_person?.name)} ·{' '}
+              {formatText(selected.contact_person?.phone_number)}
             </p>
             <div>
-              <StatusBadge status={selected.status} />
+              <StatusBadge status={selected.review_status} />
             </div>
           </div>
         </InfoWindowF>
