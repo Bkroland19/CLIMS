@@ -331,7 +331,7 @@ export function VhtRequests() {
                 : `${items(o.items)} · ${ago(o.createdAt)}`
             }
             chip={orderChip(o.status)}
-            // API alerts have no quantities or delivery details for the order page yet.
+            // A VHT has no orders:read, so the API won't show them a notification's details.
             chev={o.source !== "api"}
             onPress={o.source === "api" ? undefined : () => nav.go(`order/${o.id}`)}
           />

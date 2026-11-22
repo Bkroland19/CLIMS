@@ -80,19 +80,9 @@ export default function SignIn() {
             accessible
             accessibilityRole="image"
             accessibilityLabel="The Republic of Uganda, Ministry of Health"
-            style={{ marginBottom: isShort ? 4 : 8 }}
-          >
-            {/* The crest's lettering is black; the dark theme uses a copy with light lettering. */}
-            <Image
-              source={
-                scheme === "dark"
-                  ? require("../../assets/images/moh-logo-dark.png")
-                  : require("../../assets/images/moh-logo.png")
-              }
-              style={{ width: logoW, height: logoH }}
-              resizeMode="contain"
-            />
-          </View>
+            style={{ width: seal, height: seal, marginBottom: isShort ? 4 : 8 }}
+            resizeMode="contain"
+          />
           <Txt
             accessibilityRole="header"
             style={{

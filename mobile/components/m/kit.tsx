@@ -589,59 +589,48 @@ export function Banner({
   const T = useT();
   const tn = T.tones[tone];
   return (
-    <Section h={h}>
+    <Section h={h} style={{ marginBottom: 12 }}>
       <View
         accessibilityRole="alert"
         style={{
           marginHorizontal: 16,
-          backgroundColor: T.cardBg,
-          borderRadius: T.cardR,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: T.cardBd,
-          // A coloured edge says the kind of message before it is read.
-          borderLeftWidth: 4,
-          borderLeftColor: tn.fg,
-          paddingVertical: 14,
-          paddingLeft: 12,
-          paddingRight: 14,
-          gap: 8,
+          backgroundColor: tn.bg,
+          borderRadius: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          gap: 4,
         }}
       >
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: tn.bg,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon name={tn.icon as IconName} size={18} color={tn.fg} />
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+          <View style={{ height: TYPE.footnote.lineHeight, justifyContent: "center" }}>
+            <Icon name={tn.icon as IconName} size={15} color={tn.fg} />
           </View>
-          <View style={{ flex: 1, gap: 2, paddingTop: 5 }}>
-            <Txt style={{ color: tn.fg, fontWeight: "600", ...TYPE.subhead }}>{title}</Txt>
-            {body ? <Txt style={{ color: T.fg, ...TYPE.subhead }}>{body}</Txt> : null}
-          </View>
+          <Txt style={{ flex: 1, color: T.fg, ...TYPE.footnote }}>
+            <Txt style={{ color: tn.fg, fontWeight: "600" }}>
+              {body && !/[.!?:…]$/.test(title) ? `${title}.` : title}
+            </Txt>
+            {body ? ` ${body}` : null}
+          </Txt>
         </View>
         {items?.map((e) => (
           <Pressable
             key={e.where + e.msg}
             onPress={e.onPress}
-            style={{ marginLeft: 44, paddingVertical: 4 }}
+            style={{ marginLeft: 23, paddingVertical: 2 }}
           >
-            <Txt style={{ ...TYPE.subhead, fontWeight: "600", color: tn.fg }}>{e.where}</Txt>
-            <Txt style={{ ...TYPE.footnote, color: T.fg }}>{e.msg}</Txt>
+            <Txt style={{ ...TYPE.footnote, color: T.fg }}>
+              <Txt style={{ fontWeight: "600", color: tn.fg }}>{e.where}</Txt> {e.msg}
+            </Txt>
           </Pressable>
         ))}
         {act ? (
           <Pressable
             onPress={act.onPress}
-            style={{ marginLeft: 44, paddingVertical: 4 }}
+            hitSlop={8}
+            style={{ marginLeft: 23, paddingVertical: 2 }}
             accessibilityRole="button"
           >
-            <Txt style={{ color: T.tint, fontWeight: "600", ...TYPE.subhead }}>{act.label}</Txt>
+            <Txt style={{ color: T.tint, fontWeight: "600", ...TYPE.footnote }}>{act.label}</Txt>
           </Pressable>
         ) : null}
       </View>
@@ -739,7 +728,7 @@ export function Btn({
   const K = {
     primary: [T.b1Bg, T.b1Fg, 0, "transparent"],
     secondary: [T.b2Bg, T.b2Fg, T.b2Bw, T.b2Bd],
-    danger: ["transparent", T.danger, T.ios ? 0 : 1, T.danger],
+    danger: [T.ios ? "transparent" : T.tones.danger.bg, T.danger, 0, "transparent"],
     text: ["transparent", T.tint, 0, "transparent"],
   }[kind] as [string, string, number, string];
   const press = usePressScale(dis ? 1 : 0.97);
@@ -911,6 +900,9 @@ function FieldBox({
 /** Rows a text area shows before it scrolls, and their height. */
 const AREA_LINE = 22;
 
+/** A colour at about 45% opacity, for rings that mark state without a hard edge. */
+const soft = (hex: string) => (/^#[0-9a-f]{6}$/i.test(hex) ? `${hex}73` : hex);
+
 const inputStyle = (
   T: Tokens,
   err?: string,
@@ -919,11 +911,12 @@ const inputStyle = (
   rows = 3,
 ): TextStyle => ({
   minHeight: multiline ? rows * AREA_LINE + (T.ios ? 8 : 20) : T.inH,
-  // Material fields thicken and take the brand colour on focus; iOS cells stay borderless.
-  borderWidth: focused && !T.ios ? 2 : err ? 1.5 : T.inBw,
-  borderColor: err ? T.danger : focused && !T.ios ? T.tint : T.inBd,
+  // Material fields are borderless wells; focus and errors show as a soft ring of constant width,
+  // so the text doesn't shift. iOS cells stay borderless.
+  borderWidth: T.ios ? (err ? 1.5 : 0) : 1.5,
+  borderColor: err ? soft(T.danger) : focused && !T.ios ? soft(T.tint) : "transparent",
   borderRadius: T.inR,
-  backgroundColor: T.inBg,
+  backgroundColor: err && !T.ios ? T.tones.danger.bg : T.inBg,
   paddingHorizontal: T.ios ? 0 : 12,
   paddingVertical: multiline ? (T.ios ? 4 : 10) : 0,
   fontSize: 16,
@@ -1054,7 +1047,7 @@ export function ReadOnly({ label, value, sub }: { label: string; value: string; 
           inputStyle(T),
           {
             justifyContent: "center",
-            borderColor: T.ios ? "transparent" : T.sep,
+            borderColor: "transparent",
             backgroundColor: T.roBg,
           },
         ]}
@@ -1073,7 +1066,8 @@ export function Seg<K extends string>({
 }: {
   label: string;
   options: [K, string][];
-  value: K;
+  /** Nothing is selected while undefined, so a required choice must be made. */
+  value: K | undefined;
   onChange: (k: K) => void;
 }) {
   const T = useT();
@@ -1085,15 +1079,13 @@ export function Seg<K extends string>({
           flexDirection: "row",
           minHeight: T.segH,
           borderRadius: T.segR,
-          backgroundColor: T.ios ? T.segBg : "transparent",
-          padding: T.ios ? 2 : 0,
-          borderWidth: T.ios ? 0 : 1,
-          borderColor: T.outline,
+          backgroundColor: T.segBg,
+          padding: T.ios ? 2 : 3,
           overflow: "hidden",
           marginTop: T.ios ? 6 : 0,
         }}
       >
-        {options.map(([k, l], i) => {
+        {options.map(([k, l]) => {
           const on = k === value;
           return (
             <Pressable
@@ -1109,11 +1101,10 @@ export function Seg<K extends string>({
                 gap: 6,
                 paddingHorizontal: 6,
                 paddingVertical: 4,
-                borderRadius: T.ios ? 7 : 0,
-                backgroundColor: on ? T.segOn : T.ios ? "transparent" : T.segBg,
-                borderLeftWidth: !T.ios && i > 0 ? 1 : 0,
-                borderLeftColor: T.outline,
-                ...(T.ios && on
+                borderRadius: T.ios ? 7 : T.segR - 3,
+                backgroundColor: on ? T.segOn : "transparent",
+                // A raised pill on light tracks; dark tracks show the selection by colour.
+                ...(on && (T.ios || !T.dark)
                   ? {
                       shadowColor: "#000",
                       shadowOpacity: 0.12,
@@ -1179,8 +1170,6 @@ export function Stepper({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: T.stepperBg,
-        borderWidth: T.ios ? 0 : 1,
-        borderColor: T.outline,
       }}
     >
       <Icon name={icon} size={18} color={T.fg} />
@@ -1217,8 +1206,8 @@ export function Stepper({
               color: T.fg,
               borderRadius: T.ios ? 8 : 10,
               backgroundColor: T.stepperInBg,
-              borderWidth: err ? 1.5 : T.ios ? 0 : 1,
-              borderColor: err ? T.danger : T.outline,
+              borderWidth: err ? 1.5 : 0,
+              borderColor: err ? soft(T.danger) : "transparent",
             },
             semibold,
           ]}

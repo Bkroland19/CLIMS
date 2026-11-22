@@ -13,7 +13,6 @@ import {
   Row,
   Search,
   Seg,
-  Select,
   Sheet,
   SkeletonList,
 } from "@/components/m/kit";
@@ -21,14 +20,12 @@ import { isNetworkError, listHotspotsPage, toLocalHotspot } from "@/lib/hotspots
 import { useNav } from "@/lib/nav";
 import {
   COMMENT_MAX,
-  listProducts,
-  ProductsUnavailable,
-  productsProblemMessage,
   reportStockout,
+  SELECTION_LABEL,
   stockoutComment,
   stockoutErrorMessage,
   toLocalOrder,
-  type Product,
+  type Selection,
 } from "@/lib/orders";
 import { useMe } from "@/lib/session";
 import { useStore } from "@/lib/store";
@@ -38,8 +35,8 @@ import { matches } from "./common";
 type Reason = "Out of stock" | "Running low";
 
 /**
- * A signed-in VHT's stock request: a stockout alert for a hotspot and product
- * (POST /orders/stockouts). The district's DCFP decides the quantity.
+ * A signed-in VHT's or hotspot manager's stock request: a stockout notification for a hotspot naming
+ * Male, Female or Both (POST /orders/stockouts). The district's DCFP decides what and how much to send.
  */
 export function StockoutForm({
   hotspotId,
@@ -59,8 +56,6 @@ export function StockoutForm({
   const [hasMore, setHasMore] = useState(false);
   const [loadingHotspots, setLoadingHotspots] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [products, setProducts] = useState<Product[] | null>(null);
-  const [productsErr, setProductsErr] = useState("");
 
   const loadPage = useCallback(
     async (offset: number) => {
@@ -99,15 +94,6 @@ export function StockoutForm({
         // Offline or refused: keep the phone's copy.
       })
       .finally(() => live && setLoadingHotspots(false));
-    listProducts()
-      .then((list) => live && setProducts(list))
-      .catch((e: unknown) => {
-        if (!live) return;
-        setProducts([]);
-        setProductsErr(
-          productsProblemMessage(e instanceof ProductsUnavailable ? e.problem : "error"),
-        );
-      });
     return () => {
       live = false;
     };
@@ -118,15 +104,14 @@ export function StockoutForm({
   const [selId, setSel] = useState<string | undefined>(hotspotId);
   // Opened from a hotspot's page, it may not be in the pages loaded so far.
   const sel = hotspots.find((h) => h.id === selId) ?? s.hotspots.find((h) => h.id === selId);
-  const [productId, setProduct] = useState("");
-  const product = products?.find((p) => p.id === productId);
+  const [selection, setSelection] = useState<Selection | null>(null);
   const [reason, setReason] = useState<Reason>("Out of stock");
   const [comment, setComment] = useState("");
   const [pick, setPick] = useState(false);
   const [pq, setPq] = useState("");
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState("");
-  const [done, setDone] = useState<"sent" | "queued" | null>(null);
+  const [done, setDone] = useState<"sent" | "repeated" | "queued" | null>(null);
 
   // Pick the only choices for the VHT.
   const hotspot:
@@ -134,19 +119,19 @@ export function StockoutForm({
     fixed
       ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
       : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
-  const chosenProduct = product ?? (products?.length === 1 ? products[0] : undefined);
   const tooLong = comment.trim().length > COMMENT_MAX;
-  const ready = !!hotspot && !!chosenProduct && !tooLong && !busy;
+  const ready = !!hotspot && !!selection && !tooLong && !busy;
+  const what = selection ? SELECTION_LABEL[selection].toLowerCase() : "condoms";
 
   const submit = async () => {
-    if (!hotspot || !chosenProduct) return;
+    if (!hotspot || !selection) return;
     setRefused("");
     const request = {
       hot_spot_id: hotspot.id,
-      condom_id: chosenProduct.id,
+      selection,
       comment: stockoutComment(reason, comment),
     };
-    const names = { hotspot: hotspot.name, product: chosenProduct.name };
+    const names = { hotspot: hotspot.name, product: SELECTION_LABEL[selection] };
     const label = `Stock request · ${hotspot.name}`;
     if (offline) {
       queue("stockout", { request, ...names }, label);
@@ -155,9 +140,10 @@ export function StockoutForm({
     }
     setBusy(true);
     try {
-      const res = await reportStockout(request);
-      send("stockout", { order: toLocalOrder(res, names, me.name) }, label);
-      setDone("sent");
+      const { report, repeated } = await reportStockout(request);
+      const byRole = fixed ? "Hotspot manager" : "VHT";
+      send("stockout", { order: toLocalOrder(report, me.name, byRole) }, label);
+      setDone(repeated ? "repeated" : "sent");
     } catch (e) {
       if (isNetworkError(e)) {
         queue("stockout", { request, ...names }, label);
@@ -176,7 +162,12 @@ export function StockoutForm({
         {done === "sent" ? (
           <Done
             title="Stock request sent"
-            body={`${hotspot?.district || "The district"} focal person is notified about ${chosenProduct?.name} at ${hotspot?.name} and decides how much to send.`}
+            body={`${hotspot?.district || "The district"} focal person is notified that ${hotspot?.name} needs ${what} and decides how much to send.`}
+          />
+        ) : done === "repeated" ? (
+          <Done
+            title="Added to the open request"
+            body={`${hotspot?.name} already has a request the district hasn't fulfilled yet. Your message was added to it, so the focal person sees it's still needed.`}
           />
         ) : (
           <Done
@@ -202,7 +193,6 @@ export function StockoutForm({
   return (
     <Screen title="Request stock" backLabel="Back">
       {refused ? <Banner tone="danger" title="Couldn't send" body={refused} /> : null}
-      {productsErr ? <Banner tone="warning" title="No product list" body={productsErr} /> : null}
       {fixed ? null : (
         <Fields h="Hotspot">
           <Pick
@@ -224,12 +214,15 @@ export function StockoutForm({
         <Note text="Only active hotspots can get stock. New hotspots become active when the district focal person approves them." />
       ) : null}
       <Fields h="What's needed" f="The district focal person decides how much to send.">
-        <Select
-          label="Product"
-          value={chosenProduct?.id ?? ""}
-          options={(products ?? []).map((p) => ({ v: p.id, l: p.name }))}
-          onChange={setProduct}
-          loading={products === null}
+        <Seg
+          label="Out of"
+          options={[
+            ["male", "Male"],
+            ["female", "Female"],
+            ["both", "Both"],
+          ]}
+          value={selection ?? undefined}
+          onChange={setSelection}
         />
         <Seg
           label="What's happening?"

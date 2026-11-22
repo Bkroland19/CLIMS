@@ -4,11 +4,15 @@ import Screen from "@/components/m/Screen";
 import { Banner } from "@/components/m/kit";
 import { HM_HOTSPOT } from "@/lib/seed";
 import { useMe } from "@/lib/session";
+import { useStore } from "@/lib/store";
 import { OrderScreen } from "./order";
 import { RiderDelivery, RiderReceipt } from "./rider";
 import { Help, Inbox } from "./shared";
 import { StockoutForm } from "./stockout";
+import { StockoutScreen } from "./stockoutDetail";
 import { RequestForm, VhtHotspot, VhtMap, VhtMapDone } from "./vht";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Renders `/<tab>/<kind>/<id?>` inside any tab's stack, so detail pages keep
@@ -17,11 +21,20 @@ import { RequestForm, VhtHotspot, VhtMap, VhtMapDone } from "./vht";
 export default function Detail() {
   const { path } = useLocalSearchParams<{ path: string[] }>();
   const me = useMe();
+  const { s } = useStore();
   const [kind, id] = Array.isArray(path) ? path : [path];
 
   switch (kind) {
     case "order":
-      return id ? <OrderScreen id={id} /> : null;
+      if (!id) return null;
+      // Stockout notifications sent to the API (and inbox notes about them) open their own screen.
+      return s.orders.find((o) => o.id === id)?.source === "api" || UUID.test(id) ? (
+        <StockoutScreen id={id} />
+      ) : (
+        <OrderScreen id={id} />
+      );
+    case "stockout":
+      return id ? <StockoutScreen id={id} /> : null;
     case "hotspot":
       return id ? <VhtHotspot id={id} /> : null;
     case "request":

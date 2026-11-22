@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import Screen from "@/components/m/Screen";
 import { Banner, Btn, Hero, List, Row, SkeletonList } from "@/components/m/kit";
 import { isNetworkError } from "@/lib/hotspots";
-import { listOrders, listProducts, toLocalOrder } from "@/lib/orders";
+import { listStockouts, toLocalOrder } from "@/lib/orders";
 import { useT } from "@/lib/theme";
 import { ago, chip, items, orderChip } from "@/lib/format";
 import { useNav } from "@/lib/nav";
@@ -135,8 +135,8 @@ function HmOrdersSample() {
 type Load = "loading" | "ok" | "offline" | "forbidden" | "error";
 
 /**
- * The manager's hotspot orders from GET /orders, reloaded whenever the screen is shown. The phone's
- * copy stays on screen while offline. Product names come from the product list when available.
+ * The manager's hotspot stockout notifications from GET /orders/stockouts, reloaded whenever the
+ * screen is shown. The phone's copy stays on screen while offline.
  */
 function useApiOrders() {
   const me = useMe();
@@ -145,22 +145,10 @@ function useApiOrders() {
   useFocusEffect(
     useCallback(() => {
       let live = true;
-      Promise.all([listOrders(), listProducts().catch(() => [])])
-        .then(([orders, products]) => {
+      listStockouts()
+        .then((reports) => {
           if (!live) return;
-          const name = new Map(products.map((p) => [p.id, p.name]));
-          syncApiOrders(
-            orders
-              .filter((o) => o.hot_spot_id)
-              .map((o) =>
-                toLocalOrder(
-                  o,
-                  { hotspot: "Your hotspot", product: name.get(o.condom_id) ?? "Condoms" },
-                  me.name,
-                  "Hotspot manager",
-                ),
-              ),
-          );
+          syncApiOrders(reports.map((r) => toLocalOrder(r, me.name, "Hotspot manager")));
           setLoad("ok");
         })
         .catch((e: unknown) => {
@@ -205,7 +193,8 @@ function HmHomeLive() {
   const nav = useNav();
   const me = useMe();
   const { orders, queued, load } = useApiOrders();
-  const open = orders.find((o) => o.status !== "delivered" && o.status !== "received");
+  // A delivered notification stays open until the manager acknowledges what arrived.
+  const open = orders.find((o) => o.status !== "received");
   if (!me.hotspotId)
     return (
       <Screen title="Home" root>
@@ -247,6 +236,8 @@ function HmHomeLive() {
               t={o.product ?? "Condoms"}
               s={`Sent ${ago(o.createdAt)}`}
               chip={orderChip(o.status)}
+              chev
+              onPress={() => nav.go(`stockout/${o.id}`)}
             />
           ))}
         </List>
@@ -288,6 +279,8 @@ function HmOrdersLive() {
               t={o.product ?? "Condoms"}
               s={`${o.note ? `${o.note} · ` : ""}${ago(o.createdAt)}`}
               chip={orderChip(o.status)}
+              chev
+              onPress={() => nav.go(`stockout/${o.id}`)}
             />
           ))}
         </List>
