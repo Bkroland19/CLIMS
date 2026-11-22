@@ -15,6 +15,7 @@ const session: Session = {
     email: null,
     permissions: null,
     roleNames: ['admin'],
+    store_id: null,
   },
 };
 

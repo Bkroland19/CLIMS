@@ -2,8 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import { dispenserSummary, EMPTY_SUBMISSION, submissionSchema } from './hotspotForm';
 
-const district = '7f2c3c5e-1d4b-4c1a-9a51-2a8f6f0b9e11';
-const minimal = { ...EMPTY_SUBMISSION, name: ' Lake view bar ', district_id: district };
+const complete = {
+  ...EMPTY_SUBMISSION,
+  name: ' Lake view bar ',
+  type: 'Bar',
+  region_id: 'region-1',
+  district_id: 'district-1',
+  subcounty_id: 'subcounty-1',
+  latitude: '0.31',
+  longitude: '32.63',
+  contact_person_name: 'Okello James',
+  contact_person_phone: '0772 000 000',
+  has_condom_dispenser: 'no' as const,
+};
 
 function issues(input: typeof EMPTY_SUBMISSION) {
   const result = submissionSchema.safeParse(input);
@@ -13,35 +24,26 @@ function issues(input: typeof EMPTY_SUBMISSION) {
 }
 
 describe('submissionSchema', () => {
-  it('turns blanks into nulls and trims text', () => {
-    expect(submissionSchema.parse(minimal)).toEqual({
+  it('sends what the API requires, trimmed, with optional blanks as null', () => {
+    expect(submissionSchema.parse(complete)).toEqual({
       name: 'Lake view bar',
-      district_id: district,
-      type: null,
+      type: 'Bar',
+      region_id: 'region-1',
+      district_id: 'district-1',
+      subcounty_id: 'subcounty-1',
       village: null,
-      contact_person_name: null,
-      contact_person_telephone: null,
-      has_condom_dispenser: null,
+      latitude: 0.31,
+      longitude: 32.63,
+      contact_person_name: 'Okello James',
+      contact_person_phone: '+256772000000',
+      has_condom_dispenser: false,
       dispenser_condition: null,
-      latitude: null,
-      longitude: null,
       comment: null,
     });
   });
 
-  it('sends the contact phone in +256 form', () => {
-    expect(
-      submissionSchema.parse({ ...minimal, contact_person_telephone: '0772 000 000' })
-        .contact_person_telephone,
-    ).toBe('+256772000000');
-  });
-
-  it('sends the dispenser answer and drops a condition without a dispenser', () => {
-    const withDispenser = {
-      ...minimal,
-      has_condom_dispenser: 'yes',
-      dispenser_condition: 'Good',
-    } as const;
+  it('sends the dispenser condition only when there is a dispenser', () => {
+    const withDispenser = { ...complete, has_condom_dispenser: 'yes', dispenser_condition: 'Good' };
     expect(submissionSchema.parse(withDispenser)).toMatchObject({
       has_condom_dispenser: true,
       dispenser_condition: 'Good',
@@ -54,27 +56,25 @@ describe('submissionSchema', () => {
 
   it.each([
     [{ name: '' }, 'name'],
-    [{ name: 'x'.repeat(41) }, 'name'],
+    [{ name: 'x'.repeat(101) }, 'name'],
+    [{ type: '' }, 'type'],
+    [{ region_id: '' }, 'region_id'],
     [{ district_id: '' }, 'district_id'],
-    [{ village: 'x'.repeat(21) }, 'village'],
-    [{ contact_person_telephone: 'call me' }, 'contact_person_telephone'],
-    [{ contact_person_telephone: '+254 712 345 678' }, 'contact_person_telephone'],
-    [{ contact_person_telephone: '0414 123456' }, 'contact_person_telephone'],
+    [{ subcounty_id: '' }, 'subcounty_id'],
+    [{ village: 'x'.repeat(101) }, 'village'],
+    [{ contact_person_name: '' }, 'contact_person_name'],
+    [{ contact_person_phone: '' }, 'contact_person_phone'],
+    [{ contact_person_phone: 'call me' }, 'contact_person_phone'],
+    [{ contact_person_phone: '+254 712 345 678' }, 'contact_person_phone'],
+    [{ has_condom_dispenser: '' as const }, 'has_condom_dispenser'],
     [{ has_condom_dispenser: 'yes' as const }, 'dispenser_condition'],
-    [{ latitude: '0.31' }, 'longitude'],
-    [{ latitude: '91', longitude: '32' }, 'latitude'],
-    [{ latitude: 'north', longitude: '32' }, 'latitude'],
+    [{ latitude: '' }, 'latitude'],
+    [{ longitude: '' }, 'longitude'],
+    [{ latitude: '91' }, 'latitude'],
+    [{ longitude: 'east' }, 'longitude'],
+    [{ comment: 'x'.repeat(2001) }, 'comment'],
   ])('rejects %o on %s', (change, field) => {
-    expect(issues({ ...minimal, ...change })).toHaveProperty(field);
-  });
-
-  it('accepts a coordinate pair', () => {
-    expect(
-      submissionSchema.parse({ ...minimal, latitude: '0.31', longitude: '32.63' }),
-    ).toMatchObject({
-      latitude: 0.31,
-      longitude: 32.63,
-    });
+    expect(issues({ ...complete, ...change })).toHaveProperty(field);
   });
 });
 

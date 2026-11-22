@@ -17,13 +17,12 @@ import (
 // stockout reports that a hotspot has run out of a product. The district's DCFPs are notified; no
 // order is created.
 func (h *Handler) stockout(c fiber.Ctx) error {
-	// A notification names Male, Female or Both and no quantity. Older clients send one product
-	// instead, whose category becomes the selection.
+	// A notification names a condom category (male, female or both) and no product or quantity:
+	// the district decides what to send.
 	var input struct {
-		HotSpotID string  `json:"hot_spot_id"`
-		Selection string  `json:"selection"`
-		CondomID  *string `json:"condom_id"`
-		Comment   *string `json:"comment"`
+		HotSpotID      string  `json:"hot_spot_id"`
+		CondomCategory string  `json:"condom_category"`
+		Message        *string `json:"message"`
 	}
 	if err := request.DecodeJSON(c, &input); err != nil {
 		return response.Error(c, 400, "invalid request body", nil)
@@ -32,20 +31,13 @@ func (h *Handler) stockout(c fiber.Ctx) error {
 	if hotSpotErr != nil {
 		return response.Error(c, 422, "provide the hotspot's UUID", nil)
 	}
-	var productID *string
-	if input.CondomID != nil {
-		id, err := request.ParseUUID(*input.CondomID)
-		if err != nil {
-			return response.Error(c, 422, "condom_id must be a UUID", nil)
-		}
-		productID = &id
-	}
-	if (input.Selection == "" && productID == nil) || (input.Selection != "" && !ValidSelection(input.Selection)) {
-		return response.Error(c, 422, "selection must be male, female or both", map[string]string{"selection": "Choose male, female or both."})
+	if !ValidSelection(input.CondomCategory) {
+		return response.Error(c, 422, "condom_category must be male, female or both",
+			map[string]string{"condom_category": "Choose male, female or both."})
 	}
 	var ok bool
-	if input.Comment, ok = trimComment(input.Comment); !ok {
-		return response.Error(c, 422, "comment must be at most 4000 characters", nil)
+	if input.Message, ok = trimComment(input.Message); !ok {
+		return response.Error(c, 422, "message must be at most 4000 characters", nil)
 	}
 	access := scopeFor(users.CurrentUser(c))
 	allowed := access.allStores || assigned(access.hotSpotID, hotSpotID)
@@ -59,7 +51,7 @@ func (h *Handler) stockout(c fiber.Ctx) error {
 	if !allowed {
 		return workflowError(c, errWorkflowForbidden)
 	}
-	report, repeated, err := h.repo.reportStockout(c.Context(), access.userID, hotSpotID, productID, input.Selection, input.Comment)
+	report, repeated, err := h.repo.reportStockout(c.Context(), access.userID, hotSpotID, input.CondomCategory, input.Message)
 	if err != nil {
 		return workflowError(c, err)
 	}
@@ -190,24 +182,22 @@ func (h *Handler) stockouts(c fiber.Ctx) error {
 	return response.Success(c, 200, "", reports)
 }
 
-// warehouseRequest places a DCFP's order with NMS or JMS for a product and quantity.
+// warehouseRequest places a DCFP's order with NMS or JMS for a condom category and quantity; the
+// warehouse chooses the product at review.
 func (h *Handler) warehouseRequest(c fiber.Ctx) error {
 	var input WarehouseRequestInput
 	if err := request.DecodeJSON(c, &input); err != nil {
 		return response.Error(c, 400, "invalid request body", nil)
 	}
 	warehouseID, warehouseErr := request.ParseUUID(input.WarehouseID)
-	productID, productErr := request.ParseUUID(input.CondomID)
-	if warehouseErr != nil || productErr != nil {
-		return response.Error(c, 422, "provide warehouse_store_id and condom_id UUIDs", nil)
+	unitID, unitErr := request.ParseUUID(input.UnitOfMeasureID)
+	if warehouseErr != nil || unitErr != nil {
+		return response.Error(c, 422, "provide warehouse_store_id and unit_of_measure_id UUIDs", nil)
 	}
-	input.WarehouseID, input.CondomID = warehouseID, productID
-	if input.UnitOfMeasureID != nil {
-		unitID, err := request.ParseUUID(*input.UnitOfMeasureID)
-		if err != nil {
-			return response.Error(c, 422, "unit_of_measure_id must be a UUID", nil)
-		}
-		input.UnitOfMeasureID = &unitID
+	input.WarehouseID, input.UnitOfMeasureID = warehouseID, unitID
+	if input.CondomCategory != SelectionMale && input.CondomCategory != SelectionFemale {
+		const message = "condom_category must be male or female"
+		return response.Error(c, 422, message, map[string]string{"condom_category": message})
 	}
 	if input.Quantity < 1 {
 		const message = "quantity must be a positive whole number"
@@ -272,6 +262,13 @@ func validActionInput(action string, input *ActionInput) bool {
 			return false
 		}
 	}
+	if input.CondomID != nil {
+		id, err := request.ParseUUID(*input.CondomID)
+		if err != nil || action != "review" {
+			return false
+		}
+		input.CondomID = &id
+	}
 	if (input.QuantityReceived != nil) != (action == "receive") ||
 		(input.QuantityIssued != nil && (action != "dispatch" || *input.QuantityIssued < 1)) ||
 		(input.QuantityApproved != nil && (action != "review" || *input.QuantityApproved < 1)) ||
@@ -316,14 +313,14 @@ func workflowError(c fiber.Ctx, err error) error {
 		errors.Is(err, errAckChanged), errors.Is(err, errExpiredStock):
 		return response.Error(c, 409, err.Error(), nil)
 	case errors.Is(err, errWorkflowInput), errors.Is(err, errHotSpotRoute), errors.Is(err, errUnknownProduct),
-		errors.Is(err, errNoCategory), errors.Is(err, errNotSelected), errors.Is(err, errDeliveryUnit):
+		errors.Is(err, errNotSelected), errors.Is(err, errDeliveryUnit):
 		return response.Error(c, 422, err.Error(), nil)
 	case errors.Is(err, stock.ErrNearExpiry):
 		return response.Error(c, 422, err.Error(), map[string]string{"expiry_exception_reason": err.Error()})
 	case errors.Is(err, errNotWarehouse):
 		return response.Error(c, 422, err.Error(), map[string]string{"warehouse_store_id": err.Error()})
-	case errors.Is(err, errNoUnit):
-		return response.Error(c, 422, err.Error(), map[string]string{"unit_of_measure_id": err.Error()})
+	case errors.Is(err, errChooseProduct), errors.Is(err, errWrongCategory), errors.Is(err, errInactiveProduct):
+		return response.Error(c, 422, err.Error(), map[string]string{"condom_id": err.Error()})
 	default:
 		return orderError(c, err)
 	}

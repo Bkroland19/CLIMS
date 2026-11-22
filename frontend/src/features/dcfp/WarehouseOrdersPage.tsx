@@ -32,13 +32,13 @@ export default function WarehouseOrdersPage() {
       {
         id: 'product',
         header: 'Product',
-        value: (order) => names.product(order.condom_id),
+        value: (order) => names.product(order.condom_id, order.condom_category),
         cell: (order) => (
           <Link
             href={DCFP_PATHS.order(order.id)}
             className="font-medium underline-offset-4 hover:underline"
           >
-            {names.product(order.condom_id)}
+            {names.product(order.condom_id, order.condom_category)}
           </Link>
         ),
       },

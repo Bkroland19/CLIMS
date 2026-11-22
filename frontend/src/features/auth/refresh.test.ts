@@ -21,6 +21,7 @@ const session: Session = {
     email: null,
     permissions: null,
     roleNames: ['dfcp'],
+    store_id: null,
   },
 };
 

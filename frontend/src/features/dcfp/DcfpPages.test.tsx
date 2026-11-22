@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { anOrder, aReport, dcfpApi, FEMALE, JMS, UNITLESS } from '@/test/dcfpFixtures';
+import { anOrder, aReport, BOX, dcfpApi, JMS } from '@/test/dcfpFixtures';
 import { testRouter } from '@/test/navigation';
 import { renderApp } from '@/test/renderApp';
 
@@ -24,7 +24,7 @@ describe('StockoutsPage', () => {
     if (!row) throw new Error('The report has no row.');
     for (const text of [
       'Kisenyi, Central, Kampala',
-      'Engabu Free Female',
+      'female condoms',
       'Dispenser empty since Monday',
       'Peter Okello · 0700123456',
       'Grace Nakato',
@@ -33,7 +33,7 @@ describe('StockoutsPage', () => {
     }
   });
 
-  it('starts a warehouse order for the reported product', async () => {
+  it('starts a warehouse order for the reported condom type', async () => {
     const user = userEvent.setup();
     renderApp(<StockoutsPage />, {
       route: '/dcfp/stockouts',
@@ -44,7 +44,7 @@ describe('StockoutsPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Actions for Kisenyi Landing' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Order stock from a warehouse' }));
 
-    expect(testRouter.location).toBe(`/dcfp/restock/new?product=${FEMALE.id}`);
+    expect(testRouter.location).toBe('/dcfp/restock/new?category=female');
   });
 
   it('says so when no hotspot has reported', async () => {
@@ -82,10 +82,10 @@ describe('WarehouseOrdersPage', () => {
 });
 
 describe('NewWarehouseOrderPage', () => {
-  it('sends the product and quantity to the chosen warehouse, then opens the order', async () => {
+  it('sends the condom type, unit and quantity to the chosen warehouse, then opens the order', async () => {
     const user = userEvent.setup();
     const { requests } = renderApp(<NewWarehouseOrderPage />, {
-      route: `/dcfp/restock/new?product=${FEMALE.id}`,
+      route: '/dcfp/restock/new?category=female',
       signedIn: true,
       replies: [
         dcfpApi(
@@ -106,6 +106,9 @@ describe('NewWarehouseOrderPage', () => {
       await screen.findByText('Enter how many to order, as a whole number.'),
     ).toBeInTheDocument();
 
+    expect(screen.getByRole('radio', { name: /Female condoms/ })).toBeChecked();
+    await user.click(screen.getByRole('combobox', { name: 'Unit' }));
+    await user.click(await screen.findByRole('option', { name: 'box' }));
     await user.type(screen.getByLabelText('Quantity'), '500');
     expect(screen.getByText('In box.')).toBeInTheDocument();
     await user.type(screen.getByLabelText(/Comment for the warehouse/), 'Two hotspots are out');
@@ -116,16 +119,17 @@ describe('NewWarehouseOrderPage', () => {
     });
     expect(requests.find((request) => request.method === 'POST')?.body).toEqual({
       warehouse_store_id: JMS.id,
-      condom_id: FEMALE.id,
+      condom_category: 'female',
       quantity: 500,
+      unit_of_measure_id: BOX.id,
       comment: 'Two hotspots are out',
     });
   });
 
-  it('asks for a unit when the product has none in the catalogue', async () => {
+  it('asks for the condom type and the unit, not a product', async () => {
     const user = userEvent.setup();
-    renderApp(<NewWarehouseOrderPage />, {
-      route: `/dcfp/restock/new?product=${UNITLESS.id}`,
+    const { requests } = renderApp(<NewWarehouseOrderPage />, {
+      route: '/dcfp/restock/new',
       signedIn: true,
       replies: [dcfpApi()],
     });
@@ -133,15 +137,16 @@ describe('NewWarehouseOrderPage', () => {
     await user.type(await screen.findByLabelText('Quantity'), '20');
     await user.click(screen.getByRole('button', { name: 'Send order to NMS' }));
 
-    expect(
-      await screen.findByText('This product has no unit in the catalogue; choose one.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Choose male or female condoms.')).toBeInTheDocument();
+    expect(screen.getByText('Choose the unit.')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Product' })).not.toBeInTheDocument();
+    expect(requests.some((request) => request.method === 'POST')).toBe(false);
   });
 
   it('shows the API’s field message beside the field', async () => {
     const user = userEvent.setup();
     renderApp(<NewWarehouseOrderPage />, {
-      route: `/dcfp/restock/new?product=${FEMALE.id}`,
+      route: '/dcfp/restock/new?category=female',
       signedIn: true,
       replies: [
         dcfpApi(
@@ -163,7 +168,9 @@ describe('NewWarehouseOrderPage', () => {
       ],
     });
 
-    await user.type(await screen.findByLabelText('Quantity'), '5');
+    await user.click(await screen.findByRole('combobox', { name: 'Unit' }));
+    await user.click(await screen.findByRole('option', { name: 'box' }));
+    await user.type(screen.getByLabelText('Quantity'), '5');
     await user.click(screen.getByRole('button', { name: 'Send order to NMS' }));
 
     expect(

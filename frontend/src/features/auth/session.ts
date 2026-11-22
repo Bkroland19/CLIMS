@@ -68,6 +68,8 @@ export const authUserSchema = z
     firstname: z.string().nullish().default(null),
     lastname: z.string().nullish().default(null),
     email: z.string().nullish().default(null),
+    /** The store the account works at (a DCFP's district store); `null` when none is assigned. */
+    store_id: z.string().nullish().default(null),
   })
   .transform(({ role, roles, permissions, roleNames, ...user }) => {
     // Without a primary role, the first role held names the user.

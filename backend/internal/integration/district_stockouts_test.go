@@ -128,7 +128,7 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 	alert := func(hotSpot string, want int) map[string]any {
 		t.Helper()
 		return request("POST", "/orders/stockouts", map[string]any{
-			"hot_spot_id": hotSpot, "condom_id": product, "comment": "Out of stock",
+			"hot_spot_id": hotSpot, "condom_category": "male", "message": "Out of stock",
 		}, vht, want)
 	}
 	raised := alert(active, 201)["data"].(map[string]any)
@@ -142,5 +142,5 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 	request("PUT", "/roles/"+roleID("healthy facility")+"/permissions",
 		map[string]any{"permissions": []string{"orders:stockout"}}, admin, 200)
 	facility := account("healthy facility", "district-facility")
-	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": active, "condom_id": product}, facility, 403)
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": active, "condom_category": "male"}, facility, 403)
 }

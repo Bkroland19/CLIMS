@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { parseList, type HttpClient } from '@/lib/api';
+import { parseList, readAllPages, type HttpClient } from '@/lib/api';
 
 /*
  * Uganda's administrative places as the Go API knows them: regions, their
@@ -96,27 +96,18 @@ export async function listDistrictHotspots(
   districtId: string,
   signal?: AbortSignal,
 ): Promise<PlacedHotspot[]> {
-  const readPage = async (page: number) => {
-    const query = new URLSearchParams({
-      district_id: districtId,
-      limit: String(PAGE_SIZE),
-      offset: String(page * PAGE_SIZE),
-    }).toString();
-    return parseList(hotspotSchema, await http.get(`/hotspots?${query}`, { signal }), 'hotspots');
-  };
-
-  const byId = new Map<string, PlacedHotspot>();
-  for (let first = 0; first < MAX_PAGES; first += PAGES_AT_ONCE) {
-    const pages = await Promise.all(
-      Array.from({ length: Math.min(PAGES_AT_ONCE, MAX_PAGES - first) }, (_, index) =>
-        readPage(first + index),
-      ),
-    );
-    // Keyed by id: a hotspot edited between two reads can move across a page boundary.
-    for (const hotspot of pages.flat()) byId.set(hotspot.id, hotspot);
-    if (pages.some((page) => page.length < PAGE_SIZE)) break;
-  }
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const { items } = await readAllPages(
+    async (offset, limit) => {
+      const query = new URLSearchParams({
+        district_id: districtId,
+        limit: String(limit),
+        offset: String(offset),
+      }).toString();
+      return parseList(hotspotSchema, await http.get(`/hotspots?${query}`, { signal }), 'hotspots');
+    },
+    { pageSize: PAGE_SIZE, maxPages: MAX_PAGES, pagesAtOnce: PAGES_AT_ONCE },
+  );
+  return items.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
