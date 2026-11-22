@@ -35,13 +35,14 @@ VALUES ($1, $2, $3::uuid);
 Set these on the backend to turn portal sign-in on. Without `OIDC_CLIENT_ID`,
 CLIMS offers password sign-in only.
 
-| Variable | Value |
-|---|---|
-| `OIDC_ISSUER` | The realm issuer, exactly as it appears in `iss`, e.g. `https://sso.health.go.ug/realms/moh`. The dashboard reconciler must use the same value. |
-| `OIDC_CLIENT_ID` | `clims` |
-| `OIDC_CLIENT_SECRET` | The `clims` client secret |
-| `OIDC_PUBLIC_ORIGIN` | The CLIMS address users see, scheme and host only, e.g. `https://clims.health.go.ug` |
-| `IDENTITY_SYNC_CLIENT_ID` | `clims-identity-sync`, the dashboard reconciler's service client. Optional; it turns on the identity-sync endpoints, which require an HTTPS issuer. Its service account holds the `clims` client role `identity_sync`. |
+| Variable                   | Value                                                                                                                                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OIDC_ISSUER`              | The realm issuer, exactly as it appears in `iss`, e.g. `https://sso.health.go.ug/realms/moh`. The dashboard reconciler must use the same value.                                                                        |
+| `OIDC_CLIENT_ID`           | `clims`                                                                                                                                                                                                                |
+| `OIDC_CLIENT_SECRET`       | The `clims` client secret                                                                                                                                                                                              |
+| `OIDC_PUBLIC_ORIGIN`       | The CLIMS address users see, scheme and host only, e.g. `https://clims.health.go.ug`                                                                                                                                   |
+| `IDENTITY_SYNC_CLIENT_ID`  | `clims-identity-sync`, the dashboard reconciler's service client. Optional; it turns on the identity-sync endpoints, which require an HTTPS issuer. Its service account holds the `clims` client role `identity_sync`. |
+| `IDENTITY_SYNC_TEST_PROBE` | Leave unset. `1` adds the conformance suite's session probe; test environments only.                                                                                                                                   |
 
 The portal tile opens `/api/v1/auth/sso/start`. The flow is:
 
@@ -65,16 +66,53 @@ assignment, because the session belongs to their existing account.
 When sign-in is refused, the callback redirects to
 `/sign-in?sso_error=<reason>` and the sign-in page explains it:
 
-| Reason | Cause |
-|---|---|
-| `denied` | No `clims_access` role in the token, or the token was issued to another client |
-| `unavailable` | No account link for this Keycloak user, or the linked account is disabled or has no role |
-| `invalid` | Missing or mismatched state, nonce or ID token. Usually a stale tab or a sign-in that was started somewhere other than the portal. |
-| `failed` | Keycloak or the database could not be reached |
-| `expired` | The handoff was older than 60 seconds or had already been used |
+| Reason        | Cause                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `denied`      | No `clims_access` role in the token, or the token was issued to another client                                                     |
+| `unavailable` | No account link for this Keycloak user, or the linked account is disabled or has no role                                           |
+| `invalid`     | Missing or mismatched state, nonce or ID token. Usually a stale tab or a sign-in that was started somewhere other than the portal. |
+| `failed`      | Keycloak or the database could not be reached                                                                                      |
+| `expired`     | The handoff was older than 60 seconds or had already been used                                                                     |
 
 Signing out of CLIMS ends the CLIMS session only; the Keycloak session stays.
-Ending existing sessions when portal access is removed is not handled yet.
+
+## Identity sync (contract 1.1)
+
+With `IDENTITY_SYNC_CLIENT_ID` set, CLIMS serves the MoH identity-sync contract
+v1.1 at `/api/v1/internal/identity-sync`. The contract is defined in the
+dashboard repository (`docs/integrations/identity-sync-contract.md`). Every
+request needs a Keycloak access token for `aud` `clims`, `azp` equal to
+`IDENTITY_SYNC_CLIENT_ID`, `typ` `Bearer`, and the `clims` client role
+`identity_sync`. A token that is missing, badly signed, expired, from another
+issuer or for another audience gets 401. A valid token that fails any of the
+other checks gets 403.
+
+| Endpoint                      | Purpose                                                                                                                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /`                       | Descriptor: application `clims`, account IDs `uuid`, page size 100, capabilities `accounts.list`, `identity.link`, `sessions.revoke`                                                                                                                 |
+| `GET /accounts?after=&limit=` | Active accounts with at least one role, in UUID order, each with its current `link` for `OIDC_ISSUER` or `null`                                                                                                                                      |
+| `PUT /accounts/{id}/identity` | Records a link. It never replaces a link or grants roles.                                                                                                                                                                                            |
+| `POST /sessions/revoke`       | Ends every CLIMS session of the linked account at once. Access tokens stop working on their next request, because each request checks its session, and refresh tokens are refused. The link and roles stay. Returns 204 even when nothing is linked. |
+
+When portal access to CLIMS is removed, the dashboard removes `clims_access` in
+Keycloak, so new sign-ins are refused, and then calls `POST /sessions/revoke`,
+which ends existing sessions immediately.
+
+### Test session probe
+
+`IDENTITY_SYNC_TEST_PROBE=1` adds two routes for the dashboard's conformance
+suite. They use the same bearer checks as the endpoints above:
+
+- `POST /test/sessions` with `{"issuer","subject"}` starts a real CLIMS session
+  for the linked account and returns `201 {"sessionToken": "..."}`, or 404 when
+  nothing is linked.
+- `GET /test/sessions/check` with header `X-Test-Session: <token>` returns 200
+  while that session would still authorize a request, and 401 once it is
+  revoked or expired.
+
+Never set this flag outside a disposable test environment. Without it the
+routes do not exist, and the backend logs a warning at startup whenever it is
+on.
 
 Keep the launcher in the registration workflow until pilot users have signed
 in from the portal and CLIMS authorization has been verified with users from
