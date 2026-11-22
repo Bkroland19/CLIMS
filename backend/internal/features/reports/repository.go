@@ -96,6 +96,8 @@ type NotificationSummary struct {
 	Backlog                 Backlog              `json:"backlog"`
 	AcknowledgementOverdue  int64                `json:"acknowledgement_overdue"`
 	Districts               []DistrictRow        `json:"districts"`
+	// Settings are the review cycle, deadline and target in effect; request parameters may override them.
+	Settings ResponseSettings `json:"settings"`
 }
 
 type Period struct {

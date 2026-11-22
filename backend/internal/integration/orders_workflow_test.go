@@ -262,4 +262,5 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	testNotificationFulfilment(t, pool, request, admin, hotspotToken, districtToken, otherToken, district, hotSpot, unit, reportID)
 	testSupplyReports(t, pool, request, admin, districtToken, warehouseToken, otherToken, warehouse, district, product, unit)
 	testBatchExpiry(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)
+	testSettingsAndHMIS(t, pool, request, admin, districtToken, otherToken, warehouse, district)
 }

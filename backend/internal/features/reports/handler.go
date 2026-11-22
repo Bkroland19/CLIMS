@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"clims-backend/internal/features/rbac"
@@ -29,6 +30,126 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/stock", h.stock)
 	group.Get("/batches", h.batches)
 	group.Get("/expiry-exceptions", h.expiryExceptions)
+	group.Get("/settings", h.settings)
+	group.Post("/settings", rbac.RequirePermission("reports:configure"), h.saveSettings)
+	group.Get("/hmis-105", h.hmis)
+}
+
+// settings returns the response settings in effect for a store (store_id) or nationally, with the
+// history of that scope.
+func (h *Handler) settings(c fiber.Ctx) error {
+	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
+	if err != nil {
+		return response.Error(c, 500, "the settings could not be loaded", nil)
+	}
+	var storeID *string
+	if raw := c.Query("store_id"); raw != "" {
+		id, err := request.ParseUUID(raw)
+		if err != nil {
+			return response.Error(c, 400, "store_id must be a UUID", nil)
+		}
+		if !s.all && (s.storeID == nil || *s.storeID != id) {
+			return response.Error(c, 403, errSettingsScope.Error(), nil)
+		}
+		storeID = &id
+	}
+	effective, err := h.repo.effectiveSettings(c.Context(), storeID, h.today())
+	if err != nil {
+		slog.Error("settings failed", "error", err)
+		return response.Error(c, 500, "the settings could not be loaded", nil)
+	}
+	history, err := h.repo.settingsHistory(c.Context(), storeID)
+	if err != nil {
+		slog.Error("settings history failed", "error", err)
+		return response.Error(c, 500, "the settings could not be loaded", nil)
+	}
+	return response.Success(c, 200, "", fiber.Map{"effective": effective, "history": history})
+}
+
+// saveSettings adds a setting taking effect from a date (RF07). A store may change only its own
+// targets, and national targets need orders:all_stores (RN11).
+func (h *Handler) saveSettings(c fiber.Ctx) error {
+	var in SettingsInput
+	if err := request.DecodeJSON(c, &in); err != nil {
+		return response.Error(c, 400, "invalid request body", nil)
+	}
+	if in.StoreID != nil {
+		id, err := request.ParseUUID(*in.StoreID)
+		if err != nil {
+			return response.Error(c, 422, "store_id must be a UUID, or null for national settings", nil)
+		}
+		in.StoreID = &id
+	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	switch {
+	case !ValidCycle(in.ReviewCycle):
+		return response.Error(c, 422, "review_cycle must be weekly, monthly, bimonthly or quarterly", nil)
+	case in.DeadlineDays < 1 || in.DeadlineDays > 365:
+		return response.Error(c, 422, "deadline_days must be between 1 and 365", nil)
+	case in.TargetPercent < 1 || in.TargetPercent > 100:
+		return response.Error(c, 422, "target_percent must be between 1 and 100", nil)
+	case in.Reason == "" || len(in.Reason) > 1000:
+		return response.Error(c, 422, "give a reason of at most 1000 characters", nil)
+	}
+	effective := h.today()
+	if in.EffectiveFrom != nil {
+		day, err := time.ParseInLocation(time.DateOnly, *in.EffectiveFrom, Kampala)
+		if err != nil {
+			return response.Error(c, 422, "effective_from must be a YYYY-MM-DD date", nil)
+		}
+		if day.Before(effective) {
+			return response.Error(c, 422, errPastEffective.Error(), nil)
+		}
+		effective = day
+	}
+	user := users.CurrentUser(c)
+	all := user.HasPermission("orders:all_stores")
+	if !all && (in.StoreID == nil || user.StoreID == nil || *user.StoreID != *in.StoreID) {
+		return response.Error(c, 403, errSettingsScope.Error(), nil)
+	}
+	saved, err := h.repo.saveSettings(c.Context(), in, effective, user.ID)
+	if err != nil {
+		slog.Error("saving settings failed", "error", err)
+		return response.Error(c, 500, "the settings could not be saved", nil)
+	}
+	return response.Success(c, 201, "settings saved; they apply from effective_from", saved)
+}
+
+// hmis prepares HMIS 105 condom figures for a month (month=YYYY-MM, default the current month).
+func (h *Handler) hmis(c fiber.Ctx) error {
+	today := h.today()
+	month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, Kampala)
+	if raw := c.Query("month"); raw != "" {
+		parsed, err := time.ParseInLocation("2006-01", raw, Kampala)
+		if err != nil {
+			return response.Error(c, 400, "month must be YYYY-MM", nil)
+		}
+		month = parsed
+	}
+	var district *string
+	if raw := c.Query("district_id"); raw != "" {
+		id, err := request.ParseUUID(raw)
+		if err != nil {
+			return response.Error(c, 400, "district_id must be a UUID", nil)
+		}
+		district = &id
+	}
+	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
+	if err != nil {
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	report, err := h.repo.hmisReadiness(c.Context(), s, month, district, h.now())
+	if err != nil {
+		slog.Error("HMIS readiness failed", "error", err)
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	return response.Success(c, 200, "", report)
+}
+
+// today is the current Kampala calendar day.
+func (h *Handler) today() time.Time {
+	t := h.now().In(Kampala)
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, Kampala)
 }
 
 var bands = map[string]bool{"": true, "expired": true, "under_1_month": true, "under_3_months": true,
@@ -143,7 +264,7 @@ func page(c fiber.Ctx) (int32, int32, error) {
 }
 
 func (h *Handler) notificationSummary(c fiber.Ctx) error {
-	f, s, err := h.filter(c)
+	f, s, settings, err := h.filter(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -152,11 +273,12 @@ func (h *Handler) notificationSummary(c fiber.Ctx) error {
 		slog.Error("notification report failed", "error", err)
 		return response.Error(c, 500, "the report could not be calculated", nil)
 	}
+	summary.Settings = settings
 	return response.Success(c, 200, "", summary)
 }
 
 func (h *Handler) notificationRecords(c fiber.Ctx) error {
-	f, s, err := h.filter(c)
+	f, s, _, err := h.filter(c)
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -177,27 +299,49 @@ func (h *Handler) notificationRecords(c fiber.Ctx) error {
 	return response.Success(c, 200, "", records)
 }
 
-// filter reads the period, geography, product and response settings shared by every notification
-// report, and the user's scope.
-// shortcut: deadline_days and target_percent are request parameters; RF07 wants them saved per
-// organisation with who set them and when. Upgrade once the programme approves the defaults.
-func (h *Handler) filter(c fiber.Ctx) (Filter, scope, error) {
-	f, err := ParseFilter(c.Query("from"), c.Query("to"), c.Query("category"), c.Query("deadline_days", "7"),
-		c.Query("target_percent", "80"), h.now())
-	if err != nil {
-		return Filter{}, scope{}, err
+// filter reads the period, geography and product shared by every notification report, the user's
+// scope, and the response settings in effect (RF07): those of the filtered district's store, else the
+// user's store, else national. Without from and to the period is the current review cycle to date;
+// deadline_days and target_percent override the saved targets for ad hoc analysis.
+func (h *Handler) filter(c fiber.Ctx) (Filter, scope, ResponseSettings, error) {
+	fail := func(err error) (Filter, scope, ResponseSettings, error) {
+		return Filter{}, scope{}, ResponseSettings{}, err
 	}
-	for name, dst := range map[string]**string{"district_id": &f.DistrictID, "hot_spot_id": &f.HotSpotID} {
+	ids := map[string]*string{}
+	for _, name := range []string{"district_id", "hot_spot_id"} {
 		if raw := c.Query(name); raw != "" {
 			id, err := request.ParseUUID(raw)
 			if err != nil {
-				return Filter{}, scope{}, errors.New(name + " must be a UUID")
+				return fail(errors.New(name + " must be a UUID"))
 			}
-			*dst = &id
+			ids[name] = &id
 		}
 	}
 	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
-	return f, s, err
+	if err != nil {
+		return fail(err)
+	}
+	store := s.storeID
+	if ids["district_id"] != nil {
+		if store, err = h.repo.districtStore(c.Context(), *ids["district_id"]); err != nil {
+			return fail(err)
+		}
+	}
+	settings, err := h.repo.effectiveSettings(c.Context(), store, h.today())
+	if err != nil {
+		return fail(err)
+	}
+	from, to := c.Query("from"), c.Query("to")
+	if from == "" && to == "" {
+		from = CycleStart(settings.ReviewCycle, h.now()).Format(time.DateOnly)
+	}
+	f, err := ParseFilter(from, to, c.Query("category"), c.Query("deadline_days", strconv.Itoa(settings.DeadlineDays)),
+		c.Query("target_percent", strconv.Itoa(settings.TargetPercent)), h.now())
+	if err != nil {
+		return fail(err)
+	}
+	f.DistrictID, f.HotSpotID = ids["district_id"], ids["hot_spot_id"]
+	return f, s, settings, nil
 }
 
 // ParseFilter reads a report period as Kampala calendar days, both included, defaulting to the
