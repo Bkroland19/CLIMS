@@ -4623,6 +4623,303 @@
           }
         }
       }
+    },
+    "/api/v1/reports/export/{report}": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "exportReport",
+        "summary": "Export a report's rows as calculated now",
+        "description": "Requires reports:read. The same rows, filters and access rules as the report on screen (RN01, RN02), with the period, data update time, scope, product, rule version and definitions (RF15). Pass the report's own query parameters; unknown ones are rejected. CSV starts with that header block, then the column headers and rows, with Kampala times, and text that could run as a spreadsheet formula prefixed with an apostrophe. At most 50,000 rows.",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "notifications",
+                "warehouse-requests",
+                "stock",
+                "batches",
+                "expiry-exceptions",
+                "hmis-105"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "csv downloads a CSV file; json (the default) returns the table for the web's Excel export.",
+            "schema": {
+              "type": "string",
+              "enum": ["csv", "json"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportTableResponse"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/versions": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listReportVersions",
+        "summary": "Approved report versions",
+        "description": "Requires reports:read. Newest first, without their figures. orders:all_stores sees every version; others see their store's.",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "notifications",
+                "warehouse-requests",
+                "stock",
+                "batches",
+                "expiry-exceptions",
+                "hmis-105"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Reports"],
+        "operationId": "approveReportVersion",
+        "summary": "Approve a report version",
+        "description": "Requires reports:approve and an assigned store, or orders:all_stores for a national version. Calculates the report now for the filters and saves the figures and rows unchanged, so they stay reproducible after later corrections (RN04).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/versions/{id}": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getReportVersion",
+        "summary": "One approved version with its saved figures and rows",
+        "description": "Requires reports:read. format=csv downloads the version's saved rows. Versions outside the user's scope return 404.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "csv downloads a CSV file; json (the default) returns the table for the web's Excel export.",
+            "schema": {
+              "type": "string",
+              "enum": ["csv", "json"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionResponse"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/versions/{id}/corrections": {
+      "post": {
+        "tags": ["Reports"],
+        "operationId": "correctReportVersion",
+        "summary": "Correct an approved version",
+        "description": "Requires reports:approve, with the same scope as the version. Recalculates the report from the version's saved filters and saves it as a new version with the reason; the corrected version keeps its figures and becomes superseded. Only the latest version can be corrected (409).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8769,6 +9066,336 @@
           },
           "data": {
             "$ref": "#/components/schemas/HMISReadiness"
+          }
+        }
+      },
+      "ReportTable": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-11-01 to 2026-11-22"
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scope": {
+            "type": "string",
+            "example": "National · Kampala"
+          },
+          "product": {
+            "type": "string"
+          },
+          "rule_version": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The filters with the period and targets resolved, so a recalculation covers the same period."
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "header": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "The report's records keyed by column; null means not applicable or not recorded, 0 a recorded zero."
+          }
+        }
+      },
+      "ReportTableResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReportTable"
+          }
+        }
+      },
+      "ReportVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The report's query parameters: from, to, category, district_id, hot_spot_id, deadline_days, target_percent, status, store_type, warehouse_store_id, store_id, band or month."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The approving user's store; null for national versions."
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "supersedes_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correction_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "superseded_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["approved", "superseded"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReportVersionDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The report's query parameters: from, to, category, district_id, hot_spot_id, deadline_days, target_percent, status, store_type, warehouse_store_id, store_id, band or month."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The approving user's store; null for national versions."
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "supersedes_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correction_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "superseded_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["approved", "superseded"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "The report's figures as shown on screen when approved; null for expiry exceptions."
+          },
+          "export": {
+            "$ref": "#/components/schemas/ReportTable"
+          }
+        }
+      },
+      "ReportVersionList": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportVersion"
+            }
+          }
+        }
+      },
+      "ReportVersionResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReportVersionDetail"
+          }
+        }
+      },
+      "ReportVersionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report"],
+        "properties": {
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The report's query parameters: from, to, category, district_id, hot_spot_id, deadline_days, target_percent, status, store_type, warehouse_store_id, store_id, band or month."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "ReportCorrectionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reason"],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           }
         }
       }

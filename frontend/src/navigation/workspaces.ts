@@ -1,4 +1,5 @@
 import {
+  ChartColumn,
   ClipboardCheck,
   ClipboardList,
   HeartPulse,
@@ -49,6 +50,28 @@ function monthlyReports(path: string, description: string): NavItem {
     icon: ClipboardCheck,
     pages: [{ path, tab: 'Reports', title: 'Monthly reports', description, layout: 'table' }],
     details: [{ path: `${path}/[id]`, label: 'Monthly report', layout: 'form' }],
+  };
+}
+
+/**
+ * Programme reports from the Go API: notification fulfilment, warehouse
+ * requests, stock, expiry, HMIS 105 and approved versions, with downloads.
+ */
+function programmeReports(path: string, description: string): NavItem {
+  return {
+    id: 'programme-reports',
+    label: 'Programme reports',
+    icon: ChartColumn,
+    pages: [
+      {
+        path,
+        tab: 'Programme reports',
+        title: 'Programme reports',
+        description,
+        layout: 'table',
+        permission: 'reports:read',
+      },
+    ],
   };
 }
 
@@ -156,6 +179,10 @@ export const workspaces: readonly Workspace[] = [
             ],
             details: [{ path: '/moh/reports/[id]', label: 'Report', layout: 'detail' }],
           },
+          programmeReports(
+            '/moh/programme-reports',
+            'Notification fulfilment, warehouse requests, stock, expiry and HMIS 105 readiness from CLIMS records, with downloads and approved versions.',
+          ),
           // Distribution, procurement and the hotspot map predate the prototype, which has no
           // equivalent for them. They stay until it is decided whether MOH still needs them.
           {
@@ -367,6 +394,10 @@ export const workspaces: readonly Workspace[] = [
             '/dcfp/reports',
             'Send the monthly district stock report to MOH. CLIMS checks the figures before they are sent.',
           ),
+          programmeReports(
+            '/dcfp/programme-reports',
+            "Your district's notification fulfilment, warehouse requests, stock, expiry and HMIS 105 readiness, with downloads and approved versions.",
+          ),
         ],
       },
     ],
@@ -437,6 +468,10 @@ export const workspaces: readonly Workspace[] = [
           monthlyReports(
             '/warehouse/reports',
             'Send the monthly warehouse stock report to MOH. CLIMS checks the figures before they are sent.',
+          ),
+          programmeReports(
+            '/warehouse/programme-reports',
+            'Warehouse requests, store stock and expiry from CLIMS records, with downloads and approved versions.',
           ),
         ],
       },

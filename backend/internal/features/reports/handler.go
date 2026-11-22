@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -33,17 +34,23 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/settings", h.settings)
 	group.Post("/settings", rbac.RequirePermission("reports:configure"), h.saveSettings)
 	group.Get("/hmis-105", h.hmis)
+	group.Get("/export/:report", h.export)
+	group.Get("/versions", h.listVersions)
+	group.Post("/versions", rbac.RequirePermission("reports:approve"), h.createVersion)
+	group.Get("/versions/:id", h.getVersion)
+	group.Post("/versions/:id/corrections", rbac.RequirePermission("reports:approve"), h.correctVersion)
 }
 
 // settings returns the response settings in effect for a store (store_id) or nationally, with the
 // history of that scope.
 func (h *Handler) settings(c fiber.Ctx) error {
+	p := params(c.Queries())
 	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
 	if err != nil {
 		return response.Error(c, 500, "the settings could not be loaded", nil)
 	}
 	var storeID *string
-	if raw := c.Query("store_id"); raw != "" {
+	if raw := p.get("store_id"); raw != "" {
 		id, err := request.ParseUUID(raw)
 		if err != nil {
 			return response.Error(c, 400, "store_id must be a UUID", nil)
@@ -117,22 +124,9 @@ func (h *Handler) saveSettings(c fiber.Ctx) error {
 
 // hmis prepares HMIS 105 condom figures for a month (month=YYYY-MM, default the current month).
 func (h *Handler) hmis(c fiber.Ctx) error {
-	today := h.today()
-	month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, Kampala)
-	if raw := c.Query("month"); raw != "" {
-		parsed, err := time.ParseInLocation("2006-01", raw, Kampala)
-		if err != nil {
-			return response.Error(c, 400, "month must be YYYY-MM", nil)
-		}
-		month = parsed
-	}
-	var district *string
-	if raw := c.Query("district_id"); raw != "" {
-		id, err := request.ParseUUID(raw)
-		if err != nil {
-			return response.Error(c, 400, "district_id must be a UUID", nil)
-		}
-		district = &id
+	month, district, err := h.hmisFilter(params(c.Queries()))
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
 	}
 	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
 	if err != nil {
@@ -146,6 +140,38 @@ func (h *Handler) hmis(c fiber.Ctx) error {
 	return response.Success(c, 200, "", report)
 }
 
+// hmisFilter reads month=YYYY-MM (default the current month) and an optional district_id.
+func (h *Handler) hmisFilter(p params) (time.Time, *string, error) {
+	today := h.today()
+	month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, Kampala)
+	if raw := p.get("month"); raw != "" {
+		parsed, err := time.ParseInLocation("2006-01", raw, Kampala)
+		if err != nil {
+			return time.Time{}, nil, errors.New("month must be YYYY-MM")
+		}
+		month = parsed
+	}
+	var district *string
+	if raw := p.get("district_id"); raw != "" {
+		id, err := request.ParseUUID(raw)
+		if err != nil {
+			return time.Time{}, nil, errors.New("district_id must be a UUID")
+		}
+		district = &id
+	}
+	return month, district, nil
+}
+
+// params are a report's query parameters, from the request or from a saved report version.
+type params map[string]string
+
+func (p params) get(key string, fallback ...string) string {
+	if v := p[key]; v != "" || len(fallback) == 0 {
+		return v
+	}
+	return fallback[0]
+}
+
 // today is the current Kampala calendar day.
 func (h *Handler) today() time.Time {
 	t := h.now().In(Kampala)
@@ -156,7 +182,7 @@ var bands = map[string]bool{"": true, "expired": true, "under_1_month": true, "u
 	"under_6_months": true, "ok": true, "unknown": true}
 
 func (h *Handler) batches(c fiber.Ctx) error {
-	f, s, err := h.supplyFilter(c)
+	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -173,11 +199,11 @@ func (h *Handler) batches(c fiber.Ctx) error {
 }
 
 func (h *Handler) expiryExceptions(c fiber.Ctx) error {
-	f, s, err := h.supplyFilter(c)
+	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
-	if f.Limit, f.Offset, err = page(c); err != nil {
+	if f.Limit, f.Offset, err = page(params(c.Queries())); err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
 	exceptions, err := h.repo.expiryExceptions(c.Context(), s, f)
@@ -189,17 +215,17 @@ func (h *Handler) expiryExceptions(c fiber.Ctx) error {
 }
 
 // supplyFilter reads the period and category as the notification reports do, plus the store filters.
-func (h *Handler) supplyFilter(c fiber.Ctx) (SupplyFilter, scope, error) {
-	base, err := ParseFilter(c.Query("from"), c.Query("to"), c.Query("category"), "7", "80", h.now())
+func (h *Handler) supplyFilter(ctx context.Context, user *users.User, p params) (SupplyFilter, scope, error) {
+	base, err := ParseFilter(p.get("from"), p.get("to"), p.get("category"), "7", "80", h.now())
 	if err != nil {
 		return SupplyFilter{}, scope{}, err
 	}
-	f := SupplyFilter{Filter: base, StoreType: c.Query("store_type")}
+	f := SupplyFilter{Filter: base, StoreType: p.get("store_type")}
 	if f.StoreType != "" && f.StoreType != "national" && f.StoreType != "district" {
 		return SupplyFilter{}, scope{}, errors.New("store_type must be national or district")
 	}
 	for name, dst := range map[string]**string{"district_id": &f.DistrictID, "warehouse_store_id": &f.WarehouseID, "store_id": &f.StoreID} {
-		if raw := c.Query(name); raw != "" {
+		if raw := p.get(name); raw != "" {
 			id, err := request.ParseUUID(raw)
 			if err != nil {
 				return SupplyFilter{}, scope{}, errors.New(name + " must be a UUID")
@@ -207,12 +233,12 @@ func (h *Handler) supplyFilter(c fiber.Ctx) (SupplyFilter, scope, error) {
 			*dst = &id
 		}
 	}
-	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
+	s, err := h.repo.scopeFor(ctx, user)
 	return f, s, err
 }
 
 func (h *Handler) supply(c fiber.Ctx) error {
-	f, s, err := h.supplyFilter(c)
+	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -225,11 +251,11 @@ func (h *Handler) supply(c fiber.Ctx) error {
 }
 
 func (h *Handler) supplyRecords(c fiber.Ctx) error {
-	f, s, err := h.supplyFilter(c)
+	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
-	if f.Limit, f.Offset, err = page(c); err != nil {
+	if f.Limit, f.Offset, err = page(params(c.Queries())); err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
 	records, err := h.repo.requestRecords(c.Context(), s, f)
@@ -241,7 +267,7 @@ func (h *Handler) supplyRecords(c fiber.Ctx) error {
 }
 
 func (h *Handler) stock(c fiber.Ctx) error {
-	f, s, err := h.supplyFilter(c)
+	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -254,9 +280,9 @@ func (h *Handler) stock(c fiber.Ctx) error {
 }
 
 // page reads a list's limit (default 50, at most 100) and offset (default 0).
-func page(c fiber.Ctx) (int32, int32, error) {
-	limit, limitErr := strconv.ParseInt(c.Query("limit", "50"), 10, 32)
-	offset, offsetErr := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
+func page(p params) (int32, int32, error) {
+	limit, limitErr := strconv.ParseInt(p.get("limit", "50"), 10, 32)
+	offset, offsetErr := strconv.ParseInt(p.get("offset", "0"), 10, 32)
 	if limitErr != nil || offsetErr != nil || limit < 1 || limit > 100 || offset < 0 {
 		return 0, 0, errors.New("limit must be between 1 and 100 and offset must be nonnegative")
 	}
@@ -264,7 +290,7 @@ func page(c fiber.Ctx) (int32, int32, error) {
 }
 
 func (h *Handler) notificationSummary(c fiber.Ctx) error {
-	f, s, settings, err := h.filter(c)
+	f, s, settings, err := h.filter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -278,7 +304,7 @@ func (h *Handler) notificationSummary(c fiber.Ctx) error {
 }
 
 func (h *Handler) notificationRecords(c fiber.Ctx) error {
-	f, s, _, err := h.filter(c)
+	f, s, _, err := h.filter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
@@ -288,7 +314,7 @@ func (h *Handler) notificationRecords(c fiber.Ctx) error {
 	default:
 		return response.Error(c, 400, "status must be fulfilled, partly_received, awaiting_acknowledgement or awaiting_supply", nil)
 	}
-	if f.Limit, f.Offset, err = page(c); err != nil {
+	if f.Limit, f.Offset, err = page(params(c.Queries())); err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
 	records, err := h.repo.notificationRecords(c.Context(), s, f)
@@ -303,13 +329,13 @@ func (h *Handler) notificationRecords(c fiber.Ctx) error {
 // scope, and the response settings in effect (RF07): those of the filtered district's store, else the
 // user's store, else national. Without from and to the period is the current review cycle to date;
 // deadline_days and target_percent override the saved targets for ad hoc analysis.
-func (h *Handler) filter(c fiber.Ctx) (Filter, scope, ResponseSettings, error) {
+func (h *Handler) filter(ctx context.Context, user *users.User, p params) (Filter, scope, ResponseSettings, error) {
 	fail := func(err error) (Filter, scope, ResponseSettings, error) {
 		return Filter{}, scope{}, ResponseSettings{}, err
 	}
 	ids := map[string]*string{}
 	for _, name := range []string{"district_id", "hot_spot_id"} {
-		if raw := c.Query(name); raw != "" {
+		if raw := p.get(name); raw != "" {
 			id, err := request.ParseUUID(raw)
 			if err != nil {
 				return fail(errors.New(name + " must be a UUID"))
@@ -317,26 +343,26 @@ func (h *Handler) filter(c fiber.Ctx) (Filter, scope, ResponseSettings, error) {
 			ids[name] = &id
 		}
 	}
-	s, err := h.repo.scopeFor(c.Context(), users.CurrentUser(c))
+	s, err := h.repo.scopeFor(ctx, user)
 	if err != nil {
 		return fail(err)
 	}
 	store := s.storeID
 	if ids["district_id"] != nil {
-		if store, err = h.repo.districtStore(c.Context(), *ids["district_id"]); err != nil {
+		if store, err = h.repo.districtStore(ctx, *ids["district_id"]); err != nil {
 			return fail(err)
 		}
 	}
-	settings, err := h.repo.effectiveSettings(c.Context(), store, h.today())
+	settings, err := h.repo.effectiveSettings(ctx, store, h.today())
 	if err != nil {
 		return fail(err)
 	}
-	from, to := c.Query("from"), c.Query("to")
+	from, to := p.get("from"), p.get("to")
 	if from == "" && to == "" {
 		from = CycleStart(settings.ReviewCycle, h.now()).Format(time.DateOnly)
 	}
-	f, err := ParseFilter(from, to, c.Query("category"), c.Query("deadline_days", strconv.Itoa(settings.DeadlineDays)),
-		c.Query("target_percent", strconv.Itoa(settings.TargetPercent)), h.now())
+	f, err := ParseFilter(from, to, p.get("category"), p.get("deadline_days", strconv.Itoa(settings.DeadlineDays)),
+		p.get("target_percent", strconv.Itoa(settings.TargetPercent)), h.now())
 	if err != nil {
 		return fail(err)
 	}

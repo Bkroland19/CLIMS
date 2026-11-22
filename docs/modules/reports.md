@@ -16,6 +16,11 @@ The reports module serves the programme reports described in the reporting requi
 | GET    | `/api/v1/reports/settings`                   | `reports:read`      |
 | POST   | `/api/v1/reports/settings`                   | `reports:configure` |
 | GET    | `/api/v1/reports/hmis-105`                   | `reports:read`      |
+| GET    | `/api/v1/reports/export/{report}`            | `reports:read`      |
+| GET    | `/api/v1/reports/versions`                   | `reports:read`      |
+| POST   | `/api/v1/reports/versions`                   | `reports:approve`   |
+| GET    | `/api/v1/reports/versions/{id}`              | `reports:read`      |
+| POST   | `/api/v1/reports/versions/{id}/corrections`  | `reports:approve`   |
 
 ## Notification fulfilment
 
@@ -85,6 +90,22 @@ A user sets targets for their assigned store only (RN11); national settings and 
 
 `GET /api/v1/reports/hmis-105?month=YYYY-MM` prepares 105-CT11 Female and 105-CT12 Male condoms in pieces from hotspot managers' acknowledged receipts, dated by the acknowledgement in Kampala time and grouped by the hotspot's district and subcounty (RF14). Lines delivered in the month but not yet acknowledged are shown as a quality issue and not counted. These figures are evidence of supply, not condoms dispensed: the response lists the decisions still pending (the counting event, the dispensing channel and the subcounty reporting units), and `integration_enabled` stays `false`, so nothing is sent to DHIS2. National users see every district, others the district they work in.
 
+## Exports
+
+`GET /api/v1/reports/export/{report}` returns a report's rows exactly as the screen shows them (RF15, RN02): `notifications`, `warehouse-requests`, `stock`, `batches`, `expiry-exceptions` or `hmis-105`, with that report's own query parameters and access rules. Each export carries the period, data update time, scope, product, rule version and the definitions that apply, and the server defines the columns and their headers. `format=csv` downloads a CSV that starts with that information, then the headers and rows, with times in Kampala. Text that a spreadsheet could run as a formula is prefixed with an apostrophe. Without `format`, the JSON table is what the web screens show and turn into Excel. A blank cell means not applicable or not recorded, while 0 is a recorded zero. An export holds at most 50,000 rows; beyond that it asks for narrower filters.
+
+## Approved versions
+
+`POST /api/v1/reports/versions` approves a report as calculated now for its filters, saving the figures and rows unchanged with who approved them and an optional note (RF15, RN04). The saved filters pin the period, and for notifications the deadline and target, so a recalculation covers the same period. Stock and batches are current views, so a recalculation reads current stock.
+
+A correction (`POST /api/v1/reports/versions/{id}/corrections`, with a reason) recalculates from the saved filters and saves a new version that supersedes the old one. The old version keeps its figures, so it can still be reproduced. Only the latest version can be corrected, and a second correction of the same version is refused (409).
+
+National users (`orders:all_stores`) approve national versions and see every version. Others approve for their assigned store and see only its versions, and only a user with the same scope can correct a version. `GET /api/v1/reports/versions/{id}?format=csv` downloads a version's saved rows.
+
+## Screens
+
+The web app's **Programme reports** page (`/moh/programme-reports`, `/dcfp/programme-reports` and `/warehouse/programme-reports`) needs `reports:read`. It shows each report's cards and the export table, with filters kept in the address, a refresh button, CSV and Excel downloads, and approval and correction for holders of `reports:approve`. A failed load is shown as an error, never as zeros.
+
 ## Filters and dates
 
 The notification and warehouse request reports accept `from` and `to` as calendar days in Africa/Kampala (`YYYY-MM-DD`, both included), defaulting to the current review cycle to date for notifications and the current month to date for warehouse requests, and `district_id`, `hot_spot_id`, `category`, `deadline_days` and `target_percent`. Timestamps are stored with their time zone and periods are cut at Kampala midnight (RN09).
@@ -93,7 +114,7 @@ The notification and warehouse request reports accept `from` and `to` as calenda
 
 Access is checked on the server for every request (RN01). `orders:all_stores` sees every notification, request and store, for national users. Warehouse request and stock reports show other users their assigned store only. For notifications, others see the notifications of their assigned district store, of their assigned hotspot, the ones they sent, and with `orders:stockout_district` the district they work in. Filters only narrow what the user can already see, so another district's data is never returned, including by asking for its hotspot.
 
-Migration 24 grants `reports:read`, and migration 27 `reports:configure`, to `admin` only. Grant it to MoH, district and community reporting roles through `PUT /api/v1/roles/{id}/permissions`, with `orders:all_stores` for national users.
+Migration 24 grants `reports:read`, migration 27 `reports:configure` and migration 28 `reports:approve` to `admin` only. Grant it to MoH, district and community reporting roles through `PUT /api/v1/roles/{id}/permissions`, with `orders:all_stores` for national users.
 
 ## Not covered yet
 
@@ -102,4 +123,3 @@ These parts of the requirements need decisions or data that do not exist yet:
 - **Expiry targets and quarantine (RF16):** the six and three month dispatch targets, the calendar-month boundary rules and who may authorise exceptions await programme approval; quarantined stock is not recorded.
 - **Coverage settings (RF11):** the three-month window is the draft's proposal and awaits the supply-chain team's approval.
 - **HMIS 105 submission (RF14):** figures are prepared, but the counting event, dispensing channel and reporting units await programme approval, so DHIS2 integration stays disabled.
-- **Report versions and exports (RF15, RN04):** totals are live, not saved as approved versions.

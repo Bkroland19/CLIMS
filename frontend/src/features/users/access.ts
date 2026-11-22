@@ -100,6 +100,10 @@ const PERMISSION_LABELS: Readonly<Record<string, string>> = {
   'hotspots:submit': 'Submit newly identified hotspots for activation',
   'hotspots:activate': 'Verify and activate hotspots in their district',
   'hotspots:all_districts': 'Use their hotspot permissions in every district',
+  'orders:supply_hotspots': 'Deliver stock to hotspots in their district',
+  'reports:read': 'View programme reports and download them',
+  'reports:configure': "Set their store's review cycle, receipt deadline and on-time target",
+  'reports:approve': 'Approve report versions and record corrections',
 };
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
@@ -109,6 +113,7 @@ const GROUP_LABELS: Readonly<Record<string, string>> = {
   orders: 'Orders',
   inventory: 'Inventory',
   hotspots: 'Hotspots',
+  reports: 'Reports',
 };
 
 export function permissionLabel(code: string): string {
