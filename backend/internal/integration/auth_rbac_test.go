@@ -157,13 +157,13 @@ func TestAuthRBACIntegration(t *testing.T) {
 	notifier := notifications.NewService()
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
-	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier), jwtMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier), jwtMiddleware, activeUser)
-	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier, auditor), jwtMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier, auditor), jwtMiddleware, activeUser)
+	inventory.RegisterRoutes(v1, inventory.NewRepository(pool, auditor), jwtMiddleware, activeUser)
 	reports.RegisterRoutes(v1, reports.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
-	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool, auditor), jwtMiddleware, activeUser)
 	audit.RegisterRoutes(v1, audit.NewRepository(pool), auditor, jwtMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
@@ -391,6 +391,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
 	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
 	testStoreAssignment(t, pool, request, adminToken, userToken)
+	testFeatureAudit(t, pool)
 
 	// Two simultaneous updates must leave at least one administrator active.
 	results := make(chan error, 2)

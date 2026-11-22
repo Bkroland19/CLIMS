@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/users"
 
@@ -71,11 +72,12 @@ func (s scope) districtMode() int {
 type Repository struct {
 	db       *pgxpool.Pool
 	notifier notifications.Notifier
+	audit    audit.Auditor
 }
 
 // NewRepository needs a notifier with NotificationTypes registered.
-func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier) *Repository {
-	return &Repository{db: db, notifier: notifier}
+func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier, auditor audit.Auditor) *Repository {
+	return &Repository{db: db, notifier: notifier, audit: auditor}
 }
 
 // The district a DCFP is responsible for, from their assigned store ($1 is the user).
@@ -189,7 +191,7 @@ func (r *Repository) submit(ctx context.Context, actorID string, input SubmitReq
 				return err
 			}
 		}
-		return r.record(ctx, tx, id, actorID, EventSubmitted, true, nil, nil)
+		return r.record(ctx, tx, id, actorID, EventSubmitted, nil, true, nil, nil)
 	})
 	return id, err
 }
@@ -207,6 +209,10 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 		}
 		if status != StatusInactive {
 			return ErrNotEditable
+		}
+		before, err := snapshot(ctx, tx, id)
+		if err != nil {
+			return err
 		}
 		if review == ReviewDeactivated && (district == nil || *district != d.DistrictID) {
 			return ErrDistrictLocked
@@ -235,7 +241,7 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 			id, d.ContactPersonName, d.ContactPersonPhone); err != nil {
 			return err
 		}
-		return r.record(ctx, tx, id, actorID, event, true, nil, nil)
+		return r.record(ctx, tx, id, actorID, event, before, true, nil, nil)
 	})
 }
 
@@ -251,6 +257,10 @@ func (r *Repository) comment(ctx context.Context, access scope, id, text string)
 			` AND h.id = $5 FOR UPDATE OF h`, visibleArgs(access, id)...).Scan(&submittedBy); err != nil {
 			return err
 		}
+		before, err := snapshot(ctx, tx, id)
+		if err != nil {
+			return err
+		}
 		if err := addComment(ctx, tx, id, access.userID, ActionComment, text); err != nil {
 			return err
 		}
@@ -263,7 +273,7 @@ func (r *Repository) comment(ctx context.Context, access scope, id, text string)
 		if !fromSubmitter {
 			notifyUser = submittedBy
 		}
-		return r.record(ctx, tx, id, access.userID, EventCommented, fromSubmitter, notifyUser, &text)
+		return r.record(ctx, tx, id, access.userID, EventCommented, before, fromSubmitter, notifyUser, &text)
 	})
 }
 
@@ -282,6 +292,10 @@ func (r *Repository) decide(ctx context.Context, access scope, id, action, text 
 		if !slices.Contains(step.from, review) {
 			return ErrInvalidTransition
 		}
+		before, err := snapshot(ctx, tx, id)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE hot_spots SET status = $2, review_status = $3,
 			updated_at = CURRENT_TIMESTAMP WHERE id = $1`, id, statusFor(step.review), step.review); err != nil {
 			return err
@@ -289,7 +303,7 @@ func (r *Repository) decide(ctx context.Context, access scope, id, action, text 
 		if err := addComment(ctx, tx, id, access.userID, step.commentAction, text); err != nil {
 			return err
 		}
-		return r.record(ctx, tx, id, access.userID, step.event, false, submittedBy, &text)
+		return r.record(ctx, tx, id, access.userID, step.event, before, false, submittedBy, &text)
 	})
 }
 

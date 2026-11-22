@@ -109,14 +109,14 @@ func main() {
 	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret, auditor), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
 	rbac.RegisterRoutes(v1, rbac.NewHandler(roleRepo), jwtAuthMiddleware, activeUser)
-	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
-	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
-	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier, auditor), jwtAuthMiddleware, activeUser)
+	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool, notifier, auditor), jwtAuthMiddleware, activeUser)
+	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool, auditor), jwtAuthMiddleware, activeUser)
 	reports.RegisterRoutes(v1, reports.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser, rbac.RequirePermission("audit:read"))
-	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool, auditor), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {
