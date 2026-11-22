@@ -3830,7 +3830,7 @@
         "tags": ["Reports"],
         "operationId": "getNotificationReport",
         "summary": "Hotspot notification fulfilment",
-        "description": "Notifications raised in the period, their fulfilment (manager acknowledgement of every selected type), fulfilment rate, product components, response time, deadline progress, the earlier backlog, overdue acknowledgements and a comparison by district, all calculated from source records on request. Requires reports:read. orders:all_stores sees every notification; others see their district store's, their hotspot's, the ones they sent and, with orders:stockout_district, the district they work in. Filters only narrow that.",
+        "description": "Notifications raised in the period, their fulfilment (manager acknowledgement of every selected type), fulfilment rate, product components, response time, deadline progress, the earlier backlog, overdue acknowledgements and a comparison by district, all calculated from source records on request. Requires reports:read. orders:all_stores sees every notification; others see their district store's, their hotspot's, the ones they sent and, with orders:stockout_district, the district they work in. Filters only narrow that. Without from and to, the period is the current review cycle to date. deadline_days and target_percent default to the saved settings in effect for the filtered district's store, else the user's store, else national, and the response shows them in settings; passing them overrides for ad hoc analysis.",
         "parameters": [
           {
             "name": "from",
@@ -3880,23 +3880,21 @@
           {
             "name": "deadline_days",
             "in": "query",
-            "description": "Days within which acknowledgement counts as on time.",
+            "description": "Days within which acknowledgement counts as on time. Defaults to the saved settings.",
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 365,
-              "default": 7
+              "maximum": 365
             }
           },
           {
             "name": "target_percent",
             "in": "query",
-            "description": "On-time target.",
+            "description": "On-time target. Defaults to the saved settings.",
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
-              "default": 80
+              "maximum": 100
             }
           }
         ],
@@ -4469,6 +4467,144 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExpiryExceptionListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/settings": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getResponseSettings",
+        "summary": "Response settings in effect and their history",
+        "description": "Requires reports:read. The review cycle, receipt deadline and on-time target in effect today for a store (store_id) or nationally, and every saved row for that scope. Other users may read their own store or the national settings.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "One store; omitted for national settings."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Reports"],
+        "operationId": "saveResponseSettings",
+        "summary": "Save response settings from a date",
+        "description": "Requires reports:configure. Adds a setting that applies from effective_from (today or later), recording who set it and why; earlier rows are kept, so earlier reports stay reproducible. A user sets their assigned store's targets only; national targets and other stores need orders:all_stores.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/hmis-105": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getHMIS105Readiness",
+        "summary": "HMIS 105 condom figures, prepared but not submitted",
+        "description": "Requires reports:read. 105-CT11 Female and 105-CT12 Male condoms in pieces for a month, from hotspot managers' acknowledged receipts dated by acknowledgement, by district and subcounty. This is operational evidence of supply, not condoms dispensed: the counting event, dispensing channel and subcounty reporting units await programme approval, and DHIS2 integration stays disabled. orders:all_stores sees every district; others see the district they work in.",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "description": "YYYY-MM; defaults to the current month.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HMISReadinessResponse"
                 }
               }
             }
@@ -7664,6 +7800,9 @@
                 }
               }
             }
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ResponseSettings"
           }
         }
       },
@@ -8394,6 +8533,242 @@
             "items": {
               "$ref": "#/components/schemas/ExpiryException"
             }
+          }
+        }
+      },
+      "ResponseSettings": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null for national settings."
+          },
+          "review_cycle": {
+            "type": "string",
+            "enum": ["weekly", "monthly", "bimonthly", "quarterly"]
+          },
+          "deadline_days": {
+            "type": "integer"
+          },
+          "target_percent": {
+            "type": "integer"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "set_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "set_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": ["store", "national", "default"],
+            "description": "The store's own setting, the national one, or the draft default (monthly, 7 days, 80%)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ResponseSettingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["review_cycle", "deadline_days", "target_percent", "reason"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The store the setting covers; null or omitted for national settings, which need orders:all_stores."
+          },
+          "review_cycle": {
+            "type": "string",
+            "enum": ["weekly", "monthly", "bimonthly", "quarterly"]
+          },
+          "deadline_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "target_percent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date",
+            "description": "Defaults to today; cannot be in the past."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "ResponseSettingsView": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "effective": {
+                "$ref": "#/components/schemas/ResponseSettings"
+              },
+              "history": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ResponseSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ResponseSettingsResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ResponseSettings"
+          }
+        }
+      },
+      "HMISRow": {
+        "type": "object",
+        "properties": {
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subcounty": {
+            "type": "string",
+            "nullable": true
+          },
+          "ct11_female_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ct12_male_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "acknowledgements": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Delivery lines acknowledged with pieces in the month."
+          },
+          "hotspots": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unacknowledged_lines": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Quality issue: lines delivered in the month and not yet acknowledged; not counted."
+          }
+        }
+      },
+      "HMISReadiness": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2026-11"
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "date_basis": {
+            "type": "string"
+          },
+          "measure": {
+            "type": "string"
+          },
+          "data_elements": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "pending_decisions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "integration_enabled": {
+            "type": "boolean",
+            "description": "False: nothing is sent to DHIS2 until the programme authorises it."
+          },
+          "total": {
+            "$ref": "#/components/schemas/HMISRow"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HMISRow"
+            }
+          }
+        }
+      },
+      "HMISReadinessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HMISReadiness"
           }
         }
       }

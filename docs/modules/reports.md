@@ -4,15 +4,18 @@
 
 The reports module serves the programme reports described in the reporting requirements (draft v0.2). Every figure is calculated on request from source records, using the same notification facts as the orders screens, so a total and the records behind it always agree (RN02).
 
-| Method | Route                                        | Permission     |
-| ------ | -------------------------------------------- | -------------- |
-| GET    | `/api/v1/reports/notifications`              | `reports:read` |
-| GET    | `/api/v1/reports/notifications/records`      | `reports:read` |
-| GET    | `/api/v1/reports/warehouse-requests`         | `reports:read` |
-| GET    | `/api/v1/reports/warehouse-requests/records` | `reports:read` |
-| GET    | `/api/v1/reports/stock`                      | `reports:read` |
-| GET    | `/api/v1/reports/batches`                    | `reports:read` |
-| GET    | `/api/v1/reports/expiry-exceptions`          | `reports:read` |
+| Method | Route                                        | Permission          |
+| ------ | -------------------------------------------- | ------------------- |
+| GET    | `/api/v1/reports/notifications`              | `reports:read`      |
+| GET    | `/api/v1/reports/notifications/records`      | `reports:read`      |
+| GET    | `/api/v1/reports/warehouse-requests`         | `reports:read`      |
+| GET    | `/api/v1/reports/warehouse-requests/records` | `reports:read`      |
+| GET    | `/api/v1/reports/stock`                      | `reports:read`      |
+| GET    | `/api/v1/reports/batches`                    | `reports:read`      |
+| GET    | `/api/v1/reports/expiry-exceptions`          | `reports:read`      |
+| GET    | `/api/v1/reports/settings`                   | `reports:read`      |
+| POST   | `/api/v1/reports/settings`                   | `reports:configure` |
+| GET    | `/api/v1/reports/hmis-105`                   | `reports:read`      |
 
 ## Notification fulfilment
 
@@ -32,7 +35,7 @@ A hotspot stockout notification names Male, Female or Both and no quantity. The 
 - **Fulfilment rate**: fulfilled divided by raised, as a percentage to one decimal. With no notifications it is `null` (Not applicable).
 - **Component**: with `category=male` or `female`, the report covers notifications that include that type, and `component` gives that type's part. A Both notification counts under each type, so the two components exceed the unique total.
 - **Response**: the median hours from notification to the last acknowledgement needed, among fulfilled notifications, with the pending count and the oldest pending age. The clock starts when the notification was first raised; a repeat does not restart it.
-- **Deadline**: notifications fulfilled within `deadline_days` (default 7) divided by those raised, against `target_percent` (default 80), and open notifications already past the deadline. For a period still in progress this is progress to date.
+- **Deadline**: notifications fulfilled within the deadline divided by those raised, against the on-time target (see [response settings](#response-settings)), and open notifications already past the deadline. For a period still in progress this is progress to date.
 - **Backlog**: open notifications raised before the period, kept apart from it.
 - **Acknowledgement overdue**: a quality issue, counting notifications with a delivery left unacknowledged for longer than the deadline.
 - **Districts**: raised, fulfilled and rate per district, for comparison.
@@ -70,22 +73,33 @@ Stock is held in batches, each with an optional batch number and expiry date; se
 
 The draft's six-month warehouse and three-month district dispatch targets are not enforced: each shipped batch's `days_remaining` on the dispatch date is recorded, so they can be reported once approved.
 
+## Response settings
+
+The review cycle (`weekly`, `monthly`, `bimonthly` or `quarterly`), the receipt deadline in days and the on-time target percentage are saved settings (RF07). `POST /api/v1/reports/settings` adds a row for one store, or nationally without `store_id`, applying from `effective_from` (today or later) and recording who set it and why. Rows are never changed, so an earlier report can be reproduced with the settings it used.
+
+The settings in effect are the store's own latest row, else the national one, else the draft defaults (monthly, 7 days, 80%), and `source` says which. The notification report uses the settings of the filtered district's store, else the user's store, and returns them in `settings`; without `from` and `to` its period is the current review cycle to date. `deadline_days` and `target_percent` parameters still override them for ad hoc analysis. `GET /api/v1/reports/settings` shows the settings in effect for a store or nationally, with their history.
+
+A user sets targets for their assigned store only (RN11); national settings and other stores need `orders:all_stores`.
+
+## HMIS 105 readiness
+
+`GET /api/v1/reports/hmis-105?month=YYYY-MM` prepares 105-CT11 Female and 105-CT12 Male condoms in pieces from hotspot managers' acknowledged receipts, dated by the acknowledgement in Kampala time and grouped by the hotspot's district and subcounty (RF14). Lines delivered in the month but not yet acknowledged are shown as a quality issue and not counted. These figures are evidence of supply, not condoms dispensed: the response lists the decisions still pending (the counting event, the dispensing channel and the subcounty reporting units), and `integration_enabled` stays `false`, so nothing is sent to DHIS2. National users see every district, others the district they work in.
+
 ## Filters and dates
 
-The notification and warehouse request reports accept `from` and `to` as calendar days in Africa/Kampala (`YYYY-MM-DD`, both included), defaulting to the current month to date, and `district_id`, `hot_spot_id`, `category`, `deadline_days` and `target_percent`. Timestamps are stored with their time zone and periods are cut at Kampala midnight (RN09).
+The notification and warehouse request reports accept `from` and `to` as calendar days in Africa/Kampala (`YYYY-MM-DD`, both included), defaulting to the current review cycle to date for notifications and the current month to date for warehouse requests, and `district_id`, `hot_spot_id`, `category`, `deadline_days` and `target_percent`. Timestamps are stored with their time zone and periods are cut at Kampala midnight (RN09).
 
 ## Access
 
 Access is checked on the server for every request (RN01). `orders:all_stores` sees every notification, request and store, for national users. Warehouse request and stock reports show other users their assigned store only. For notifications, others see the notifications of their assigned district store, of their assigned hotspot, the ones they sent, and with `orders:stockout_district` the district they work in. Filters only narrow what the user can already see, so another district's data is never returned, including by asking for its hotspot.
 
-Migration 24 grants `reports:read` to `admin` only. Grant it to MoH, district and community reporting roles through `PUT /api/v1/roles/{id}/permissions`, with `orders:all_stores` for national users.
+Migration 24 grants `reports:read`, and migration 27 `reports:configure`, to `admin` only. Grant it to MoH, district and community reporting roles through `PUT /api/v1/roles/{id}/permissions`, with `orders:all_stores` for national users.
 
 ## Not covered yet
 
 These parts of the requirements need decisions or data that do not exist yet:
 
-- **Saved response settings (RF07, RN11):** `deadline_days` and `target_percent` are request parameters. Saving them per organisation, with who set them and from when, waits for approval of the defaults.
 - **Expiry targets and quarantine (RF16):** the six and three month dispatch targets, the calendar-month boundary rules and who may authorise exceptions await programme approval; quarantined stock is not recorded.
 - **Coverage settings (RF11):** the three-month window is the draft's proposal and awaits the supply-chain team's approval.
-- **HMIS 105 (RF14):** awaits programme approval; DHIS2 integration stays disabled.
+- **HMIS 105 submission (RF14):** figures are prepared, but the counting event, dispensing channel and reporting units await programme approval, so DHIS2 integration stays disabled.
 - **Report versions and exports (RF15, RN04):** totals are live, not saved as approved versions.
