@@ -92,8 +92,9 @@ func testInventoryReports(t *testing.T, pool *pgxpool.Pool,
 	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": stock[district]["condom_id"],
 		"unit_of_measure_id": stock[district]["unit_of_measure_id"], "reason": "receipt", "quantity": 5}, districtToken, 403)
 
-	// A stockout report moves no stock and opens no request, so the reports are unchanged by one.
-	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": stock[district]["condom_id"]}, admin, 201)
+	// A stockout report moves no stock and opens no request, so the reports are unchanged by one. The
+	// hotspot's notification is still open, so this send counts as a repeat of it (200), not a new one.
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": stock[district]["condom_id"]}, admin, 200)
 	if after := list("/inventory/summary", admin); len(after) != 1 || after[0]["open_hotspot_requests"] != float64(0) {
 		t.Fatalf("a stockout report changed the summary: %v", after)
 	}

@@ -259,4 +259,5 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	balance(district, 55)
 	balance(warehouse, 50)
 	testInventoryReports(t, pool, request, admin, districtToken, warehouse, district, hotSpot)
+	testNotificationFulfilment(t, pool, request, admin, hotspotToken, districtToken, otherToken, district, hotSpot, unit, reportID)
 }
