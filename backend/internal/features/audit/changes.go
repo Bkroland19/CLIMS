@@ -40,12 +40,20 @@ func secret(field string) bool {
 	return false
 }
 
+// bookkeeping fields change with every write and say nothing about what was done;
+// the entry's own time already records when.
+var bookkeeping = map[string]bool{"created_at": true, "updated_at": true}
+
 // Diff returns the fields that differ between before and after, by their JSON
-// names, leaving out secrets. Pass nil before for a creation and nil after for a
+// names, leaving out secrets and row timestamps. Pass nil before for a creation and nil after for a
 // deletion. Values that cannot be encoded as JSON objects produce no changes.
 func Diff(before, after any) map[string]Change {
 	old, current := fields(before), fields(after)
 	changes := map[string]Change{}
+	for name := range bookkeeping {
+		delete(old, name)
+		delete(current, name)
+	}
 	for name, value := range current {
 		if !secret(name) && !reflect.DeepEqual(old[name], value) {
 			changes[name] = Change{Before: old[name], After: value}

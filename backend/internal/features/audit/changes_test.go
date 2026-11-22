@@ -44,6 +44,10 @@ func TestDiffOfCreationAndDeletion(t *testing.T) {
 	if len(Diff(account{Name: "Jane"}, account{Name: "Jane"})) != 0 {
 		t.Fatal("identical values produced changes")
 	}
+	touched := Diff(map[string]any{"name": "Jane", "updated_at": "monday"}, map[string]any{"name": "Jane", "updated_at": "tuesday"})
+	if len(touched) != 0 {
+		t.Fatalf("a timestamp alone produced changes: %v", touched)
+	}
 }
 
 func TestSecretWords(t *testing.T) {
