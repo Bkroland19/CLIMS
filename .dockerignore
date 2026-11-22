@@ -10,3 +10,4 @@ infra/env/*.env
 artifacts
 website/build
 website/.docusaurus
+website/generated

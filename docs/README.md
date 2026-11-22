@@ -35,5 +35,5 @@ The API contract is maintained in [`api/openapi.json`](api/openapi.json). It doc
 These files are also published as a Docusaurus site from [`website/`](../website/docusaurus.config.ts). Run `make docs-serve` to preview it with live reload, or `make docs-build` to build it; the build fails on broken links and anchors.
 
 - Write plain Markdown (`.md`). It is parsed as CommonMark, so `<`, `>` and `{` need no escaping. Only `.mdx` files are parsed as MDX.
-- Keep links relative to the file, as on GitHub. Links to files outside `docs/` are rewritten to GitHub when the site is built, and links to `api/openapi.json` go to the copy the site publishes.
+- Keep links relative to the file, as on GitHub. Links to files outside `docs/` are rewritten to GitHub when the site is built, and links to `api/openapi.json` go to the site's API reference, which serves this folder's Swagger UI at `/handbook/api-reference/`.
 - New files in `modules/`, `adr/` and `releases/` appear in the sidebar automatically. Add a new top-level guide to [`website/sidebars.ts`](../website/sidebars.ts), or it is published without a sidebar entry.

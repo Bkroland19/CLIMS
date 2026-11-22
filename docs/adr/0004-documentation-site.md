@@ -30,15 +30,25 @@ and contributors do not need to learn MDX. A page that needs components can be w
 ### 2. Links are rewritten at build time, not in the docs
 
 A remark plugin in `website/` rewrites links that leave `docs/` to the file on GitHub, and links to
-`api/openapi.json` to a copy the site publishes. The docs keep their relative links, so they still
+`api/openapi.json` to the site's API reference (decision 3). The docs keep their relative links, so they still
 work on GitHub and `check_docs.py` still checks them. The site build fails on broken links and
 anchors, and CI runs that build on every pull request.
 
-The OpenAPI link goes to the site's own copy because Docusaurus prefixes its base path to every
-same-host link. The navbar links to the API's Swagger UI at `/docs/` with raw HTML for the same
-reason.
+### 3. The API reference is the repository's Swagger UI
 
-### 3. Served from the production server under /handbook/
+The site serves `docs/api/` (the Swagger UI page, its vendored and checksummed bundle, and
+`openapi.json`) at `/handbook/api-reference/`, and the navbar's "API reference" opens it. It is the
+same Swagger UI the API serves at `/docs/`, built from the same files, so the two cannot drift. It
+works in `make docs-serve` as well as in production, where a link to the API's `/docs/` would not:
+Docusaurus prefixes its base path to same-host links, and the dev server does not serve the API.
+
+"Try it out" sends requests to the same origin, as the OpenAPI document's `servers` entry says. In
+production that is the API behind the same Nginx; the local dev server has no API to answer.
+
+Generating one page per endpoint with an OpenAPI plugin was left for later: it adds a dependency
+and generated files to keep in step with the API.
+
+### 4. Served from the production server under /handbook/
 
 The site is a `docs` image, a static Nginx serving the built files, published by the release
 workflow next to the backend, frontend and mobile images and pinned by digest in `images.env`. The
@@ -57,13 +67,13 @@ Alternatives considered:
 The site's public address comes from the origin of `EXPO_PUBLIC_API_URL`, which the release
 workflow already requires, because both are served by the same Nginx.
 
-### 4. Updated with releases
+### 5. Updated with releases
 
 The public site changes only when a stable release deploys, like the rest of production. Rolling
 back a release rolls back its docs. Contributors preview changes with `make docs-serve`; development
 Compose has no docs container.
 
-### 5. Kept small
+### 6. Kept small
 
 - Search is the local search plugin: no external account, and it works on any host.
 - No versioned docs: the site shows the release it was built from, labelled in the navbar.

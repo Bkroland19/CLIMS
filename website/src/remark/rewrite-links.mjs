@@ -1,6 +1,6 @@
 // Docs keep repository-relative links so they work on GitHub. The site only publishes docs/,
 // so links that leave it (or point at non-Markdown files) are rewritten at build time:
-// the OpenAPI document goes to the copy the site publishes, everything else to the file on GitHub.
+// the OpenAPI document goes to the site's Swagger UI copy, everything else to the file on GitHub.
 import fs from "node:fs";
 import path from "node:path";
 

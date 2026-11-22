@@ -21,3 +21,4 @@ node_modules/
 .idea/
 website/build/
 website/.docusaurus/
+website/generated/

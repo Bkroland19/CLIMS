@@ -9,6 +9,18 @@ const repoRoot = path.resolve(__dirname, "..");
 const docsDir = path.join(repoRoot, "docs");
 const version = fs.readFileSync(path.join(repoRoot, "VERSION"), "utf8").trim();
 const repository = "https://github.com/mohuganda/CLIMS";
+const baseUrl = "/handbook/";
+
+// The site serves the repository's own Swagger UI (docs/api: page, vendored bundle and
+// openapi.json) at /handbook/api-reference/. It is copied whenever the config loads, so both
+// docs-serve and docs-build use it; restart docs-serve to pick up OpenAPI changes.
+const generatedDir = path.join(__dirname, "generated");
+const swaggerDir = path.join(generatedDir, "api-reference");
+fs.rmSync(generatedDir, { recursive: true, force: true });
+fs.mkdirSync(swaggerDir, { recursive: true });
+for (const name of ["index.html", "swagger-initializer.js", "openapi.json", "assets"]) {
+  fs.cpSync(path.join(docsDir, "api", name), path.join(swaggerDir, name), { recursive: true });
+}
 
 const config: Config = {
   title: "CLIMS Documentation",
@@ -16,7 +28,7 @@ const config: Config = {
   favicon: "img/favicon.ico",
   // Served by the production Nginx under /handbook/; the host is the deployment's own.
   url: process.env.DOCS_SITE_URL || "https://clims.example.invalid",
-  baseUrl: "/handbook/",
+  baseUrl,
   trailingSlash: true,
   onBrokenLinks: "throw",
   onBrokenAnchors: "throw",
@@ -26,6 +38,7 @@ const config: Config = {
     hooks: { onBrokenMarkdownLinks: "throw" },
   },
   i18n: { defaultLocale: "en", locales: ["en"] },
+  staticDirectories: ["static", "generated"],
 
   presets: [
     [
@@ -43,8 +56,8 @@ const config: Config = {
                 repoRoot,
                 docsDir,
                 githubBlob: `${repository}/blob/main`,
-                // pathname:// skips route checks; the file is copied in by the plugin below.
-                openApiUrl: "pathname:///openapi.json",
+                // pathname:// marks a static file rather than a page; see generatedDir above.
+                openApiUrl: "pathname:///api-reference/openapi.json",
               },
             ],
           ],
@@ -54,20 +67,6 @@ const config: Config = {
         theme: { customCss: "./src/css/custom.css" },
       } satisfies Preset.Options,
     ],
-  ],
-
-  plugins: [
-    // Publish docs/api/openapi.json as /handbook/openapi.json. Docusaurus prefixes its baseUrl to
-    // every same-host link, so docs cannot point at the API's own /docs/openapi.json.
-    () => ({
-      name: "clims-openapi-document",
-      async postBuild({ outDir }) {
-        fs.copyFileSync(
-          path.join(docsDir, "api", "openapi.json"),
-          path.join(outDir, "openapi.json"),
-        );
-      },
-    }),
   ],
 
   themes: [
@@ -88,11 +87,11 @@ const config: Config = {
       title: "CLIMS Documentation",
       items: [
         { type: "docSidebar", sidebarId: "docs", position: "left", label: "Docs" },
-        // Raw HTML so Docusaurus does not prefix /handbook/ to the API's own Swagger UI at /docs/.
+        // A plain link: Swagger UI is a static page, not a Docusaurus route.
         {
           type: "html",
           position: "left",
-          value: '<a class="navbar__item navbar__link" href="/docs/">API reference</a>',
+          value: `<a class="navbar__item navbar__link" href="${baseUrl}api-reference/">API reference</a>`,
         },
         {
           href: `${repository}/blob/main/docs/releases/${version}.md`,
