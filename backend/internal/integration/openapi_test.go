@@ -111,6 +111,7 @@ func TestSwaggerAssets(t *testing.T) {
 	for path, contentType := range map[string]string{
 		"/docs/":                            "text/html",
 		"/docs/openapi.json":                "application/json",
+		"/docs/swagger-config.js":           "application/javascript",
 		"/docs/swagger-initializer.js":      "application/javascript",
 		"/docs/assets/swagger-ui-bundle.js": "application/javascript",
 		"/docs/assets/swagger-ui.css":       "text/css",

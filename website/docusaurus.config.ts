@@ -11,14 +11,14 @@ const version = fs.readFileSync(path.join(repoRoot, "VERSION"), "utf8").trim();
 const repository = "https://github.com/mohuganda/CLIMS";
 const baseUrl = "/handbook/";
 
-// The site serves the repository's own Swagger UI (docs/api: page, vendored bundle and
-// openapi.json) at /handbook/api-reference/. It is copied whenever the config loads, so both
-// docs-serve and docs-build use it; restart docs-serve to pick up OpenAPI changes.
+// The API reference page renders the repository's own Swagger UI (docs/api: vendored bundle,
+// shared settings and openapi.json), published at /handbook/swagger/. It is copied whenever the
+// config loads, so docs-serve and docs-build both have it; restart docs-serve after changing it.
 const generatedDir = path.join(__dirname, "generated");
-const swaggerDir = path.join(generatedDir, "api-reference");
+const swaggerDir = path.join(generatedDir, "swagger");
 fs.rmSync(generatedDir, { recursive: true, force: true });
 fs.mkdirSync(swaggerDir, { recursive: true });
-for (const name of ["index.html", "swagger-initializer.js", "openapi.json", "assets"]) {
+for (const name of ["assets", "swagger-config.js", "openapi.json"]) {
   fs.cpSync(path.join(docsDir, "api", name), path.join(swaggerDir, name), { recursive: true });
 }
 
@@ -57,7 +57,7 @@ const config: Config = {
                 docsDir,
                 githubBlob: `${repository}/blob/main`,
                 // pathname:// marks a static file rather than a page; see generatedDir above.
-                openApiUrl: "pathname:///api-reference/openapi.json",
+                openApiUrl: "pathname:///swagger/openapi.json",
               },
             ],
           ],
@@ -87,12 +87,7 @@ const config: Config = {
       title: "CLIMS Documentation",
       items: [
         { type: "docSidebar", sidebarId: "docs", position: "left", label: "Docs" },
-        // A plain link: Swagger UI is a static page, not a Docusaurus route.
-        {
-          type: "html",
-          position: "left",
-          value: `<a class="navbar__item navbar__link" href="${baseUrl}api-reference/">API reference</a>`,
-        },
+        { type: "doc", docId: "api/reference", position: "left", label: "API reference" },
         {
           href: `${repository}/blob/main/docs/releases/${version}.md`,
           label: `v${version}`,

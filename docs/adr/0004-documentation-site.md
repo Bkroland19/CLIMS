@@ -36,11 +36,17 @@ anchors, and CI runs that build on every pull request.
 
 ### 3. The API reference is the repository's Swagger UI
 
-The site serves `docs/api/` (the Swagger UI page, its vendored and checksummed bundle, and
-`openapi.json`) at `/handbook/api-reference/`, and the navbar's "API reference" opens it. It is the
-same Swagger UI the API serves at `/docs/`, built from the same files, so the two cannot drift. It
-works in `make docs-serve` as well as in production, where a link to the API's `/docs/` would not:
-Docusaurus prefixes its base path to same-host links, and the dev server does not serve the API.
+The "API reference" page (`docs/api/reference.mdx`) shows Swagger UI inside the site, with the
+site's header, search and docs sidebar. It loads the vendored, checksummed bundle and `openapi.json`
+from `docs/api/`, which the site publishes under `/handbook/swagger/`. Its settings live in
+`docs/api/swagger-config.js`, loaded by both this page and the API's own page at `/docs/`, so the
+two cannot drift. It works in `make docs-serve` as well as in production, where a link to the API's
+`/docs/` would not: Docusaurus prefixes its base path to same-host links, and the dev server does
+not serve the API.
+
+It is the one `.mdx` file in `docs/`, because only a doc page gets the docs sidebar. On GitHub it
+shows as source rather than Swagger. Swagger keeps its own look inside the page, on a light panel in
+both themes.
 
 "Try it out" sends requests to the same origin, as the OpenAPI document's `servers` entry says. In
 production that is the API behind the same Nginx; the local dev server has no API to answer.
