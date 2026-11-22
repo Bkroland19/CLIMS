@@ -4,7 +4,7 @@
 
 See the [2.2.0 release notes](releases/2.2.0.md) for the latest release, the [2.1.0 release notes](releases/2.1.0.md) for orders and hotspot activation, and the [2.0.0 release notes](releases/2.0.0.md) for the platform revamp.
 
-`.github/workflows/images.yml` builds the three application production Dockerfiles on pull requests without publishing. Pushing a version tag runs the complete [CI workflow](ci.md), publishes images to GitHub Container Registry (GHCR), and creates a GitHub Release after all three application images succeed. Normal pushes to `main` run CI; they do not publish images.
+`.github/workflows/images.yml` builds the four application production Dockerfiles on pull requests without publishing. Pushing a version tag runs the complete [CI workflow](ci.md), publishes images to GitHub Container Registry (GHCR), and creates a GitHub Release after all four application images succeed. Normal pushes to `main` run CI; they do not publish images.
 
 ## Images and tags
 
@@ -15,8 +15,9 @@ Images use the repository's lowercase owner and name:
 | backend  | `ghcr.io/mohuganda/clims/backend:v2.0.0`  |
 | frontend | `ghcr.io/mohuganda/clims/frontend:v2.0.0` |
 | mobile   | `ghcr.io/mohuganda/clims/mobile:v2.0.0`   |
+| docs     | `ghcr.io/mohuganda/clims/docs:v2.0.0`     |
 
-All three application images target `linux/amd64`, use production Dockerfiles, and include OCI source/version/commit labels, build provenance, and an SBOM. Builds cache each service independently. The backend receives version, commit, and timestamp build arguments. Development images are not published.
+All four application images target `linux/amd64`, use production Dockerfiles, and include OCI source/version/commit labels, build provenance, and an SBOM. Builds cache each service independently. The backend receives version, commit, and timestamp build arguments. The docs image builds the [documentation site](README.md#documentation-site) and takes its public address from the origin of `EXPO_PUBLIC_API_URL`, since both are served by the same Nginx. Development images are not published.
 
 Supported tags are `vMAJOR.MINOR.PATCH`, optionally followed by prerelease identifiers, such as `v2.0.0-rc.1`. Numeric version components cannot have leading zeros. Build metadata (`+build`) is not supported because it cannot be used directly as a Docker tag. Prereleases are marked as such on GitHub. There are no floating `latest`, major, or minor image aliases.
 
@@ -57,10 +58,10 @@ git push origin v2.0.0
 
 Use the next unused version; the example does not select a version automatically. A release tag must point to a commit reachable from `main`. The workflow rejects tags with an existing GitHub Release. Do not move published tags. Use a new version for changed code or build configuration.
 
-After CI and all three application image uploads succeed, the workflow creates a GitHub Release with image references and two assets:
+After CI and all four application image uploads succeed, the workflow creates a GitHub Release with image references and two assets:
 
 - `images.json`: version, application version, source commit, target platform, version tags, and image digests.
-- `images.env`: `BACKEND_IMAGE`, `FRONTEND_IMAGE`, and `MOBILE_IMAGE`, each pinned by digest for Compose.
+- `images.env`: `BACKEND_IMAGE`, `FRONTEND_IMAGE`, `MOBILE_IMAGE`, and `DOCS_IMAGE`, each pinned by digest for Compose.
 
 Image uploads are separate registry operations. If one fails, some images may already exist, but no GitHub Release is created. Fix transient failures and rerun failed jobs for the same unchanged tag. Rerunning an already published release is rejected. Consume the release's digest references to retain the exact image set even if registry tags are changed later.
 
@@ -81,7 +82,7 @@ docker compose --env-file infra/env/prod.env \
 docker compose --env-file infra/env/prod.env \
   --env-file artifacts/release/v2.0.0/images.env \
   -f infra/compose/docker-compose.yml \
-  -f infra/compose/docker-compose.prod.yml pull backend frontend
+  -f infra/compose/docker-compose.prod.yml pull backend frontend docs
 
 docker compose --env-file infra/env/prod.env \
   --env-file artifacts/release/v2.0.0/images.env \
@@ -114,7 +115,7 @@ Provision an amd64 Linux server with Bash, OpenSSH, Docker Engine, Docker Compos
 
 The deployment job uses its short-lived `GITHUB_TOKEN` with `packages: read` to authenticate to GHCR over SSH. Registry credentials are passed through standard input and kept in a temporary Docker configuration that is removed when deployment finishes or fails. No long-lived registry token is needed on the server. For manual deployments outside Actions, authenticate Docker as the deployment user with package read access. Verify the SSH host key through a trusted server console before storing it; the workflow enforces host-key verification.
 
-Each run uploads tracked Compose/Nginx/infrastructure configuration from the tagged commit and the published `images.env` into `releases/<run-id>-<attempt>`. It validates Compose, pulls application images, builds the PostgreSQL, Nginx, and SeaweedFS infrastructure images, and starts production services with a five-minute health-check timeout. The mobile image remains an on-demand artifact exporter. The production project name stays `clims-prod`, preserving the existing database volume. No database seeding, volume removal, or image pruning runs during deployment.
+Each run uploads tracked Compose/Nginx/infrastructure configuration from the tagged commit and the published `images.env` into `releases/<run-id>-<attempt>`. It validates Compose, pulls the backend, frontend, and documentation site images, builds the PostgreSQL, Nginx, and SeaweedFS infrastructure images, and starts production services with a five-minute health-check timeout. The mobile image remains an on-demand artifact exporter. The production project name stays `clims-prod`, preserving the existing database volume. No database seeding, volume removal, or image pruning runs during deployment.
 
 The backend applies embedded database migrations at startup. Take a database backup before releases with schema changes. A failed health check fails the deployment job and leaves `current` pointing at the last successful configuration; it does not undo containers or migrations already applied. On success, `current` points to the new directory and `previous` records the prior healthy directory.
 

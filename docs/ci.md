@@ -4,7 +4,7 @@
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It uses read-only repository permissions and requires no repository secrets. A newer run on the same ref cancels the older run.
 
-The workflow is also reusable by [tagged image releases](releases.md), which run the same checks before publishing. The quality job checks shared application version consistency and tests release version validation and digest manifest assembly. A separate image workflow builds the three application production Dockerfiles on pull requests without publishing.
+The workflow is also reusable by [tagged image releases](releases.md), which run the same checks before publishing. The quality job checks shared application version consistency and tests release version validation and digest manifest assembly. A separate image workflow builds the four application production Dockerfiles on pull requests without publishing.
 
 | Check                           | Coverage                                                                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |

@@ -18,9 +18,9 @@ compose=(docker compose --project-name clims-prod
 
 # Fail before changing running services if configuration or image access is invalid.
 "${compose[@]}" config --quiet
-"${compose[@]}" pull backend frontend
+"${compose[@]}" pull backend frontend docs
 infrastructure=(postgres nginx)
-services=(postgres backend frontend nginx)
+services=(postgres backend frontend docs nginx)
 if [[ -f $release/infra/docker/seaweedfs/Dockerfile.prod ]]; then
   infrastructure+=(seaweedfs)
   services+=(seaweedfs)

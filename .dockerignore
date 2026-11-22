@@ -8,3 +8,5 @@ frontend
 mobile
 infra/env/*.env
 artifacts
+website/build
+website/.docusaurus

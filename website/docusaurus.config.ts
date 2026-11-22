@@ -15,7 +15,7 @@ const config: Config = {
   tagline: "Condom Logistics Information Management System",
   favicon: "img/favicon.ico",
   // Served by the production Nginx under /handbook/; the host is the deployment's own.
-  url: process.env.DOCS_SITE_URL ?? "https://clims.example.invalid",
+  url: process.env.DOCS_SITE_URL || "https://clims.example.invalid",
   baseUrl: "/handbook/",
   trailingSlash: true,
   onBrokenLinks: "throw",

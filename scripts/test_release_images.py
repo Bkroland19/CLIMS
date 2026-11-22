@@ -31,7 +31,8 @@ class ReleaseImagesTest(unittest.TestCase):
             self.assertEqual(values["version"], "v" + version)
             matrix = json.loads(values["matrix"])["include"]
             self.assertEqual(
-                {item["service"] for item in matrix}, {"backend", "frontend", "mobile"}
+                {item["service"]: item["context"] for item in matrix},
+                {"backend": ".", "frontend": "./frontend", "mobile": "./mobile", "docs": "."},
             )
 
     def test_stable_release_and_registry_case(self):
@@ -81,7 +82,7 @@ class ReleaseImagesTest(unittest.TestCase):
                     )
                 )
             result = manifest(directory, "ghcr.io/owner/repo", "v1.2.3", "b" * 40)
-            self.assertEqual(set(result["images"]), {"backend", "frontend", "mobile"})
+            self.assertEqual(set(result["images"]), {"backend", "frontend", "mobile", "docs"})
             self.assertEqual(result["app_version"], "1.2.3")
             self.assertEqual(
                 result["images"]["backend"]["digest"],
