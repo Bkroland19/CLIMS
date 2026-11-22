@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"clims-backend/internal/features/rbac"
+	"clims-backend/internal/features/stock"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/request"
 	"clims-backend/internal/pkg/response"
@@ -128,6 +129,9 @@ func validDelivery(in *DeliveryInput) string {
 	var ok bool
 	if in.Note, ok = trimComment(in.Note); !ok {
 		return "note must be at most 4000 characters"
+	}
+	if !validExceptionReason(&in.ExpiryExceptionReason) {
+		return "expiry_exception_reason must be at most 1000 characters"
 	}
 	if in.ClientReference != nil {
 		reference := strings.TrimSpace(*in.ClientReference)
@@ -259,6 +263,9 @@ func (h *Handler) performAction(c fiber.Ctx) error {
 // validActionInput accepts only the fields an action uses: an optional positive quantity_issued at
 // dispatch, and a nonnegative quantity_received with an optional discrepancy_note at receipt.
 func validActionInput(action string, input *ActionInput) bool {
+	if !validExceptionReason(&input.ExpiryExceptionReason) {
+		return false
+	}
 	if input.DiscrepancyNote != nil {
 		*input.DiscrepancyNote = strings.TrimSpace(*input.DiscrepancyNote)
 		if *input.DiscrepancyNote == "" || len(*input.DiscrepancyNote) > 4000 {
@@ -267,6 +274,8 @@ func validActionInput(action string, input *ActionInput) bool {
 	}
 	if (input.QuantityReceived != nil) != (action == "receive") ||
 		(input.QuantityIssued != nil && (action != "dispatch" || *input.QuantityIssued < 1)) ||
+		(input.QuantityApproved != nil && (action != "review" || *input.QuantityApproved < 1)) ||
+		(input.ExpiryExceptionReason != nil && action != "dispatch") ||
 		(input.DiscrepancyNote != nil && action != "receive") {
 		return false
 	}
@@ -304,11 +313,13 @@ func workflowError(c fiber.Ctx, err error) error {
 	case errors.Is(err, errWorkflowForbidden), errors.Is(err, errNotDistrictStore), errors.Is(err, errNotManager):
 		return response.Error(c, 403, err.Error(), nil)
 	case errors.Is(err, errWorkflowConflict), errors.Is(err, errNotEnoughStock), errors.Is(err, errAlreadyFulfilled),
-		errors.Is(err, errAckChanged):
+		errors.Is(err, errAckChanged), errors.Is(err, errExpiredStock):
 		return response.Error(c, 409, err.Error(), nil)
 	case errors.Is(err, errWorkflowInput), errors.Is(err, errHotSpotRoute), errors.Is(err, errUnknownProduct),
 		errors.Is(err, errNoCategory), errors.Is(err, errNotSelected), errors.Is(err, errDeliveryUnit):
 		return response.Error(c, 422, err.Error(), nil)
+	case errors.Is(err, stock.ErrNearExpiry):
+		return response.Error(c, 422, err.Error(), map[string]string{"expiry_exception_reason": err.Error()})
 	case errors.Is(err, errNotWarehouse):
 		return response.Error(c, 422, err.Error(), map[string]string{"warehouse_store_id": err.Error()})
 	case errors.Is(err, errNoUnit):
@@ -316,6 +327,20 @@ func workflowError(c fiber.Ctx, err error) error {
 	default:
 		return orderError(c, err)
 	}
+}
+
+// validExceptionReason trims an expiry exception reason, dropping it when blank; false when too long.
+func validExceptionReason(reason **string) bool {
+	if *reason == nil {
+		return true
+	}
+	trimmed := strings.TrimSpace(**reason)
+	if trimmed == "" {
+		*reason = nil
+		return true
+	}
+	*reason = &trimmed
+	return len(trimmed) <= 1000
 }
 
 // trimComment trims a free-text message, dropping it when blank. The result is false when it is
