@@ -10,6 +10,8 @@ const TONES: Record<string, StatusTone> = {
   'order.replenishment_rejected': 'negative',
   'order.shipment_dispatched': 'caution',
   'order.shipment_received': 'positive',
+  'inventory.batch_expiring': 'caution',
+  'inventory.batch_expired': 'negative',
   'hotspot.submitted': 'info',
   'hotspot.resubmitted': 'info',
 };
@@ -56,6 +58,9 @@ export function hrefFor(notification: InboxNotification, opens: Opens): string |
   if (opens.warehouse && WAREHOUSE_ORDER_TYPES.has(type) && kind === 'order' && id) {
     return `/warehouse/requests/${encodeURIComponent(id)}`;
   }
+  // Expiry alerts go to the store's stock managers; the warehouse's stock page lists the batches.
+  if (opens.warehouse && type === 'inventory.batch_expired') return '/warehouse/stock?band=expired';
+  if (opens.warehouse && type === 'inventory.batch_expiring') return '/warehouse/stock';
   return null;
 }
 

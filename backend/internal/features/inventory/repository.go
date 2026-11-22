@@ -217,6 +217,10 @@ type Movement struct {
 	ActorID         *string   `json:"actor_id"`
 	Note            *string   `json:"note"`
 	CreatedAt       time.Time `json:"created_at"`
+	// The batch a receipt or adjustment changed; null for order steps, which can span batches.
+	BatchNumber *string `json:"batch_number"`
+	// ExpiryDate is the batch's, YYYY-MM-DD.
+	ExpiryDate *string `json:"expiry_date"`
 }
 
 type MovementFilter struct {
@@ -229,12 +233,14 @@ type MovementFilter struct {
 }
 
 const movementColumns = `m.id, m.store_id, s.name, m.condom_id, ` + productName + `, m.unit_of_measure_id, um.name,
-	m.reason, m.quantity, m.on_hand_after, m.order_id, m.actor_id, m.note, m.created_at`
+	m.reason, m.quantity, m.on_hand_after, m.order_id, m.actor_id, m.note, m.created_at,
+	sb.batch_number, to_char(sb.expiry_date, 'YYYY-MM-DD')`
 
 const movementJoins = ` FROM inventory_movements m
 	JOIN stores s ON s.id = m.store_id
 	JOIN condoms c ON c.id = m.condom_id
-	JOIN unit_of_measures um ON um.id = m.unit_of_measure_id`
+	JOIN unit_of_measures um ON um.id = m.unit_of_measure_id
+	LEFT JOIN stock_batches sb ON sb.id = m.stock_batch_id`
 
 func (r *Repository) movements(ctx context.Context, access scope, f MovementFilter) ([]Movement, error) {
 	rows, err := r.db.Query(ctx, `SELECT `+movementColumns+movementJoins+`

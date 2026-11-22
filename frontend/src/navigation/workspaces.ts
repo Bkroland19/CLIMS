@@ -418,7 +418,7 @@ export const workspaces: readonly Workspace[] = [
           dashboard(
             '/warehouse',
             'Warehouse dashboard',
-            'District requests waiting on this warehouse, and stock against its minimum levels.',
+            'District orders waiting on this warehouse, and batches to dispatch first or write off.',
           ),
         ],
       },
@@ -460,6 +460,9 @@ export const workspaces: readonly Workspace[] = [
                 description: 'Condom stock held at this warehouse, by batch, and every movement.',
                 layout: 'table',
               },
+            ],
+            details: [
+              { path: '/warehouse/stock/receive', label: 'Record a delivery', layout: 'form' },
             ],
           },
           catalogue('/warehouse/catalogue'),

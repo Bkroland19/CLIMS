@@ -25,9 +25,13 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 	day := func(days int) string { return today.AddDate(0, 0, days).Format(time.DateOnly) }
 	receive := func(store, batch, expiry string, quantity int) {
 		t.Helper()
-		request("POST", "/inventory/movements", map[string]any{"store_id": store, "condom_id": product,
+		recorded := request("POST", "/inventory/movements", map[string]any{"store_id": store, "condom_id": product,
 			"unit_of_measure_id": unit, "reason": "receipt", "quantity": quantity, "note": "Batch received",
-			"batch_number": batch, "expiry_date": expiry}, admin, 201)
+			"batch_number": batch, "expiry_date": expiry}, admin, 201)["data"].(map[string]any)
+		// The ledger entry names the batch it filled.
+		if recorded["batch_number"] != batch || recorded["expiry_date"] != expiry {
+			t.Fatalf("receipt's batch: %v", recorded)
+		}
 	}
 	receive(warehouse, "EXP-1", day(-1), 5)
 	receive(warehouse, "NEAR-1", day(10), 10)

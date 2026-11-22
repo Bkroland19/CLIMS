@@ -17,6 +17,7 @@ const SAMPLE_PATHS: Readonly<Record<string, string>> = {
   '/dcfp/reports/[id]': '/dcfp/reports/RPT-2610-WAKISO',
   // Mukono's order NMS has reserved, waiting to be dispatched (dev/mock/dcfp.mts).
   '/warehouse/requests/[id]': '/warehouse/requests/00000000-0000-4000-8301-000000000008?store=NMS',
+  '/warehouse/stock/receive': '/warehouse/stock/receive?store=NMS',
   '/warehouse/reports/[id]': '/warehouse/reports/RPT-2610-NMS?store=NMS',
 };
 

@@ -53,6 +53,17 @@ describe('hrefFor', () => {
     expect(hrefFor(order('order.replenishment_approved'), WAREHOUSE)).toBeNull();
   });
 
+  it('opens the warehouse stock for a batch expiry alert', () => {
+    const alert = (type: string) =>
+      notification({ type, resource_type: 'stock_batch', resource_id: 'b1' });
+    expect(hrefFor(alert('inventory.batch_expired'), WAREHOUSE)).toBe(
+      '/warehouse/stock?band=expired',
+    );
+    expect(hrefFor(alert('inventory.batch_expiring'), WAREHOUSE)).toBe('/warehouse/stock');
+    // A district's stock screen is not on the API yet.
+    expect(hrefFor(alert('inventory.batch_expired'), DCFP)).toBeNull();
+  });
+
   it('gives no link where there is no screen to open', () => {
     // A warehouse order needs the warehouse workspace; a VHT has no DCFP workspace.
     expect(hrefFor(notification({ type: 'order.replenishment_requested' }), DCFP)).toBeNull();

@@ -17,7 +17,7 @@
  */
 import { mockProductId, mockUnitId } from './admin.mts';
 import { MOCK_STORES, mockDistrictStoreId } from './hotspots.mts';
-import { addTo, planTake, reservableFor, reserve, take, type Take } from './inventory.mts';
+import { addTo, log, planTake, reservableFor, reserve, take, type Take } from './inventory.mts';
 
 interface Reply {
   status: number;
@@ -555,6 +555,9 @@ function dispatch(o: Order, body: Body): Reply {
   }
   reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, -approved);
   state.shipments.set(o.id, take(plan.takes));
+  log(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, 'dispatch', -quantity, {
+    orderId: o.id,
+  });
   Object.assign(o, {
     quantity_issued: quantity,
     handled_by_id: WAREHOUSE_STAFF,
@@ -587,6 +590,9 @@ function receiveIntoBatches(o: Order, counted: number): void {
   }
   // A surplus, or an order seeded as dispatched, goes to a batch of unknown expiry.
   if (left > 0) addTo(o.ordered_for_store_id, o.condom_id, o.unit_of_measure_id, null, null, left);
+  log(o.ordered_for_store_id, o.condom_id, o.unit_of_measure_id, 'order_receipt', counted, {
+    orderId: o.id,
+  });
 }
 
 function receive(o: Order, body: Body): Reply {

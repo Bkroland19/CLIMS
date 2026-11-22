@@ -1,10 +1,9 @@
 import type { Product } from '@/features/catalogue/api';
-import type { StockBalance, StockBatch } from '@/features/inventory/api';
+import type { Movement, StockBalance, StockBatch } from '@/features/inventory/api';
 import type { Order, OrderEvent } from '@/features/orders/api';
 
 import { anOrder, BOX, FEMALE, JMS, NMS } from './dcfpFixtures';
 import type { FakeReply } from './fakeAdapter';
-import { warehouseApi } from './warehouseFixtures';
 
 /*
  * The warehouse screens on the Go API, for tests: district orders placed with NMS or JMS, the
@@ -92,8 +91,7 @@ export interface WarehouseOrderData {
   balances?: StockBalance[];
   batches?: StockBatch[];
   products?: Product[];
-  /** Answers for the screens still on the mock-only `/warehouses/…` contract (stock, dashboard). */
-  legacy?: Parameters<typeof warehouseApi>[0];
+  movements?: Movement[];
 }
 
 /**
@@ -102,10 +100,8 @@ export interface WarehouseOrderData {
  */
 export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<string, Answer> = {}) {
   const orders = data.orders ?? [];
-  const legacy = warehouseApi(data.legacy ?? {});
   return (request: { method: string; url: string }): Answer => {
     const [path = ''] = request.url.split('?');
-    if (path.startsWith('/warehouses/')) return legacy(request);
     const order = /^\/orders\/([^/]+)/.exec(path);
     if (request.method !== 'GET') {
       return (
@@ -137,10 +133,35 @@ export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<strin
     }
     if (path === '/inventory/stock') return { status: 200, body: envelope(data.balances ?? []) };
     if (path === '/inventory/batches') return { status: 200, body: envelope(data.batches ?? []) };
+    if (path === '/inventory/movements') {
+      return { status: 200, body: envelope(data.movements ?? []) };
+    }
     if (path === '/catalogue/products') {
       return { status: 200, body: envelope(data.products ?? [FEMALE, FEMALE_FC2]) };
     }
     if (path === '/catalogue/units') return { status: 200, body: envelope([BOX]) };
     return { status: 200, body: envelope([]) };
+  };
+}
+
+export function aMovement(overrides: Partial<Movement> = {}): Movement {
+  return {
+    id: 'm1',
+    store_id: NMS.id,
+    store_name: NMS.name,
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    reason: 'receipt',
+    quantity: 600,
+    on_hand_after: 910,
+    order_id: null,
+    actor_id: 'u1',
+    note: 'UNFPA consignment, delivery note DN-118',
+    created_at: '2026-11-19T09:00:00Z',
+    batch_number: 'FC2-2502-118',
+    expiry_date: '2028-06-30',
+    ...overrides,
   };
 }

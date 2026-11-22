@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { resetMock } from './support/mock';
-import { expectToast, open } from './support/ui';
+import { choose, expectToast, open } from './support/ui';
 
 /*
  * The warehouse deciding on and dispatching district orders, on the Go API's shapes. The mock
@@ -115,4 +115,40 @@ test('lists what waits on the warehouse, and opens an order to dispatch', async 
 
   await expect(page).toHaveURL(new RegExp(`/warehouse/requests/${MUKONO}`));
   await expect(page.getByRole('heading', { name: 'Dispatch to Mukono' })).toBeVisible();
+});
+
+test('records a delivery batch by batch, and it shows in the stock', async ({ page }) => {
+  await open(page, '/warehouse/stock/receive?store=NMS', 'Record a delivery');
+  await choose(page, 'Product', FC2_BOXES);
+  await expect(page.getByRole('combobox', { name: 'Unit' })).toContainText('Box');
+  await page.getByRole('textbox', { name: 'Batch number' }).fill('FC2-2611-301');
+  await page.getByLabel('Expiry date').fill('2029-06-30');
+  await page.getByRole('textbox', { name: 'Quantity received' }).fill('250');
+  await page.getByRole('textbox', { name: /Where it came from/ }).fill('UNFPA, DN-301');
+  await page.getByRole('button', { name: 'Record this batch' }).click();
+
+  await expectToast(page, 'Delivery recorded in batch FC2-2611-301.');
+  await expect(page.getByRole('list', { name: 'Batches recorded' })).toContainText('FC2-2611-301');
+  await expect(page.getByRole('textbox', { name: 'Batch number' })).toHaveValue('');
+  await page.getByRole('link', { name: 'Done' }).click();
+
+  await expect(page).toHaveURL(/\/warehouse\/stock\?store=NMS$/);
+  const batches = page.getByRole('table', { name: 'Batches at NMS' });
+  await expect(batches.getByRole('row').filter({ hasText: 'FC2-2611-301' })).toContainText('250');
+  await expect(
+    page.getByRole('table', { name: 'Stock movements at NMS' }).getByRole('row').nth(1),
+  ).toContainText('UNFPA, DN-301');
+});
+
+test('writes off an expired batch', async ({ page }) => {
+  await open(page, '/warehouse/stock?store=NMS&band=expired', 'Warehouse stock');
+  await page.getByRole('button', { name: 'Actions for batch FC2-2311-090' }).click();
+  await page.getByRole('menuitem', { name: 'Write off…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Write off batch FC2-2311-090' });
+  await expect(dialog.getByRole('textbox', { name: 'How many' })).toHaveValue('40');
+  await dialog.getByRole('textbox', { name: 'Why' }).fill('Incinerated under supervision');
+  await dialog.getByRole('button', { name: 'Write off' }).click();
+
+  await expectToast(page, 'Batch FC2-2311-090 adjusted.');
+  await expect(page.getByText('No batches in this view')).toBeVisible();
 });

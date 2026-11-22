@@ -5,6 +5,8 @@
  *
  * - `GET /inventory/stock?store_id=&condom_id=`: balances, with reserved and available.
  * - `GET /inventory/batches?store_id=&condom_id=`: batches with stock, first expiry first out.
+ * - `GET /inventory/movements?store_id=` and `POST /inventory/movements`: the ledger, and a
+ *   delivery (`receipt`) into a batch or an `adjustment` of one, with a note.
  *
  * The order mock (`dcfp.mts`) reserves, dispatches and receives through the functions exported
  * here, so a dispatch takes stock from the warehouse's batches and the district's receipt adds
@@ -63,8 +65,26 @@ const UNIT_NAMES: Record<string, string> = {
   [mockUnitId(3)]: 'Carton',
 };
 
+export interface Movement {
+  id: string;
+  store_id: string;
+  condom_id: string;
+  unit_of_measure_id: string;
+  reason: 'opening' | 'receipt' | 'adjustment' | 'dispatch' | 'order_receipt';
+  quantity: number;
+  on_hand_after: number;
+  order_id: string | null;
+  note: string | null;
+  batch_number: string | null;
+  expiry_date: string | null;
+  created_at: string;
+}
+
+const ACTOR = '00000000-0000-4000-8002-000000000009';
+
 const state = {
   batches: [] as Batch[],
+  movements: [] as Movement[],
   /** Reserved for confirmed orders, by `store|product|unit`. */
   reserved: new Map<string, number>(),
   next: 1,
@@ -97,6 +117,7 @@ function batch(
 export function seedInventory(dataset: string): void {
   state.next = 100;
   state.reserved = new Map();
+  state.movements = [];
   if (dataset === 'empty') {
     state.batches = [];
     return;
@@ -116,6 +137,22 @@ export function seedInventory(dataset: string): void {
     // Wakiso district store, from the order it received.
     batch(10, WAKISO, 2, 2, null, null, 990),
   ];
+  // Each batch arrived as a delivery, oldest first, so the ledger accounts for what is held.
+  const running = new Map<string, number>();
+  for (const b of [...state.batches].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
+    const key = keyOf(b.store_id, b.condom_id, b.unit_of_measure_id);
+    running.set(key, (running.get(key) ?? 0) + b.on_hand);
+    const entry = log(
+      b.store_id,
+      b.condom_id,
+      b.unit_of_measure_id,
+      b.batch_number ? 'receipt' : 'opening',
+      b.on_hand,
+      { note: b.batch_number ? 'Delivery from the supplier' : 'Opening balance', batch: b },
+      b.created_at,
+    );
+    entry.on_hand_after = running.get(key) ?? b.on_hand;
+  }
   if (dataset === 'worst') {
     state.batches.push(
       batch(
@@ -129,6 +166,42 @@ export function seedInventory(dataset: string): void {
       ),
     );
   }
+}
+
+function onHandOf(storeId: string, condomId: string, unitId: string): number {
+  return state.batches
+    .filter(
+      (b) => b.store_id === storeId && b.condom_id === condomId && b.unit_of_measure_id === unitId,
+    )
+    .reduce((sum, b) => sum + b.on_hand, 0);
+}
+
+/** Adds a ledger entry after the stock it records has changed. */
+export function log(
+  storeId: string,
+  condomId: string,
+  unitId: string,
+  reason: Movement['reason'],
+  quantity: number,
+  extra: { note?: string | null; orderId?: string; batch?: Batch } = {},
+  at = new Date().toISOString(),
+): Movement {
+  const entry: Movement = {
+    id: `00000000-0000-4000-8401-${String((state.next += 1)).padStart(12, '0')}`,
+    store_id: storeId,
+    condom_id: condomId,
+    unit_of_measure_id: unitId,
+    reason,
+    quantity,
+    on_hand_after: onHandOf(storeId, condomId, unitId),
+    order_id: extra.orderId ?? null,
+    note: extra.note ?? null,
+    batch_number: extra.batch?.batch_number ?? null,
+    expiry_date: extra.batch?.expiry_date ?? null,
+    created_at: at,
+  };
+  state.movements.unshift(entry);
+  return entry;
 }
 
 /** Shelf life left in calendar months, as the API bands it. */
@@ -257,7 +330,7 @@ export function addTo(
   number: string | null,
   expiry: string | null,
   quantity: number,
-): void {
+): Batch {
   let found = state.batches.find(
     (b) =>
       b.store_id === storeId &&
@@ -280,6 +353,7 @@ export function addTo(
     state.batches.push(found);
   }
   found.on_hand += quantity;
+  return found;
 }
 
 function balances(query: URLSearchParams) {
@@ -317,14 +391,88 @@ function balances(query: URLSearchParams) {
   });
 }
 
+function presentMovement(m: Movement) {
+  return {
+    ...m,
+    store_name: storeOf(m.store_id)?.name ?? 'Store',
+    product: PRODUCTS[m.condom_id]?.name ?? 'Condoms',
+    unit: UNIT_NAMES[m.unit_of_measure_id] ?? 'Unit',
+    actor_id: ACTOR,
+  };
+}
+
+const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+/** Like the Go API: a delivery into a batch, or an adjustment of one with a note. */
+function record(body: Record<string, unknown>): Reply {
+  const storeId = text(body.store_id);
+  const condomId = text(body.condom_id);
+  const unitId = text(body.unit_of_measure_id);
+  const reason = text(body.reason);
+  const quantity = body.quantity;
+  const note = text(body.note) || null;
+  const number = text(body.batch_number) || null;
+  const expiry = text(body.expiry_date) || null;
+  if (!storeId || !condomId || !unitId) return fail(422, 'store, product and unit are required');
+  if (typeof quantity !== 'number' || !Number.isInteger(quantity)) {
+    return fail(422, 'quantity must be a whole number');
+  }
+  if (reason === 'receipt' && quantity <= 0)
+    return fail(422, 'a receipt needs a positive quantity');
+  if (reason === 'adjustment' && (quantity === 0 || !note)) {
+    return fail(422, 'an adjustment needs a nonzero quantity and a note explaining it');
+  }
+  if (reason !== 'receipt' && reason !== 'adjustment') {
+    return fail(422, 'reason must be receipt or adjustment');
+  }
+  const reserved = state.reserved.get(keyOf(storeId, condomId, unitId)) ?? 0;
+  if (onHandOf(storeId, condomId, unitId) + quantity < reserved) {
+    return fail(409, 'adjustment would leave less stock on hand than is reserved for open orders');
+  }
+  let batch: Batch;
+  if (quantity > 0) {
+    batch = addTo(storeId, condomId, unitId, number, expiry, quantity);
+  } else {
+    const found = state.batches.find(
+      (b) =>
+        b.store_id === storeId &&
+        b.condom_id === condomId &&
+        b.unit_of_measure_id === unitId &&
+        b.batch_number === number &&
+        b.expiry_date === expiry,
+    );
+    if (!found || found.on_hand < -quantity) {
+      return fail(409, 'the batch holds less than the quantity to remove');
+    }
+    found.on_hand += quantity;
+    batch = found;
+  }
+  const entry = log(storeId, condomId, unitId, reason, quantity, { note, batch });
+  return ok(presentMovement(entry), 201);
+}
+
 /** Answers `/inventory/…`, or returns null for any other path. */
 export function handleInventory(
   method: string,
   parts: string[],
   query: URLSearchParams,
+  body: Record<string, unknown> = {},
 ): Reply | null {
   const [resource, target] = parts;
   if (resource !== 'inventory') return null;
+  if (target === 'movements') {
+    if (method === 'POST') return record(body);
+    if (method === 'GET') {
+      const storeId = query.get('store_id');
+      const limit = Math.min(Number(query.get('limit') ?? 50) || 50, 100);
+      return ok(
+        state.movements
+          .filter((m) => !storeId || m.store_id === storeId)
+          .slice(0, limit)
+          .map(presentMovement),
+      );
+    }
+  }
   if (method === 'GET' && target === 'stock') return ok(balances(query));
   if (method === 'GET' && target === 'batches') {
     const storeId = query.get('store_id');

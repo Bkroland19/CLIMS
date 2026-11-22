@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { parseList, type HttpClient } from '@/lib/api';
+import { parseBody, parseList, type HttpClient } from '@/lib/api';
 
 /*
  * Stock against the Go API (docs/modules/inventory.md). A store's stock of a product in a unit is
@@ -104,4 +104,75 @@ export async function listBatches(
     { signal },
   );
   return parseList(batchSchema, body, 'batches');
+}
+
+/** Why stock changed: a delivery or adjustment recorded by hand, or a step of the order workflow. */
+export const MOVEMENT_REASONS = [
+  'opening',
+  'receipt',
+  'adjustment',
+  'dispatch',
+  'order_receipt',
+] as const;
+export type MovementReason = (typeof MOVEMENT_REASONS)[number];
+
+const movementSchema = z.object({
+  id: z.string(),
+  store_id: z.string(),
+  store_name: z.string(),
+  condom_id: z.string(),
+  product: z.string(),
+  unit_of_measure_id: z.string(),
+  unit: z.string(),
+  reason: z.enum(MOVEMENT_REASONS),
+  /** Positive adds stock, negative takes it away. */
+  quantity: count,
+  /** The store's balance of the product in the unit after this entry. */
+  on_hand_after: count,
+  order_id: text,
+  actor_id: text,
+  note: text,
+  created_at: z.string(),
+  /** The batch a receipt or adjustment changed; null for order steps. */
+  batch_number: text.default(null),
+  expiry_date: text.default(null),
+});
+
+export type Movement = z.infer<typeof movementSchema>;
+
+/** The store's ledger, newest first. */
+export async function listMovements(
+  http: HttpClient,
+  filter: { storeId?: string; limit?: number },
+  signal?: AbortSignal,
+): Promise<Movement[]> {
+  const body = await http.get(
+    `/inventory/movements${query({ store_id: filter.storeId, limit: String(filter.limit ?? 100) })}`,
+    { signal },
+  );
+  return parseList(movementSchema, body, 'stock movements');
+}
+
+export interface MovementInput {
+  store_id: string;
+  condom_id: string;
+  unit_of_measure_id: string;
+  /** A delivery adds stock; an adjustment corrects a batch either way and needs a note. */
+  reason: 'receipt' | 'adjustment';
+  /** Signed for an adjustment; positive for a receipt. */
+  quantity: number;
+  note?: string;
+  /** The batch: leave both out for stock without batch details. */
+  batch_number?: string;
+  /** YYYY-MM-DD. */
+  expiry_date?: string;
+}
+
+/** Records a delivery into a batch, or corrects a batch; returns the ledger entry. */
+export async function recordMovement(http: HttpClient, input: MovementInput): Promise<Movement> {
+  return parseBody(
+    movementSchema,
+    await http.post('/inventory/movements', input),
+    'stock movement',
+  );
 }

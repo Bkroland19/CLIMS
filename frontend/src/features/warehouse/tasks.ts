@@ -1,34 +1,11 @@
-import type { WarehouseRequest } from '@/features/fulfilment/api';
-import { expiryOf, MIN_SHELF_MONTHS } from '@/features/fulfilment/batches';
-import { formatQuantities } from '@/features/fulfilment/products';
-import { REQUEST_STATUS } from '@/features/fulfilment/status';
+import type { StockBatch } from '@/features/inventory/api';
+import { BAND_STATUS, batchLabel } from '@/features/inventory/bands';
+import type { Order } from '@/features/orders/api';
 import { formatNumber } from '@/lib/format';
 import type { StatusTone } from '@/lib/status';
 
-import type { WarehouseBatch } from './api';
-import { BATCH_STATUS } from './dispatch';
 import { WAREHOUSE_PATHS } from './paths';
-import { isNew } from './progress';
-
-/** The request list's filters, in the order they are shown. `status` in the address picks one. */
-export const REQUEST_FILTERS = [
-  { value: 'all', label: 'All', keeps: () => true },
-  { value: 'new', label: 'New', keeps: isNew },
-  { value: 'queued', label: 'Queued', keeps: (request) => request.status === 'queued' },
-  { value: 'on_hold', label: 'On hold', keeps: (request) => request.status === 'on_hold' },
-  { value: 'dispatched', label: 'In transit', keeps: (request) => request.status === 'dispatched' },
-  { value: 'received', label: 'Received', keeps: (request) => request.status === 'received' },
-] as const satisfies readonly {
-  value: string;
-  label: string;
-  keeps: (request: WarehouseRequest) => boolean;
-}[];
-
-export type RequestFilter = (typeof REQUEST_FILTERS)[number];
-
-export function requestFilterFrom(param: string | null): RequestFilter {
-  return REQUEST_FILTERS.find((filter) => filter.value === param) ?? REQUEST_FILTERS[0];
-}
+import { requestStatus } from './requests';
 
 export interface WarehouseTask {
   id: string;
@@ -40,105 +17,124 @@ export interface WarehouseTask {
   href: string;
 }
 
+/** Names the dashboard needs for an order: its district, product and an amount in its unit. */
+export interface TaskNames {
+  store: (id: string) => string;
+  product: (id: string | null, category: string | null) => string;
+  quantity: (value: number | null, unitId: string | null) => string;
+}
+
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
+const sum = (batches: readonly StockBatch[]) =>
+  batches.reduce((total, batch) => total + batch.on_hand, 0);
 
 /**
- * What needs the warehouse, in the order it needs doing: review new requests,
- * check and dispatch queued ones, re-check held ones, then deal with stock
- * that cannot go out (expired) or should go first (short shelf life).
+ * What needs the warehouse, in the order it needs doing: decide on new orders, reserve or recheck
+ * approved ones, dispatch reserved ones, write off expired batches, send short-dated batches
+ * first, and recount stock held without an expiry date.
  */
 export function warehouseTasks(
-  requests: readonly WarehouseRequest[],
-  batches: readonly WarehouseBatch[],
-  now: Date,
+  orders: readonly Order[],
+  batches: readonly StockBatch[],
+  names: TaskNames,
   formatTime: (iso: string) => string,
 ): WarehouseTask[] {
   const tasks: WarehouseTask[] = [];
+  const amount = (order: Order, value: number | null) =>
+    names.quantity(value, order.unit_of_measure_id);
+  const product = (order: Order) => names.product(order.condom_id, order.condom_category);
+  const district = (order: Order) => names.store(order.ordered_for_store_id);
+  const withStatus = (status: Order['order_status']) =>
+    orders.filter((order) => order.order_status === status);
 
-  for (const request of requests.filter(isNew)) {
+  for (const order of withStatus('queued')) {
     tasks.push({
-      id: `review-${request.id}`,
-      status: REQUEST_STATUS[request.status],
-      title: `Review ${request.id} from ${request.district}`,
-      detail: `${formatQuantities(request.items)} · ${request.requested_by} · ${formatTime(request.created_at)}`,
-      action: 'Review request',
-      href: WAREHOUSE_PATHS.request(request.id),
+      id: `decide-${order.id}`,
+      status: requestStatus(order),
+      title: `Decide on ${district(order)}'s order for ${amount(order, order.quantity_needed)}`,
+      detail: `${product(order)} · received ${formatTime(order.created_at)}`,
+      action: 'Decide',
+      href: WAREHOUSE_PATHS.request(order.id),
     });
   }
-
-  for (const request of requests.filter((candidate) => candidate.status === 'queued')) {
+  for (const order of withStatus('reviewed')) {
     tasks.push({
-      id: `dispatch-${request.id}`,
-      status: REQUEST_STATUS.queued,
-      title: `Check stock and dispatch ${request.id} to ${request.district}`,
-      detail: formatQuantities(request.items),
+      id: `reserve-${order.id}`,
+      status: requestStatus(order),
+      title: `Reserve ${amount(order, order.quantity_approved)} for ${district(order)}`,
+      detail: `${product(order)} · approved, stock not checked yet`,
       action: 'Check stock',
-      href: WAREHOUSE_PATHS.request(request.id),
+      href: WAREHOUSE_PATHS.request(order.id),
     });
   }
-
-  for (const request of requests.filter((candidate) => candidate.status === 'on_hold')) {
+  for (const order of withStatus('confirmed')) {
     tasks.push({
-      id: `recheck-${request.id}`,
-      status: REQUEST_STATUS.on_hold,
-      title: `Re-check ${request.id} for ${request.district}`,
-      detail: `${formatQuantities(request.items)} · ${request.hold_reason ?? 'On hold'}`,
-      action: 'Re-check',
-      href: WAREHOUSE_PATHS.request(request.id),
+      id: `dispatch-${order.id}`,
+      status: requestStatus(order),
+      title: `Dispatch ${amount(order, order.quantity_approved ?? order.quantity_needed)} to ${district(order)}`,
+      detail: product(order),
+      action: 'Dispatch',
+      href: WAREHOUSE_PATHS.request(order.id),
+    });
+  }
+  for (const order of withStatus('on_hold')) {
+    tasks.push({
+      id: `recheck-${order.id}`,
+      status: requestStatus(order),
+      title: `Check stock again for ${district(order)}`,
+      detail: `${amount(order, order.quantity_approved ?? order.quantity_needed)} of ${product(order)} waits for stock`,
+      action: 'Check again',
+      href: WAREHOUSE_PATHS.request(order.id),
     });
   }
 
-  const byState = (state: 'expired' | 'flagged') =>
-    batches.filter((batch) => {
-      const expiry = expiryOf(batch.expires_on, now).state;
-      return state === 'expired' ? expiry === 'expired' : expiry === 'near' || expiry === 'short';
-    });
+  const inBand = (band: StockBatch['band']) =>
+    batches.filter((batch) => batch.band === band && batch.on_hand > 0);
+  const list = (group: readonly StockBatch[]) => group.map(batchLabel).join(', ');
 
-  const expired = byState('expired');
+  const expired = inBand('expired');
   if (expired.length > 0) {
-    const pieces = expired.reduce((sum, batch) => sum + batch.quantity, 0);
     tasks.push({
       id: 'expired',
-      status: BATCH_STATUS.expired,
-      title: `Remove ${String(expired.length)} expired ${plural(expired.length, 'batch', 'batches')} from stock`,
-      detail: `${expired.map((batch) => batch.batch).join(', ')} · ${formatNumber(pieces)} pieces can't be dispatched`,
-      action: 'View stock',
-      href: WAREHOUSE_PATHS.stock,
+      status: BAND_STATUS.expired,
+      title: `Write off ${String(expired.length)} expired ${plural(expired.length, 'batch', 'batches')}`,
+      detail: `${list(expired)} · ${formatNumber(sum(expired))} can't be dispatched`,
+      action: 'View expired',
+      href: WAREHOUSE_PATHS.stockWithBand('expired'),
     });
   }
-
-  const flagged = byState('flagged');
-  if (flagged.length > 0) {
+  const lastMonth = inBand('under_1_month');
+  if (lastMonth.length > 0) {
     tasks.push({
-      id: 'flagged',
-      status: { label: 'Short shelf life', tone: 'caution' },
-      title: `${String(flagged.length)} ${plural(flagged.length, 'batch has', 'batches have')} under ${String(MIN_SHELF_MONTHS)} months left`,
-      detail: `${flagged.map((batch) => batch.batch).join(', ')} · districts are warned if these are dispatched`,
-      action: 'View stock',
-      href: WAREHOUSE_PATHS.stock,
+      id: 'under-1-month',
+      status: BAND_STATUS.under_1_month,
+      title: `${String(lastMonth.length)} ${plural(lastMonth.length, 'batch has', 'batches have')} under a month left`,
+      detail: `${list(lastMonth)} · dispatching needs a documented reason`,
+      action: 'View batches',
+      href: WAREHOUSE_PATHS.stockWithBand('under_1_month'),
     });
   }
-
+  const soon = inBand('under_3_months');
+  if (soon.length > 0) {
+    tasks.push({
+      id: 'under-3-months',
+      status: BAND_STATUS.under_3_months,
+      title: `${String(soon.length)} ${plural(soon.length, 'batch expires', 'batches expire')} within 3 months`,
+      detail: `${list(soon)} · they go out first`,
+      action: 'View batches',
+      href: WAREHOUSE_PATHS.stockWithBand('under_3_months'),
+    });
+  }
+  const unknown = inBand('unknown');
+  if (unknown.length > 0) {
+    tasks.push({
+      id: 'recount',
+      status: BAND_STATUS.unknown,
+      title: 'Record the batches of stock held without an expiry date',
+      detail: `${formatNumber(sum(unknown))} held without a batch number or expiry date; it goes out last`,
+      action: 'View stock',
+      href: WAREHOUSE_PATHS.stockWithBand('unknown'),
+    });
+  }
   return tasks;
-}
-
-/** Pieces of each product asked for by requests the warehouse has not dispatched yet. */
-export function reservedByOpenRequests(requests: readonly WarehouseRequest[]) {
-  const open = requests.filter((request) => !['dispatched', 'received'].includes(request.status));
-  return {
-    male: open.reduce((sum, request) => sum + request.items.male, 0),
-    female: open.reduce((sum, request) => sum + request.items.female, 0),
-  };
-}
-
-/** Sidebar badge: requests waiting on the warehouse to review or dispatch them. */
-export function warehouseCounts(
-  requests: readonly WarehouseRequest[] | undefined,
-): Record<string, number> {
-  if (!requests) return {};
-  return {
-    [WAREHOUSE_PATHS.requests]: requests.filter(
-      (request) => isNew(request) || request.status === 'queued',
-    ).length,
-  };
 }

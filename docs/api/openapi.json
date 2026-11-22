@@ -6347,6 +6347,17 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "batch_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "The batch a receipt or adjustment changed; null for order steps, which can span batches, and for stock without batch details."
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "The batch's expiry date."
           }
         }
       },

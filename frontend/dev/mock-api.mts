@@ -28,7 +28,6 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { handleDcfp, seedDcfp } from './mock/dcfp.mts';
 import { handleInventory, seedInventory } from './mock/inventory.mts';
 import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
-import { handleWarehouse, seedWarehouse } from './mock/warehouse.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
 import { handleOnboarding, seedOnboarding } from './mock/onboarding.mts';
 import { handleAdmin, handleAuth, seedAdmin, signedInUser } from './mock/admin.mts';
@@ -80,7 +79,6 @@ function seedAll(dataset: (typeof datasets)[number]): void {
   // Stock first: the order seed adds the reservations of its confirmed orders to it.
   seedInventory(dataset);
   seedDcfp(dataset);
-  seedWarehouse(dataset);
   seedMoh(dataset);
   seedOnboarding();
   seedAdmin(dataset);
@@ -191,12 +189,11 @@ async function route(request: IncomingMessage): Promise<Reply> {
     request.method ?? 'GET',
     parts,
     new URL(request.url ?? '/', 'http://mock').searchParams,
+    body,
   );
   if (inventory) return inventory;
   const fulfilment = handleFulfilment(request.method ?? 'GET', parts, body);
   if (fulfilment) return fulfilment;
-  const warehouse = handleWarehouse(request.method ?? 'GET', parts, body);
-  if (warehouse) return warehouse;
   const national = handleMoh(
     request.method ?? 'GET',
     parts,

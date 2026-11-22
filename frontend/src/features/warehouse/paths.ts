@@ -40,4 +40,6 @@ export const WAREHOUSE_PATHS = {
     `/warehouse/requests?status=${encodeURIComponent(status)}`,
   request: (id: string) => `/warehouse/requests/${encodeURIComponent(id)}`,
   stock: '/warehouse/stock',
+  receive: '/warehouse/stock/receive',
+  stockWithBand: (band: string) => `/warehouse/stock?band=${encodeURIComponent(band)}`,
 } as const;

@@ -24,6 +24,9 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Removed
 
+- The warehouse screens' mock-only `/warehouses/{code}/…` contract and its sample requests, stock and
+  dispatch picker; the warehouse now reads orders, stock and batches from the Go API.
+
 - **Generic store-to-store orders and the orders-only inbox.** `POST /api/v1/orders`,
   `PATCH /api/v1/orders/{id}/fulfill` and `GET /api/v1/orders/notifications` had no client: the web
   and mobile apps use warehouse orders and the central inbox. Migration 32 deletes `orders:create`,
@@ -51,6 +54,17 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
   It updates with each stable release. Preview it with `make docs-serve`. See
   [ADR 0004](adr/0004-documentation-site.md).
+- **Warehouse stock on the Go API.** The stock page shows, per product, what is free to reserve,
+  what is reserved, expired and expiring within 3 months, and the next expiry; every batch with its
+  shelf-life band (filtered by band from the address); and the stock ledger with each entry's batch.
+  A batch can be adjusted after a count or written off as damaged, expired or lost, with a note.
+  **Record a delivery** (`/warehouse/stock/receive`) records a delivery batch by batch, with its
+  number, expiry date and quantity. The dashboard lists orders to decide, reserve, dispatch or
+  recheck and batches to write off or send first, on live data; batch expiry alerts in the bell open
+  the stock page.
+- Inventory movements name the batch a receipt or adjustment changed (`batch_number`,
+  `expiry_date`).
+
 - **Warehouse district requests on the Go API.** NMS and JMS list the orders districts placed with
   them and open one to decide: choose the product to send from the category requested (each with
   what it can reserve), approve all or part, and the stock is reserved at once or the order waits
