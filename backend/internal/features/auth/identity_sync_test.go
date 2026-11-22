@@ -40,6 +40,9 @@ type testIdP struct {
 	// Set by the test before each sign-in; the token endpoint puts them in the ID token.
 	subject, nonce, challenge, redirect string
 	roles                               []string
+	// editIDToken, when set, changes the ID token's claims; signingKey, when set, signs it instead.
+	editIDToken func(jwt.MapClaims)
+	signingKey  *rsa.PrivateKey
 }
 
 func newTestIdP(t *testing.T) *testIdP {
@@ -68,10 +71,18 @@ func newTestIdP(t *testing.T) *testIdP {
 			http.Error(w, "invalid exchange", http.StatusBadRequest)
 			return
 		}
-		raw := idp.sign(t, idp.key, jwt.MapClaims{
+		claims := jwt.MapClaims{
 			"iss": idp.issuer, "sub": idp.subject, "aud": "clims", "azp": "clims", "nonce": idp.nonce,
 			"iat": time.Now().Unix(), "exp": time.Now().Add(time.Minute).Unix(), "clims_roles": idp.roles,
-		})
+		}
+		if idp.editIDToken != nil {
+			idp.editIDToken(claims)
+		}
+		key := idp.key
+		if idp.signingKey != nil {
+			key = idp.signingKey
+		}
+		raw := idp.sign(t, key, claims)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"id_token": raw, "access_token": "test", "token_type": "Bearer"})
 	})
