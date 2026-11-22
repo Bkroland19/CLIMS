@@ -7,6 +7,8 @@ import (
 	"errors"
 	"time"
 
+	"clims-backend/internal/features/audit"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,11 +28,12 @@ type period struct {
 }
 
 type Repository struct {
-	db *pgxpool.Pool
+	db    *pgxpool.Pool
+	audit audit.Auditor
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *pgxpool.Pool, auditor audit.Auditor) *Repository {
+	return &Repository{db: db, audit: auditor}
 }
 
 // productName labels a condom product as brand, type and category,
@@ -246,8 +249,14 @@ func (r *Repository) record(ctx context.Context, actorID string, in MovementInpu
 		if err != nil {
 			return err
 		}
-		result, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[Movement])
-		return err
+		if result, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[Movement]); err != nil {
+			return err
+		}
+		return r.audit.Record(ctx, tx, audit.Entry{Action: "inventory.movement_recorded",
+			Target:  &audit.Subject{Type: "inventory_movement", ID: result.ID},
+			Related: []audit.Subject{{Type: "store", ID: result.StoreID}, {Type: "product", ID: result.CondomID}},
+			Details: map[string]any{"reason": result.Reason, "quantity": result.Quantity,
+				"on_hand_after": result.OnHandAfter, "unit_of_measure_id": result.UnitOfMeasureID, "note": result.Note}})
 	})
 	return result, err
 }

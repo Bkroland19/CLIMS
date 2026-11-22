@@ -84,7 +84,7 @@ func (r *Repository) createWarehouseRequest(ctx context.Context, access scope, i
 		if err != nil {
 			return err
 		}
-		return r.record(ctx, tx, order, access.userID, "replenishment_requested", &input.WarehouseID)
+		return r.record(ctx, tx, nil, order, access.userID, "replenishment_requested", &input.WarehouseID)
 	})
 	return order, err
 }
@@ -134,6 +134,7 @@ func (r *Repository) act(ctx context.Context, access scope, id, action string, i
 // transition moves a warehouse request one step: the warehouse reviews, checks stock (reserving it,
 // or holding the request until stock arrives) and dispatches; the district receives.
 func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
+	before := order
 	next := order.Status
 	var notifyStore *string
 	switch action {
@@ -257,7 +258,7 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 	if err != nil {
 		return Order{}, err
 	}
-	return result, r.record(ctx, tx, result, actorID, action, notifyStore)
+	return result, r.record(ctx, tx, &before, result, actorID, action, notifyStore)
 }
 
 // chooseProduct sets the product the warehouse sends: an active product of the category requested.

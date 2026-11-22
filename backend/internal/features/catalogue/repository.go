@@ -3,7 +3,9 @@ package catalogue
 import (
 	"context"
 	"errors"
+	"strings"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/pkg/validator"
 
 	"github.com/jackc/pgx/v5"
@@ -137,11 +139,26 @@ type querier interface {
 }
 
 type Repository struct {
-	db *pgxpool.Pool
+	db    *pgxpool.Pool
+	audit audit.Auditor
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *pgxpool.Pool, auditor audit.Auditor) *Repository {
+	return &Repository{db: db, audit: auditor}
+}
+
+// subject is how the audit log names a lookup kind, e.g. "unit_of_measure".
+func (k lookupKind) subject() string { return strings.ReplaceAll(k.singular, " ", "_") }
+
+// recordChange writes a catalogue change to the audit log. A nil before is a creation,
+// a nil after a deletion.
+func (r *Repository) recordChange(ctx context.Context, tx pgx.Tx, subjectType, event, id string, before, after any) error {
+	changes := audit.Diff(before, after)
+	if event == "updated" && len(changes) == 0 {
+		return nil
+	}
+	return r.audit.Record(ctx, tx, audit.Entry{Action: subjectType + "." + event,
+		Target: &audit.Subject{Type: subjectType, ID: id}, Changes: changes})
 }
 
 func scanProduct(row pgx.Row) (Product, error) {
@@ -208,6 +225,9 @@ func (r *Repository) createProduct(ctx context.Context, fields ProductFields) (P
 	if err != nil {
 		return Product{}, err
 	}
+	if err = r.recordChange(ctx, tx, "product", "created", id, nil, product); err != nil {
+		return Product{}, err
+	}
 	return product, tx.Commit(ctx)
 }
 
@@ -225,6 +245,10 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 	if err = tx.QueryRow(ctx, `SELECT category, type_id, brand_id, unit_id, pieces_per_unit, active
 		FROM condoms WHERE id = $1 FOR UPDATE`, id).Scan(
 		&current.Category, &current.TypeID, &current.BrandID, &current.UnitID, &current.PiecesPerUnit, &active); err != nil {
+		return Product{}, err
+	}
+	before, err := getProduct(ctx, tx, id)
+	if err != nil {
 		return Product{}, err
 	}
 	merged := current.overlay(patch.ProductFields)
@@ -260,12 +284,15 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 	if err != nil {
 		return Product{}, err
 	}
+	if err = r.recordChange(ctx, tx, "product", "updated", id, before, product); err != nil {
+		return Product{}, err
+	}
 	return product, tx.Commit(ctx)
 }
 
 func (r *Repository) deleteProduct(ctx context.Context, id string) error {
 	return r.deleteUnlessInUse(ctx, `SELECT `+productInUse+` FROM condoms c WHERE c.id = $1 FOR UPDATE`,
-		`DELETE FROM condoms WHERE id = $1`, id)
+		`DELETE FROM condoms WHERE id = $1`, id, "product", func(tx pgx.Tx) (any, error) { return getProduct(ctx, tx, id) })
 }
 
 // productReference is a lookup a product names, and the request field that names it.
@@ -349,6 +376,9 @@ func (r *Repository) createLookup(ctx context.Context, kind lookupKind, input Lo
 	if err != nil {
 		return Lookup{}, err
 	}
+	if err = r.recordChange(ctx, tx, kind.subject(), "created", id, nil, lookup); err != nil {
+		return Lookup{}, err
+	}
 	return lookup, tx.Commit(ctx)
 }
 
@@ -363,6 +393,10 @@ func (r *Repository) updateLookup(ctx context.Context, kind lookupKind, id strin
 	var active bool
 	if err = tx.QueryRow(ctx, `SELECT name, note, active FROM `+kind.table+` WHERE id = $1 FOR UPDATE`, id).Scan(
 		&name, &note, &active); err != nil {
+		return Lookup{}, err
+	}
+	before, err := getLookup(ctx, tx, kind, id)
+	if err != nil {
 		return Lookup{}, err
 	}
 	if patch.Name != nil {
@@ -388,17 +422,22 @@ func (r *Repository) updateLookup(ctx context.Context, kind lookupKind, id strin
 	if err != nil {
 		return Lookup{}, err
 	}
+	if err = r.recordChange(ctx, tx, kind.subject(), "updated", id, before, lookup); err != nil {
+		return Lookup{}, err
+	}
 	return lookup, tx.Commit(ctx)
 }
 
 func (r *Repository) deleteLookup(ctx context.Context, kind lookupKind, id string) error {
 	return r.deleteUnlessInUse(ctx, `SELECT (`+kind.inUse+`) FROM `+kind.table+` t WHERE t.id = $1 FOR UPDATE`,
-		`DELETE FROM `+kind.table+` WHERE id = $1`, id)
+		`DELETE FROM `+kind.table+` WHERE id = $1`, id, kind.subject(), func(tx pgx.Tx) (any, error) { return getLookup(ctx, tx, kind, id) })
 }
 
-// deleteUnlessInUse locks the row, refuses when inUseQuery says it is referenced, then deletes it.
-// A foreign key violation means a reference appeared after the check, which is also in use.
-func (r *Repository) deleteUnlessInUse(ctx context.Context, inUseQuery, deleteQuery, id string) error {
+// deleteUnlessInUse locks the row, refuses when inUseQuery says it is referenced, then deletes it,
+// recording what was deleted, as read by load. A foreign key violation means a reference appeared
+// after the check, which is also in use.
+func (r *Repository) deleteUnlessInUse(ctx context.Context, inUseQuery, deleteQuery, id, subjectType string,
+	load func(pgx.Tx) (any, error)) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -411,11 +450,18 @@ func (r *Repository) deleteUnlessInUse(ctx context.Context, inUseQuery, deleteQu
 	if inUse {
 		return errInUse
 	}
+	before, err := load(tx)
+	if err != nil {
+		return err
+	}
 	if _, err = tx.Exec(ctx, deleteQuery, id); err != nil {
 		var dbError *pgconn.PgError
 		if errors.As(err, &dbError) && dbError.Code == "23503" {
 			return errInUse
 		}
+		return err
+	}
+	if err = r.recordChange(ctx, tx, subjectType, "deleted", id, before, nil); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
