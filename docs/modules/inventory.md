@@ -7,6 +7,7 @@ The inventory API reports stock across the supply chain: the national warehouse,
 | Method | Route                         | Permission         |
 | ------ | ----------------------------- | ------------------ |
 | GET    | `/api/v1/inventory/stock`     | `inventory:read`   |
+| GET    | `/api/v1/inventory/batches`   | `inventory:read`   |
 | GET    | `/api/v1/inventory/hotspots`  | `inventory:read`   |
 | GET    | `/api/v1/inventory/movements` | `inventory:read`   |
 | POST   | `/api/v1/inventory/movements` | `inventory:manage` |
@@ -35,6 +36,8 @@ Stock cannot fall below what open orders have reserved; such an adjustment retur
 A store's stock of a product in a unit is held in batches (`stock_batches`), each with an optional `batch_number` and `expiry_date`, adding up to the store total. A receipt or positive adjustment adds to the batch it names; a negative adjustment comes out of it (409 when the batch holds less). Without batch details the stock is in the unknown-expiry batch, which reports do not count as usable until reviewed. Migration 26 put each existing balance in an unknown-expiry batch.
 
 Stock leaves a store first expiry first out: warehouse dispatch and district deliveries to hotspots take the earliest-expiring batch first and unknown expiry last. Expired batches never leave, and a batch with under one calendar month left leaves only with an `expiry_exception_reason`, recorded with who authorised it and the rule version. What left is recorded per batch (`shipment_batches`), and a district's receipt puts the counted quantity into the batches the warehouse shipped: a shortfall comes off the latest-expiring batch, and a surplus goes to an unknown-expiry batch. Warehouse check-stock does not count expired stock as available. See [reports](reports.md#batches-and-expiry).
+
+`GET /api/v1/inventory/batches` lists the batches with stock at the stores the user may see, optionally for one `store_id` and `condom_id`, in the order dispatch takes them: earliest expiry first, unknown expiry last. Each has its `band` (`expired`, `under_1_month`, `under_3_months`, `under_6_months`, `ok`, or `unknown` without an expiry date) and `days_remaining`. It needs `inventory:read`, so warehouse and district staff can see their batches without report access.
 
 ### Expiry alerts
 

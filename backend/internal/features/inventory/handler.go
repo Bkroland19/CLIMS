@@ -28,6 +28,7 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	h := &Handler{repo: repo}
 	group := router.Group("/inventory", jwt, activeUser)
 	group.Get("/stock", rbac.RequirePermission("inventory:read"), h.stock)
+	group.Get("/batches", rbac.RequirePermission("inventory:read"), h.batches)
 	group.Get("/hotspots", rbac.RequirePermission("inventory:read"), h.hotspots)
 	group.Get("/movements", rbac.RequirePermission("inventory:read"), h.movements)
 	group.Post("/movements", rbac.RequirePermission("inventory:manage"), h.record)
@@ -50,6 +51,16 @@ func (h *Handler) stock(c fiber.Ctx) error {
 	}
 	result, err := h.repo.stock(c.Context(), scopeFor(users.CurrentUser(c)),
 		StockFilter{StoreID: storeID, StoreType: storeType, CondomID: condomID})
+	return reply(c, result, err)
+}
+
+func (h *Handler) batches(c fiber.Ctx) error {
+	storeID, condomID, err := optionalIDs(c, "store_id", "condom_id")
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	result, err := h.repo.batches(c.Context(), scopeFor(users.CurrentUser(c)),
+		StockFilter{StoreID: storeID, CondomID: condomID}, time.Now())
 	return reply(c, result, err)
 }
 

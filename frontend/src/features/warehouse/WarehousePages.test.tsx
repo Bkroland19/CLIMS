@@ -6,7 +6,9 @@ import { AppUnderTest } from '@/test/AppUnderTest';
 import { aRequest } from '@/test/fulfilmentFixtures';
 import { testRouter } from '@/test/navigation';
 import { renderApp } from '@/test/renderApp';
+import { FEMALE, JMS } from '@/test/dcfpFixtures';
 import { aWarehouseStock, warehouseApi } from '@/test/warehouseFixtures';
+import { aWarehouseOrder, warehouseOrderApi } from '@/test/warehouseOrderFixtures';
 
 const REQUESTS = [
   aRequest({ id: 'WR-2026-0031', warehouse: 'JMS', district: 'Gulu', status: 'sent' }),
@@ -31,23 +33,66 @@ function render(route: string, stock = aWarehouseStock()) {
 }
 
 describe('District requests', () => {
-  it('lists the requests at the store in the address, and switches store by link', async () => {
-    const user = userEvent.setup();
-    const { requests } = render('/warehouse/requests?store=NMS');
+  const ORDERS = [
+    aWarehouseOrder({ id: 'o-gulu', ordered_for_store_id: 'store-gulu' }),
+    aWarehouseOrder({
+      id: 'o-mukono',
+      ordered_for_store_id: 'store-mukono',
+      condom_id: FEMALE.id,
+      order_status: 'confirmed',
+      quantity_needed: 500,
+      quantity_approved: 300,
+    }),
+    aWarehouseOrder({
+      id: 'o-held',
+      ordered_for_store_id: 'store-wakiso',
+      order_status: 'on_hold',
+    }),
+    aWarehouseOrder({
+      id: 'o-wakiso',
+      ordered_for_store_id: 'store-wakiso',
+      order_status: 'received',
+    }),
+    aWarehouseOrder({
+      id: 'o-jms',
+      ordered_for_store_id: 'store-wakiso',
+      ordered_from_store_id: JMS.id,
+    }),
+  ];
 
-    const table = await screen.findByRole('table', { name: 'District requests at NMS' });
-    expect(await within(table).findByRole('link', { name: 'WR-2026-0030' })).toHaveAttribute(
+  function renderOrders(route: string) {
+    return renderApp(<AppUnderTest />, {
+      route,
+      signedIn: true,
+      replies: [
+        warehouseOrderApi({
+          orders: ORDERS,
+          legacy: { requests: REQUESTS, stock: aWarehouseStock() },
+        }),
+      ],
+    });
+  }
+
+  it('lists the orders at the store in the address, and switches store by link', async () => {
+    const user = userEvent.setup();
+    renderOrders('/warehouse/requests?store=NMS');
+
+    const table = await screen.findByRole('table', { name: 'District orders at NMS' });
+    expect(await within(table).findByRole('link', { name: 'Gulu' })).toHaveAttribute(
       'href',
-      '/warehouse/requests/WR-2026-0030?store=NMS',
+      '/warehouse/requests/o-gulu?store=NMS',
     );
-    expect(within(table).queryByText('WR-2026-0031')).not.toBeInTheDocument();
-    expect(requests.some((request) => request.url === '/warehouses/NMS/requests')).toBe(true);
-    // The sidebar badge counts what waits on NMS: one new and one queued request.
-    expect(
-      within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', {
-        name: /District requests/,
-      }),
-    ).toHaveTextContent('2');
+    expect(within(table).getByText('300 box approved')).toBeInTheDocument();
+    expect(within(table).getAllByText('Female condoms')).toHaveLength(3); // product not chosen yet
+    expect(within(table).getAllByRole('link')).toHaveLength(4);
+    // The sidebar badge counts what waits on NMS: one to decide and one to dispatch.
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', {
+          name: /District requests/,
+        }),
+      ).toHaveTextContent('2');
+    });
 
     const switcher = screen.getByRole('navigation', { name: 'Switch warehouse' });
     expect(within(switcher).getByRole('link', { name: 'NMS · Entebbe' })).toHaveAttribute(
@@ -57,16 +102,16 @@ describe('District requests', () => {
     await user.click(within(switcher).getByRole('link', { name: 'JMS · Kampala' }));
 
     expect(testRouter.location).toBe('/warehouse/requests?store=JMS');
-    expect(
-      await within(
-        await screen.findByRole('table', { name: 'District requests at JMS' }),
-      ).findByRole('link', { name: 'WR-2026-0031' }),
-    ).toBeInTheDocument();
+    const jms = await screen.findByRole('table', { name: 'District orders at JMS' });
+    expect(await within(jms).findByRole('link', { name: 'Wakiso' })).toHaveAttribute(
+      'href',
+      '/warehouse/requests/o-jms?store=JMS',
+    );
   });
 
   it('remembers the store when a sidebar link leaves it out of the address', async () => {
-    const { storage } = render('/warehouse/requests?store=JMS');
-    await screen.findByRole('table', { name: 'District requests at JMS' });
+    const { storage } = renderOrders('/warehouse/requests?store=JMS');
+    await screen.findByRole('table', { name: 'District orders at JMS' });
     await waitFor(() => {
       expect(storage.getItem('clims.warehouse.store')).toBe('"JMS"');
     });
@@ -81,14 +126,17 @@ describe('District requests', () => {
   });
 
   it('filters by status from the address', async () => {
-    render('/warehouse/requests?store=NMS&status=new');
-    const table = await screen.findByRole('table', { name: 'District requests at NMS' });
-    expect(await within(table).findByRole('link', { name: 'WR-2026-0028' })).toBeInTheDocument();
-    expect(within(table).queryByText('WR-2026-0030')).not.toBeInTheDocument();
+    renderOrders('/warehouse/requests?store=NMS&status=on_hold');
+    const table = await screen.findByRole('table', { name: 'District orders at NMS' });
+    expect(await within(table).findByRole('link', { name: 'Wakiso' })).toHaveAttribute(
+      'href',
+      '/warehouse/requests/o-held?store=NMS',
+    );
+    expect(within(table).queryByText('Gulu')).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole('navigation', { name: 'Filter requests by status' })).getByRole(
+      within(screen.getByRole('navigation', { name: 'Filter orders by status' })).getByRole(
         'link',
-        { name: /New/ },
+        { name: /Waiting for stock/ },
       ),
     ).toHaveAttribute('aria-current', 'true');
   });

@@ -15,9 +15,12 @@ const notification = (overrides: Partial<InboxNotification> = {}): InboxNotifica
   ...overrides,
 });
 
+const DCFP = { dcfp: true, warehouse: false };
+const WAREHOUSE = { dcfp: false, warehouse: true };
+
 describe('hrefFor', () => {
   it('opens the DCFP screen a notification is about', () => {
-    expect(hrefFor(notification(), true)).toBe('/dcfp/stockouts');
+    expect(hrefFor(notification(), DCFP)).toBe('/dcfp/stockouts');
     expect(
       hrefFor(
         notification({
@@ -25,28 +28,42 @@ describe('hrefFor', () => {
           resource_type: 'order',
           resource_id: 'o 1',
         }),
-        true,
+        DCFP,
       ),
     ).toBe('/dcfp/restock/o%201');
     for (const type of ['order.replenishment_approved', 'order.replenishment_rejected']) {
-      expect(hrefFor(notification({ type, resource_type: 'order', resource_id: 'o2' }), true)).toBe(
+      expect(hrefFor(notification({ type, resource_type: 'order', resource_id: 'o2' }), DCFP)).toBe(
         '/dcfp/restock/o2',
       );
     }
-    expect(hrefFor(notification({ type: 'hotspot.submitted' }), true)).toBe('/dcfp/hotspots');
+    expect(hrefFor(notification({ type: 'hotspot.submitted' }), DCFP)).toBe('/dcfp/hotspots');
+  });
+
+  it('opens the warehouse order a warehouse notification is about', () => {
+    const order = (type: string) =>
+      notification({ type, resource_type: 'order', resource_id: 'o3' });
+    expect(hrefFor(order('order.replenishment_requested'), WAREHOUSE)).toBe(
+      '/warehouse/requests/o3',
+    );
+    expect(hrefFor(order('order.shipment_received'), WAREHOUSE)).toBe('/warehouse/requests/o3');
+    // Both sides hear of a receipt; someone in both workspaces opens the district's view.
+    expect(hrefFor(order('order.shipment_received'), { dcfp: true, warehouse: true })).toBe(
+      '/dcfp/restock/o3',
+    );
+    expect(hrefFor(order('order.replenishment_approved'), WAREHOUSE)).toBeNull();
   });
 
   it('gives no link where there is no screen to open', () => {
-    // The warehouse's screens are not on the API yet; a VHT has no DCFP workspace.
-    expect(hrefFor(notification({ type: 'order.replenishment_requested' }), true)).toBeNull();
-    expect(hrefFor(notification({ type: 'hotspot.activated' }), true)).toBeNull();
-    expect(hrefFor(notification(), false)).toBeNull();
+    // A warehouse order needs the warehouse workspace; a VHT has no DCFP workspace.
+    expect(hrefFor(notification({ type: 'order.replenishment_requested' }), DCFP)).toBeNull();
+    expect(hrefFor(notification({ type: 'hotspot.activated' }), DCFP)).toBeNull();
+    expect(hrefFor(notification(), { dcfp: false, warehouse: false })).toBeNull();
   });
 });
 
 describe('toAppNotification and unreadOfType', () => {
   it('shows the body, with the title and time beneath, and keeps the read state', () => {
-    expect(toAppNotification(notification(), true, () => '3 h ago')).toEqual({
+    expect(toAppNotification(notification(), DCFP, () => '3 h ago')).toEqual({
       id: 'n1',
       text: 'Kisenyi Landing is out of Engabu Free Female.',
       meta: 'Stockout at Kisenyi Landing · 3 h ago',
@@ -56,7 +73,7 @@ describe('toAppNotification and unreadOfType', () => {
     });
     const read = toAppNotification(
       notification({ type: 'something.new', read_at: '2026-11-21T10:00:00Z' }),
-      true,
+      DCFP,
       () => '',
     );
     expect(read).toMatchObject({ unread: false, tone: 'neutral', href: undefined });

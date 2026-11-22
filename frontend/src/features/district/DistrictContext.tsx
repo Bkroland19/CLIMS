@@ -9,8 +9,8 @@ import { readJson, writeJson } from '@/lib/storage/jsonStorage';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
 import { useLocationDistricts } from '@/features/hotspots/queries';
 import { useDistrictStores } from '@/features/moh/queries';
-import { useWarehouseRequests } from '@/features/warehouse/queries';
-import { useWarehouseStore } from '@/features/warehouse/useWarehouseStore';
+import { useStores } from '@/features/geography/queries';
+import { useCurrentWarehouse, useStoreOrders } from '@/features/warehouse/orderQueries';
 
 const ALL = 'all';
 const DistrictContext = createContext<{
@@ -29,8 +29,10 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
   const isMoh = pathname === '/moh' || pathname.startsWith('/moh/');
   const isWarehouse = pathname === '/warehouse' || pathname.startsWith('/warehouse/');
   const isMap = pathname === '/moh/hotspot-map';
-  const { store } = useWarehouseStore();
-  const requests = useWarehouseRequests(store, { enabled: isWarehouse });
+  // A warehouse serves the districts whose stores have ordered from it.
+  const { warehouse } = useCurrentWarehouse({ enabled: isWarehouse });
+  const orders = useStoreOrders(warehouse?.id, { enabled: isWarehouse });
+  const allStores = useStores(isWarehouse);
   const stores = useDistrictStores(isMoh && !isMap);
   const locations = useLocationDistricts(isMoh);
   const storage = useAppStorage();
@@ -50,7 +52,11 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
   const options = [
     ...new Set(
       isWarehouse
-        ? (requests.data ?? []).map((request) => request.district)
+        ? (orders.data ?? []).map(
+            (order) =>
+              allStores.data?.find((candidate) => candidate.id === order.ordered_for_store_id)
+                ?.district_name ?? '',
+          )
         : [...locationsByName.keys(), ...(stores.data ?? []).map((district) => district.district)],
     ),
   ]
@@ -74,7 +80,7 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
         <FilterSelect
           label="District"
           value={district ?? ALL}
-          disabled={isWarehouse ? requests.isPending : locations.isPending && stores.isPending}
+          disabled={isWarehouse ? orders.isPending : locations.isPending && stores.isPending}
           options={[
             { value: ALL, label: isWarehouse ? 'All served districts' : 'All districts' },
             ...options.map((name) => ({ value: name, label: name })),

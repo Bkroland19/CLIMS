@@ -26,6 +26,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { handleDcfp, seedDcfp } from './mock/dcfp.mts';
+import { handleInventory, seedInventory } from './mock/inventory.mts';
 import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
 import { handleWarehouse, seedWarehouse } from './mock/warehouse.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
@@ -76,6 +77,8 @@ if (!isDatasetName(DATASET)) {
 function seedAll(dataset: (typeof datasets)[number]): void {
   seedHotspotsMock(dataset);
   seedFulfilment(dataset);
+  // Stock first: the order seed adds the reservations of its confirmed orders to it.
+  seedInventory(dataset);
   seedDcfp(dataset);
   seedWarehouse(dataset);
   seedMoh(dataset);
@@ -184,6 +187,12 @@ async function route(request: IncomingMessage): Promise<Reply> {
     new URL(request.url ?? '/', 'http://mock').searchParams,
   );
   if (dcfp) return dcfp;
+  const inventory = handleInventory(
+    request.method ?? 'GET',
+    parts,
+    new URL(request.url ?? '/', 'http://mock').searchParams,
+  );
+  if (inventory) return inventory;
   const fulfilment = handleFulfilment(request.method ?? 'GET', parts, body);
   if (fulfilment) return fulfilment;
   const warehouse = handleWarehouse(request.method ?? 'GET', parts, body);

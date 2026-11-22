@@ -1468,6 +1468,58 @@
         }
       }
     },
+    "/api/v1/inventory/batches": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listStockBatches",
+        "summary": "Batches at stores",
+        "description": "Requires inventory:read. The batches with stock at the stores the user may see (their assigned store; orders:all_stores sees every store), in the order dispatch takes them within each product and unit: earliest expiry first, unknown expiry last. band is the shelf life left in calendar months (expired, under_1_month, under_3_months, under_6_months, ok, or unknown without an expiry date), with days_remaining counted in Kampala time.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockBatchListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/inventory/hotspots": {
       "get": {
         "tags": ["Inventory"],
@@ -9527,6 +9579,110 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AuditEntry"
+            }
+          }
+        }
+      },
+      "StockBatch": {
+        "type": "object",
+        "required": [
+          "id",
+          "store_id",
+          "store_name",
+          "store_type",
+          "condom_id",
+          "product",
+          "unit_of_measure_id",
+          "unit",
+          "band",
+          "on_hand",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["male", "female"],
+            "nullable": true
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "batch_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for stock recorded without batch details."
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "days_remaining": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Days from today (Kampala) to the expiry date; negative once expired; null without an expiry date."
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "expired",
+              "under_1_month",
+              "under_3_months",
+              "under_6_months",
+              "ok",
+              "unknown"
+            ]
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockBatchListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockBatch"
             }
           }
         }

@@ -1,129 +1,121 @@
 'use client';
 
-import { useDistrictContext } from '@/features/district/DistrictContext';
-import { ArrowRight, Check } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
-import { toast } from 'sonner';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { RowActions, type RowActionItem } from '@/components/data-table/RowActions';
+import { RowActions } from '@/components/data-table/RowActions';
 import { FilterTabs } from '@/components/FilterTabs';
-import { SampleDataNotice } from '@/components/SampleData';
 import { StatusBadge } from '@/components/StatusBadge';
-import type { WarehouseCode, WarehouseRequest } from '@/features/fulfilment/api';
-import { formatQuantities, totalPieces } from '@/features/fulfilment/products';
-import { REQUEST_STATUS } from '@/features/fulfilment/status';
-import { getErrorMessage } from '@/lib/api';
+import { useDistrictContext } from '@/features/district/DistrictContext';
+import type { Order } from '@/features/orders/api';
 import { formatTimestamp } from '@/lib/format';
 
+import {
+  useCurrentWarehouse,
+  useRequestNames,
+  useStoreOrders,
+  type RequestNames,
+} from './orderQueries';
 import { WAREHOUSE_PATHS, withStore } from './paths';
-import { isNew } from './progress';
-import { useAcceptWarehouseRequest, useWarehouseRequests } from './queries';
+import { REQUEST_FILTERS, requestFilterFrom, requestStatus } from './requests';
 import { StoreSwitch } from './StoreSwitch';
-import { REQUEST_FILTERS, requestFilterFrom } from './tasks';
-import { useWarehouseStore } from './useWarehouseStore';
 
-function columnsFor(store: WarehouseCode): DataTableColumn<WarehouseRequest>[] {
+function columnsFor(names: RequestNames, href: (path: string) => string): DataTableColumn<Order>[] {
   return [
     {
-      id: 'id',
-      header: 'Request',
-      value: (request) => request.id,
-      cell: (request) => (
+      id: 'district',
+      header: 'Ordered for',
+      value: (order) => names.store(order.ordered_for_store_id),
+      cell: (order) => (
         <Link
-          href={withStore(WAREHOUSE_PATHS.request(request.id), store)}
+          href={href(WAREHOUSE_PATHS.request(order.id))}
           className="text-foreground font-medium underline-offset-4 hover:underline"
         >
-          {request.id}
+          {names.store(order.ordered_for_store_id)}
         </Link>
       ),
     },
     {
-      id: 'district',
-      header: 'Ordered for',
-      value: (request) => request.district,
-      cell: (request) => (
-        <div className="min-w-0">
-          <div className="truncate">{request.district} district store</div>
-          <div className="text-muted-foreground truncate text-xs">
-            {request.requested_by} · DCFP
-          </div>
+      id: 'product',
+      header: 'Product',
+      value: (order) => names.product(order.condom_id, order.condom_category),
+      cell: (order) => (
+        <span className="block max-w-64 truncate">
+          {names.product(order.condom_id, order.condom_category)}
+        </span>
+      ),
+    },
+    {
+      id: 'quantity',
+      header: 'Quantity',
+      value: (order) => order.quantity_needed ?? 0,
+      cell: (order) => (
+        <div className="tabular-nums">
+          <div>{names.quantity(order.quantity_needed, order.unit_of_measure_id)}</div>
+          {order.quantity_approved !== null && order.quantity_approved !== order.quantity_needed ? (
+            <div className="text-muted-foreground text-xs">
+              {names.quantity(order.quantity_approved, order.unit_of_measure_id)} approved
+            </div>
+          ) : null}
         </div>
       ),
     },
     {
-      id: 'items',
-      header: 'Quantity needed',
-      value: (request) => totalPieces(request.items),
-      cell: (request) => formatQuantities(request.items),
-    },
-    {
       id: 'received',
       header: 'Received',
-      value: (request) => request.created_at,
-      cell: (request) => formatTimestamp(request.created_at),
+      value: (order) => order.created_at,
+      cell: (order) => formatTimestamp(order.created_at),
     },
     {
       id: 'status',
       header: 'Status',
-      value: (request) => REQUEST_STATUS[request.status].label,
-      cell: (request) => (
-        <StatusBadge
-          status={REQUEST_STATUS[request.status].label}
-          tone={REQUEST_STATUS[request.status].tone}
-        />
-      ),
+      value: (order) => requestStatus(order).label,
+      cell: (order) => {
+        const status = requestStatus(order);
+        return <StatusBadge status={status.label} tone={status.tone} />;
+      },
     },
   ];
 }
 
+/** What opening the order is for, by what it waits on. */
+function actionLabel(order: Order): string {
+  switch (order.order_status) {
+    case 'queued':
+      return 'Decide on order';
+    case 'reviewed':
+    case 'on_hold':
+      return 'Check stock';
+    case 'confirmed':
+      return 'Dispatch order';
+    default:
+      return 'Open order';
+  }
+}
+
 export default function DistrictRequestsPage() {
-  const { store, href } = useWarehouseStore();
+  const { code, href, warehouse, ...stores } = useCurrentWarehouse();
+  const orders = useStoreOrders(warehouse?.id);
+  const names = useRequestNames();
   const district = useDistrictContext()?.district;
-  const requests = useWarehouseRequests(store);
-  const visibleRequests = district
-    ? requests.data?.filter((request) => request.district === district)
-    : requests.data;
-  const accept = useAcceptWarehouseRequest(store);
   const router = useRouter();
   const filter = requestFilterFrom(useSearchParams().get('status'));
-  const columns = useMemo(() => columnsFor(store), [store]);
+  const columns = useMemo(() => columnsFor(names, href), [names, href]);
 
-  const rows = visibleRequests?.filter(filter.keeps);
-
-  function actionsFor(request: WarehouseRequest): RowActionItem[] {
-    const open = {
-      label: isNew(request) ? 'Review request' : 'Open request',
-      icon: ArrowRight,
-      onSelect: () => {
-        router.push(href(WAREHOUSE_PATHS.request(request.id)));
-      },
-    };
-    if (!isNew(request)) return [open];
-    return [
-      open,
-      {
-        label: 'Accept and queue',
-        icon: Check,
-        onSelect: () => {
-          accept.mutate(request.id, {
-            onError: (error) => {
-              toast.error(`Could not accept ${request.id}: ${getErrorMessage(error)}`);
-            },
-          });
-        },
-      },
-    ];
-  }
+  const visible = district
+    ? orders.data?.filter((order) => names.district(order.ordered_for_store_id) === district)
+    : orders.data;
+  const rows = visible?.filter(filter.keeps);
+  const error = stores.error ?? orders.error;
 
   return (
     <div className="flex flex-col gap-4">
-      <StoreSwitch store={store} hrefFor={(code) => withStore(WAREHOUSE_PATHS.requests, code)} />
-      <SampleDataNotice subject="The district requests" />
+      <StoreSwitch store={code} hrefFor={(other) => withStore(WAREHOUSE_PATHS.requests, other)} />
       <FilterTabs
-        label="Filter requests by status"
+        label="Filter orders by status"
         value={filter.value}
         hrefFor={(value) =>
           href(
@@ -133,31 +125,43 @@ export default function DistrictRequestsPage() {
         tabs={REQUEST_FILTERS.map((option) => ({
           value: option.value,
           label: option.label,
-          ...(visibleRequests ? { count: visibleRequests.filter(option.keeps).length } : {}),
+          ...(visible ? { count: visible.filter(option.keeps).length } : {}),
         }))}
       />
       <DataTable
-        label={`District requests at ${store}`}
+        label={`District orders at ${code}`}
         columns={columns}
         rows={rows}
-        getRowId={(request) => request.id}
-        isLoading={requests.isPending}
-        error={requests.error}
-        onRetry={() => void requests.refetch()}
-        isRetrying={requests.isRefetching}
-        searchPlaceholder="Search requests…"
+        getRowId={(order) => order.id}
+        isLoading={stores.isPending || (warehouse !== undefined && orders.isPending)}
+        error={error}
+        onRetry={() => {
+          void stores.refetch();
+          void orders.refetch();
+        }}
+        isRetrying={orders.isRefetching}
+        searchPlaceholder="Search by district or product…"
         emptyTitle={
-          filter.value === 'all'
-            ? `No district requests at ${store} yet`
-            : 'No requests in this view'
+          filter.value === 'all' ? `No district orders at ${code} yet` : 'No orders in this view'
         }
         emptyDescription={
           filter.value === 'all'
-            ? 'Requests from district stores appear here as soon as they are sent.'
-            : 'Choose another filter to see the rest of the requests.'
+            ? 'Orders from district stores appear here as soon as a DCFP sends one.'
+            : 'Choose another filter to see the rest of the orders.'
         }
-        rowActions={(request) => (
-          <RowActions label={`Actions for ${request.id}`} actions={actionsFor(request)} />
+        rowActions={(order) => (
+          <RowActions
+            label={`Actions for the order from ${names.store(order.ordered_for_store_id)}`}
+            actions={[
+              {
+                label: actionLabel(order),
+                icon: ArrowRight,
+                onSelect: () => {
+                  router.push(href(WAREHOUSE_PATHS.request(order.id)));
+                },
+              },
+            ]}
+          />
         )}
       />
     </div>

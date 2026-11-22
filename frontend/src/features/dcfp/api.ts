@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { orderSchema, orderAction, type Order } from '@/features/orders/api';
 import { parseBody, parseList, type HttpClient } from '@/lib/api';
 
 /*
@@ -15,7 +16,6 @@ import { parseBody, parseList, type HttpClient } from '@/lib/api';
  */
 
 const text = z.string().nullable();
-const count = z.number().int();
 
 const stockoutReportSchema = z.object({
   id: z.string(),
@@ -43,74 +43,17 @@ const stockoutReportSchema = z.object({
 
 export type StockoutReport = z.infer<typeof stockoutReportSchema>;
 
-export const ORDER_STATUSES = [
-  'pending',
-  'fulfilled',
-  'queued',
-  'reviewed',
-  'on_hold',
-  'confirmed',
-  'rejected',
-  'dispatched',
-  'received',
-  'delivered',
-] as const;
-
-const orderSchema = z.object({
-  id: z.string(),
-  /** Null until the warehouse chooses the product at review. */
-  condom_id: z.string().nullable(),
-  /** The condom category the district requested. */
-  condom_category: z.enum(['male', 'female']).nullable(),
-  quantity_needed: count.nullable(),
-  /** What the warehouse approved at review; at most the quantity ordered. */
-  quantity_approved: count.nullable().default(null),
-  quantity_issued: count.nullable(),
-  quantity_received: count.nullable(),
-  order_status: z.enum(ORDER_STATUSES),
-  order_date: z.string(),
-  ordered_by_id: z.string(),
-  ordered_for_store_id: z.string(),
-  ordered_from_store_id: z.string(),
-  unit_of_measure_id: text,
-  comment: text,
-  discrepancy_note: text,
-  /** Why the warehouse rejected the order; set only on rejected orders. */
-  rejection_reason: text.default(null),
-  /** The transport the warehouse recorded at dispatch, each optional. */
-  waybill_number: text.default(null),
-  vehicle_registration: text.default(null),
-  driver_name: text.default(null),
-  driver_phone: text.default(null),
-  /** Set only on alert orders raised before stockouts became reports. */
-  hot_spot_id: text,
-  created_at: z.string(),
-  updated_at: z.string(),
-});
-
-export type Order = z.infer<typeof orderSchema>;
-export type OrderStatus = Order['order_status'];
-
-const eventSchema = z.object({
-  id: z.string(),
-  order_id: z.string(),
-  actor_id: z.string(),
-  action: z.string(),
-  status: z.enum(ORDER_STATUSES),
-  created_at: z.string(),
-});
-
-export type OrderEvent = z.infer<typeof eventSchema>;
-
-const storeSchema = z.object({
-  id: z.string(),
-  /** `nms` or `jms` for a national warehouse. */
-  code: z.string(),
-  name: z.string(),
-  store_type: z.enum(['national', 'district']),
-});
-
-export type Warehouse = z.infer<typeof storeSchema>;
+export {
+  getOrder,
+  listOrderEvents,
+  listOrders,
+  listWarehouses,
+  ORDER_STATUSES,
+  type Order,
+  type OrderEvent,
+  type OrderStatus,
+  type Warehouse,
+} from '@/features/orders/api';
 
 /* Reads. */
 
@@ -121,30 +64,6 @@ export async function listStockouts(
 ): Promise<StockoutReport[]> {
   const body = await http.get('/orders/stockouts?limit=100', { signal });
   return parseList(stockoutReportSchema, body, 'stockout reports');
-}
-
-export async function listOrders(http: HttpClient, signal?: AbortSignal): Promise<Order[]> {
-  return parseList(orderSchema, await http.get('/orders?limit=100', { signal }), 'orders');
-}
-
-export async function getOrder(http: HttpClient, id: string, signal?: AbortSignal): Promise<Order> {
-  const body = await http.get(`/orders/${encodeURIComponent(id)}`, { signal });
-  return parseBody(orderSchema, body, 'order');
-}
-
-export async function listOrderEvents(
-  http: HttpClient,
-  id: string,
-  signal?: AbortSignal,
-): Promise<OrderEvent[]> {
-  const body = await http.get(`/orders/${encodeURIComponent(id)}/events`, { signal });
-  return parseList(eventSchema, body, 'order history');
-}
-
-/** NMS and JMS. */
-export async function listWarehouses(http: HttpClient, signal?: AbortSignal): Promise<Warehouse[]> {
-  const body = await http.get('/locations/stores?store_type=national', { signal });
-  return parseList(storeSchema, body, 'warehouses');
 }
 
 /* Writes. */
@@ -176,6 +95,5 @@ export async function receiveOrder(
   id: string,
   input: ReceiptInput,
 ): Promise<Order> {
-  const body = await http.post(`/orders/${encodeURIComponent(id)}/actions/receive`, input);
-  return parseBody(orderSchema, body, 'order');
+  return orderAction(http, id, 'receive', input);
 }

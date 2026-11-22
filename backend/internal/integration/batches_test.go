@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,6 +55,28 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 		t.Fatalf("expired band filter: %v", expired)
 	}
 	request("GET", "/reports/batches?band=soon", nil, admin, 400)
+	// Stock managers see the same batches through inventory, in the order dispatch takes them.
+	var listed []string
+	for _, item := range request("GET", "/inventory/batches?store_id="+warehouse+"&condom_id="+product, nil, admin, 200)["data"].([]any) {
+		b := item.(map[string]any)
+		if b["unit_of_measure_id"] != unit {
+			continue
+		}
+		name := "unknown"
+		if b["batch_number"] != nil {
+			name = b["batch_number"].(string)
+		}
+		days := "-"
+		if b["days_remaining"] != nil {
+			days = fmt.Sprint(b["days_remaining"])
+		}
+		listed = append(listed, name+":"+b["band"].(string)+":"+days)
+	}
+	if strings.Join(listed, " ") != "EXP-1:expired:-1 NEAR-1:under_1_month:10 LATE-1:ok:365 unknown:unknown:-" {
+		t.Fatalf("inventory batches: %v", listed)
+	}
+	request("GET", "/inventory/batches", nil, districtToken, 403) // without inventory:read
+	request("GET", "/inventory/batches?store_id=nope", nil, admin, 400)
 	stockLine := func(store string) map[string]any {
 		t.Helper()
 		for _, line := range request("GET", "/reports/stock?store_id="+store, nil, admin, 200)["data"].(map[string]any)["lines"].([]any) {

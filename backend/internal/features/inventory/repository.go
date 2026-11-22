@@ -93,6 +93,61 @@ func (r *Repository) stock(ctx context.Context, access scope, f StockFilter) ([]
 	return pgx.CollectRows(rows, pgx.RowToStructByPos[StockBalance])
 }
 
+// StockBatch is a batch a store holds, with its shelf life left. A batch without an expiry date is in
+// the unknown band; stock recorded without batch details has no batch number either.
+type StockBatch struct {
+	ID              string  `json:"id"`
+	StoreID         string  `json:"store_id"`
+	StoreName       string  `json:"store_name"`
+	StoreType       string  `json:"store_type"`
+	CondomID        string  `json:"condom_id"`
+	Product         string  `json:"product"`
+	Category        *string `json:"category"`
+	UnitOfMeasureID string  `json:"unit_of_measure_id"`
+	Unit            string  `json:"unit"`
+	BatchNumber     *string `json:"batch_number"`
+	// ExpiryDate is YYYY-MM-DD.
+	ExpiryDate    *string   `json:"expiry_date"`
+	DaysRemaining *int      `json:"days_remaining"`
+	Band          string    `json:"band"`
+	OnHand        int64     `json:"on_hand"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// batches lists the batches with stock at the stores the user may see, in the order dispatch takes
+// them within each product and unit: earliest expiry first, unknown expiry last.
+func (r *Repository) batches(ctx context.Context, access scope, f StockFilter, now time.Time) ([]StockBatch, error) {
+	rows, err := r.db.Query(ctx, `SELECT x.id, s.id, s.name, s.store_type, x.condom_id, `+productName+`, c.category,
+			x.unit_of_measure_id, um.name, x.batch_number, x.expiry_date, x.on_hand, x.created_at
+		FROM stock_batches x
+		JOIN stores s ON s.id = x.store_id
+		JOIN condoms c ON c.id = x.condom_id
+		JOIN unit_of_measures um ON um.id = x.unit_of_measure_id
+		WHERE x.on_hand > 0 AND ($1::boolean OR x.store_id = $2::uuid)
+			AND ($3::uuid IS NULL OR x.store_id = $3) AND ($4::uuid IS NULL OR x.condom_id = $4)
+		ORDER BY s.store_type = 'district', s.name, 6, um.name, x.expiry_date NULLS LAST, x.created_at, x.id`,
+		access.allStores, access.storeID, f.StoreID, f.CondomID)
+	if err != nil {
+		return nil, err
+	}
+	today := stock.Today(now)
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (StockBatch, error) {
+		var b StockBatch
+		var expiry *time.Time
+		if err := row.Scan(&b.ID, &b.StoreID, &b.StoreName, &b.StoreType, &b.CondomID, &b.Product, &b.Category,
+			&b.UnitOfMeasureID, &b.Unit, &b.BatchNumber, &expiry, &b.OnHand, &b.CreatedAt); err != nil {
+			return b, err
+		}
+		b.Band = stock.Band(expiry, today)
+		if expiry != nil {
+			date := expiry.Format(time.DateOnly)
+			days := int(expiry.Sub(today).Hours() / 24)
+			b.ExpiryDate, b.DaysRemaining = &date, &days
+		}
+		return b, nil
+	})
+}
+
 type HotspotStock struct {
 	HotSpotID       string     `json:"hot_spot_id"`
 	HotSpotName     *string    `json:"hot_spot_name"`

@@ -51,6 +51,17 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
   It updates with each stable release. Preview it with `make docs-serve`. See
   [ADR 0004](adr/0004-documentation-site.md).
+- **Warehouse district requests on the Go API.** NMS and JMS list the orders districts placed with
+  them and open one to decide: choose the product to send from the category requested (each with
+  what it can reserve), approve all or part, and the stock is reserved at once or the order waits
+  for stock; a held order is checked again or approved again for less or another product. A
+  reserved order is dispatched first expiry first out: the page shows the batches that will go,
+  asks for a reason when one has under a month left, and records the transport. Any order can be
+  rejected with a reason before dispatch. The sidebar badge counts orders to decide or dispatch,
+  and the bell opens warehouse order notifications on these screens.
+- `GET /api/v1/inventory/batches` lists a store's batches with their shelf-life band and days left,
+  for `inventory:read`, in the order dispatch takes them.
+
 - **Batch expiry alerts.** Every hour the server tells the people who manage a store's stock
   (`inventory:manage` at the store), at NMS, JMS and district stores alike, once when a batch with
   stock comes within 3 months of its expiry date (`inventory.batch_expiring`) and once when it

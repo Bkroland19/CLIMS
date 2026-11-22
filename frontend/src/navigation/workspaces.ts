@@ -435,7 +435,7 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Requests',
                 title: 'District requests',
                 description:
-                  'Stock orders from district stores. Review, check stock, then dispatch or hold.',
+                  'Stock orders from district stores. Approve or reject each one, then dispatch it.',
                 layout: 'table',
               },
             ],
