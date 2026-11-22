@@ -30,8 +30,18 @@ Passwords, password hashes and tokens are never recorded. `audit.Diff` and the d
 | `auth.logged_out`               | A user signs out                                                        |
 | `auth.session_revoked`          | A user ends one of their other sessions                                 |
 | `audit.searched`                | Someone searches the audit log, with the filters they used              |
+| `user.roles_changed`            | An administrator changes a user's roles, before and after               |
+| `user.disabled`                 | An administrator disables an account, with the sessions it ended        |
+| `user.enabled`                  | An administrator re-enables an account                                  |
+| `user.store_assigned`           | A user's store changes; the old and new stores are related records      |
+| `user.sessions_revoked`         | An administrator signs a user out everywhere                            |
+| `user.identity_linked`          | The identity sync client links an SSO identity to an account            |
+| `role.permissions_changed`      | A role's permissions are replaced, before and after                     |
+| `access.denied`                 | A data-changing request is refused for a missing permission             |
 
 Routine token refreshes are not recorded; they would dominate the log.
+
+Access changes are recorded only when something changed: saving the same roles, status or store again adds nothing. Refused reads (`GET`) are not recorded as `access.denied`; listing screens would flood the log. The identity sync client is recorded as the system actor `identity-sync:<client>`.
 
 ## Recording from a feature
 
