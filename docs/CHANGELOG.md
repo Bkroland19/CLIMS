@@ -45,6 +45,26 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
   It updates with each stable release. Preview it with `make docs-serve`. See
   [ADR 0004](adr/0004-documentation-site.md).
+- **NMS and JMS can reject a district's order.** `POST /api/v1/orders/{id}/actions/reject` with a
+  required `reason`, at any step before dispatch. The order becomes `rejected`, keeps
+  `rejection_reason` and releases anything `check-stock` reserved (migration 31).
+- **The DCFP hears what the warehouse decided.** Review sends `order.replenishment_approved` with the
+  product chosen and the approved quantity (saying when it is less than ordered); rejection sends
+  `order.replenishment_rejected` quoting the reason. A receipt now also notifies the warehouse, with
+  any discrepancy note.
+- Dispatch can record the transport (waybill, vehicle, driver and phone, each optional), which the
+  district's dispatch notification includes.
+- Migration 31 grants the `nms` and `jms` roles `orders:read`, `orders:process`, `inventory:read` and
+  `inventory:manage`, and the `dfcp` role `orders:read`, `orders:replenish`, `orders:receive`,
+  `inventory:read` and `inventory:manage`, by default. Administrators can change them in Users &
+  access.
+- The warehouse requests report counts `rejected` requests, which are no longer counted as pending
+  or approved.
+- **Web Restock shows the warehouse's decision.** A rejected order says why, with a link to place a
+  new one; an approval of less than ordered says so; a dispatched order shows its waybill, vehicle and
+  driver. The bell opens approval and rejection notifications on the order. Reviewed orders read
+  "Approved".
+
 - **VHT stockout alerts for their district.** A VHT with the new `orders:stockout_district` permission can
   raise a stockout alert for any active hotspot in the district they work in (assigned store's district,
   or else assigned subcounty's). Inactive hotspots and other districts are refused.

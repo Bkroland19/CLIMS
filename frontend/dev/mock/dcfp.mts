@@ -21,7 +21,8 @@ interface Reply {
 
 type Body = Record<string, unknown>;
 
-type Status = 'queued' | 'reviewed' | 'on_hold' | 'confirmed' | 'dispatched' | 'received';
+type Status =
+  'queued' | 'reviewed' | 'on_hold' | 'confirmed' | 'rejected' | 'dispatched' | 'received';
 
 interface Order {
   id: string;
@@ -39,6 +40,12 @@ interface Order {
   unit_of_measure_id: string;
   comment: string | null;
   discrepancy_note: string | null;
+  quantity_approved: number | null;
+  rejection_reason: string | null;
+  waybill_number: string | null;
+  vehicle_registration: string | null;
+  driver_name: string | null;
+  driver_phone: string | null;
   hot_spot_id: null;
   parent_order_id: null;
   rider_id: null;
@@ -155,6 +162,12 @@ function order(
     unit_of_measure_id: mockUnitId(2),
     comment: null,
     discrepancy_note: null,
+    quantity_approved: null,
+    rejection_reason: null,
+    waybill_number: null,
+    vehicle_registration: null,
+    driver_name: null,
+    driver_phone: null,
     hot_spot_id: null,
     parent_order_id: null,
     rider_id: null,
@@ -176,6 +189,7 @@ function historyOf(o: Order): Event[] {
   if (reached >= 3) steps.push(['check-stock', 'confirmed', WAREHOUSE_STAFF]);
   if (reached >= 4) steps.push(['dispatch', 'dispatched', WAREHOUSE_STAFF]);
   if (reached >= 5) steps.push(['receive', 'received', ME]);
+  if (o.order_status === 'rejected') steps.push(['reject', 'rejected', WAREHOUSE_STAFF]);
   const start = Date.parse(o.created_at);
   return steps.map(([action, status, actor], index) => ({
     id: `${o.id}-e${index}`,
@@ -274,6 +288,19 @@ export function seedDcfp(dataset: string): void {
         handled_by_id: WAREHOUSE_STAFF,
       },
       24 * 9,
+    ),
+    order(
+      5,
+      {
+        order_status: 'rejected',
+        ordered_from_store_id: JMS,
+        condom_id: null,
+        condom_category: 'female',
+        quantity_needed: 800,
+        rejection_reason:
+          'Female condoms are reserved for the national campaign until 15 December. Please order from NMS.',
+      },
+      24 * 4,
     ),
   ];
   state.reports = [

@@ -53,8 +53,8 @@ A hotspot stockout notification names Male, Female or Both and no quantity. The 
 
 - **Requested, approved, issued and acknowledged pieces.** Requested is the original request. Approved is what the warehouse approved at review, which may be less ([orders](orders.md)). Issued is what it dispatched, and acknowledged is what the district counted on receipt.
 - **Quantity fulfilment rate**: acknowledged pieces divided by originally requested pieces, as a percentage to one decimal.
-- **Fully received, partly received and pending**: a request is fully received when the district counted at least the quantity requested.
-- **Response**: median hours from the request to the district's receipt, with the pending count and the oldest pending age.
+- **Fully received, partly received, pending and rejected**: a request is fully received when the district counted at least the quantity requested. Pending requests are still open. A request the warehouse rejected is counted as rejected, not pending; it stays in the requested pieces and the fulfilment rate, with nothing approved.
+- **Response**: median hours from the request to the district's receipt, with the pending count and the oldest pending age. Rejected requests are not pending.
 - **Unconverted**: a quality issue. Quantities convert to pieces with the product's `pieces_per_unit` in its catalogue unit; requests in another unit, or for a product without pieces per unit, are left out of the piece totals and counted here.
 
 `GET /api/v1/reports/warehouse-requests/records` lists the requests behind those totals, newest first, in units and pieces. Filter both by `warehouse_store_id`, `district_id` and `category`.

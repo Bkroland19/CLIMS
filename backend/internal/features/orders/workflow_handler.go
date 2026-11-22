@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/stock"
@@ -216,7 +217,7 @@ func (h *Handler) warehouseRequest(c fiber.Ctx) error {
 
 var actionPermissions = map[string]string{
 	"review": "orders:process", "check-stock": "orders:process", "dispatch": "orders:process",
-	"receive": "orders:receive",
+	"reject": "orders:process", "receive": "orders:receive",
 }
 
 func (h *Handler) action(c fiber.Ctx) error {
@@ -240,6 +241,9 @@ func (h *Handler) performAction(c fiber.Ctx) error {
 		}
 	}
 	action := c.Params("action")
+	if action == "reject" && !validReason(&input.Reason) {
+		return workflowError(c, errRejectReason)
+	}
 	if !validActionInput(action, &input) {
 		return workflowError(c, errWorkflowInput)
 	}
@@ -250,11 +254,35 @@ func (h *Handler) performAction(c fiber.Ctx) error {
 	return response.Success(c, 200, "", order)
 }
 
-// validActionInput accepts only the fields an action uses: an optional positive quantity_issued at
+// validActionInput accepts only the fields an action uses: the product and an approved quantity at
+// review, a reason to reject, an optional positive quantity_issued, expiry exception and transport at
 // dispatch, and a nonnegative quantity_received with an optional discrepancy_note at receipt.
 func validActionInput(action string, input *ActionInput) bool {
 	if !validExceptionReason(&input.ExpiryExceptionReason) {
 		return false
+	}
+	if input.Reason != nil && action != "reject" {
+		return false
+	}
+	for _, field := range []struct {
+		value **string
+		limit int
+	}{{&input.WaybillNumber, 100}, {&input.VehicleRegistration, 30}, {&input.DriverName, 200}, {&input.DriverPhone, 30}} {
+		if *field.value == nil {
+			continue
+		}
+		if action != "dispatch" {
+			return false
+		}
+		// Transport is optional: blank counts as not given.
+		trimmed := strings.TrimSpace(**field.value)
+		if utf8.RuneCountInString(trimmed) > field.limit {
+			return false
+		}
+		*field.value = &trimmed
+		if trimmed == "" {
+			*field.value = nil
+		}
 	}
 	if input.DiscrepancyNote != nil {
 		*input.DiscrepancyNote = strings.TrimSpace(*input.DiscrepancyNote)
@@ -317,6 +345,8 @@ func workflowError(c fiber.Ctx, err error) error {
 		return response.Error(c, 422, err.Error(), nil)
 	case errors.Is(err, stock.ErrNearExpiry):
 		return response.Error(c, 422, err.Error(), map[string]string{"expiry_exception_reason": err.Error()})
+	case errors.Is(err, errRejectReason):
+		return response.Error(c, 422, err.Error(), map[string]string{"reason": err.Error()})
 	case errors.Is(err, errNotWarehouse):
 		return response.Error(c, 422, err.Error(), map[string]string{"warehouse_store_id": err.Error()})
 	case errors.Is(err, errChooseProduct), errors.Is(err, errWrongCategory), errors.Is(err, errInactiveProduct):
@@ -342,6 +372,16 @@ func validExceptionReason(reason **string) bool {
 
 // trimComment trims a free-text message, dropping it when blank. The result is false when it is
 // longer than the 4000 characters the API accepts.
+// validReason trims a rejection reason, which is required and at most 4000 characters.
+func validReason(reason **string) bool {
+	if *reason == nil {
+		return false
+	}
+	trimmed := strings.TrimSpace(**reason)
+	*reason = &trimmed
+	return trimmed != "" && utf8.RuneCountInString(trimmed) <= 4000
+}
+
 func trimComment(comment *string) (*string, bool) {
 	if comment == nil {
 		return nil, true

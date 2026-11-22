@@ -2,6 +2,7 @@ package orders
 
 import (
 	"context"
+	"strings"
 
 	"clims-backend/internal/features/notifications"
 
@@ -10,7 +11,7 @@ import (
 
 // NotificationTypes are the order notifications; register them once at startup. A stockout report's
 // template receives the keys of stockoutData; the warehouse steps receive product, unit, quantity,
-// from_store and to_store.
+// quantity_ordered, quantity_dispatched, note, transport, from_store and to_store.
 func NotificationTypes() []notifications.Type {
 	inApp := []string{notifications.ChannelInApp}
 	return []notifications.Type{
@@ -28,28 +29,55 @@ func NotificationTypes() []notifications.Type {
 		{Name: "order.replenishment_requested", Channels: inApp,
 			Title: "Stock order from {{.to_store}}",
 			Body:  "{{.to_store}} ordered {{.quantity}} {{.unit}} of {{.product}}."},
+		// Review approves the request, all or part, for the product the warehouse chose.
+		{Name: "order.replenishment_approved", Channels: inApp,
+			Title: "Order approved by {{.from_store}}",
+			Body: "{{.from_store}} approved {{if eq .quantity .quantity_ordered}}the order for {{.quantity}} {{.unit}}" +
+				"{{else}}{{.quantity}} of the {{.quantity_ordered}} {{.unit}}{{end}} ordered by {{.to_store}}, " +
+				"and will send {{.product}}."},
+		{Name: "order.replenishment_rejected", Channels: inApp,
+			Title: "Order rejected by {{.from_store}}",
+			Body: "{{.from_store}} rejected the order for {{.quantity_ordered}} {{.unit}} of {{.product}} " +
+				"from {{.to_store}}. Reason: \"{{.note}}\""},
 		{Name: "order.shipment_dispatched", Channels: inApp,
 			Title: "Stock on the way from {{.from_store}}",
-			Body:  "{{.from_store}} dispatched {{.quantity}} {{.unit}} of {{.product}}. Record the receipt when it arrives."},
+			Body: "{{.from_store}} dispatched {{.quantity}} {{.unit}} of {{.product}}.{{with .transport}} {{.}}.{{end}}" +
+				" Record the receipt when it arrives."},
+		// The DCFPs who ordered and the warehouse that dispatched both receive this one.
 		{Name: "order.shipment_received", Channels: inApp,
 			Title: "Stock received at {{.to_store}}",
-			Body:  "{{.quantity}} {{.unit}} of {{.product}} from {{.from_store}} arrived at {{.to_store}}."},
+			Body: "{{.quantity}} {{.unit}} of {{.product}} from {{.from_store}} arrived at {{.to_store}}." +
+				"{{with .note}} {{$.quantity_dispatched}} were dispatched. Note: \"{{.}}\"{{end}}"},
 	}
 }
 
-// notification picks the type for a warehouse request step and the permission that acts on it at
-// the notified store. The second result is false for steps that notify nobody.
-func notification(action string) (string, string, bool) {
+// recipient is who hears of a workflow step: the holders of a permission at the supplying warehouse
+// or at the ordering district store.
+type recipient struct {
+	permission string
+	warehouse  bool
+}
+
+// notification picks the type for a warehouse request step and who receives it. Steps without a
+// type notify nobody.
+func notification(action string) (string, []recipient) {
+	district := func(permission string) recipient { return recipient{permission: permission} }
 	switch action {
 	case "replenishment_requested":
-		return "order.replenishment_requested", "orders:process", true
+		return "order.replenishment_requested", []recipient{{permission: "orders:process", warehouse: true}}
+	case "review":
+		return "order.replenishment_approved", []recipient{district("orders:replenish")}
+	case "reject":
+		return "order.replenishment_rejected", []recipient{district("orders:replenish")}
 	case "dispatch":
-		return "order.shipment_dispatched", "orders:receive", true
+		return "order.shipment_dispatched", []recipient{district("orders:receive")}
 	case "receive":
-		// The DCFPs who order from the warehouse learn their stock is in.
-		return "order.shipment_received", "orders:replenish", true
+		// The DCFPs who order from the warehouse learn their stock is in, and the warehouse learns what
+		// arrived, with any discrepancy.
+		return "order.shipment_received", []recipient{district("orders:replenish"),
+			{permission: "orders:process", warehouse: true}}
 	}
-	return "", "", false
+	return "", nil
 }
 
 // productLabel names a product the same way as the inventory reports: brand,
@@ -72,8 +100,8 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, before *Order, order
 		order.ID, actorID, action, order.Status, notifyStore, quantityFor(order, action)).Scan(&eventID); err != nil {
 		return err
 	}
-	typeName, permission, notifies := notification(action)
-	if !notifies || notifyStore == nil {
+	typeName, recipients := notification(action)
+	if typeName == "" || notifyStore == nil {
 		return nil
 	}
 	var product, fromStore, toStore string
@@ -92,18 +120,78 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, before *Order, order
 		product = "condoms"
 	}
 	data := map[string]any{"product": product, "from_store": fromStore, "to_store": toStore,
-		"unit": "units", "quantity": quantityFor(order, action)}
+		"unit": "units", "quantity": quantityFor(order, action), "quantity_ordered": value(order.QuantityNeeded),
+		"quantity_dispatched": value(order.QuantityIssued), "note": noteFor(order, action),
+		"transport": transportOf(order)}
 	if unit != nil {
 		data["unit"] = *unit
 	}
+	targets := make([]notifications.Target, 0, len(recipients))
+	for _, to := range recipients {
+		store := order.OrderedForStoreID
+		if to.warehouse {
+			store = order.OrderedFromStoreID
+		}
+		targets = append(targets, notifications.Target{Permission: to.permission, StoreID: store})
+	}
 	return r.notifier.Notify(ctx, tx, notifications.Message{
 		Type:           typeName,
-		Targets:        []notifications.Target{{Permission: permission, StoreID: *notifyStore}},
+		Targets:        targets,
 		ActorID:        &actorID,
 		Resource:       &notifications.Resource{Type: "order", ID: order.ID},
 		Data:           data,
 		IdempotencyKey: eventID,
 	})
+}
+
+// noteFor is the person's words on a step: the rejection reason or the discrepancy note, or "" when
+// the step has none.
+func noteFor(order Order, action string) string {
+	var note *string
+	switch action {
+	case "reject":
+		note = order.RejectionReason
+	case "receive":
+		note = order.DiscrepancyNote
+	}
+	if note == nil {
+		return ""
+	}
+	return *note
+}
+
+// transportOf describes the dispatch's transport, e.g. "Waybill WB-104, vehicle UAX 123B, driver John
+// Okello (0772 000000)", leaving out what the warehouse did not record; "" when it recorded none.
+func transportOf(order Order) string {
+	var parts []string
+	if order.WaybillNumber != nil {
+		parts = append(parts, "waybill "+*order.WaybillNumber)
+	}
+	if order.VehicleRegistration != nil {
+		parts = append(parts, "vehicle "+*order.VehicleRegistration)
+	}
+	driver := ""
+	if order.DriverName != nil {
+		driver = *order.DriverName
+	}
+	if order.DriverPhone != nil {
+		driver = strings.TrimSpace(driver + " (" + *order.DriverPhone + ")")
+	}
+	if driver != "" {
+		parts = append(parts, "driver "+driver)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	text := strings.Join(parts, ", ")
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+func value(quantity *int32) int32 {
+	if quantity == nil {
+		return 0
+	}
+	return *quantity
 }
 
 // quantityFor is the quantity a step is about: ordered, approved, issued or counted on arrival.

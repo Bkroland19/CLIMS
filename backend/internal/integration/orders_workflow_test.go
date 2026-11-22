@@ -222,6 +222,12 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	if reviewed := act("review", warehouseToken, map[string]any{"condom_id": product}, 200, "reviewed"); reviewed["condom_id"] != product {
 		t.Fatalf("the warehouse's product choice was not kept: %v", reviewed)
 	}
+	// The district hears what was approved, and which product is coming.
+	if approved := inbox(districtToken, "order", orderID, "order.replenishment_approved"); approved == nil ||
+		!strings.Contains(approved["body"].(string), "approved the order for 50 ") {
+		t.Fatalf("approval notification: %v", approved)
+	}
+	act("review", warehouseToken, map[string]any{"reason": "No"}, 422, "") // a reason is for rejecting
 	act("check-stock", warehouseToken, nil, 200, "on_hold")
 	// Warehouse stock arrives through the inventory API, so the ledger accounts for every unit.
 	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": product,
@@ -230,9 +236,16 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	act("dispatch", warehouseToken, map[string]any{"quantity_issued": 51}, 422, "")
 	act("dispatch", warehouseToken, map[string]any{"quantity_issued": 0}, 422, "")
 	request("POST", orderPath+"/actions/dispatch", map[string]any{"rider_id": warehouse}, warehouseToken, 400)
-	act("dispatch", warehouseToken, nil, 200, "dispatched")
-	if inbox(districtToken, "order", orderID, "order.shipment_dispatched") == nil {
-		t.Fatal("the district was not told the stock is on the way")
+	act("dispatch", warehouseToken, map[string]any{"vehicle_registration": strings.Repeat("A", 31)}, 422, "")
+	// The transport is optional; a blank field is dropped.
+	dispatched := act("dispatch", warehouseToken, map[string]any{"waybill_number": " WB-104 ",
+		"vehicle_registration": "UAX 123B", "driver_name": "  "}, 200, "dispatched")
+	if dispatched["waybill_number"] != "WB-104" || dispatched["vehicle_registration"] != "UAX 123B" || dispatched["driver_name"] != nil {
+		t.Fatalf("dispatch transport: %v", dispatched)
+	}
+	if note := inbox(districtToken, "order", orderID, "order.shipment_dispatched"); note == nil ||
+		!strings.Contains(note["body"].(string), "Waybill WB-104, vehicle UAX 123B.") {
+		t.Fatalf("the district was not told the stock is on the way: %v", note)
 	}
 
 	// 4. The district records what arrived; a difference needs a note.
@@ -249,7 +262,69 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	if inbox(districtToken, "order", orderID, "order.shipment_received") != nil {
 		t.Fatal("the DCFP who recorded the receipt was notified of it")
 	}
+	// The warehouse learns what arrived, with the discrepancy.
+	if note := inbox(warehouseToken, "order", orderID, "order.shipment_received"); note == nil ||
+		!strings.Contains(note["body"].(string), `50 were dispatched. Note: "Five additional units counted"`) {
+		t.Fatalf("the warehouse was not told what arrived: %v", note)
+	}
 	request("GET", orderPath+"/events", nil, districtToken, 200)
+
+	// 5. Before dispatch the warehouse may reject an order instead, with the reason the district reads.
+	// It runs after the supply report checks, which count every request.
+	testRejection := func() {
+		pendingBefore := request("GET", "/reports/warehouse-requests", nil, admin, 200)["data"].(map[string]any)["total"].(map[string]any)["pending"]
+		reject := func(path string, body any, code int) map[string]any {
+			t.Helper()
+			return request("POST", path+"/actions/reject", body, warehouseToken, code)
+		}
+		if res := reject(orderPath, map[string]any{"reason": "Too late"}, 409); res["message"] == nil {
+			t.Fatalf("a received order was rejected: %v", res)
+		}
+		queued := order(districtToken, with(map[string]any{"quantity": 20}), 201)
+		queuedPath := "/orders/" + queued["id"].(string)
+		request("POST", queuedPath+"/actions/reject", map[string]any{"reason": "No"}, districtToken, 403) // orders:process
+		for _, blank := range []any{nil, map[string]any{"reason": "   "}} {
+			if res := reject(queuedPath, blank, 422); res["error"].(map[string]any)["reason"] == nil {
+				t.Fatalf("a rejection without a reason should fail on error.reason: %v", res)
+			}
+		}
+		rejected := reject(queuedPath, map[string]any{"reason": " Stock is held for a campaign "}, 200)["data"].(map[string]any)
+		if rejected["order_status"] != "rejected" || rejected["rejection_reason"] != "Stock is held for a campaign" {
+			t.Fatalf("rejected order: %v", rejected)
+		}
+		if note := inbox(colleagueToken, "order", queued["id"].(string), "order.replenishment_rejected"); note == nil ||
+			!strings.Contains(note["body"].(string), `Reason: "Stock is held for a campaign"`) {
+			t.Fatalf("rejection notification: %v", note)
+		}
+		reject(queuedPath, map[string]any{"reason": "Again"}, 409)
+		request("POST", queuedPath+"/actions/review", map[string]any{"condom_id": product}, warehouseToken, 409)
+		// A rejection after the stock check releases what it reserved.
+		confirmed := order(districtToken, with(map[string]any{"quantity": 20}), 201)
+		confirmedPath := "/orders/" + confirmed["id"].(string)
+		request("POST", confirmedPath+"/actions/review", map[string]any{"condom_id": product}, warehouseToken, 200)
+		if checked := request("POST", confirmedPath+"/actions/check-stock", nil, warehouseToken, 200)["data"].(map[string]any); checked["order_status"] != "confirmed" {
+			t.Fatalf("stock check before rejecting: %v", checked)
+		}
+		reject(confirmedPath, map[string]any{"reason": "The cartons failed inspection"}, 200)
+		var reservedAfter int
+		scalar(&reservedAfter, `SELECT reserved FROM order_store_stock WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3`,
+			warehouse, product, unit)
+		if reservedAfter != 0 {
+			t.Fatalf("a rejection left %d reserved", reservedAfter)
+		}
+		found := false
+		for _, item := range request("GET", "/orders?status=rejected", nil, warehouseToken, 200)["data"].([]any) {
+			found = found || item.(map[string]any)["id"] == confirmed["id"]
+		}
+		if !found {
+			t.Fatal("rejected orders are missing from the status filter")
+		}
+		// The report counts the requests as rejected: still requested, but neither approved nor pending.
+		total := request("GET", "/reports/warehouse-requests", nil, admin, 200)["data"].(map[string]any)["total"].(map[string]any)
+		if total["rejected"] != float64(2) || total["pending"] != pendingBefore {
+			t.Fatalf("supply report after two rejections: %v (pending before %v)", total, pendingBefore)
+		}
+	}
 
 	// Alert orders raised before stockouts became reports are history: no workflow step applies.
 	var legacy string
@@ -274,7 +349,30 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	testInventoryReports(t, pool, request, admin, districtToken, warehouse, district, hotSpot)
 	testNotificationFulfilment(t, pool, request, admin, hotspotToken, districtToken, otherToken, district, hotSpot, unit, reportID)
 	testSupplyReports(t, pool, request, admin, districtToken, warehouseToken, otherToken, warehouse, district, product, unit)
+	testRejection()
 	testBatchExpiry(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)
 	testSettingsAndHMIS(t, pool, request, admin, districtToken, otherToken, warehouse, district)
 	testExportsAndVersions(t, pool, request, admin, districtToken, district)
+}
+
+// assertWarehouseGrants checks the default grants migration 31 gives the warehouse and DCFP roles,
+// before any test changes a role's permissions.
+func assertWarehouseGrants(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	want := map[string][]string{
+		"nms":  {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
+		"jms":  {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
+		"dfcp": {"inventory:manage", "inventory:read", "orders:read", "orders:receive", "orders:replenish"},
+	}
+	for role, permissions := range want {
+		var granted []string
+		if err := pool.QueryRow(context.Background(), `SELECT coalesce(array_agg(p.name ORDER BY p.name), '{}')
+			FROM role_permission rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+			WHERE r.name = $1 AND (p.name LIKE 'orders:%' OR p.name LIKE 'inventory:%')`, role).Scan(&granted); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(granted, ",") != strings.Join(permissions, ",") {
+			t.Errorf("role %s has %v, want %v", role, granted, permissions)
+		}
+	}
 }

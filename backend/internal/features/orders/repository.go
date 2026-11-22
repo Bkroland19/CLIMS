@@ -38,6 +38,13 @@ type Order struct {
 	Comment            *string   `json:"comment"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+	// RejectionReason says why the warehouse rejected the order; it is set only on rejected orders.
+	RejectionReason *string `json:"rejection_reason"`
+	// The transport the warehouse recorded at dispatch; each is optional.
+	WaybillNumber       *string `json:"waybill_number"`
+	VehicleRegistration *string `json:"vehicle_registration"`
+	DriverName          *string `json:"driver_name"`
+	DriverPhone         *string `json:"driver_phone"`
 }
 
 type scope struct {
@@ -64,7 +71,7 @@ const columns = `id, condom_id, quantity_needed, quantity_issued, order_status,
 to_char(order_date, 'YYYY-MM-DD'), ordered_by_id, handled_by_id, ordered_for_store_id,
 ordered_from_store_id, unit_of_measure_id, comment, created_at, updated_at,
 hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note, quantity_approved,
-condom_category`
+condom_category, rejection_reason, waybill_number, vehicle_registration, driver_name, driver_phone`
 
 func scanOrder(row pgx.Row) (Order, error) {
 	var order Order
@@ -73,7 +80,8 @@ func scanOrder(row pgx.Row) (Order, error) {
 		&order.OrderedForStoreID, &order.OrderedFromStoreID, &order.UnitOfMeasureID,
 		&order.Comment, &order.CreatedAt, &order.UpdatedAt, &order.HotSpotID,
 		&order.ParentOrderID, &order.RiderID, &order.QuantityReceived, &order.DiscrepancyNote, &order.DeliveryNote,
-		&order.QuantityApproved, &order.CondomCategory)
+		&order.QuantityApproved, &order.CondomCategory, &order.RejectionReason, &order.WaybillNumber,
+		&order.VehicleRegistration, &order.DriverName, &order.DriverPhone)
 	return order, err
 }
 
@@ -166,6 +174,7 @@ var auditActions = map[string]string{
 	"replenishment_requested": "order.requested",
 	"review":                  "order.reviewed",
 	"check-stock":             "order.stock_checked",
+	"reject":                  "order.rejected",
 	"dispatch":                "order.dispatched",
 	"receive":                 "order.received",
 }

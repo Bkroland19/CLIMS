@@ -23,6 +23,7 @@ var (
 	errChooseProduct     = errors.New("choose the product to send: give condom_id at review")
 	errWrongCategory     = errors.New("the product chosen is not of the condom category requested")
 	errExpiredStock      = errors.New("not enough unexpired stock: expired batches cannot be issued")
+	errRejectReason      = errors.New("say why the order is rejected")
 )
 
 // ActionInput carries the details a workflow step needs: an optional smaller quantity at dispatch,
@@ -37,6 +38,13 @@ type ActionInput struct {
 	QuantityReceived      *int32  `json:"quantity_received"`
 	QuantityIssued        *int32  `json:"quantity_issued"`
 	DiscrepancyNote       *string `json:"discrepancy_note"`
+	// Reason says why the warehouse rejects the order; the district's DCFPs read it.
+	Reason *string `json:"reason"`
+	// The transport recorded at dispatch, each optional.
+	WaybillNumber       *string `json:"waybill_number"`
+	VehicleRegistration *string `json:"vehicle_registration"`
+	DriverName          *string `json:"driver_name"`
+	DriverPhone         *string `json:"driver_phone"`
 }
 
 // WarehouseRequestInput is a DCFP's order to a national warehouse: which warehouse, which condom
@@ -132,7 +140,8 @@ func (r *Repository) act(ctx context.Context, access scope, id, action string, i
 }
 
 // transition moves a warehouse request one step: the warehouse reviews, checks stock (reserving it,
-// or holding the request until stock arrives) and dispatches; the district receives.
+// or holding the request until stock arrives) and dispatches; the district receives. Before dispatch
+// the warehouse may reject the order with a reason instead, releasing anything reserved.
 func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
 	before := order
 	next := order.Status
@@ -161,6 +170,8 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		if order.CondomID == nil {
 			return Order{}, errChooseProduct
 		}
+		// The district hears what was approved: the product and how much of the request.
+		notifyStore = &order.OrderedForStoreID
 		next = "reviewed"
 	case "check-stock":
 		// A held request is rechecked directly once stock arrives.
@@ -175,6 +186,28 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		if reserved {
 			next = "confirmed"
 		}
+	case "reject":
+		// A rejection closes the order at any step before dispatch; the DCFP orders again if needed.
+		switch order.Status {
+		case "queued", "reviewed", "on_hold", "confirmed":
+		default:
+			return Order{}, errWorkflowConflict
+		}
+		if order.Status == "confirmed" {
+			// check-stock reserved the approved quantity; give it back.
+			tag, err := tx.Exec(ctx, `UPDATE order_store_stock SET reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
+				WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4`,
+				order.OrderedFromStoreID, *order.CondomID, order.UnitOfMeasureID, approvedQuantity(order))
+			if err != nil {
+				return Order{}, err
+			}
+			if tag.RowsAffected() != 1 {
+				return Order{}, fmt.Errorf("reject order %s: its reservation is missing", order.ID)
+			}
+		}
+		order.RejectionReason = input.Reason
+		notifyStore = &order.OrderedForStoreID
+		next = "rejected"
 	case "dispatch":
 		// The warehouse ships what check-stock reserved, or less, releasing the rest.
 		if order.Status != "confirmed" {
@@ -216,6 +249,8 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		}
 		order.QuantityIssued = &quantity
 		order.HandledByID = &actorID
+		order.WaybillNumber, order.VehicleRegistration = input.WaybillNumber, input.VehicleRegistration
+		order.DriverName, order.DriverPhone = input.DriverName, input.DriverPhone
 		notifyStore = &order.OrderedForStoreID
 		next = "dispatched"
 	case "receive":
@@ -253,8 +288,11 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 	}
 	result, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = $2, quantity_issued = $3,
 		handled_by_id = $4, quantity_received = $5, discrepancy_note = $6, quantity_approved = $7, condom_id = $8,
-		updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, order.ID, next, order.QuantityIssued,
-		order.HandledByID, order.QuantityReceived, order.DiscrepancyNote, order.QuantityApproved, order.CondomID))
+		rejection_reason = $9, waybill_number = $10, vehicle_registration = $11, driver_name = $12,
+		driver_phone = $13, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, order.ID, next,
+		order.QuantityIssued, order.HandledByID, order.QuantityReceived, order.DiscrepancyNote, order.QuantityApproved,
+		order.CondomID, order.RejectionReason, order.WaybillNumber, order.VehicleRegistration, order.DriverName,
+		order.DriverPhone))
 	if err != nil {
 		return Order{}, err
 	}

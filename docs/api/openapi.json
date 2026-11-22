@@ -340,7 +340,7 @@
         "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance a warehouse order",
-        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body. review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
+        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest, and the transport: waybill_number, vehicle_registration, driver_name, driver_phone). Until dispatch (queued, reviewed, on_hold or confirmed) they may instead reject the order with a reason: it becomes rejected, keeps rejection_reason, releases any reservation, and takes no further step (409). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body; reject needs reason. review notifies the district of the approval (order.replenishment_approved), reject of the rejection (order.replenishment_rejected), and receive notifies the warehouse as well as the district. review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
         "responses": {
           "200": {
             "description": "Success",
@@ -390,7 +390,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["review", "check-stock", "dispatch", "receive"]
+              "enum": ["review", "check-stock", "reject", "dispatch", "receive"]
             }
           }
         ],
@@ -440,7 +440,10 @@
           {
             "name": "status",
             "in": "query",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by order_status, e.g. on_hold or rejected."
           },
           {
             "name": "limit",
@@ -5110,6 +5113,35 @@
             "type": "string",
             "format": "uuid",
             "description": "review only: the product the warehouse sends, an active product of the requested condom_category. Required at the first review of a request without a product (422 with error.condom_id); a held request may switch product at a new review."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "description": "reject only (required): why the warehouse rejects the order. Trimmed; blank or missing returns 422 with error.reason. The district's DCFPs read it in their notification."
+          },
+          "waybill_number": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "description": "dispatch only, optional: the waybill or delivery note number. Trimmed; blank means not given. The district's dispatch notification includes it."
+          },
+          "vehicle_registration": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true,
+            "description": "dispatch only, optional: the vehicle's registration, e.g. UAX 123B. Trimmed; blank means not given. The district's dispatch notification includes it."
+          },
+          "driver_name": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true,
+            "description": "dispatch only, optional: the driver's name. Trimmed; blank means not given. The district's dispatch notification includes it."
+          },
+          "driver_phone": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true,
+            "description": "dispatch only, optional: the driver's phone number. Trimmed; blank means not given. The district's dispatch notification includes it."
           }
         },
         "additionalProperties": false
@@ -5310,6 +5342,7 @@
               "reviewed",
               "on_hold",
               "confirmed",
+              "rejected",
               "dispatched",
               "received",
               "delivered"
@@ -5365,6 +5398,31 @@
             "enum": ["male", "female"],
             "nullable": true,
             "description": "The condom category requested."
+          },
+          "rejection_reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the warehouse rejected the order; set only when order_status is rejected."
+          },
+          "waybill_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
+          },
+          "vehicle_registration": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
+          },
+          "driver_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
+          },
+          "driver_phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
           }
         }
       },
@@ -8383,7 +8441,12 @@
           "pending": {
             "type": "integer",
             "format": "int64",
-            "description": "Not yet received by the district."
+            "description": "Still open: neither received by the district nor rejected by the warehouse."
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Rejected by the warehouse before dispatch. Still counted as requested (and in the fulfilment rate), with no approved pieces."
           },
           "unconverted": {
             "type": "integer",

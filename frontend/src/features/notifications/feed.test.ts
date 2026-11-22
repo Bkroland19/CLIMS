@@ -28,6 +28,11 @@ describe('hrefFor', () => {
         true,
       ),
     ).toBe('/dcfp/restock/o%201');
+    for (const type of ['order.replenishment_approved', 'order.replenishment_rejected']) {
+      expect(hrefFor(notification({ type, resource_type: 'order', resource_id: 'o2' }), true)).toBe(
+        '/dcfp/restock/o2',
+      );
+    }
     expect(hrefFor(notification({ type: 'hotspot.submitted' }), true)).toBe('/dcfp/hotspots');
   });
 

@@ -219,4 +219,63 @@ describe('WarehouseOrderPage', () => {
     expect(await screen.findByText('Waiting for stock at the warehouse')).toBeInTheDocument();
     expect(screen.queryByLabelText('Quantity counted')).not.toBeInTheDocument();
   });
+
+  it('says why the warehouse rejected the order and offers a new one', async () => {
+    const rejected = anOrder({
+      order_status: 'rejected',
+      condom_id: null,
+      rejection_reason: 'Female condoms are held for the national campaign',
+    });
+    renderApp(<WarehouseOrderPage />, {
+      route: '/dcfp/restock/o1',
+      signedIn: true,
+      replies: [dcfpApi({ orders: [rejected] })],
+    });
+
+    expect(await screen.findByText('NMS rejected this order')).toBeInTheDocument();
+    expect(
+      screen.getByText('Female condoms are held for the national campaign'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Place a new order' })).toHaveAttribute(
+      'href',
+      '/dcfp/restock/new?category=female',
+    );
+    expect(screen.queryByLabelText('Quantity counted')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quantity dispatched')).not.toBeInTheDocument();
+  });
+
+  it('points out a smaller approval and shows the dispatch transport', async () => {
+    const { unmount } = renderApp(<WarehouseOrderPage />, {
+      route: '/dcfp/restock/o1',
+      signedIn: true,
+      replies: [
+        dcfpApi({ orders: [anOrder({ order_status: 'reviewed', quantity_approved: 300 })] }),
+      ],
+    });
+    expect(await screen.findByText('NMS approved part of this order')).toBeInTheDocument();
+    unmount();
+
+    renderApp(<WarehouseOrderPage />, {
+      route: '/dcfp/restock/o1',
+      signedIn: true,
+      replies: [
+        dcfpApi({
+          orders: [
+            anOrder({
+              order_status: 'dispatched',
+              quantity_approved: 500,
+              quantity_issued: 500,
+              waybill_number: 'WB-104',
+              driver_name: 'John Okello',
+              driver_phone: '0772 000000',
+            }),
+          ],
+        }),
+      ],
+    });
+    expect(await screen.findByText('WB-104')).toBeInTheDocument();
+    expect(screen.getByText('John Okello (0772 000000)')).toBeInTheDocument();
+    expect(screen.queryByText('Vehicle')).not.toBeInTheDocument();
+    expect(screen.queryByText('NMS approved part of this order')).not.toBeInTheDocument();
+  });
 });

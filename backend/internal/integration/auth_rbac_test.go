@@ -112,6 +112,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	// Importing after migrations resolves the backup's shared usernames and phone numbers.
 	assertUniqueIdentifiers(t, pool)
+	assertWarehouseGrants(t, pool)
 	auditor := audit.NewService(pool)
 	repo := users.NewRepository(pool, auditor)
 	var legacyAdminID string
@@ -476,12 +477,14 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms; every other
-	// non-admin grant is the custom one.
+	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms, and migration 31
+	// gives the warehouse and DCFP roles their order and inventory defaults; every other non-admin
+	// grant is the custom one.
 	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
-			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'),
+			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'
+			AND NOT (r.name IN ('nms', 'jms', 'dfcp') AND (p.name LIKE 'orders:%' OR p.name LIKE 'inventory:%'))),
 		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
 		&userCount, &roleCount, &catalogueManagers); err != nil {
@@ -490,6 +493,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if userCount != 455 || roleCount != 1 || catalogueManagers != "jms,moh,nms" {
 		t.Fatalf("upgrade changed user count, lost custom permission grants or granted the catalogue to %q", catalogueManagers)
 	}
+	assertWarehouseGrants(t, upgrade)
 	// Upgrading a database that already holds the backup resolves the same duplicates.
 	assertUniqueIdentifiers(t, upgrade)
 	var sameAssignment bool

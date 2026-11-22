@@ -8,7 +8,8 @@ import { parseBody, parseList, type HttpClient } from '@/lib/api';
  * 1. Hotspots report stockouts. A report is a notification to the district's
  *    DCFPs, with the hotspot's details and a message; it is not an order.
  * 2. The DCFP orders a product and quantity from NMS or JMS. The warehouse
- *    reviews, checks stock and dispatches it; the DCFP records the receipt.
+ *    approves it (review), checks stock and dispatches it, or rejects it with
+ *    a reason; the DCFP records the receipt.
  *
  * Ids are UUIDs. The API scopes every list to the signed-in user's store.
  */
@@ -49,6 +50,7 @@ export const ORDER_STATUSES = [
   'reviewed',
   'on_hold',
   'confirmed',
+  'rejected',
   'dispatched',
   'received',
   'delivered',
@@ -61,6 +63,8 @@ const orderSchema = z.object({
   /** The condom category the district requested. */
   condom_category: z.enum(['male', 'female']).nullable(),
   quantity_needed: count.nullable(),
+  /** What the warehouse approved at review; at most the quantity ordered. */
+  quantity_approved: count.nullable().default(null),
   quantity_issued: count.nullable(),
   quantity_received: count.nullable(),
   order_status: z.enum(ORDER_STATUSES),
@@ -71,6 +75,13 @@ const orderSchema = z.object({
   unit_of_measure_id: text,
   comment: text,
   discrepancy_note: text,
+  /** Why the warehouse rejected the order; set only on rejected orders. */
+  rejection_reason: text.default(null),
+  /** The transport the warehouse recorded at dispatch, each optional. */
+  waybill_number: text.default(null),
+  vehicle_registration: text.default(null),
+  driver_name: text.default(null),
+  driver_phone: text.default(null),
   /** Set only on alert orders raised before stockouts became reports. */
   hot_spot_id: text,
   created_at: z.string(),
