@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"clims-backend/internal/features/rbac"
+	"clims-backend/internal/features/stock"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/request"
 	"clims-backend/internal/pkg/response"
@@ -161,6 +162,22 @@ func validate(in *MovementInput) string {
 	if in.Quantity > 1_000_000_000 || in.Quantity < -1_000_000_000 {
 		return "quantity is out of range"
 	}
+	if in.BatchNumber != nil {
+		number := strings.TrimSpace(*in.BatchNumber)
+		in.BatchNumber = &number
+		if number == "" {
+			in.BatchNumber = nil
+		} else if utf8.RuneCountInString(number) > 60 {
+			return "batch_number must be at most 60 characters"
+		}
+	}
+	if in.ExpiryDate != nil {
+		expiry, err := time.Parse(time.DateOnly, *in.ExpiryDate)
+		if err != nil {
+			return "expiry_date must be a YYYY-MM-DD date"
+		}
+		in.expiry = &expiry
+	}
 	return ""
 }
 
@@ -219,7 +236,7 @@ func inventoryError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, errForbidden):
 		return response.Error(c, 403, err.Error(), nil)
-	case errors.Is(err, errBelowReserved):
+	case errors.Is(err, errBelowReserved), errors.Is(err, stock.ErrBatchShort):
 		return response.Error(c, 409, err.Error(), nil)
 	case errors.As(err, &dbError) && dbError.Code == "23503":
 		return response.Error(c, 422, "store_id, condom_id or unit_of_measure_id does not exist", nil)

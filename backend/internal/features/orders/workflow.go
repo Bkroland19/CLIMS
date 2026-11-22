@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"clims-backend/internal/features/stock"
 	"clims-backend/internal/features/users"
 
 	"github.com/jackc/pgx/v5"
@@ -20,16 +21,19 @@ var (
 	errNotWarehouse      = errors.New("warehouse_store_id must name a national warehouse (NMS or JMS)")
 	errUnknownProduct    = errors.New("condom_id does not name a product")
 	errNoUnit            = errors.New("this product has no default unit; provide unit_of_measure_id")
+	errExpiredStock      = errors.New("not enough unexpired stock: expired batches cannot be issued")
 )
 
 // ActionInput carries the details a workflow step needs: an optional smaller quantity at dispatch,
 // and the counted quantity (with a note when it differs) at receipt.
 type ActionInput struct {
 	// QuantityApproved lets the warehouse approve less than requested at review.
-	QuantityApproved *int32  `json:"quantity_approved"`
-	QuantityReceived *int32  `json:"quantity_received"`
-	QuantityIssued   *int32  `json:"quantity_issued"`
-	DiscrepancyNote  *string `json:"discrepancy_note"`
+	QuantityApproved *int32 `json:"quantity_approved"`
+	// ExpiryExceptionReason documents dispatching a batch with under one month left.
+	ExpiryExceptionReason *string `json:"expiry_exception_reason"`
+	QuantityReceived      *int32  `json:"quantity_received"`
+	QuantityIssued        *int32  `json:"quantity_issued"`
+	DiscrepancyNote       *string `json:"discrepancy_note"`
 }
 
 // WarehouseRequestInput is a DCFP's order to a national warehouse: which warehouse, which product
@@ -163,7 +167,7 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		if order.Status != "reviewed" && order.Status != "on_hold" {
 			return Order{}, errWorkflowConflict
 		}
-		reserved, err := reserve(ctx, tx, order)
+		reserved, err := reserve(ctx, tx, order, stock.Today(time.Now()))
 		if err != nil {
 			return Order{}, err
 		}
@@ -195,6 +199,18 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		if err != nil {
 			return Order{}, err
 		}
+		// Stock leaves first-expiry-first-out; expired batches stay behind.
+		taken, err := stock.Take(ctx, tx, order.OrderedFromStoreID, order.CondomID, *order.UnitOfMeasureID, int64(quantity),
+			stock.Today(time.Now()), input.ExpiryExceptionReason)
+		if errors.Is(err, stock.ErrShort) {
+			return Order{}, errExpiredStock
+		}
+		if err != nil {
+			return Order{}, err
+		}
+		if err = stock.Ship(ctx, tx, taken, &order.ID, nil, nil, actorID, input.ExpiryExceptionReason); err != nil {
+			return Order{}, err
+		}
 		if err := recordMovement(ctx, tx, order, order.OrderedFromStoreID, "dispatch", -int64(quantity), onHand, actorID); err != nil {
 			return Order{}, err
 		}
@@ -220,6 +236,11 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 			return Order{}, err
 		}
 		if *input.QuantityReceived > 0 {
+			// The district's batches are the ones the warehouse shipped.
+			if err = stock.Receive(ctx, tx, order.OrderedForStoreID, order.CondomID, *order.UnitOfMeasureID, order.ID,
+				int64(*input.QuantityReceived)); err != nil {
+				return Order{}, err
+			}
 			if err = recordMovement(ctx, tx, order, order.OrderedForStoreID, "order_receipt",
 				int64(*input.QuantityReceived), onHand, actorID); err != nil {
 				return Order{}, err
@@ -250,12 +271,13 @@ func recordMovement(ctx context.Context, tx pgx.Tx, order Order, storeID, reason
 }
 
 // reserve holds the order's full quantity at the supplying store when enough unreserved stock is on hand.
-func reserve(ctx context.Context, tx pgx.Tx, order Order) (bool, error) {
-	tag, err := tx.Exec(ctx, `UPDATE order_store_stock
+func reserve(ctx context.Context, tx pgx.Tx, order Order, today time.Time) (bool, error) {
+	// Expired stock cannot be issued, so it cannot be reserved either.
+	tag, err := tx.Exec(ctx, `UPDATE order_store_stock b
 		SET reserved = reserved + $4, updated_at = CURRENT_TIMESTAMP
 		WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3
-			AND on_hand - reserved >= $4`, order.OrderedFromStoreID, order.CondomID,
-		order.UnitOfMeasureID, approvedQuantity(order))
+			AND on_hand - reserved - `+stock.ExpiredQuantity("$5::date")+` >= $4`, order.OrderedFromStoreID, order.CondomID,
+		order.UnitOfMeasureID, approvedQuantity(order), today)
 	return tag.RowsAffected() == 1, err
 }
 

@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+
+	"clims-backend/internal/features/stock"
 	"errors"
 	"time"
 
@@ -198,6 +200,10 @@ type MovementInput struct {
 	Reason          string  `json:"reason"`
 	Quantity        int64   `json:"quantity"`
 	Note            *string `json:"note"`
+	// BatchNumber and ExpiryDate name the batch the stock is in; omitted, it is the unknown-expiry batch.
+	BatchNumber *string `json:"batch_number"`
+	ExpiryDate  *string `json:"expiry_date"`
+	expiry      *time.Time
 }
 
 func (r *Repository) record(ctx context.Context, actorID string, in MovementInput) (Movement, error) {
@@ -218,11 +224,22 @@ func (r *Repository) record(ctx context.Context, actorID string, in MovementInpu
 		if err != nil {
 			return err
 		}
+		// The batches add up to the store total: a receipt or a positive count fills the named batch, and
+		// a negative count must come out of it.
+		var batchID string
+		if in.Quantity > 0 {
+			batchID, err = stock.Add(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, in.Quantity)
+		} else {
+			batchID, err = stock.Remove(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, -in.Quantity)
+		}
+		if err != nil {
+			return err
+		}
 		var id string
 		if err = tx.QueryRow(ctx, `INSERT INTO inventory_movements
-				(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, actor_id, note)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Reason, in.Quantity, onHand, actorID, in.Note).Scan(&id); err != nil {
+				(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, actor_id, note, stock_batch_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+			in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Reason, in.Quantity, onHand, actorID, in.Note, batchID).Scan(&id); err != nil {
 			return err
 		}
 		rows, err := tx.Query(ctx, `SELECT `+movementColumns+movementJoins+` WHERE m.id = $1`, id)

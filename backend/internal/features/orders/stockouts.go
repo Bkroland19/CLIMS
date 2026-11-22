@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"clims-backend/internal/features/notifications"
+	"clims-backend/internal/features/stock"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -395,6 +396,8 @@ type DeliveryInput struct {
 	} `json:"lines"`
 	Note            *string `json:"note"`
 	ClientReference *string `json:"client_reference"`
+	// ExpiryExceptionReason documents delivering a batch with under one month left.
+	ExpiryExceptionReason *string `json:"expiry_exception_reason"`
 }
 
 // recordDelivery takes each line out of the district store's available stock, records it against the
@@ -492,8 +495,22 @@ func (r *Repository) deliver(ctx context.Context, tx pgx.Tx, actorID, reportID, 
 		if pieces > 2_000_000_000 {
 			return "", errWorkflowInput
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO hotspot_delivery_lines (delivery_id, category, condom_id, unit_of_measure_id, quantity, pieces)
-			VALUES ($1, $2, $3, $4, $5, $6)`, deliveryID, *category, line.CondomID, *unitID, line.Quantity, pieces); err != nil {
+		// Stock leaves first-expiry-first-out; expired batches stay behind.
+		taken, err := stock.Take(ctx, tx, storeID, line.CondomID, *unitID, int64(line.Quantity), stock.Today(time.Now()),
+			in.ExpiryExceptionReason)
+		if errors.Is(err, stock.ErrShort) {
+			return "", errExpiredStock
+		}
+		if err != nil {
+			return "", err
+		}
+		var lineID string
+		if err = tx.QueryRow(ctx, `INSERT INTO hotspot_delivery_lines (delivery_id, category, condom_id, unit_of_measure_id, quantity, pieces)
+			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, deliveryID, *category, line.CondomID, *unitID, line.Quantity,
+			pieces).Scan(&lineID); err != nil {
+			return "", err
+		}
+		if err = stock.Ship(ctx, tx, taken, nil, &lineID, &deliveryID, actorID, in.ExpiryExceptionReason); err != nil {
 			return "", err
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO inventory_movements

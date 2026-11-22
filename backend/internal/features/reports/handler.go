@@ -27,6 +27,44 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/warehouse-requests", h.supply)
 	group.Get("/warehouse-requests/records", h.supplyRecords)
 	group.Get("/stock", h.stock)
+	group.Get("/batches", h.batches)
+	group.Get("/expiry-exceptions", h.expiryExceptions)
+}
+
+var bands = map[string]bool{"": true, "expired": true, "under_1_month": true, "under_3_months": true,
+	"under_6_months": true, "ok": true, "unknown": true}
+
+func (h *Handler) batches(c fiber.Ctx) error {
+	f, s, err := h.supplyFilter(c)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	band := c.Query("band")
+	if !bands[band] {
+		return response.Error(c, 400, "band must be expired, under_1_month, under_3_months, under_6_months, ok or unknown", nil)
+	}
+	report, err := h.repo.batchReport(c.Context(), s, f, band, h.now())
+	if err != nil {
+		slog.Error("batch report failed", "error", err)
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	return response.Success(c, 200, "", report)
+}
+
+func (h *Handler) expiryExceptions(c fiber.Ctx) error {
+	f, s, err := h.supplyFilter(c)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	if f.Limit, f.Offset, err = page(c); err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	exceptions, err := h.repo.expiryExceptions(c.Context(), s, f)
+	if err != nil {
+		slog.Error("expiry exceptions failed", "error", err)
+		return response.Error(c, 500, "the exceptions could not be loaded", nil)
+	}
+	return response.Success(c, 200, "", exceptions)
 }
 
 // supplyFilter reads the period and category as the notification reports do, plus the store filters.

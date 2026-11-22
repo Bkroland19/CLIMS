@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"clims-backend/internal/features/stock"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -26,14 +28,19 @@ type StockLine struct {
 	Unit            string  `json:"unit"`
 	Physical        int64   `json:"physical"`
 	Reserved        int64   `json:"reserved"`
-	Usable          int64   `json:"usable"`
-	InTransit       int64   `json:"in_transit"`
+	Expired         int64   `json:"expired"`
+	UnknownExpiry   int64   `json:"unknown_expiry"`
+	// Usable is physical stock less expired, unknown-expiry (needing review) and reserved stock.
+	Usable    int64 `json:"usable"`
+	InTransit int64 `json:"in_transit"`
 	// Pieces are null when the stock is not held in the product's catalogue unit.
 	PhysicalPieces  *int64 `json:"physical_pieces"`
 	UsablePieces    *int64 `json:"usable_pieces"`
 	InTransitPieces *int64 `json:"in_transit_pieces"`
 	// Reconciled is true when the inventory ledger adds up to the physical balance.
 	Reconciled bool `json:"reconciled"`
+	// BatchesReconciled is true when the store's batches add up to the physical balance.
+	BatchesReconciled bool `json:"batches_reconciled"`
 	// MonthlyIssues is the average outward issue per month over the coverage window.
 	MonthlyIssues *float64 `json:"average_monthly_issues"`
 	// MonthsOfStock is usable stock divided by MonthlyIssues: issue-based coverage, not consumption.
@@ -41,8 +48,7 @@ type StockLine struct {
 	CoverageStatus string   `json:"coverage_status"`
 }
 
-// StockReport is the current dated stock view. Batches and expiry are not tracked yet, so expired
-// and unknown-expiry stock cannot be separated from usable stock.
+// StockReport is the current dated stock view, separating expired and unknown-expiry stock (RF10).
 type StockReport struct {
 	StockDate      time.Time   `json:"stock_date"`
 	CoverageWindow Period      `json:"coverage_window"`
@@ -63,6 +69,7 @@ func (r *Repository) stockReport(ctx context.Context, s scope, f SupplyFilter, n
 	out := StockReport{
 		StockDate:      now,
 		CoverageWindow: Period{From: start.Format(time.DateOnly), To: end.AddDate(0, 0, -1).Format(time.DateOnly)},
+		ExpiryTracked:  true,
 		CoverageMethod: "Usable stock divided by average monthly outward issues (warehouse dispatches to districts, district deliveries to hotspots) over the coverage window. Issue-based coverage; it does not measure consumption.",
 		Lines:          []StockLine{},
 	}
@@ -82,21 +89,27 @@ func (r *Repository) stockReport(ctx context.Context, s scope, f SupplyFilter, n
 				AND m.condom_id = b.condom_id AND m.unit_of_measure_id = b.unit_of_measure_id) AS history_from,
 			coalesce((SELECT -sum(m.quantity) FROM inventory_movements m WHERE m.store_id = b.store_id
 				AND m.condom_id = b.condom_id AND m.unit_of_measure_id = b.unit_of_measure_id
-				AND m.reason IN ('dispatch', 'hotspot_delivery') AND m.created_at >= $7 AND m.created_at < $8), 0) AS issued
+				AND m.reason IN ('dispatch', 'hotspot_delivery') AND m.created_at >= $7 AND m.created_at < $8), 0) AS issued,
+			coalesce(batch.expired, 0) AS expired, coalesce(batch.unknown, 0) AS unknown_expiry,
+			coalesce(batch.total, 0) AS batch_total
 		FROM order_store_stock b
 		JOIN stores s ON s.id = b.store_id
 		LEFT JOIN districts d ON d.id = s.district_id
 		JOIN condoms c ON c.id = b.condom_id
 		JOIN unit_of_measures um ON um.id = b.unit_of_measure_id
+		LEFT JOIN LATERAL (SELECT sum(sb.on_hand) FILTER (WHERE sb.expiry_date < $9) AS expired,
+				sum(sb.on_hand) FILTER (WHERE sb.expiry_date IS NULL) AS unknown, sum(sb.on_hand) AS total
+			FROM stock_batches sb WHERE sb.store_id = b.store_id AND sb.condom_id = b.condom_id
+				AND sb.unit_of_measure_id = b.unit_of_measure_id) batch ON true
 		WHERE ($1::boolean OR b.store_id = $2::uuid)
 			AND ($3::uuid IS NULL OR b.store_id = $3) AND ($4 = '' OR s.store_type = $4)
 			AND ($5::uuid IS NULL OR s.district_id = $5) AND ($6 = '' OR c.category = $6))
 	SELECT store_id, store, store_type, district_id, district, condom_id, product, category, unit_of_measure_id, unit,
-		on_hand, reserved, on_hand - reserved, in_transit,
-		on_hand * per_unit, (on_hand - reserved) * per_unit, in_transit * per_unit,
-		ledger = on_hand, issued, history_from
+		on_hand, reserved, expired, unknown_expiry, greatest(on_hand - expired - unknown_expiry - reserved, 0), in_transit,
+		on_hand * per_unit, greatest(on_hand - expired - unknown_expiry - reserved, 0) * per_unit, in_transit * per_unit,
+		ledger = on_hand, batch_total = on_hand, issued, history_from
 	FROM lines ORDER BY store_type DESC, store, product, unit`,
-		s.all, s.storeID, f.StoreID, f.StoreType, f.DistrictID, f.Category, start, end)
+		s.all, s.storeID, f.StoreID, f.StoreType, f.DistrictID, f.Category, start, end, stock.Today(now))
 	if err != nil {
 		return StockReport{}, err
 	}
@@ -105,8 +118,9 @@ func (r *Repository) stockReport(ctx context.Context, s scope, f SupplyFilter, n
 		var issued int64
 		var historyFrom *time.Time
 		if err := row.Scan(&l.StoreID, &l.Store, &l.StoreType, &l.DistrictID, &l.District, &l.CondomID, &l.Product,
-			&l.Category, &l.UnitOfMeasureID, &l.Unit, &l.Physical, &l.Reserved, &l.Usable, &l.InTransit,
-			&l.PhysicalPieces, &l.UsablePieces, &l.InTransitPieces, &l.Reconciled, &issued, &historyFrom); err != nil {
+			&l.Category, &l.UnitOfMeasureID, &l.Unit, &l.Physical, &l.Reserved, &l.Expired, &l.UnknownExpiry, &l.Usable,
+			&l.InTransit, &l.PhysicalPieces, &l.UsablePieces, &l.InTransitPieces, &l.Reconciled, &l.BatchesReconciled,
+			&issued, &historyFrom); err != nil {
 			return StockLine{}, err
 		}
 		l.MonthlyIssues, l.MonthsOfStock, l.CoverageStatus = coverage(l.Usable, issued, l.Reconciled, historyFrom, start)

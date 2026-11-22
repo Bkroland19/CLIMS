@@ -11,6 +11,8 @@ The reports module serves the programme reports described in the reporting requi
 | GET    | `/api/v1/reports/warehouse-requests`         | `reports:read` |
 | GET    | `/api/v1/reports/warehouse-requests/records` | `reports:read` |
 | GET    | `/api/v1/reports/stock`                      | `reports:read` |
+| GET    | `/api/v1/reports/batches`                    | `reports:read` |
+| GET    | `/api/v1/reports/expiry-exceptions`          | `reports:read` |
 
 ## Notification fulfilment
 
@@ -53,11 +55,20 @@ A hotspot stockout notification names Male, Female or Both and no quantity. The 
 
 `GET /api/v1/reports/stock` is a current, dated view of stock at warehouses and district stores, separate from any reporting period (`stock_date`). Each line is a store, product and unit:
 
-- **Physical, reserved, usable and in transit.** Usable is physical less reserved. In transit is stock dispatched to the store and not yet received, counted once. Pieces are given when the stock is held in the product's catalogue unit.
+- **Physical, reserved, expired, unknown expiry, usable and in transit.** Usable is physical less expired, unknown-expiry and reserved stock, at least zero; unknown-expiry stock needs its batch reviewed before it counts. In transit is stock dispatched to the store and not yet received, counted once. Pieces are given when the stock is held in the product's catalogue unit.
+- **Batches reconciled**: whether the store's batches add up to the physical balance.
 - **Reconciled**: whether the inventory ledger adds up to the physical balance.
 - **Months of stock**: usable stock divided by average monthly outward issues over the last three complete Kampala months. Outward issues are warehouse dispatches to districts and district deliveries to hotspots. This is issue-based coverage, not consumption. `coverage_status` explains when it is unavailable: the ledger does not reconcile, the history does not cover the whole window, or nothing was issued.
 
-Filter by `store_id`, `store_type`, `district_id` and `category`. Batches and expiry dates are not recorded yet (`expiry_tracked` is false), so expired and unknown-expiry stock cannot be separated from usable stock.
+Filter by `store_id`, `store_type`, `district_id` and `category`.
+
+## Batches and expiry
+
+Stock is held in batches, each with an optional batch number and expiry date; see [inventory](inventory.md#batches-and-expiry). `GET /api/v1/reports/batches` lists the batches in stock, earliest expiry first, with `days_remaining` and a `band` by calendar months left: `expired`, `under_1_month` (red), `under_3_months`, `under_6_months`, `ok`, or `unknown` without an expiry date. Filter by store, store type, district, category and `band`.
+
+`GET /api/v1/reports/expiry-exceptions` lists the batches with under one month left that left a store in the period, with the documented reason, who authorised it and the rule version, newest first.
+
+The draft's six-month warehouse and three-month district dispatch targets are not enforced: each shipped batch's `days_remaining` on the dispatch date is recorded, so they can be reported once approved.
 
 ## Filters and dates
 
@@ -74,7 +85,7 @@ Migration 24 grants `reports:read` to `admin` only. Grant it to MoH, district an
 These parts of the requirements need decisions or data that do not exist yet:
 
 - **Saved response settings (RF07, RN11):** `deadline_days` and `target_percent` are request parameters. Saving them per organisation, with who set them and from when, waits for approval of the defaults.
-- **Batches and expiry (RF10, RF16):** stock is not tracked by batch or expiry date, so expired, quarantined and unknown-expiry stock are not deducted from usable stock, and FEFO is not applied.
+- **Expiry targets and quarantine (RF16):** the six and three month dispatch targets, the calendar-month boundary rules and who may authorise exceptions await programme approval; quarantined stock is not recorded.
 - **Coverage settings (RF11):** the three-month window is the draft's proposal and awaits the supply-chain team's approval.
 - **HMIS 105 (RF14):** awaits programme approval; DHIS2 integration stays disabled.
 - **Report versions and exports (RF15, RN04):** totals are live, not saved as approved versions.

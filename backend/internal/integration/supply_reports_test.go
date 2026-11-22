@@ -100,17 +100,18 @@ func testSupplyReports(t *testing.T, pool *pgxpool.Pool,
 
 	// RF10/RF11: stock at the warehouse and the district, with the second request in transit.
 	stock := report("/reports/stock?store_id="+warehouse, admin)
-	if stock["expiry_tracked"] != false || stock["coverage_method"] == "" {
+	if stock["expiry_tracked"] != true || stock["coverage_method"] == "" {
 		t.Fatalf("stock report header: %v", stock)
 	}
 	lines := stock["lines"].([]any)
 	if len(lines) != 1 {
 		t.Fatalf("warehouse stock lines: %v", lines)
 	}
-	// Its history starts this month, so there are not three complete months of issues yet.
+	// Its history starts this month, so there are not three complete months of issues yet. The stock was
+	// received without batch details, so it is unknown expiry and not yet usable.
 	expect("warehouse stock", lines[0].(map[string]any), map[string]any{"physical": float64(20), "reserved": float64(0),
-		"usable": float64(20), "usable_pieces": float64(200), "reconciled": true,
-		"coverage_status": "unavailable_short_history", "months_of_stock": nil})
+		"expired": float64(0), "unknown_expiry": float64(20), "usable": float64(0), "usable_pieces": float64(0),
+		"reconciled": true, "batches_reconciled": true, "coverage_status": "unavailable_short_history", "months_of_stock": nil})
 	var districtLine map[string]any
 	for _, line := range report("/reports/stock", districtToken)["lines"].([]any) {
 		l := line.(map[string]any)
