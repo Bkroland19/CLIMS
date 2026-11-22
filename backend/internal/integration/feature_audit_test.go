@@ -49,12 +49,14 @@ func testFeatureAudit(t *testing.T, pool *pgxpool.Pool) {
 	check("a comment changes nothing but keeps its text", `SELECT bool_and(changes IS NULL AND details ? 'comment')
 		FROM audit_log WHERE action = 'hotspot.commented'`)
 
-	// Orders: each step records its status change and both stores and the product.
+	// Orders: each step records its status change and both stores, and the product once there is
+	// one: a district's warehouse request names only a category until the warehouse chooses.
 	check("a dispatch records the status change", `SELECT bool_and(changes->'order_status'->>'before' = 'confirmed'
 		AND changes->'order_status'->>'after' = 'dispatched' AND changes ? 'quantity_issued')
 		FROM audit_log WHERE action = 'order.dispatched'`)
-	check("order entries name the stores and product", `SELECT bool_and((SELECT count(*) FILTER (WHERE s.subject_type = 'store') >= 1
-		AND count(*) FILTER (WHERE s.subject_type = 'product') = 1 FROM audit_log_subjects s WHERE s.audit_id = a.id))
+	check("order entries name the stores, and the product once chosen", `SELECT bool_and((SELECT count(*) FILTER (WHERE s.subject_type = 'store') >= 1
+		AND count(*) FILTER (WHERE s.subject_type = 'product') = CASE WHEN a.action = 'order.requested' THEN 0 ELSE 1 END
+		FROM audit_log_subjects s WHERE s.audit_id = a.id))
 		FROM audit_log a WHERE action LIKE 'order.%'`)
 	check("a fulfilment is recorded once per order, refused retries are not", `SELECT bool_and(n = 1) FROM (
 		SELECT count(*) AS n FROM audit_log WHERE action = 'order.fulfilled' GROUP BY target_id) per_order`)
