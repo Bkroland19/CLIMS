@@ -1,69 +1,122 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { notificationKeys } from '@/features/notifications/queries';
 import { useApiQuery, useHttp } from '@/lib/api';
 
 import {
-  actOnHotspot,
-  listDistricts,
-  listHotspotNotifications,
-  listLocationDistricts,
+  commentOnHotspot,
+  decideOnHotspot,
+  getHotspot,
+  listAllHotspots,
+  listHotspotEvents,
   listHotspots,
+  listLocationDistricts,
   submitHotspot,
-  type HotspotAction,
+  type HotspotDecision,
+  type HotspotFilter,
   type HotspotSubmission,
 } from './api';
 
 const hotspotsKey = ['hotspots'] as const;
+export const hotspotKeys = {
+  all: hotspotsKey,
+  list: (districtId: string | null) => [...hotspotsKey, 'list', districtId] as const,
+  allPages: (filter: HotspotFilter) => [...hotspotsKey, 'all', filter] as const,
+  detail: (id: string) => [...hotspotsKey, 'detail', id] as const,
+  events: (id: string) => [...hotspotsKey, 'detail', id, 'events'] as const,
+};
 
 export function useHotspots(districtId: string | null = null, enabled = true) {
   return useApiQuery(
-    [...hotspotsKey, 'list', districtId],
+    hotspotKeys.list(districtId),
     (http, signal) => listHotspots(http, signal, districtId),
     { enabled },
   );
+}
+
+/** Every hotspot matching `filter` that the caller can see, read page by page. */
+export function useAllHotspots(filter: HotspotFilter = {}, { enabled = true } = {}) {
+  return useApiQuery(
+    hotspotKeys.allPages(filter),
+    (http, signal) => listAllHotspots(http, filter, signal),
+    { enabled },
+  );
+}
+
+export function useHotspot(id: string) {
+  return useApiQuery(hotspotKeys.detail(id), (http, signal) => getHotspot(http, id, signal));
+}
+
+export function useHotspotEvents(id: string) {
+  return useApiQuery(hotspotKeys.events(id), (http, signal) => listHotspotEvents(http, id, signal));
 }
 
 export function useLocationDistricts(enabled: boolean) {
   return useApiQuery(['locations', 'districts'], listLocationDistricts, { enabled });
 }
 
-export function useHotspotNotifications() {
-  return useApiQuery([...hotspotsKey, 'notifications'], listHotspotNotifications);
-}
-
-export function useDistricts() {
-  return useApiQuery(['districts'], listDistricts);
+/** Refetches every hotspot view, and the inbox the step notified. */
+function useInvalidateHotspots() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: hotspotsKey }),
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+    ]);
 }
 
 export function useSubmitHotspot() {
   const http = useHttp();
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateHotspots();
   return useMutation({
     mutationFn: (input: HotspotSubmission) => submitHotspot(http, input),
     onSuccess: async () => {
-      toast.success('Hotspot submitted for district verification');
-      await queryClient.invalidateQueries({ queryKey: hotspotsKey });
+      toast.success('Hotspot submitted. The district focal person will review it.');
+      await invalidate();
     },
     meta: { handlesOwnErrors: true },
   });
 }
 
-const actionToasts: Record<HotspotAction, string> = {
-  verify: 'Hotspot verified',
+export function useCommentOnHotspot(id: string) {
+  const http = useHttp();
+  const invalidate = useInvalidateHotspots();
+  return useMutation({
+    mutationFn: (comment: string) => commentOnHotspot(http, id, comment),
+    onSuccess: async () => {
+      toast.success('Comment added');
+      await invalidate();
+    },
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+const DECISION_TOASTS: Record<HotspotDecision, string> = {
   activate: 'Hotspot activated',
+  deactivate: 'Hotspot deactivated',
   reject: 'Hotspot rejected',
 };
 
-export function useHotspotAction() {
+/** A DCFP's decision on any hotspot, so one list can act on each of its rows. */
+export function useHotspotDecision() {
   const http = useHttp();
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateHotspots();
   return useMutation({
-    mutationFn: ({ id, action, reason }: { id: string; action: HotspotAction; reason?: string }) =>
-      actOnHotspot(http, id, action, reason),
-    onSuccess: async (_, { action }) => {
-      toast.success(actionToasts[action]);
-      await queryClient.invalidateQueries({ queryKey: hotspotsKey });
+    mutationFn: ({
+      id,
+      decision,
+      comment,
+    }: {
+      id: string;
+      decision: HotspotDecision;
+      comment: string;
+    }) => decideOnHotspot(http, id, decision, comment),
+    onSuccess: async (_, { decision }) => {
+      toast.success(DECISION_TOASTS[decision]);
+      await invalidate();
     },
+    // The decision dialog shows a refusal next to the comment.
+    meta: { handlesOwnErrors: true },
   });
 }
