@@ -38,10 +38,25 @@ Passwords, password hashes and tokens are never recorded. `audit.Diff` and the d
 | `user.identity_linked`          | The identity sync client links an SSO identity to an account            |
 | `role.permissions_changed`      | A role's permissions are replaced, before and after                     |
 | `access.denied`                 | A data-changing request is refused for a missing permission             |
+| `hotspot.<step>`                | Any hotspot step (see below), with what changed and the district        |
+| `order.created`                 | A generic order is placed                                               |
+| `order.fulfilled`               | A generic order is fulfilled                                            |
+| `order.requested`               | A DCFP requests stock from a warehouse                                  |
+| `order.reviewed`                | A warehouse reviews a request                                           |
+| `order.stock_checked`           | A warehouse reserves stock for a request, or holds it                   |
+| `order.dispatched`              | A warehouse ships a request, with the quantity issued                   |
+| `order.received`                | A district receives a shipment, with the quantity counted               |
+| `stockout.reported`             | A hotspot reports a stockout to its district store                      |
+| `inventory.movement_recorded`   | Stock is adjusted at a store, with the reason and resulting balance     |
+| `<item>.created`                | A catalogue item is added (see below)                                   |
+| `<item>.updated`                | A catalogue item changes; saving it unchanged records nothing           |
+| `<item>.deleted`                | A catalogue item is deleted, keeping what it was                        |
 
 Routine token refreshes are not recorded; they would dominate the log.
 
 Access changes are recorded only when something changed: saving the same roles, status or store again adds nothing. Refused reads (`GET`) are not recorded as `access.denied`; listing screens would flood the log. The identity sync client is recorded as the system actor `identity-sync:<client>`.
+
+The hotspot steps are `submitted`, `updated`, `resubmitted`, `commented`, `activated`, `rejected` and `deactivated`; a DCFP's decision and a comment keep its text. Catalogue items are a `product`, `brand`, `product_type` or `unit_of_measure`. Order entries can be found under the order, both stores, the product and any hotspot; stock moved by a dispatch or receipt is part of the order's entry. Changes never include `created_at` or `updated_at`.
 
 ## Recording from a feature
 
