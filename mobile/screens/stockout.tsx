@@ -17,11 +17,7 @@ import {
   Sheet,
   SkeletonList,
 } from "@/components/m/kit";
-import {
-  isNetworkError,
-  listHotspotsPage,
-  toLocalHotspot,
-} from "@/lib/hotspots";
+import { isNetworkError, listHotspotsPage, toLocalHotspot } from "@/lib/hotspots";
 import { useNav } from "@/lib/nav";
 import {
   CATEGORY_LABEL,
@@ -56,9 +52,7 @@ export function StockoutForm({
   const { s, send, queue, offline } = useStore();
 
   // Hotspots: the API's active list, a page at a time, falling back to what the phone already has.
-  const cached = s.hotspots.filter(
-    (h) => h.source === "api" && h.status === "Active",
-  );
+  const cached = s.hotspots.filter((h) => h.source === "api" && h.status === "Active");
   const [hotspots, setHotspots] = useState<Hotspot[]>(cached);
   const [hasMore, setHasMore] = useState(false);
   const [loadingHotspots, setLoadingHotspots] = useState(true);
@@ -110,9 +104,7 @@ export function StockoutForm({
 
   const [selId, setSel] = useState<string | undefined>(hotspotId);
   // Opened from a hotspot's page, it may not be in the pages loaded so far.
-  const sel =
-    hotspots.find((h) => h.id === selId) ??
-    s.hotspots.find((h) => h.id === selId);
+  const sel = hotspots.find((h) => h.id === selId) ?? s.hotspots.find((h) => h.id === selId);
   const [category, setCategory] = useState<Category | "">("");
   const [reason, setReason] = useState<Reason>("Out of stock");
   const [comment, setComment] = useState("");
@@ -124,13 +116,10 @@ export function StockoutForm({
 
   // Pick the only choices for the VHT.
   const hotspot:
-    | Pick<
-        Hotspot,
-        "id" | "name" | "village" | "subcounty" | "district" | "contact"
-      >
-    | undefined = fixed
-    ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
-    : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
+    Pick<Hotspot, "id" | "name" | "village" | "subcounty" | "district" | "contact"> | undefined =
+    fixed
+      ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
+      : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
   const tooLong = comment.trim().length > COMMENT_MAX;
   const ready = !!hotspot && !!category && !tooLong && !busy;
 
@@ -197,9 +186,7 @@ export function StockoutForm({
 
   return (
     <Screen title="Request stock" backLabel="Back">
-      {refused ? (
-        <Banner tone="danger" title="Couldn't send" body={refused} />
-      ) : null}
+      {refused ? <Banner tone="danger" title="Couldn't send" body={refused} /> : null}
       {fixed ? null : (
         <Fields h="Hotspot">
           <Pick
@@ -212,13 +199,7 @@ export function StockoutForm({
                   ? "Loading hotspots…"
                   : "No active hotspots")
             }
-            sub={
-              hotspot
-                ? [hotspot.village, hotspot.subcounty]
-                    .filter(Boolean)
-                    .join(", ")
-                : ""
-            }
+            sub={hotspot ? [hotspot.village, hotspot.subcounty].filter(Boolean).join(", ") : ""}
             onPress={() => setPick(true)}
           />
         </Fields>
@@ -226,10 +207,7 @@ export function StockoutForm({
       {!fixed && !hotspots.length && !loadingHotspots ? (
         <Note text="Only active hotspots can get stock. New hotspots become active when the district focal person approves them." />
       ) : null}
-      <Fields
-        h="What's needed"
-        f="The district focal person decides how much to send."
-      >
+      <Fields h="What's needed" f="The district focal person decides how much to send.">
         <Select
           label="Condom type"
           value={category}
@@ -260,13 +238,7 @@ export function StockoutForm({
       </Fields>
       <Btns>
         <Btn
-          label={
-            busy
-              ? "Sending…"
-              : offline
-                ? "Save and send when online"
-                : "Send stock request"
-          }
+          label={busy ? "Sending…" : offline ? "Save and send when online" : "Send stock request"}
           onPress={submit}
           dis={!ready}
         />
@@ -281,11 +253,7 @@ export function StockoutForm({
               : "The hotspot manager confirms receipt when the rider arrives."
         }
       />
-      <Sheet
-        visible={pick}
-        title="Choose hotspot"
-        onClose={() => setPick(false)}
-      >
+      <Sheet visible={pick} title="Choose hotspot" onClose={() => setPick(false)}>
         <Search value={pq} onChangeText={setPq} ph="Name, village or contact" />
         {loadingHotspots && !hotspots.length ? <SkeletonList rows={5} /> : null}
         <List
@@ -300,9 +268,7 @@ export function StockoutForm({
           }
         >
           {hotspots
-            .filter((h) =>
-              matches(pq, h.name, h.village, h.subcounty, h.contact),
-            )
+            .filter((h) => matches(pq, h.name, h.village, h.subcounty, h.contact))
             .map((h) => (
               <Row
                 key={h.id}
@@ -323,11 +289,7 @@ export function StockoutForm({
           <SkeletonList rows={2} />
         ) : hasMore ? (
           <Btns>
-            <Btn
-              label="Show more hotspots"
-              kind="secondary"
-              onPress={loadMore}
-            />
+            <Btn label="Show more hotspots" kind="secondary" onPress={loadMore} />
           </Btns>
         ) : null}
       </Sheet>

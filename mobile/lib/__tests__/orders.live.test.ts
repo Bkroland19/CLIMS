@@ -49,8 +49,7 @@ live("stockout alerts against a running backend", () => {
 
   it("as a VHT: lists active hotspots and handles the send", async () => {
     await signIn(env.CLIMS_LIVE_LOGIN, env.CLIMS_LIVE_PASSWORD);
-    const hotspots = (await listHotspotsPage({ offset: 0, status: "active" }))
-      .items;
+    const hotspots = (await listHotspotsPage({ offset: 0, status: "active" })).items;
     expect(hotspots.every((h) => h.status === "active")).toBe(true);
     expect(hotspots.length).toBeGreaterThan(0);
 
@@ -63,27 +62,20 @@ live("stockout alerts against a running backend", () => {
     if (isAxiosError(res)) {
       // Today's rule: only the hotspot's assigned manager may report, so a VHT is refused.
       expect(res.response?.status).toBe(403);
-      expect(stockoutErrorMessage(res)).toMatch(
-        /isn't allowed to send stock requests/,
-      );
+      expect(stockoutErrorMessage(res)).toMatch(/isn't allowed to send stock requests/);
     } else {
       // Accepted once VHTs may report for their district (or the role has orders:all_stores).
       expect(res).toMatchObject({
         hot_spot_id: body.hot_spot_id,
         order_status: "queued",
       });
-      expect(
-        toLocalOrder(res as never, { hotspot: "h", product: "p" }, "me").source,
-      ).toBe("api");
+      expect(toLocalOrder(res as never, { hotspot: "h", product: "p" }, "me").source).toBe("api");
     }
   });
 
   it("as the hotspot manager: the app's request is accepted and queued for the DCFP", async () => {
     if (!env.CLIMS_LIVE_HM_LOGIN) return;
-    const user = await signIn(
-      env.CLIMS_LIVE_HM_LOGIN,
-      env.CLIMS_LIVE_HM_PASSWORD,
-    );
+    const user = await signIn(env.CLIMS_LIVE_HM_LOGIN, env.CLIMS_LIVE_HM_PASSWORD);
     const body = {
       hot_spot_id: user.hot_spot_id!,
       condom_category: "female" as const,
@@ -95,9 +87,7 @@ live("stockout alerts against a running backend", () => {
       order_status: "queued",
       comment: "Running low. Hotspot manager live check",
     });
-    expect(toLocalOrder(res, { hotspot: "h", product: "p" }, "me").status).toBe(
-      "queued",
-    );
+    expect(toLocalOrder(res, { hotspot: "h", product: "p" }, "me").status).toBe("queued");
     // The manager's Orders tab lists it from GET /orders.
     const orders = await listOrders();
     expect(orders.map((o) => o.id)).toContain(res.id);

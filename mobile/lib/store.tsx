@@ -139,8 +139,7 @@ function apply(
         byRole: p.byRole,
         createdAt: now,
       };
-      const to: AppRole[] =
-        role === "vht" ? (h.id === HM_HOTSPOT ? ["hm"] : []) : ["vht"];
+      const to: AppRole[] = role === "vht" ? (h.id === HM_HOTSPOT ? ["hm"] : []) : ["vht"];
       const events = to.length
         ? [
             ev({
@@ -178,12 +177,8 @@ function apply(
     case "mapHotspot": {
       // `p.hotspot` comes from toLocalHotspot (the API's copy, with its UUID) or draftHotspot
       // (demo sign-ins). New hotspots wait inactive for the DCFP's review either way.
-      const nums = s.hotspots.map(
-        (h) => parseInt(h.id.replace(/\D/g, ""), 10) || 0,
-      );
-      const id: string =
-        p.hotspot.id ??
-        `HS-${String(Math.max(0, ...nums) + 1).padStart(4, "0")}`;
+      const nums = s.hotspots.map((h) => parseInt(h.id.replace(/\D/g, ""), 10) || 0);
+      const id: string = p.hotspot.id ?? `HS-${String(Math.max(0, ...nums) + 1).padStart(4, "0")}`;
       const h: Hotspot = {
         status: "Inactive",
         reviewStatus: "submitted",
@@ -295,9 +290,7 @@ function apply(
  * Monthly reporting was removed from the field app. Drop what older versions saved for it:
  * the reports, their MOH notifications, and report saves still waiting in the outbox.
  */
-export function withoutReports(
-  saved: DomainState & { reports?: unknown },
-): DomainState {
+export function withoutReports(saved: DomainState & { reports?: unknown }): DomainState {
   const { reports: _reports, ...rest } = saved;
   return {
     ...rest,
@@ -309,10 +302,7 @@ export function withoutReports(
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const me = useMe();
   const key = `clims.domain.v1.${me.id}`;
-  const personas = useMemo(
-    () => ({ ...DEFAULT_PERSONAS, [me.role]: me.name }),
-    [me.role, me.name],
-  );
+  const personas = useMemo(() => ({ ...DEFAULT_PERSONAS, [me.role]: me.name }), [me.role, me.name]);
   const [s, setS] = useState<DomainState>(() => createSeed(personas));
   const [ready, setReady] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -365,20 +355,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (it.type === "mapHotspot" && it.payload?.request) {
           try {
             const res = await submitHotspot(it.payload.request);
-            const hotspot = toLocalHotspot(
-              res,
-              me.name,
-              it.payload.request.comment,
-            );
+            const hotspot = toLocalHotspot(res, me.name, it.payload.request.comment);
             commit(
-              apply(
-                drop(ref.current),
-                it.type,
-                { hotspot },
-                it.role,
-                me.name,
-                Date.now(),
-              ).next,
+              apply(drop(ref.current), it.type, { hotspot }, it.role, me.name, Date.now()).next,
             );
           } catch (err) {
             if (isNetworkError(err)) break;
@@ -406,20 +385,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (it.type === "stockout" && it.payload?.request) {
           const { request, hotspot, product } = it.payload;
           try {
-            const res = await reportStockout(
-              currentStockoutRequest(request, product),
-            );
+            const res = await reportStockout(currentStockoutRequest(request, product));
             const order = toLocalOrder(res, { hotspot, product }, me.name);
-            commit(
-              apply(
-                drop(ref.current),
-                it.type,
-                { order },
-                it.role,
-                me.name,
-                Date.now(),
-              ).next,
-            );
+            commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
           } catch (err) {
             if (isNetworkError(err)) break;
             const cur = drop(ref.current);
@@ -442,16 +410,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           }
           continue;
         }
-        commit(
-          apply(
-            drop(ref.current),
-            it.type,
-            it.payload,
-            it.role,
-            me.name,
-            Date.now(),
-          ).next,
-        );
+        commit(apply(drop(ref.current), it.type, it.payload, it.role, me.name, Date.now()).next);
       }
     } finally {
       flushing.current = false;
@@ -496,14 +455,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         queue(type, payload, label);
         return { queued: true };
       }
-      const { next, id } = apply(
-        cur,
-        type,
-        payload,
-        me.role,
-        me.name,
-        Date.now(),
-      );
+      const { next, id } = apply(cur, type, payload, me.role, me.name, Date.now());
       commit(next);
       return { queued: false, id };
     },
@@ -583,10 +535,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [commit],
   );
 
-  const reset = useCallback(
-    () => commit(createSeed(personas)),
-    [commit, personas],
-  );
+  const reset = useCallback(() => commit(createSeed(personas)), [commit, personas]);
 
   const value = useMemo(
     () => ({
@@ -631,23 +580,15 @@ export function useNotes() {
     // Signed-in VHTs and hotspot managers only hear about their own hotspots and orders (and the app's own alerts),
     // not the sample data the phone starts with.
     const ownOnly = (me.role === "vht" || me.role === "hm") && !me.demo;
-    const hotspots = new Set(
-      s.hotspots.filter((h) => h.source === "api").map((h) => h.id),
-    );
+    const hotspots = new Set(s.hotspots.filter((h) => h.source === "api").map((h) => h.id));
     const refs = new Set([
       ...hotspots,
-      ...s.orders
-        .filter((o) => o.source === "api" || hotspots.has(o.hotspotId))
-        .map((o) => o.id),
+      ...s.orders.filter((o) => o.source === "api" || hotspots.has(o.hotspotId)).map((o) => o.id),
     ]);
     return s.events
       .filter((e) => e.to.includes(me.role) && e.actor !== me.name)
       .filter(
-        (e) =>
-          !ownOnly ||
-          refs.has(e.ref) ||
-          e.ref.startsWith("MAP-") ||
-          e.ref.startsWith("REQ-"),
+        (e) => !ownOnly || refs.has(e.ref) || e.ref.startsWith("MAP-") || e.ref.startsWith("REQ-"),
       )
       .sort((a, b) => b.t - a.t);
   }, [s.events, s.hotspots, s.orders, me.role, me.name, me.demo]);
@@ -666,8 +607,6 @@ export function useUnread() {
 export function usePending(id?: string) {
   const { s } = useStore();
   return id
-    ? s.outbox.find(
-        (it) => it.payload?.id === id || it.payload?.hotspotId === id,
-      )
+    ? s.outbox.find((it) => it.payload?.id === id || it.payload?.hotspotId === id)
     : undefined;
 }

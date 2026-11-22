@@ -49,10 +49,7 @@ export const COMMENT_MAX = 4000;
 
 /** POST /orders/stockouts. */
 export async function reportStockout(body: StockoutRequest): Promise<ApiOrder> {
-  const { data } = await api.post<{ data: ApiOrder }>(
-    "/orders/stockouts",
-    body,
-  );
+  const { data } = await api.post<{ data: ApiOrder }>("/orders/stockouts", body);
   return data.data;
 }
 
@@ -64,10 +61,8 @@ export function stockoutErrorMessage(err: unknown): string {
       return "CLIMS didn't accept this request: your account isn't allowed to send stock requests for this hotspot yet. Your district focal person can tell you when it's switched on, or ask the hotspot manager to send it.";
     if (s === 422)
       return "This hotspot isn't linked to a district yet, so the request has nowhere to go. Call your district focal person.";
-    if (s === 404)
-      return "That hotspot isn't in CLIMS any more. Refresh and try again.";
-    if (s === 400)
-      return "Some details weren't accepted. Check the form and try again.";
+    if (s === 404) return "That hotspot isn't in CLIMS any more. Refresh and try again.";
+    if (s === 400) return "Some details weren't accepted. Check the form and try again.";
     if (!err.response)
       return "Can't reach CLIMS. Your request will be sent when you're back online.";
   }
@@ -130,9 +125,7 @@ export function stockoutComment(reason: string, comment: string): string {
  * saved with it; a name without one asks for both.
  */
 export function currentStockoutRequest(
-  request:
-    | StockoutRequest
-    | { hot_spot_id: string; condom_id?: string; comment?: string | null },
+  request: StockoutRequest | { hot_spot_id: string; condom_id?: string; comment?: string | null },
   product: string,
 ): StockoutRequest {
   if ("condom_category" in request) return request;

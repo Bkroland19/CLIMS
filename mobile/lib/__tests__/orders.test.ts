@@ -15,13 +15,10 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 /** Answer GET requests by path; anything else is a 404. */
-function serve(
-  routes: Record<string, { status: number; data?: unknown } | "offline">,
-) {
+function serve(routes: Record<string, { status: number; data?: unknown } | "offline">) {
   const adapter: AxiosAdapter = async (cfg) => {
     const r = routes[cfg.url ?? ""] ?? { status: 404 };
-    if (r === "offline")
-      throw new AxiosError("Network Error", "ERR_NETWORK", cfg);
+    if (r === "offline") throw new AxiosError("Network Error", "ERR_NETWORK", cfg);
     const res = {
       data: r.data,
       status: r.status,
@@ -29,8 +26,7 @@ function serve(
       headers: {},
       config: cfg,
     };
-    if (r.status >= 400)
-      throw new AxiosError("fail", String(r.status), cfg, null, res as never);
+    if (r.status >= 400) throw new AxiosError("fail", String(r.status), cfg, null, res as never);
     return res;
   };
   api.defaults.adapter = adapter;
@@ -40,22 +36,12 @@ beforeEach(() => mockStore.clear());
 
 describe("stockoutErrorMessage", () => {
   const err = (status?: number) =>
-    new AxiosError(
-      "x",
-      "x",
-      undefined,
-      null,
-      status ? ({ status } as never) : undefined,
-    );
+    new AxiosError("x", "x", undefined, null, status ? ({ status } as never) : undefined);
   it("explains a refusal so the VHT knows it isn't their mistake", () => {
-    expect(stockoutErrorMessage(err(403))).toMatch(
-      /isn't allowed to send stock requests/,
-    );
+    expect(stockoutErrorMessage(err(403))).toMatch(/isn't allowed to send stock requests/);
   });
   it("explains a hotspot without a district", () => {
-    expect(stockoutErrorMessage(err(422))).toMatch(
-      /isn't linked to a district/,
-    );
+    expect(stockoutErrorMessage(err(422))).toMatch(/isn't linked to a district/);
   });
   it("promises to send later when offline", () => {
     expect(stockoutErrorMessage(err())).toMatch(/back online/);
@@ -72,9 +58,7 @@ describe("toLocalOrder", () => {
     created_at: "2026-11-21T09:00:00Z",
   };
   it("keeps the API id, names and comment", () => {
-    expect(
-      toLocalOrder(base, { hotspot: "Kazo Lodge", product: "Male" }, "Grace"),
-    ).toMatchObject({
+    expect(toLocalOrder(base, { hotspot: "Kazo Lodge", product: "Male" }, "Grace")).toMatchObject({
       id: "o1",
       source: "api",
       hotspotId: "h1",
@@ -88,8 +72,7 @@ describe("toLocalOrder", () => {
   });
   it("maps the API's workflow statuses onto the app's", () => {
     const st = (order_status: ApiOrder["order_status"]) =>
-      toLocalOrder({ ...base, order_status }, { hotspot: "", product: "" }, "")
-        .status;
+      toLocalOrder({ ...base, order_status }, { hotspot: "", product: "" }, "").status;
     expect(st("on_hold")).toBe("on_hold");
     expect(st("reviewed")).toBe("review");
     expect(st("dispatched")).toBe("dispatched");
@@ -99,9 +82,7 @@ describe("toLocalOrder", () => {
 
 describe("stockoutComment", () => {
   it("leads with what's happening", () => {
-    expect(stockoutComment("Running low", "  Busy weekend ")).toBe(
-      "Running low. Busy weekend",
-    );
+    expect(stockoutComment("Running low", "  Busy weekend ")).toBe("Running low. Busy weekend");
     expect(stockoutComment("Out of stock", "")).toBe("Out of stock");
   });
 });
@@ -126,11 +107,7 @@ describe("currentStockoutRequest", () => {
       condom_category: "female",
       message: "Out of stock",
     });
-    expect(
-      currentStockoutRequest(saved, "Engabu male · Free").condom_category,
-    ).toBe("male");
-    expect(
-      currentStockoutRequest(saved, "Trust · Commercial").condom_category,
-    ).toBe("both");
+    expect(currentStockoutRequest(saved, "Engabu male · Free").condom_category).toBe("male");
+    expect(currentStockoutRequest(saved, "Trust · Commercial").condom_category).toBe("both");
   });
 });
