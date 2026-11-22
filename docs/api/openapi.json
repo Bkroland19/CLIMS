@@ -154,6 +154,49 @@
         "deprecated": true
       }
     },
+    "/api/v1/orders/riders": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listOrderRiders",
+        "summary": "List the riders a DCFP can dispatch",
+        "description": "Requires orders:process. Active accounts with orders:deliver assigned to your store, by name: exactly the riders `dispatch` accepts as `rider_id`. `open_deliveries` counts each rider's dispatched hotspot orders not yet delivered. Without orders:all_stores the list is for your assigned store (403 if you have none, or if `store_id` names another). With orders:all_stores, `store_id` is required (400 without it). `data` is always an array.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "The store whose riders to list. Required with orders:all_stores; otherwise optional and must be your assigned store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/events": {
       "get": {
         "tags": ["Orders"],
@@ -221,7 +264,7 @@
         "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance an order workflow",
-        "description": "On a stockout alert (queued, or on_hold while the warehouse fills a request) the DCFP either sends stock or asks the warehouse. dispatch takes rider_id (an active rider with orders:deliver at the district store), unit_of_measure_id and quantity_issued, and takes the quantity from the district's available stock; too little returns 409. request-replenishment (orders:replenish) takes warehouse_store_id, unit_of_measure_id and quantity, creates a linked warehouse request, notifies the warehouse and puts the alert on hold; an alert has one open request at a time. review and check-stock do not apply to alerts. A warehouse request is reviewed, stock-checked (which reserves it, or holds it) and dispatched by warehouse staff with orders:process; dispatch may give a smaller quantity_issued. The district then runs receive (orders:receive) with quantity_received, and a mismatch needs discrepancy_note. deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. review and check-stock accept an empty body.",
+        "description": "On a stockout alert (queued, or on_hold while the warehouse fills a request) the DCFP either sends stock or asks the warehouse. dispatch takes rider_id (an active rider with orders:deliver at the district store, as listed by GET /api/v1/orders/riders), unit_of_measure_id and quantity_issued, and takes the quantity from the district's available stock; too little returns 409. request-replenishment (orders:replenish) takes warehouse_store_id, unit_of_measure_id and quantity, creates a linked warehouse request, notifies the warehouse and puts the alert on hold; an alert has one open request at a time. review and check-stock do not apply to alerts. A warehouse request is reviewed, stock-checked (which reserves it, or holds it) and dispatched by warehouse staff with orders:process; dispatch may give a smaller quantity_issued. The district then runs receive (orders:receive) with quantity_received, and a mismatch needs discrepancy_note. deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. review and check-stock accept an empty body.",
         "responses": {
           "200": {
             "description": "Success",
@@ -3427,6 +3470,51 @@
           }
         },
         "required": ["success", "data"]
+      },
+      "Rider": {
+        "type": "object",
+        "required": ["id", "first_name", "last_name", "phone_number", "open_deliveries"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "As recorded on the account; may be empty."
+          },
+          "open_deliveries": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "description": "Hotspot orders dispatched to this rider and not yet delivered."
+          }
+        }
+      },
+      "RiderListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rider"
+            }
+          }
+        }
       },
       "CreateOrderRequest": {
         "type": "object",

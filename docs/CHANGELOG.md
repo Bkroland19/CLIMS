@@ -11,8 +11,12 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   or else assigned subcounty's). Inactive hotspots and other districts are refused.
 - `hotspots:read_district` lets a VHT list and view their district's active hotspots, to choose one; it
   does not open those hotspots' comment threads.
-- Migration 20 adds the two permissions (granted to admin). Grant VHTs `hotspots:read`, `hotspots:submit`,
+- Migration 21 adds the two permissions (granted to admin). Grant VHTs `hotspots:read`, `hotspots:submit`,
   `hotspots:read_district`, `orders:stockout` and `orders:stockout_district` through the RBAC API.
+- **Rider picker for DCFPs.** `GET /api/v1/orders/riders` (`orders:process`) lists the riders a DCFP can
+  dispatch a stockout alert to: active accounts with `orders:deliver` at the DCFP's store, by name, with
+  `open_deliveries` (hotspot orders dispatched to them and not yet delivered). `orders:all_stores` must
+  pass `?store_id=`. Dispatch checks riders with the same rule.
 - **Web app** in `frontend/`, imported from the `LMD_FE` prototype and rebuilt on Next.js 16,
   React 19, TypeScript, Tailwind CSS 4 and shadcn/ui, themed after the SalesOps dashboard reference in light
   mode with an optional dark theme. Decisions are recorded in `docs/adr/0001-frontend-stack.md`.
@@ -61,6 +65,12 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - New orders and stockout requests reject inactive products.
 - A product's type is its distribution channel (free, socially marketed or commercial), and its
   brand is chosen from the brand list. The product minimum level is removed.
+- The web app's hotspot screens follow the hotspot API: a DCFP activates or rejects a submitted
+  hotspot and can deactivate an active one, each with a comment, and the separate verify step is
+  gone. The VHT's submission form asks for what the API requires: type, region, district,
+  subcounty, coordinates, and the hotspot manager's name and phone.
+- The VHT district stockout migration is number 21. It was numbered 20, like the store assignment
+  migration, which stopped migrations from running.
 
 ### Removed
 
