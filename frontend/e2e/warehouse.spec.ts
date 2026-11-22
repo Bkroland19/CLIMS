@@ -1,10 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { resetMock } from './support/mock';
 import { expectToast, open } from './support/ui';
 
 /*
- * The warehouse forms, and the round trip with the district: the mock seeds WR-2026-0031
+ * The warehouse forms, on the prototype contract (`dev/mock/fulfilment.mts`); the district
+ * side has moved to the live orders API, so the two no longer share requests. The mock seeds WR-2026-0031
  * (new, at JMS), WR-2026-0030 (queued at NMS, for Mukono) and WR-2026-0027 (on hold at JMS,
  * for Lira, awaiting a supplier delivery).
  */
@@ -64,10 +65,10 @@ test('returns a held request to the queue', async ({ page }) => {
   await expect(summary).toContainText('Queued');
 });
 
-/** Fills in transport details and dispatches the request open on the page. */
-async function dispatch(page: Page, id: string): Promise<void> {
+test('dispatches a queued request; transport details come first', async ({ page }) => {
+  await open(page, '/warehouse/requests/WR-2026-0030?store=NMS', 'District request');
   await page.getByRole('button', { name: 'Check stock' }).click();
-  const send = page.getByRole('button', { name: 'Dispatch to Wakiso district store' });
+  const send = page.getByRole('button', { name: 'Dispatch to Mukono district store' });
   await send.click();
   // Transport details are required before anything is sent.
   await expect(page.getByLabel('Waybill number')).toHaveAttribute('aria-invalid', 'true');
@@ -76,33 +77,6 @@ async function dispatch(page: Page, id: string): Promise<void> {
   await page.getByLabel('Vehicle').fill('UBF 112C');
   await page.getByLabel('Driver').fill('Robert Ssali');
   await send.click();
-  await expectToast(page, `${id} dispatched to Wakiso district store.`);
-}
-
-test('a district request goes to the warehouse, is dispatched, and is received', async ({
-  page,
-}) => {
-  // District: ask NMS for stock.
-  await open(page, '/dcfp/restock/new', 'New warehouse request');
-  await page.getByRole('button', { name: 'Send request to NMS' }).click();
-  await expect(page).toHaveURL(/\/dcfp\/restock\/WR-\d{4}-\d{4}$/);
-  const id = new URL(page.url()).pathname.split('/').pop() ?? '';
-  expect(id).toMatch(/^WR-\d{4}-\d{4}$/);
-
-  // Warehouse: accept, check stock, dispatch.
-  await open(page, `/warehouse/requests/${id}?store=NMS`, 'District request');
-  await page.getByRole('button', { name: 'Accept and queue request' }).click();
-  await expectToast(page, `${id} accepted and queued.`);
-  await dispatch(page, id);
+  await expectToast(page, 'WR-2026-0030 dispatched to Mukono district store.');
   await expect(page.getByText('WB-NMS-26-1300').first()).toBeVisible();
-
-  // District: the consignment is waiting to be received.
-  await open(page, `/dcfp/restock/${id}`, 'Warehouse request');
-  await expect(page.getByRole('heading', { name: 'Receive and verify stock' })).toBeVisible();
-  await page.getByRole('checkbox', { name: /checked batch numbers and expiry dates/ }).check();
-  await page.getByRole('checkbox', { name: /signed waybill WB-NMS-26-1300/ }).check();
-  await page.getByRole('button', { name: 'Confirm receipt and issue GRN' }).click();
-
-  await expectToast(page, `${id} received. District stock updated.`);
-  await expect(page.getByRole('heading', { name: /^Goods received note / })).toBeVisible();
 });
