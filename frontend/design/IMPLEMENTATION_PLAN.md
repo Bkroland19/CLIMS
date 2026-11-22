@@ -133,6 +133,11 @@ unless asked.
 
 ### Phase 4 notes (DCFP workspace)
 
+> **History for the DCFP side.** `/dcfp` now runs on the live orders, inventory, hotspot and
+> notification endpoints (`src/features/district`, `dev/mock/orders.mts`); see
+> `DCFP_LIVE_API_PLAN.md`. The contract below still describes the warehouse and MOH screens,
+> which stay on `src/features/fulfilment` and `dev/mock/fulfilment.mts` until they move too.
+
 **Fulfilment API contract.** Not yet in the Go API. The client (`src/features/fulfilment/api.ts`)
 and the mock (`dev/mock/fulfilment.mts`) use these paths and shapes. Every reply uses the Go
 envelope: `{ success: true, data }`, or `{ success: false, message, error?: { field: message } }`.
