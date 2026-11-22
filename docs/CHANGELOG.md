@@ -34,6 +34,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 - Two migrations shared version 20, so the API failed at start-up ("duplicate migration file").
   `vht_district_stockouts` is now migration 21.
+- The audit log and condom category requests both added migration 29, and the API no longer
+  compiled: the audit entries still expected every order and stockout report to name a product.
+  `order_condom_category` is now migration 30, and a category request is recorded without a
+  product until the warehouse chooses one.
 
 ### Added
 
