@@ -175,7 +175,8 @@ const ROLE_SEED: readonly [string, string[]][] = [
   ['dfcp', ['users:read']],
   ['store incharge', []],
   ['hotspot manager', []],
-  ['delivery agent', []],
+  // Riders: the orders mock lists active holders of orders:deliver as the Go API does.
+  ['delivery agent', ['orders:deliver']],
   ['other supplier', []],
   ['healthy facility', []],
   ['vht', []],
@@ -235,9 +236,14 @@ const LAST_SEEN_DAYS: readonly (number | null)[] = [
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
 
-/** A demo account's store, as migration 20 assigns it: DCFPs at Wakiso's, warehouse staff at theirs. */
+/**
+ * A demo account's store, as migration 20 assigns it: DCFPs and riders at Wakiso's, warehouse
+ * staff at theirs.
+ */
 function seedStoreFor(roles: readonly string[]): string | null {
-  if (roles.includes('dfcp')) return mockDistrictStoreId('Wakiso');
+  if (roles.includes('dfcp') || roles.includes('delivery agent')) {
+    return mockDistrictStoreId('Wakiso');
+  }
   const warehouse = roles.find((role) => role === 'jms' || role === 'nms');
   return MOCK_STORES.find((store) => store.code === warehouse)?.id ?? null;
 }
@@ -298,6 +304,21 @@ function seedUsers(dataset: string): User[] {
 
 const BRAND = (n: number) => uuid(21, n);
 const UNIT = (n: number) => uuid(22, n);
+
+/** Catalogue records the orders mock (`orders.mts`) refers to. */
+export const MOCK_CATALOGUE = {
+  /** Engabu Free Male, in boxes of 144. */
+  maleBox: uuid(20, 2),
+  /** FC2 Free Female, by the piece. */
+  femalePiece: uuid(20, 4),
+  /** Engabu Free Male, by the piece. */
+  malePiece: uuid(20, 1),
+  /** Trust, a deactivated legacy product with no type or category. */
+  legacy: uuid(20, 8),
+  piece: UNIT(1),
+  box: UNIT(2),
+  carton: UNIT(3),
+};
 
 function lookup(id: string, name: string, note: string | null, active = true, age = 400): Lookup {
   return { id, name, note, active, created_at: daysAgo(age), updated_at: daysAgo(age / 2) };
@@ -1382,15 +1403,19 @@ function handleCatalogue(
 
 // ---------------------------------------------------------------- the signed-in user (Go shapes)
 
+/** The signed-in account's id, which the orders mock records on the steps it takes. */
+export const SIGNED_IN_USER_ID = 1;
+
 /**
  * The account every mock sign-in opens: an administrator holding every
  * permission, in the shape `POST /auth/login` and `GET /auth/me` send.
- * `email` is what the visitor typed when it looks like an address.
+ * `email` is what the visitor typed when it looks like an address. It is
+ * assigned Wakiso's district store, so the DCFP workspace works as Wakiso's DCFP.
  */
 export function signedInUser(email: string | null = null) {
   const admin = state.roles.find((role) => role.name === 'admin') ?? null;
   return {
-    id: 1,
+    id: SIGNED_IN_USER_ID,
     username: 'sarah.nakato',
     firstname: 'Sarah',
     lastname: 'Nakato',
@@ -1398,7 +1423,76 @@ export function signedInUser(email: string | null = null) {
     status: 'active',
     role: admin,
     roles: admin ? [admin] : [],
+    store_id: mockDistrictStoreId('Wakiso'),
   };
+}
+
+// ---------------------------------------------------------------- lookups for the orders mock
+
+const TYPE_LABELS: Record<ProductType, string> = {
+  free: 'Free',
+  socially_marketed: 'Socially marketed',
+  commercial: 'Commercial',
+};
+const CATEGORY_LABELS: Record<ProductCategory, string> = { male: 'Male', female: 'Female' };
+
+/**
+ * A product's label as the Go API's stock reports write it: brand, distribution channel and
+ * category ("Engabu Free Male"), leaving out what a legacy product lacks. Null when there is no
+ * such product.
+ */
+export function mockProductLabel(id: string): string | null {
+  const product = state.products.find((candidate) => candidate.id === id);
+  if (!product) return null;
+  const brand = state.brands.find((candidate) => candidate.id === product.brand_id)?.name;
+  return [
+    brand,
+    product.type && TYPE_LABELS[product.type],
+    product.category && CATEGORY_LABELS[product.category],
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** A unit's name, or null when there is no such unit. */
+export function mockUnitName(id: string): string | null {
+  return state.units.find((unit) => unit.id === id)?.name ?? null;
+}
+
+/** The id of the demo account named "First Last", or null. */
+export function mockUserIdByName(name: string): string | null {
+  return state.users.find((user) => `${user.firstname} ${user.lastname}` === name)?.id ?? null;
+}
+
+/**
+ * The riders a store can dispatch to, as the Go API's rider rule finds them: active accounts
+ * assigned to the store whose roles grant `orders:deliver`, by name.
+ */
+export function mockRidersAt(storeId: string) {
+  const delivers = new Set(
+    state.roles
+      .filter((role) => role.permissions.includes('orders:deliver'))
+      .map((role) => role.id),
+  );
+  return state.users
+    .filter(
+      (user) =>
+        user.status === 'active' &&
+        user.store_id === storeId &&
+        user.role_ids.some((roleId) => delivers.has(roleId)),
+    )
+    .map((user) => ({
+      id: user.id,
+      first_name: user.firstname,
+      last_name: user.lastname,
+      phone_number: user.phone_number,
+    }))
+    .sort(
+      (a, b) =>
+        a.first_name.localeCompare(b.first_name) ||
+        a.last_name.localeCompare(b.last_name) ||
+        a.id.localeCompare(b.id),
+    );
 }
 
 /**
