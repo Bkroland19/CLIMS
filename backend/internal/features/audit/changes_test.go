@@ -77,4 +77,10 @@ func TestRequestContext(t *testing.T) {
 	if Anonymous(job) || requestFrom(job).system != "create-admin" {
 		t.Fatal("a system actor should not be anonymous")
 	}
+	// A service's request keeps its address but drops any signed-in user.
+	signedIn := context.WithValue(context.Background(), contextKey{}, &requestInfo{ip: "10.0.0.5", actorID: func() string { return "u1" }})
+	service := requestFrom(AsSystemActor(signedIn, "identity-sync:kc"))
+	if service.system != "identity-sync:kc" || service.ip != "10.0.0.5" || service.actorID() != "" {
+		t.Fatalf("service request: %+v", service)
+	}
 }

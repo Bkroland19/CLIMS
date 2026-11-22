@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/pkg/request"
 	"clims-backend/internal/pkg/response"
 
@@ -106,10 +105,12 @@ type Handler struct {
 	auditor Auditor
 }
 
-// RegisterRoutes serves GET /audit; it requires audit:read.
-func RegisterRoutes(router fiber.Router, repo *Repository, auditor Auditor, jwtMiddleware, activeUser fiber.Handler) {
+// RegisterRoutes serves GET /audit behind requireRead, which must check audit:read
+// (rbac.RequirePermission("audit:read")). It is passed in because rbac records its
+// own changes in the audit log and so cannot be imported here.
+func RegisterRoutes(router fiber.Router, repo *Repository, auditor Auditor, jwtMiddleware, activeUser, requireRead fiber.Handler) {
 	h := &Handler{repo: repo, auditor: auditor}
-	router.Get("/audit", jwtMiddleware, activeUser, rbac.RequirePermission("audit:read"), h.search)
+	router.Get("/audit", jwtMiddleware, activeUser, requireRead, h.search)
 }
 
 func (h *Handler) search(c fiber.Ctx) error {

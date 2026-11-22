@@ -2,10 +2,15 @@ package audit
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 )
+
+// DeniedPermissionKey is the request local the permission check sets to the
+// permission it refused, so Middleware can record the denial.
+const DeniedPermissionKey = "audit.denied_permission"
 
 type contextKey struct{}
 
@@ -30,9 +35,10 @@ func requestFrom(ctx context.Context) requestInfo {
 }
 
 // Middleware attaches the request's address, device, request ID, signed-in user
-// and session to its context, so features only describe what happened. Register it
-// after the client IP and request ID middleware.
-func Middleware() fiber.Handler {
+// and session to its context, so features only describe what happened. After the
+// request, it records a refused permission on a data-changing request as
+// access.denied. Register it after the client IP and request ID middleware.
+func Middleware(auditor Auditor) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		local := func(key string) func() string {
 			return func() string {
@@ -48,7 +54,30 @@ func Middleware() fiber.Handler {
 			actorID:   local("user_id"),
 			sessionID: local("session_id"),
 		}))
-		return c.Next()
+		err := c.Next()
+		recordDenial(c, auditor)
+		return err
+	}
+}
+
+// recordDenial audits a permission the check refused. Reads are left out: a denied
+// read changes nothing, and listing screens would flood the log.
+func recordDenial(c fiber.Ctx, auditor Auditor) {
+	permission, denied := c.Locals(DeniedPermissionKey).(string)
+	if !denied {
+		return
+	}
+	switch c.Method() {
+	case fiber.MethodGet, fiber.MethodHead, fiber.MethodOptions:
+		return
+	}
+	err := auditor.RecordNow(c.Context(), Entry{Action: "access.denied", Outcome: OutcomeFailure,
+		Reason: "missing_permission", Details: map[string]any{
+			"permission": permission, "method": c.Method(), "path": c.Path(), "route": c.Route().Path,
+		}})
+	if err != nil {
+		// The response is already decided; a lost denial must not change it.
+		slog.Error("record permission denial", "error", err, "permission", permission)
 	}
 }
 
@@ -56,6 +85,14 @@ func Middleware() fiber.Handler {
 // cmd/create-admin, so its entries name the job instead of a person.
 func WithSystemActor(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, contextKey{}, &requestInfo{system: name, actorID: none, sessionID: none})
+}
+
+// AsSystemActor marks a request made by a service rather than a person, such as the
+// identity sync client, keeping the request's address, device and request ID.
+func AsSystemActor(ctx context.Context, name string) context.Context {
+	info := requestFrom(ctx)
+	info.system, info.actorID, info.sessionID = name, none, none
+	return context.WithValue(ctx, contextKey{}, &info)
 }
 
 // Anonymous reports whether no person or job is behind ctx, e.g. public sign-up.

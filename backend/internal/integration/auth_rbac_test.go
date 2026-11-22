@@ -145,10 +145,10 @@ func TestAuthRBACIntegration(t *testing.T) {
 	app := fiber.New()
 	// The same request context as the server: a request ID, then the audit middleware.
 	app.Use(requestid.New())
-	app.Use(audit.Middleware())
+	app.Use(audit.Middleware(auditor))
 	v1 := app.Group("/api/v1")
 	service := users.NewService(repo)
-	roleRepo := rbac.NewRepository(pool)
+	roleRepo := rbac.NewRepository(pool, auditor)
 	jwtMiddleware := middleware.NewJWTMiddleware("test-secret")
 	activeUser := users.ActiveUser(repo)
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret", auditor), jwtMiddleware, activeUser)
@@ -164,7 +164,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
-	audit.RegisterRoutes(v1, audit.NewRepository(pool), auditor, jwtMiddleware, activeUser)
+	audit.RegisterRoutes(v1, audit.NewRepository(pool), auditor, jwtMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 
 	request := func(method, path string, body any, token string, want int) map[string]any {
 		t.Helper()

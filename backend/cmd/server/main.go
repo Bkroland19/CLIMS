@@ -63,7 +63,8 @@ func main() {
 	// Sets X-Request-ID so a logged failure can be matched to the request that caused it.
 	app.Use(requestid.New())
 	// Gives audit entries the request's address, device, request ID, user and session.
-	app.Use(audit.Middleware())
+	auditor := audit.NewService(dbPool)
+	app.Use(audit.Middleware(auditor))
 	app.Use(middleware.NewSlogLogger())
 
 	app.Use(helmet.New())
@@ -87,7 +88,6 @@ func main() {
 	v1 := app.Group("/api/v1")
 	jwtAuthMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
-	auditor := audit.NewService(dbPool)
 	userRepo := users.NewRepository(dbPool, auditor)
 	if client := os.Getenv("IDENTITY_SYNC_CLIENT_ID"); client != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -98,7 +98,7 @@ func main() {
 		}
 	}
 	userService := users.NewService(userRepo)
-	roleRepo := rbac.NewRepository(dbPool)
+	roleRepo := rbac.NewRepository(dbPool, auditor)
 	activeUser := users.ActiveUser(userRepo)
 
 	// One notification service for every feature; each registers its own types.
@@ -115,7 +115,7 @@ func main() {
 	reports.RegisterRoutes(v1, reports.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
-	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser)
+	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)

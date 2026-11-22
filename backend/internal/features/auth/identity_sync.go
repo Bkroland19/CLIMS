@@ -13,6 +13,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gofiber/fiber/v3"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/users"
 )
 
@@ -56,7 +57,8 @@ func RegisterIdentitySync(ctx context.Context, app *fiber.App, repo syncAccounts
 			!slices.Contains(claims.Roles[audience].Roles, "identity_sync") {
 			return fiber.ErrForbidden
 		}
-		c.SetContext(ctx)
+		// Audit entries name the service client, since no person signed in.
+		c.SetContext(audit.AsSystemActor(ctx, "identity-sync:"+serviceClient))
 		return c.Next()
 	})
 	group.Get("/accounts", func(c fiber.Ctx) error {

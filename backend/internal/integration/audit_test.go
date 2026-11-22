@@ -11,11 +11,13 @@ import (
 
 	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/auth"
+	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,13 +31,14 @@ func testAudit(t *testing.T, pool *pgxpool.Pool, repo *users.Repository, service
 	ctx := context.Background()
 	app := fiber.New()
 	app.Use(requestid.New())
-	app.Use(audit.Middleware())
+	app.Use(audit.Middleware(auditor))
 	v1 := app.Group("/api/v1")
 	jwtMiddleware := middleware.NewJWTMiddleware("test-secret")
 	activeUser := users.ActiveUser(repo)
 	auth.RegisterRoutes(v1, auth.NewHandler(repo, service, "test-secret", auditor), jwtMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(repo, service), jwtMiddleware, activeUser)
-	audit.RegisterRoutes(v1, audit.NewRepository(pool), auditor, jwtMiddleware, activeUser)
+	rbac.RegisterRoutes(v1, rbac.NewHandler(rbac.NewRepository(pool, auditor)), jwtMiddleware, activeUser)
+	audit.RegisterRoutes(v1, audit.NewRepository(pool), auditor, jwtMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 
 	// raw sends a request with chosen headers and returns the status and decoded body.
 	raw := func(method, path string, body any, headers map[string]string) (int, map[string]any) {
@@ -220,6 +223,77 @@ func testAudit(t *testing.T, pool *pgxpool.Pool, repo *users.Repository, service
 	if entry := find(entries("subject_type=user&subject_id="+createdID), "user.created"); entry == nil ||
 		entry["actor"].(map[string]any)["id"] != adminID {
 		t.Fatalf("admin-created account entry: %v", entry)
+	}
+
+	// Access changes name the admin and record before and after; repeats record nothing.
+	count := func(query string) int {
+		t.Helper()
+		return len(entries(query))
+	}
+	var vhtRole, storeID string
+	if err := pool.QueryRow(ctx, `SELECT (SELECT id FROM roles WHERE name = 'vht'),
+		(SELECT id FROM stores WHERE store_type = 'district' ORDER BY code LIMIT 1)`).Scan(&vhtRole, &storeID); err != nil {
+		t.Fatal(err)
+	}
+	userPath, userSubject := "/users/"+createdID, "subject_type=user&subject_id="+createdID
+	roles := map[string]any{"role_ids": []string{registeredRole, vhtRole}}
+	request("PUT", userPath+"/roles", roles, admin, 200)
+	request("PUT", userPath+"/roles", roles, admin, 200)
+	changed := entries("action=user.roles_changed&" + userSubject)
+	if len(changed) != 1 || changed[0]["actor"].(map[string]any)["id"] != adminID {
+		t.Fatalf("role change entries: %v", changed)
+	}
+	if after := changed[0]["changes"].(map[string]any)["roles"].(map[string]any)["after"].([]any); len(after) != 2 || after[1] != "vht" {
+		t.Fatalf("roles after: %v", after)
+	}
+	request("PATCH", userPath+"/status", map[string]any{"status": "disabled"}, admin, 200)
+	request("PATCH", userPath+"/status", map[string]any{"status": "active"}, admin, 200)
+	if count("action=user.disabled&"+userSubject) != 1 || count("action=user.enabled&"+userSubject) != 1 {
+		t.Fatal("status changes were not recorded")
+	}
+	request("PATCH", userPath+"/store", map[string]any{"store_id": storeID}, admin, 200)
+	request("PATCH", userPath+"/store", map[string]any{"store_id": storeID}, admin, 200)
+	if count("action=user.store_assigned&"+userSubject) != 1 ||
+		count("action=user.store_assigned&subject_type=store&subject_id="+storeID) != 1 {
+		t.Fatal("store assignment should be recorded once, under the user and the store")
+	}
+	request("DELETE", userPath+"/sessions", nil, admin, 200)
+	if count("action=user.sessions_revoked&"+userSubject) != 1 {
+		t.Fatal("an administrator's revocation was not recorded")
+	}
+
+	var nmsRole string
+	if err := pool.QueryRow(ctx, `SELECT id FROM roles WHERE name = 'nms'`).Scan(&nmsRole); err != nil {
+		t.Fatal(err)
+	}
+	request("PUT", "/roles/"+nmsRole+"/permissions", map[string]any{"permissions": []string{"roles:read"}}, admin, 200)
+	request("PUT", "/roles/"+nmsRole+"/permissions", map[string]any{"permissions": []string{}}, admin, 200)
+	granted := entries("action=role.permissions_changed&subject_type=role&subject_id=" + nmsRole)
+	if len(granted) != 2 || granted[1]["details"].(map[string]any)["role"] != "nms" ||
+		granted[1]["changes"].(map[string]any)["permissions"].(map[string]any)["after"].([]any)[0] != "roles:read" {
+		t.Fatalf("role permission entries: %v", granted)
+	}
+
+	// The identity sync client links SSO accounts as a named system actor, once.
+	syncCtx := audit.AsSystemActor(ctx, "identity-sync:test-client")
+	for range 2 {
+		if err := repo.LinkOIDCIdentity(syncCtx, uuid.MustParse(createdID), "https://sso.example.test/realms/moh", "subject-123"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	linked := entries("action=user.identity_linked&" + userSubject)
+	if len(linked) != 1 || linked[0]["system_actor"] != "identity-sync:test-client" || linked[0]["actor"] != nil {
+		t.Fatalf("identity link entries: %v", linked)
+	}
+
+	// A refused change is recorded with the permission it lacked; a refused read is not.
+	outsider := login("audit-user@example.test", "audit-password-123", 200)
+	request("PATCH", userPath+"/status", map[string]any{"status": "disabled"}, outsider, 403)
+	request("GET", "/users", nil, outsider, 403)
+	denials := entries("action=access.denied&actor_id=" + userID)
+	if len(denials) != 1 || denials[0]["details"].(map[string]any)["permission"] != "users:update" ||
+		denials[0]["details"].(map[string]any)["method"] != "PATCH" || denials[0]["outcome"] != "failure" {
+		t.Fatalf("denial entries: %v", denials)
 	}
 
 	// No password or token reached any entry written above.

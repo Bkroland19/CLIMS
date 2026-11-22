@@ -31,7 +31,7 @@ func documentationApp() *fiber.App {
 	auditor := audit.NewService(nil)
 	repo := users.NewRepository(nil, auditor)
 	service := users.NewService(repo)
-	roles := rbac.NewRepository(nil)
+	roles := rbac.NewRepository(nil, auditor)
 	jwt := middleware.NewJWTMiddleware("test-secret")
 	active := users.ActiveUser(repo)
 	v1 := app.Group("/api/v1")
@@ -45,7 +45,7 @@ func documentationApp() *fiber.App {
 	locations.RegisterRoutes(v1, locations.NewHandler(nil), jwt, active)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(nil), jwt, active)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(nil), jwt, active)
-	audit.RegisterRoutes(v1, audit.NewRepository(nil), auditor, jwt, active)
+	audit.RegisterRoutes(v1, audit.NewRepository(nil), auditor, jwt, active, rbac.RequirePermission("audit:read"))
 	health.RegisterRoutes(app, health.NewHandler(nil, "test", "test", "test"))
 	apidocs.RegisterRoutes(app, os.DirFS(filepath.Join("..", "..", "..", "docs", "api")))
 	return app

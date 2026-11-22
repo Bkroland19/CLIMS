@@ -234,10 +234,20 @@ func (r *Repository) RevokeSession(ctx context.Context, userID, sessionID, actio
 	return revoked, err
 }
 
-// RevokeAllSessions signs the user out everywhere and returns how many sessions ended.
+// RevokeAllSessions signs the user out everywhere, as an administrator's action, and
+// returns how many sessions ended.
 func (r *Repository) RevokeAllSessions(ctx context.Context, userID string) (int64, error) {
-	tag, err := r.DB.Exec(ctx, revokeAll, userID)
-	return tag.RowsAffected(), err
+	var count int64
+	err := pgx.BeginFunc(ctx, r.DB, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, revokeAll, userID)
+		if err != nil {
+			return err
+		}
+		count = tag.RowsAffected()
+		return r.audit.Record(ctx, tx, audit.Entry{Action: "user.sessions_revoked",
+			Target: &audit.Subject{Type: "user", ID: userID}, Details: map[string]any{"sessions_revoked": count}})
+	})
+	return count, err
 }
 
 const revokeAll = `UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP
