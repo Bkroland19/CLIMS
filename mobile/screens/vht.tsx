@@ -34,6 +34,7 @@ import {
   draftHotspot,
   HOTSPOT_TYPES,
   isNetworkError,
+  LIMITS,
   listDistricts,
   listRegions,
   listSubcounties,
@@ -53,6 +54,7 @@ import { useMe } from "@/lib/session";
 import { useStore, type RefreshResult } from "@/lib/store";
 import type { Order, Qty } from "@/lib/types";
 import { call, firstName, hotspotChip, inactiveNote, matches, shortId, stockStats } from "./common";
+import { TYPE } from "@/lib/fonts";
 
 export function useMine() {
   const { s } = useStore();
@@ -825,6 +827,7 @@ export function VhtMap() {
             />
             <Input
               label="Village (optional)"
+              max={LIMITS.village}
               value={f.village}
               onChangeText={up("village")}
               ph="e.g. Kigungu"
@@ -839,6 +842,7 @@ export function VhtMap() {
           <Fields h="About the hotspot">
             <Input
               label="Hotspot name"
+              max={LIMITS.name}
               value={f.name}
               onChangeText={up("name")}
               ph="Name people in the area use"
@@ -855,6 +859,7 @@ export function VhtMap() {
             {f.type === OTHER_TYPE ? (
               <Input
                 label="What kind of place?"
+                max={LIMITS.type}
                 value={f.otherType}
                 onChangeText={up("otherType")}
                 ph="e.g. Hair salon"
@@ -889,7 +894,7 @@ export function VhtMap() {
                 marginHorizontal: 32,
                 marginTop: -12,
                 marginBottom: 16,
-                fontSize: 13,
+                ...TYPE.footnote,
                 color: T.danger,
               }}
             >
@@ -899,6 +904,7 @@ export function VhtMap() {
           <Fields f="Sent to the district focal person with the hotspot.">
             <Input
               label="Comment (optional)"
+              max={LIMITS.comment}
               value={f.comment}
               onChangeText={up("comment")}
               ph="e.g. Busy on weekends"
@@ -924,6 +930,7 @@ export function VhtMap() {
           />
           <Input
             label="Full name"
+            max={LIMITS.contact}
             value={f.contactName}
             onChangeText={up("contactName")}
             ph="e.g. Sarah Nakirya"

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "CLIMS API",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "description": "Current Go/Fiber API for authentication, users, RBAC, orders, hotspot activation, inventory reporting, the condom catalogue, and health. All protected operations require a Bearer JWT and an active account. Permission codes are application permissions, not OAuth scopes. Limits are per backend process. Public signup never assigns a role."
   },
   "servers": [
@@ -40,6 +40,9 @@
       "name": "Notifications"
     },
     {
+      "name": "Reports"
+    },
+    {
       "name": "Health"
     }
   ],
@@ -50,11 +53,130 @@
   ],
   "paths": {
     "/api/v1/orders/stockouts": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listStockoutReports",
+        "summary": "List stockout reports",
+        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutReportListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      },
       "post": {
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
-        "summary": "Raise a hotspot stockout alert",
-        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Sends a stockout alert for a product, without a quantity, to the store of the hotspot's district; that district's DCFPs are notified. The alert is queued for the DCFP. A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
+        "summary": "Report a hotspot stockout to its district's DCFPs",
+        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a product, with an optional message, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the product, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`. The notification names Male, Female or Both (selection) and no quantity. If the hotspot already has an open notification, the message is counted against it (200): its repeat_count rises and its selection widens when a new type is named (Male then Female is Both), and the history keeps both.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutReportResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Counted against the hotspot's open notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStockoutRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/warehouse-requests": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "createWarehouseRequest",
+        "summary": "Order stock from NMS or JMS",
+        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the product (`condom_id`, which fixes the condom type, e.g. female) and the `quantity`. `unit_of_measure_id` defaults to the product's catalogue unit; a product without one returns 422 with `error.unit_of_measure_id`. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
         "responses": {
           "201": {
             "description": "Success",
@@ -75,12 +197,6 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
@@ -93,7 +209,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OrderStockoutRequest"
+                "$ref": "#/components/schemas/WarehouseRequestRequest"
               }
             }
           }
@@ -152,49 +268,6 @@
           }
         ],
         "deprecated": true
-      }
-    },
-    "/api/v1/orders/riders": {
-      "get": {
-        "tags": ["Orders"],
-        "operationId": "listOrderRiders",
-        "summary": "List the riders a DCFP can dispatch",
-        "description": "Requires orders:process. Active accounts with orders:deliver assigned to your store, by name: exactly the riders `dispatch` accepts as `rider_id`. `open_deliveries` counts each rider's dispatched hotspot orders not yet delivered. Without orders:all_stores the list is for your assigned store (403 if you have none, or if `store_id` names another). With orders:all_stores, `store_id` is required (400 without it). `data` is always an array.",
-        "parameters": [
-          {
-            "name": "store_id",
-            "in": "query",
-            "description": "The store whose riders to list. Required with orders:all_stores; otherwise optional and must be your assigned store.",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RiderListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
       }
     },
     "/api/v1/orders/{id}/events": {
@@ -263,20 +336,10 @@
       "post": {
         "tags": ["Orders"],
         "operationId": "transitionOrder",
-        "summary": "Advance an order workflow",
-        "description": "On a stockout alert (queued, or on_hold while the warehouse fills a request) the DCFP either sends stock or asks the warehouse. dispatch takes rider_id (an active rider with orders:deliver at the district store, as listed by GET /api/v1/orders/riders), unit_of_measure_id and quantity_issued, and takes the quantity from the district's available stock; too little returns 409. request-replenishment (orders:replenish) takes warehouse_store_id, unit_of_measure_id and quantity, creates a linked warehouse request, notifies the warehouse and puts the alert on hold; an alert has one open request at a time. review and check-stock do not apply to alerts. A warehouse request is reviewed, stock-checked (which reserves it, or holds it) and dispatched by warehouse staff with orders:process; dispatch may give a smaller quantity_issued. The district then runs receive (orders:receive) with quantity_received, and a mismatch needs discrepancy_note. deliver requires orders:deliver, the assigned rider and delivery_note. orders:all_stores overrides assignment checks. review and check-stock accept an empty body.",
+        "summary": "Advance a warehouse order",
+        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body. review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
         "responses": {
           "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "201": {
             "description": "Success",
             "content": {
               "application/json": {
@@ -324,14 +387,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "review",
-                "check-stock",
-                "dispatch",
-                "request-replenishment",
-                "receive",
-                "deliver"
-              ]
+              "enum": ["review", "check-stock", "dispatch", "receive"]
             }
           }
         ],
@@ -381,9 +437,7 @@
           {
             "name": "status",
             "in": "query",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "limit",
@@ -1742,7 +1796,7 @@
         "tags": ["Inventory"],
         "operationId": "recordStockMovement",
         "summary": "Record stock received or an adjustment",
-        "description": "Requires inventory:manage and the store as your assigned store, or orders:all_stores. A receipt adds a positive quantity, for example a delivery from a supplier to the warehouse. An adjustment corrects stock after a count in either direction and needs a note. Stock cannot fall below what open orders have reserved (409).",
+        "description": "Requires inventory:manage and the store as your assigned store, or orders:all_stores. A receipt adds a positive quantity, for example a delivery from a supplier to the warehouse. An adjustment corrects stock after a count in either direction and needs a note. Stock cannot fall below what open orders have reserved (409). Stock is held in batches: a receipt or positive adjustment adds to the named batch, and a negative adjustment comes out of it (409 when the batch holds less).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2686,6 +2740,256 @@
         "x-required-permissions": ["catalogue:manage"]
       }
     },
+    "/api/v1/catalogue/types": {
+      "get": {
+        "tags": ["Catalogue"],
+        "operationId": "listCatalogueTypes",
+        "summary": "List product types",
+        "description": "Any active user may read the catalogue. Sorted by name. `data` is always an array.",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "description": "true lists only active records (for pickers), false only inactive ones.",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Catalogue"],
+        "operationId": "createCatalogueType",
+        "summary": "Create a product type",
+        "description": "New types are active. Requires all permissions: catalogue:manage.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "A type with this name already exists; `error.name` repeats the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
+    "/api/v1/catalogue/types/{id}": {
+      "patch": {
+        "tags": ["Catalogue"],
+        "operationId": "updateCatalogueType",
+        "summary": "Rename, describe, activate or deactivate a product type",
+        "description": "Renaming updates every product that uses it. Deactivating does not change its products; it only stops the type being newly chosen. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTypeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Product type not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A type with this name already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation failed; `error` maps each invalid field to a message. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      },
+      "delete": {
+        "tags": ["Catalogue"],
+        "operationId": "deleteCatalogueType",
+        "summary": "Delete an unused product type",
+        "description": "Only a type that no products reference can be deleted; deactivate the others. Requires all permissions: catalogue:manage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Product type not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The type is used by products.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["catalogue:manage"]
+      }
+    },
     "/api/v1/catalogue/brands": {
       "get": {
         "tags": ["Catalogue"],
@@ -3340,6 +3644,1282 @@
           }
         ]
       }
+    },
+    "/api/v1/orders/stockouts/{id}": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "getStockoutReport",
+        "summary": "Get a stockout notification with its deliveries and history",
+        "description": "Requires orders:read and the same visibility as the list. Shows the deliveries, per-line acknowledgements and every event behind the notification's status.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/stockouts/{id}/deliveries": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "recordHotspotDelivery",
+        "summary": "Record a district delivery to the hotspot",
+        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Each line is a product of a selected type in its catalogue unit, converted to pieces; it comes out of the store's available stock (409 when too little) and is written to the inventory ledger as a hotspot_delivery. The hotspot's manager accounts are notified. A fulfilled notification refuses deliveries (409). Lines are taken first expiry first out; expired batches are never delivered, and a batch with under one month left needs expiry_exception_reason.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotDeliveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "A retried send matched an existing delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/stockouts/{id}/acknowledgements": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "acknowledgeHotspotDelivery",
+        "summary": "Acknowledge pieces received at the hotspot",
+        "description": "Requires orders:stockout and the notification's hotspot as your assigned hotspot. Only the hotspot's manager acknowledges: district and national users cannot complete fulfilment. Each line records the pieces actually received. Sending a line's count again is accepted once; a different count for an acknowledged line returns 409. The notification is fulfilled when every selected type has a positive acknowledgement, and the district is notified.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/notifications": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getNotificationReport",
+        "summary": "Hotspot notification fulfilment",
+        "description": "Notifications raised in the period, their fulfilment (manager acknowledgement of every selected type), fulfilment rate, product components, response time, deadline progress, the earlier backlog, overdue acknowledgements and a comparison by district, all calculated from source records on request. Requires reports:read. orders:all_stores sees every notification; others see their district store's, their hotspot's, the ones they sent and, with orders:stockout_district, the district they work in. Filters only narrow that. Without from and to, the period is the current review cycle to date. deadline_days and target_percent default to the saved settings in effect for the filtered district's store, else the user's store, else national, and the response shows them in settings; passing them overrides for ad hoc analysis.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "description": "One hotspot.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Assess one product type: notifications that include it, and its component.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "deadline_days",
+            "in": "query",
+            "description": "Days within which acknowledgement counts as on time. Defaults to the saved settings.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365
+            }
+          },
+          {
+            "name": "target_percent",
+            "in": "query",
+            "description": "On-time target. Defaults to the saved settings.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/notifications/records": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listNotificationRecords",
+        "summary": "Notifications behind the report totals",
+        "description": "The notifications behind /reports/notifications for the same filters, newest first, with delivered and acknowledged pieces per type. Requires reports:read. orders:all_stores sees every notification; others see their district store's, their hotspot's, the ones they sent and, with orders:stockout_district, the district they work in. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "description": "One hotspot.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Assess one product type: notifications that include it, and its component.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "deadline_days",
+            "in": "query",
+            "description": "Days within which acknowledgement counts as on time.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 7
+            }
+          },
+          {
+            "name": "target_percent",
+            "in": "query",
+            "description": "On-time target.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 80
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "One status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fulfilled",
+                "partly_received",
+                "awaiting_acknowledgement",
+                "awaiting_supply"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/warehouse-requests": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getWarehouseRequestReport",
+        "summary": "Warehouse request quantities and fulfilment",
+        "description": "District requests to national warehouses raised in the period: requested, approved, issued and district-acknowledged pieces, quantity fulfilment, full and partial receipts and response time, in total and by condom type, warehouse and district. Requires reports:read. orders:all_stores sees every store; other users see requests and stock of their assigned store only. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "warehouse_store_id",
+            "in": "query",
+            "description": "One warehouse.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "One condom type.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplyReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/warehouse-requests/records": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listWarehouseRequestRecords",
+        "summary": "Warehouse requests behind the report totals",
+        "description": "The requests behind /reports/warehouse-requests for the same filters, newest first, in units and pieces. Requires reports:read. orders:all_stores sees every store; other users see requests and stock of their assigned store only. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "warehouse_store_id",
+            "in": "query",
+            "description": "One warehouse.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "One condom type.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/stock": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getStockReport",
+        "summary": "Store stock and issue-based coverage",
+        "description": "Current stock at warehouses and district stores: physical, reserved, usable and in-transit quantities in units and pieces, whether the ledger reconciles, and months of stock from average outward issues over the last three complete months. Coverage is unavailable without a reconciled balance, full history or any issues. Requires reports:read. orders:all_stores sees every store; other users see requests and stock of their assigned store only. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "store_type",
+            "in": "query",
+            "description": "Warehouses or district stores.",
+            "schema": {
+              "type": "string",
+              "enum": ["national", "district"]
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "One condom type.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/batches": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getBatchReport",
+        "summary": "Batches in stock and their expiry",
+        "description": "Each batch held at a store, earliest expiry first, with days remaining and its band. Requires reports:read. orders:all_stores sees every store; other users see their assigned store only.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "store_type",
+            "in": "query",
+            "description": "Warehouses or district stores.",
+            "schema": {
+              "type": "string",
+              "enum": ["national", "district"]
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "One condom type.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "band",
+            "in": "query",
+            "description": "One band.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "expired",
+                "under_1_month",
+                "under_3_months",
+                "under_6_months",
+                "ok",
+                "unknown"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/expiry-exceptions": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listExpiryExceptions",
+        "summary": "Near-expiry stock issued with an exception",
+        "description": "Batches with under one month left that left a store in the period, with the reason, who authorised it and the rule version, newest first. Requires reports:read. orders:all_stores sees every store; other users see their assigned store only.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "One condom type.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryExceptionListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/settings": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getResponseSettings",
+        "summary": "Response settings in effect and their history",
+        "description": "Requires reports:read. The review cycle, receipt deadline and on-time target in effect today for a store (store_id) or nationally, and every saved row for that scope. Other users may read their own store or the national settings.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "One store; omitted for national settings."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Reports"],
+        "operationId": "saveResponseSettings",
+        "summary": "Save response settings from a date",
+        "description": "Requires reports:configure. Adds a setting that applies from effective_from (today or later), recording who set it and why; earlier rows are kept, so earlier reports stay reproducible. A user sets their assigned store's targets only; national targets and other stores need orders:all_stores.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponseSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/hmis-105": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getHMIS105Readiness",
+        "summary": "HMIS 105 condom figures, prepared but not submitted",
+        "description": "Requires reports:read. 105-CT11 Female and 105-CT12 Male condoms in pieces for a month, from hotspot managers' acknowledged receipts dated by acknowledgement, by district and subcounty. This is operational evidence of supply, not condoms dispensed: the counting event, dispensing channel and subcounty reporting units await programme approval, and DHIS2 integration stays disabled. orders:all_stores sees every district; others see the district they work in.",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "description": "YYYY-MM; defaults to the current month.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HMISReadinessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/export/{report}": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "exportReport",
+        "summary": "Export a report's rows as calculated now",
+        "description": "Requires reports:read. The same rows, filters and access rules as the report on screen (RN01, RN02), with the period, data update time, scope, product, rule version and definitions (RF15). Pass the report's own query parameters; unknown ones are rejected. CSV starts with that header block, then the column headers and rows, with Kampala times, and text that could run as a spreadsheet formula prefixed with an apostrophe. At most 50,000 rows.",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "notifications",
+                "warehouse-requests",
+                "stock",
+                "batches",
+                "expiry-exceptions",
+                "hmis-105"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "csv downloads a CSV file; json (the default) returns the table for the web's Excel export.",
+            "schema": {
+              "type": "string",
+              "enum": ["csv", "json"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportTableResponse"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/versions": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listReportVersions",
+        "summary": "Approved report versions",
+        "description": "Requires reports:read. Newest first, without their figures. orders:all_stores sees every version; others see their store's.",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "notifications",
+                "warehouse-requests",
+                "stock",
+                "batches",
+                "expiry-exceptions",
+                "hmis-105"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Reports"],
+        "operationId": "approveReportVersion",
+        "summary": "Approve a report version",
+        "description": "Requires reports:approve and an assigned store, or orders:all_stores for a national version. Calculates the report now for the filters and saves the figures and rows unchanged, so they stay reproducible after later corrections (RN04).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/versions/{id}": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getReportVersion",
+        "summary": "One approved version with its saved figures and rows",
+        "description": "Requires reports:read. format=csv downloads the version's saved rows. Versions outside the user's scope return 404.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "csv downloads a CSV file; json (the default) returns the table for the web's Excel export.",
+            "schema": {
+              "type": "string",
+              "enum": ["csv", "json"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionResponse"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/versions/{id}/corrections": {
+      "post": {
+        "tags": ["Reports"],
+        "operationId": "correctReportVersion",
+        "summary": "Correct an approved version",
+        "description": "Requires reports:approve, with the same scope as the version. Recalculates the report from the version's saved filters and saves it as a new version with the reason; the corrected version keeps its figures and becomes superseded. Only the latest version can be corrected (409).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCorrectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3355,64 +4935,62 @@
       "OrderStockoutRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["hot_spot_id", "condom_id"],
+        "required": ["hot_spot_id"],
         "properties": {
           "hot_spot_id": {
             "type": "string",
             "format": "uuid"
           },
+          "selection": {
+            "type": "string",
+            "enum": ["male", "female", "both"],
+            "description": "Male, Female or Both. Required unless condom_id is sent."
+          },
           "condom_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Older clients: one product, whose category becomes the selection."
           },
           "comment": {
             "type": "string",
             "nullable": true,
-            "maxLength": 4000
+            "maxLength": 4000,
+            "description": "The message the DCFP reads in the notification."
           }
         },
-        "description": "A stockout alert names the product only. The DCFP chooses the unit and quantity when sending stock or requesting it from the warehouse."
+        "description": "A stockout notification names Male, Female or Both and no quantity."
       },
       "OrderActionRequest": {
         "type": "object",
         "properties": {
-          "warehouse_store_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "rider_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity_received": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "discrepancy_note": {
-            "type": "string",
-            "maxLength": 4000
-          },
-          "delivery_note": {
-            "type": "string",
-            "maxLength": 4000
-          },
           "quantity_issued": {
             "type": "integer",
             "format": "int32",
             "minimum": 1,
-            "description": "dispatch: for a stockout alert, the quantity sent to the hotspot (required); for a warehouse request, an optional smaller quantity than requested, releasing the rest of the reservation."
+            "description": "dispatch only: a smaller quantity than ordered, releasing the rest of the reservation."
           },
-          "unit_of_measure_id": {
+          "quantity_received": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "description": "receive only (required): the quantity counted on arrival."
+          },
+          "discrepancy_note": {
             "type": "string",
-            "format": "uuid",
-            "description": "dispatch of a stockout alert and request-replenishment: the unit the DCFP sends or requests."
+            "maxLength": 4000,
+            "description": "receive only: required when quantity_received differs from quantity_issued."
           },
-          "quantity": {
+          "quantity_approved": {
             "type": "integer",
             "format": "int32",
             "minimum": 1,
-            "description": "request-replenishment only: the quantity to request from the warehouse."
+            "description": "review only: approve less than requested. Defaults to quantity_needed; check-stock reserves and dispatch issues against it."
+          },
+          "expiry_exception_reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "dispatch only. Required when stock expiring within one calendar month would leave the store (first expiry first out). Recorded with who authorised it and the rule version."
           }
         },
         "additionalProperties": false
@@ -3470,51 +5048,6 @@
           }
         },
         "required": ["success", "data"]
-      },
-      "Rider": {
-        "type": "object",
-        "required": ["id", "first_name", "last_name", "phone_number", "open_deliveries"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "first_name": {
-            "type": "string"
-          },
-          "last_name": {
-            "type": "string"
-          },
-          "phone_number": {
-            "type": "string",
-            "description": "As recorded on the account; may be empty."
-          },
-          "open_deliveries": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Hotspot orders dispatched to this rider and not yet delivered."
-          }
-        }
-      },
-      "RiderListResponse": {
-        "type": "object",
-        "required": ["success", "message", "data"],
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [true]
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Rider"
-            }
-          }
-        }
       },
       "CreateOrderRequest": {
         "type": "object",
@@ -3699,6 +5232,12 @@
             "type": "string",
             "maxLength": 4000,
             "nullable": true
+          },
+          "quantity_approved": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "description": "What the warehouse approved at review, at most quantity_needed, which keeps the original request."
           }
         }
       },
@@ -4820,6 +6359,18 @@
             "maxLength": 1000,
             "nullable": true,
             "description": "Required for an adjustment."
+          },
+          "batch_number": {
+            "type": "string",
+            "maxLength": 60,
+            "nullable": true,
+            "description": "The batch the stock is in. With expiry_date it names the batch; omitted, the stock is in the unknown-expiry batch."
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "The batch's expiry date. Unknown expiry is not counted as usable in reports."
           }
         }
       },
@@ -5469,10 +7020,12 @@
             "nullable": true
           },
           "type": {
-            "type": "string",
-            "enum": ["free", "socially_marketed", "commercial"],
-            "nullable": true,
-            "description": "Distribution channel."
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CatalogueRef"
+              }
+            ],
+            "nullable": true
           },
           "brand": {
             "allOf": [
@@ -5553,15 +7106,16 @@
       "CreateProductRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["category", "type", "brand_id", "unit_id", "pieces_per_unit"],
+        "required": ["category", "type_id", "brand_id", "unit_id", "pieces_per_unit"],
         "properties": {
           "category": {
             "type": "string",
             "enum": ["male", "female"]
           },
-          "type": {
+          "type_id": {
             "type": "string",
-            "enum": ["free", "socially_marketed", "commercial"]
+            "format": "uuid",
+            "description": "An active product type."
           },
           "brand_id": {
             "type": "string",
@@ -5584,15 +7138,16 @@
         "type": "object",
         "additionalProperties": false,
         "minProperties": 1,
-        "description": "Any subset of fields. Deactivating alone is always allowed; any other change, or activating, must leave the product complete. A brand or unit already on the product may stay even if it has since been deactivated.",
+        "description": "Any subset of fields. Deactivating alone is always allowed; any other change, or activating, must leave the product complete. A type, brand or unit already on the product may stay even if it has since been deactivated.",
         "properties": {
           "category": {
             "type": "string",
             "enum": ["male", "female"]
           },
-          "type": {
+          "type_id": {
             "type": "string",
-            "enum": ["free", "socially_marketed", "commercial"]
+            "format": "uuid",
+            "description": "An active product type."
           },
           "brand_id": {
             "type": "string",
@@ -5616,7 +7171,7 @@
       },
       "CatalogueLookup": {
         "type": "object",
-        "description": "A brand or a unit of measure.",
+        "description": "A product type, a brand or a unit of measure.",
         "required": [
           "id",
           "name",
@@ -5641,7 +7196,7 @@
           },
           "active": {
             "type": "boolean",
-            "description": "Inactive brands and units cannot be newly chosen for a product."
+            "description": "Inactive types, brands and units cannot be newly chosen for a product."
           },
           "in_use": {
             "type": "boolean",
@@ -5693,6 +7248,45 @@
             "items": {
               "$ref": "#/components/schemas/CatalogueLookup"
             }
+          }
+        }
+      },
+      "CreateTypeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          }
+        }
+      },
+      "UpdateTypeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 40,
+            "description": "Unique regardless of case. Surrounding spaces are trimmed."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Optional. Blank clears it."
+          },
+          "active": {
+            "type": "boolean"
           }
         }
       },
@@ -5899,6 +7493,1909 @@
                 "format": "int64"
               }
             }
+          }
+        }
+      },
+      "WarehouseRequestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["warehouse_store_id", "condom_id", "quantity"],
+        "properties": {
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "A national store: NMS or JMS."
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The product, which fixes the condom type (male or female), brand and channel."
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Defaults to the product's catalogue unit."
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000
+          }
+        }
+      },
+      "StockoutReport": {
+        "type": "object",
+        "required": [
+          "id",
+          "hot_spot_id",
+          "hot_spot",
+          "product",
+          "district_store_id",
+          "reported_by_id",
+          "reported_by",
+          "comment",
+          "created_at",
+          "selection",
+          "repeat_count",
+          "last_reported_at",
+          "status",
+          "fulfilled_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot": {
+            "type": "object",
+            "required": [
+              "name",
+              "village",
+              "subcounty",
+              "district",
+              "contact_name",
+              "contact_phone"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "village": {
+                "type": "string",
+                "nullable": true
+              },
+              "subcounty": {
+                "type": "string",
+                "nullable": true
+              },
+              "district": {
+                "type": "string",
+                "nullable": true
+              },
+              "contact_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "contact_phone": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "description": "The hotspot's current details, and its latest contact person."
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Set only for notifications sent by product."
+          },
+          "product": {
+            "type": "string",
+            "example": "Engabu Free Female"
+          },
+          "district_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The district store the report went to."
+          },
+          "reported_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reported_by": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selection": {
+            "type": "string",
+            "enum": ["male", "female", "both"]
+          },
+          "repeat_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Messages repeated against this open notification."
+          },
+          "last_reported_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply"]
+          },
+          "fulfilled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the last acknowledgement needed for every selected type was recorded."
+          }
+        }
+      },
+      "StockoutReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockoutReport"
+          }
+        }
+      },
+      "StockoutReportListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockoutReport"
+            }
+          }
+        }
+      },
+      "StockoutDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StockoutReport"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "deliveries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "delivered_by_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "client_reference": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": ["male", "female"]
+                          },
+                          "condom_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "product": {
+                            "type": "string"
+                          },
+                          "unit_of_measure_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          },
+                          "pieces": {
+                            "type": "integer"
+                          },
+                          "acknowledged_pieces": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "acknowledged_by_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "acknowledged_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "actor_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "raised",
+                        "repeated",
+                        "selection_changed",
+                        "delivered",
+                        "acknowledged"
+                      ]
+                    },
+                    "selection": {
+                      "type": "string",
+                      "enum": ["male", "female", "both"]
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "StockoutDetailResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockoutDetail"
+          }
+        }
+      },
+      "HotspotDeliveryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lines"],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["condom_id", "quantity"],
+              "properties": {
+                "condom_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "unit_of_measure_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Must be the product's catalogue unit, which is the default."
+                }
+              }
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          },
+          "client_reference": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "description": "Chosen by the client; a retried send with the same reference records the delivery once (200)."
+          },
+          "expiry_exception_reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "Required when stock expiring within one calendar month would leave the store (first expiry first out). Recorded with who authorised it and the rule version."
+          }
+        }
+      },
+      "AcknowledgementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lines"],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["line_id", "pieces"],
+              "properties": {
+                "line_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "pieces": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000,
+                  "description": "Pieces actually received; zero when nothing arrived."
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotificationSummary": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgements_through": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Acknowledgements recorded up to this time are included."
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "notifications_raised": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Distinct notifications raised in the period; repeats are not counted again."
+          },
+          "by_selection": {
+            "type": "object",
+            "properties": {
+              "male": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "female": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "both": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "notifications_fulfilled": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Raised in the period and fully acknowledged by data_updated_at."
+          },
+          "partly_received": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "awaiting_acknowledgement": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "awaiting_supply": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fulfilment_rate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+          },
+          "component": {
+            "type": "object",
+            "nullable": true,
+            "description": "With category: that type's part of each notification including it. A Both notification counts under each type, so the two components exceed unique notifications.",
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "notifications": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "fulfilled": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "rate": {
+                "type": "number",
+                "nullable": true,
+                "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+              }
+            }
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "median_hours": {
+                "type": "number",
+                "nullable": true,
+                "description": "Median time from notification to the last acknowledgement needed, among fulfilled notifications."
+              },
+              "fulfilled_included": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "pending": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "oldest_pending_hours": {
+                "type": "number",
+                "nullable": true
+              }
+            }
+          },
+          "deadline": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer"
+              },
+              "target_percent": {
+                "type": "integer"
+              },
+              "fulfilled_on_time": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "on_time_rate": {
+                "type": "number",
+                "nullable": true,
+                "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+              },
+              "target_met": {
+                "type": "boolean",
+                "nullable": true
+              },
+              "late_pending": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Still open and past the deadline."
+              }
+            }
+          },
+          "backlog": {
+            "type": "object",
+            "description": "Open notifications raised before the period, kept apart from it.",
+            "properties": {
+              "open": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "oldest_raised_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          },
+          "acknowledgement_overdue": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Quality issue: notifications with a delivery unacknowledged for longer than the deadline."
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "district_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "district": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "notifications_raised": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "notifications_fulfilled": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "fulfilment_rate": {
+                  "type": "number",
+                  "nullable": true,
+                  "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+                }
+              }
+            }
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ResponseSettings"
+          }
+        }
+      },
+      "NotificationRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot": {
+            "type": "string",
+            "nullable": true
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "selection": {
+            "type": "string",
+            "enum": ["male", "female", "both"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply"]
+          },
+          "raised_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_reported_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repeat_count": {
+            "type": "integer"
+          },
+          "delivered_male_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered_female_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "received_male_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "received_female_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fulfilled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "response_hours": {
+            "type": "number",
+            "nullable": true
+          },
+          "acknowledgement_overdue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificationSummaryResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationSummary"
+          }
+        }
+      },
+      "NotificationRecordListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationRecord"
+            }
+          }
+        }
+      },
+      "RequestTotals": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requested_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Originally requested."
+          },
+          "approved_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issued_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "acknowledged_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Counted by the district on receipt."
+          },
+          "quantity_fulfilment_rate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Acknowledged pieces divided by originally requested pieces."
+          },
+          "fully_received": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Received quantity at least the requested quantity."
+          },
+          "partly_received": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Not yet received by the district."
+          },
+          "unconverted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Quality issue: requests not in the product's catalogue unit, or for a product without pieces per unit, left out of the piece totals."
+          }
+        }
+      },
+      "RequestGroup": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "nullable": true
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/RequestTotals"
+          }
+        ]
+      },
+      "SupplyReport": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "$ref": "#/components/schemas/RequestTotals"
+          },
+          "by_type": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestGroup"
+            },
+            "description": "By condom type; id and name are male or female."
+          },
+          "by_warehouse": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestGroup"
+            }
+          },
+          "by_district": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestGroup"
+            }
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "median_hours": {
+                "type": "number",
+                "nullable": true,
+                "description": "Median time from request to district receipt, among received requests."
+              },
+              "fulfilled_included": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "pending": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "oldest_pending_hours": {
+                "type": "number",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "SupplyReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SupplyReport"
+          }
+        }
+      },
+      "RequestRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "order_status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse": {
+            "type": "string"
+          },
+          "district_store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "district_store": {
+            "type": "string"
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "requested": {
+            "type": "integer",
+            "nullable": true
+          },
+          "approved": {
+            "type": "integer",
+            "nullable": true
+          },
+          "issued": {
+            "type": "integer",
+            "nullable": true
+          },
+          "received": {
+            "type": "integer",
+            "nullable": true
+          },
+          "requested_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "approved_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "issued_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "received_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "response_hours": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "RequestRecordListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestRecord"
+            }
+          }
+        }
+      },
+      "StockLine": {
+        "type": "object",
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "physical": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reserved": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "usable": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Physical less expired, unknown-expiry and reserved stock, at least zero."
+          },
+          "in_transit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dispatched to this store and not yet received."
+          },
+          "physical_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "usable_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "in_transit_pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "reconciled": {
+            "type": "boolean",
+            "description": "The inventory ledger adds up to the physical balance."
+          },
+          "average_monthly_issues": {
+            "type": "number",
+            "nullable": true
+          },
+          "months_of_stock": {
+            "type": "number",
+            "nullable": true,
+            "description": "Issue-based coverage: usable divided by average monthly outward issues. It does not measure consumption."
+          },
+          "coverage_status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable_unreconciled",
+              "unavailable_short_history",
+              "unavailable_no_issues"
+            ]
+          },
+          "expired": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In batches past their expiry date; blocked from issue."
+          },
+          "unknown_expiry": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In batches without an expiry date, needing review."
+          },
+          "batches_reconciled": {
+            "type": "boolean",
+            "description": "The store's batches add up to the physical balance."
+          }
+        }
+      },
+      "StockReport": {
+        "type": "object",
+        "properties": {
+          "stock_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the balances were read, separate from any reporting period."
+          },
+          "coverage_window": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "description": "The last three complete Kampala months."
+          },
+          "coverage_method": {
+            "type": "string"
+          },
+          "expiry_tracked": {
+            "type": "boolean",
+            "description": "True: stock is held in batches with expiry dates."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockLine"
+            }
+          }
+        }
+      },
+      "StockReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockReport"
+          }
+        }
+      },
+      "BatchLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string"
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "batch_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "days_remaining": {
+            "type": "integer",
+            "nullable": true
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "expired",
+              "under_1_month",
+              "under_3_months",
+              "under_6_months",
+              "ok",
+              "unknown"
+            ],
+            "description": "Shelf life left in calendar months. under_1_month (red) needs an exception to leave a store."
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pieces": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "BatchReport": {
+        "type": "object",
+        "properties": {
+          "stock_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rule_version": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchLine"
+            }
+          }
+        }
+      },
+      "BatchReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BatchReport"
+          }
+        }
+      },
+      "ExpiryException": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store": {
+            "type": "string"
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "batch_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "days_remaining": {
+            "type": "integer"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "authorized_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "authorized_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "rule_version": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "hotspot_delivery_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "ExpiryExceptionListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpiryException"
+            }
+          }
+        }
+      },
+      "ResponseSettings": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Null for national settings."
+          },
+          "review_cycle": {
+            "type": "string",
+            "enum": ["weekly", "monthly", "bimonthly", "quarterly"]
+          },
+          "deadline_days": {
+            "type": "integer"
+          },
+          "target_percent": {
+            "type": "integer"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "set_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "set_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": ["store", "national", "default"],
+            "description": "The store's own setting, the national one, or the draft default (monthly, 7 days, 80%)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ResponseSettingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["review_cycle", "deadline_days", "target_percent", "reason"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The store the setting covers; null or omitted for national settings, which need orders:all_stores."
+          },
+          "review_cycle": {
+            "type": "string",
+            "enum": ["weekly", "monthly", "bimonthly", "quarterly"]
+          },
+          "deadline_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "target_percent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date",
+            "description": "Defaults to today; cannot be in the past."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "ResponseSettingsView": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "effective": {
+                "$ref": "#/components/schemas/ResponseSettings"
+              },
+              "history": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ResponseSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ResponseSettingsResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ResponseSettings"
+          }
+        }
+      },
+      "HMISRow": {
+        "type": "object",
+        "properties": {
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subcounty": {
+            "type": "string",
+            "nullable": true
+          },
+          "ct11_female_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ct12_male_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "acknowledgements": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Delivery lines acknowledged with pieces in the month."
+          },
+          "hotspots": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unacknowledged_lines": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Quality issue: lines delivered in the month and not yet acknowledged; not counted."
+          }
+        }
+      },
+      "HMISReadiness": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2026-11"
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "date_basis": {
+            "type": "string"
+          },
+          "measure": {
+            "type": "string"
+          },
+          "data_elements": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "pending_decisions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "integration_enabled": {
+            "type": "boolean",
+            "description": "False: nothing is sent to DHIS2 until the programme authorises it."
+          },
+          "total": {
+            "$ref": "#/components/schemas/HMISRow"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HMISRow"
+            }
+          }
+        }
+      },
+      "HMISReadinessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HMISReadiness"
+          }
+        }
+      },
+      "ReportTable": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-11-01 to 2026-11-22"
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scope": {
+            "type": "string",
+            "example": "National · Kampala"
+          },
+          "product": {
+            "type": "string"
+          },
+          "rule_version": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The filters with the period and targets resolved, so a recalculation covers the same period."
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "header": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "The report's records keyed by column; null means not applicable or not recorded, 0 a recorded zero."
+          }
+        }
+      },
+      "ReportTableResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReportTable"
+          }
+        }
+      },
+      "ReportVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The report's query parameters: from, to, category, district_id, hot_spot_id, deadline_days, target_percent, status, store_type, warehouse_store_id, store_id, band or month."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The approving user's store; null for national versions."
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "supersedes_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correction_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "superseded_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["approved", "superseded"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReportVersionDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The report's query parameters: from, to, category, district_id, hot_spot_id, deadline_days, target_percent, status, store_type, warehouse_store_id, store_id, band or month."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The approving user's store; null for national versions."
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_by_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "supersedes_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "correction_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "superseded_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["approved", "superseded"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "The report's figures as shown on screen when approved; null for expiry exceptions."
+          },
+          "export": {
+            "$ref": "#/components/schemas/ReportTable"
+          }
+        }
+      },
+      "ReportVersionList": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportVersion"
+            }
+          }
+        }
+      },
+      "ReportVersionResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReportVersionDetail"
+          }
+        }
+      },
+      "ReportVersionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["report"],
+        "properties": {
+          "report": {
+            "type": "string",
+            "enum": [
+              "notifications",
+              "warehouse-requests",
+              "stock",
+              "batches",
+              "expiry-exceptions",
+              "hmis-105"
+            ]
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The report's query parameters: from, to, category, district_id, hot_spot_id, deadline_days, target_percent, status, store_type, warehouse_store_id, store_id, band or month."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "ReportCorrectionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reason"],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           }
         }
       }

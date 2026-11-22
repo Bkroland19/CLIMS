@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   description: 'CLIMS: stock, order and hotspot management for last-mile condom distribution.',
   // An internal tool behind a sign-in: nothing here is for search engines.
   robots: { index: false, follow: false },
-  icons: { icon: [{ url: '/favicon.ico', sizes: '32x32' }] },
+  icons: {
+    icon: [{ url: '/favicon.ico', sizes: '16x16 32x32 48x48' }],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {

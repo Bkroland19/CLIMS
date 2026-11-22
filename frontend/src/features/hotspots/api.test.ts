@@ -8,8 +8,6 @@ import {
   getHotspot,
   listAllHotspots,
   listHotspots,
-  mappableHotspots,
-  type Hotspot,
 } from './api';
 
 function fakeHttp(...bodies: unknown[]) {
@@ -143,16 +141,5 @@ describe('decisions and comments', () => {
     expect(http.post).toHaveBeenNthCalledWith(3, `/hotspots/${wire.id}/comments`, {
       comment: 'Which village?',
     });
-  });
-});
-
-describe('mappableHotspots', () => {
-  const at = (latitude: number | null, longitude: number | null) =>
-    ({ ...wire, latitude, longitude }) as unknown as Hotspot;
-
-  it('keeps hotspots with usable coordinates only', () => {
-    const hotspots = [at(0.31, 32.63), at(null, 32), at(0, 0), at(91, 32), at(0.3, 181)];
-
-    expect(mappableHotspots(hotspots)).toHaveLength(1);
   });
 });

@@ -7,8 +7,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { useCurrentUser } from '@/features/auth/hooks';
 import { useCan, useCurrentUserSync } from '@/features/auth/queries';
 import { DistrictContextProvider } from '@/features/district/DistrictContext';
-import { useDcfpCounts } from '@/features/district/useDcfpCounts';
-import { InboxBell } from '@/features/notifications/InboxBell';
+import { useDcfpCounts } from '@/features/dcfp/useDcfpCounts';
+import { useNotificationFeed } from '@/features/notifications/useNotificationFeed';
 import { useWarehouseCounts } from '@/features/warehouse/useWarehouseCounts';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
 
@@ -48,9 +48,8 @@ const inside = (pathname: string, base: string) =>
  * page outside that is replaced by a short explanation rather than left to
  * fail on the API's 403s, and a workspace opened read-only says so on top.
  *
- * It also keeps the user's roles and permissions current (`GET /auth/me`),
- * fetches each workspace's badge counts only while that workspace is open, and
- * feeds the bell from the user's inbox, whatever their role.
+ * It also keeps the user's roles and permissions current (`GET /auth/me`) and
+ * fetches each workspace's badge counts only while that workspace is open.
  */
 function SignedInShell({ children }: AppFrameProps) {
   useCurrentUserSync();
@@ -61,7 +60,9 @@ function SignedInShell({ children }: AppFrameProps) {
   const can = useCan();
   const home = useHomeWorkspace();
 
-  const dcfpCounts = useDcfpCounts(inside(pathname, '/dcfp') && accessTo(access, 'dcfp') !== null);
+  const canOpenDcfp = accessTo(access, 'dcfp') !== null;
+  const feed = useNotificationFeed(canOpenDcfp);
+  const dcfpCounts = useDcfpCounts(inside(pathname, '/dcfp') && canOpenDcfp, feed.inbox);
   const warehouseCounts = useWarehouseCounts(
     inside(pathname, '/warehouse') && accessTo(access, 'warehouse') !== null,
   );
@@ -106,7 +107,8 @@ function SignedInShell({ children }: AppFrameProps) {
         workspaces={navigation}
         storage={storage}
         counts={dcfpCounts ?? warehouseCounts}
-        bell={<InboxBell canOpen={(workspace) => accessTo(access, workspace) !== null} />}
+        notifications={feed.notifications}
+        notificationActions={feed.actions}
         fallbackTitle={fallbackTitle}
       >
         {readOnly ? <ReadOnlyNotice workspace={target.workspace} /> : null}

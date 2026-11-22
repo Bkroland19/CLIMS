@@ -104,7 +104,7 @@ export function renderApp(
 
   const view = render(
     <AppProviders
-      config={{ apiBaseUrl: '/api', googleMapsApiKey: null }}
+      config={{ apiBaseUrl: '/api', mapTiles: { kind: 'off' } }}
       store={store}
       queryClient={queryClient}
       http={http}

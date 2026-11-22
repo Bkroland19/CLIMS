@@ -1,55 +1,42 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { useApiQuery, useHttp, type ApiQueryOptions } from '@/lib/api';
+import { useApiQuery, useHttp } from '@/lib/api';
 
-import {
-  getUnreadCount,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from './api';
+import { listNotifications, markAllNotificationsRead, markNotificationRead } from './api';
 
 const ROOT = 'notifications';
-export const notificationKeys = {
-  all: [ROOT] as const,
-  list: (unread: boolean) => [ROOT, 'list', unread] as const,
-  unreadCount: [ROOT, 'unread-count'] as const,
-};
+export const notificationKeys = { inbox: [ROOT, 'inbox'] as const };
 
-/** How often the badge asks for the unread count; the API has no push, and it suggests 30–60 s. */
-export const UNREAD_POLL_MS = 60_000;
+/** The docs suggest checking every 30 to 60 seconds; a minute keeps the load low. */
+const POLL_MS = 60_000;
 
-export function useNotifications(unread = false, options: ApiQueryOptions = {}) {
-  return useApiQuery(
-    notificationKeys.list(unread),
-    (http, signal) => listNotifications(http, { unread }, signal),
-    options,
-  );
-}
-
-export function useUnreadCount(options: ApiQueryOptions = {}) {
-  return useApiQuery(notificationKeys.unreadCount, getUnreadCount, options);
-}
-
-function useInvalidateNotifications() {
-  const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: notificationKeys.all });
-}
-
-export function useMarkNotificationRead() {
-  const http = useHttp();
-  const invalidate = useInvalidateNotifications();
-  return useMutation({
-    mutationFn: (id: string) => markNotificationRead(http, id),
-    onSuccess: invalidate,
+/** The newest notifications, checked again every minute while the app is open. */
+export function useInbox(options: { enabled?: boolean } = {}) {
+  return useApiQuery(notificationKeys.inbox, listNotifications, {
+    ...options,
+    refetchInterval: POLL_MS,
   });
 }
 
-export function useMarkAllNotificationsRead() {
+function useInvalidateInbox() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: notificationKeys.inbox });
+}
+
+export function useMarkRead() {
   const http = useHttp();
-  const invalidate = useInvalidateNotifications();
+  const invalidate = useInvalidateInbox();
+  return useMutation({
+    mutationFn: (id: string) => markNotificationRead(http, id),
+    onSettled: invalidate,
+  });
+}
+
+export function useMarkAllRead() {
+  const http = useHttp();
+  const invalidate = useInvalidateInbox();
   return useMutation({
     mutationFn: () => markAllNotificationsRead(http),
-    onSuccess: invalidate,
+    onSettled: invalidate,
   });
 }

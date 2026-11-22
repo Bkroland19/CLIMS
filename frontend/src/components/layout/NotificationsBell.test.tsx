@@ -68,96 +68,35 @@ describe('NotificationsBell', () => {
     expect(bell).toHaveFocus();
   });
 
-  it('counts what is unread, not what is listed, and marks unread entries for screen readers', async () => {
+  it('counts only unread notifications, and lists read ones quietly', async () => {
     const user = userEvent.setup();
     render(
       <NotificationsBell
-        notifications={[{ ...notification(1), unread: true }, notification(2), notification(3)]}
-        unreadCount={1}
+        notifications={[notification(1), { ...notification(2), unread: false }]}
       />,
     );
 
     await user.click(screen.getByRole('button', { name: 'Notifications, 1 new' }));
 
-    const list = await screen.findByRole('list');
-    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(list).getByText(/Unread:/).parentElement).toHaveTextContent(
-      'Unread: Order ORD-101 was confirmed',
-    );
-    expect(within(list).getAllByText(/Unread:/)).toHaveLength(1);
+    expect(within(await screen.findByRole('list')).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByText('Unread:')).toHaveLength(1);
   });
 
-  it('opens a notification with a page as a link, reports it, and closes the list', async () => {
+  it('opens a notification through its link and marks the lot read on request', async () => {
     const user = userEvent.setup();
-    const onOpen = vi.fn();
-    const linked = {
-      ...notification(1),
-      unread: true,
-      detail: 'Wakiso DCFP confirmed it.',
-      href: '/orders/1',
-    };
-    render(<NotificationsBell notifications={[linked]} onOpenNotification={onOpen} />);
-
-    await user.click(screen.getByRole('button', { name: 'Notifications, 1 new' }));
-    const link = await screen.findByRole('link', { name: /Order ORD-101 was confirmed/ });
-    expect(link).toHaveAttribute('href', '/orders/1');
-    expect(link).toHaveTextContent('Wakiso DCFP confirmed it.');
-    await user.click(link);
-
-    expect(onOpen).toHaveBeenCalledWith(linked);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('makes a notification without a page a button that reports it, keeping the list open', async () => {
-    const user = userEvent.setup();
-    const onOpen = vi.fn();
-    render(
-      <NotificationsBell
-        notifications={[{ ...notification(1), unread: true }]}
-        onOpenNotification={onOpen}
-      />,
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Notifications, 1 new' }));
-    await user.click(await screen.findByRole('button', { name: /Order ORD-101 was confirmed/ }));
-
-    expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('shows placeholders while the list loads, then a failure with a way to try again', async () => {
-    const user = userEvent.setup();
-    const onRetry = vi.fn();
-    const { rerender } = render(<NotificationsBell isLoading unreadCount={2} />);
+    const actions = { onOpen: vi.fn(), onMarkAllRead: vi.fn() };
+    const linked = { ...notification(1), href: '/dcfp/stockouts' };
+    render(<NotificationsBell notifications={[linked, notification(2)]} actions={actions} />);
 
     await user.click(screen.getByRole('button', { name: 'Notifications, 2 new' }));
-    expect(await screen.findByText('Loading notifications…')).toBeInTheDocument();
-    expect(screen.queryByText("You're all caught up.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mark all read' }));
+    expect(actions.onMarkAllRead).toHaveBeenCalledOnce();
 
-    rerender(
-      <NotificationsBell unreadCount={2} error={new Error('Network down')} onRetry={onRetry} />,
-    );
-    expect(await screen.findByText('Could not load notifications')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it('puts an action beside the heading and tells the owner when it opens and closes', async () => {
-    const user = userEvent.setup();
-    const onOpenChange = vi.fn();
-    render(
-      <NotificationsBell
-        notifications={[]}
-        action={<button type="button">Mark all read</button>}
-        onOpenChange={onOpenChange}
-      />,
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Notifications' }));
-    expect(await screen.findByRole('button', { name: 'Mark all read' })).toBeInTheDocument();
-    expect(onOpenChange).toHaveBeenLastCalledWith(true);
-
-    await user.keyboard('{Escape}');
-    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    const link = screen.getByRole('link', { name: /Order ORD-101 was confirmed/ });
+    expect(link).toHaveAttribute('href', '/dcfp/stockouts');
+    await user.click(link);
+    expect(actions.onOpen).toHaveBeenCalledWith(linked);
+    // Following a notification closes the list.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

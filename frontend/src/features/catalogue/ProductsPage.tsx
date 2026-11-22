@@ -1,7 +1,7 @@
 'use client';
 
 import { Ban, CircleCheck, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useCan } from '@/features/auth/queries';
 import { formatNumber } from '@/lib/format';
+import { useReadOnly } from '@/navigation/useAccess';
 
 import {
   CATALOGUE_PERMISSION,
@@ -26,14 +27,11 @@ import {
   isComplete,
   packLabel,
   productName,
-  typeLabel,
   type Product,
 } from './api';
 import { ProductFormDialog } from './ProductFormDialog';
 import { useDeleteProduct, useLookups, useProducts, useSetProductActive } from './queries';
 import { activeFilters, filterFrom, statusHref, type StatusFilter } from './statusFilters';
-
-const PATH = '/moh/catalogue';
 
 const FILTERS: readonly StatusFilter<Product>[] = [
   ...activeFilters<Product>(),
@@ -48,15 +46,22 @@ function actionsLabel(product: Product): string {
   return `Actions for ${productName(product)}${pack ? ` (${pack})` : ''}`;
 }
 
-/** Condom products: one entry per brand, category, type and unit. */
+/**
+ * Condom products: one entry per brand, category, type and unit. The MOH and
+ * warehouse workspaces both show it; changes need `catalogue:manage` and a
+ * workspace the person may act in.
+ */
 export default function ProductsPage() {
   const products = useProducts();
+  const types = useLookups('types');
   const brands = useLookups('brands');
   const units = useLookups('units');
   const setActive = useSetProductActive();
   const deleteProduct = useDeleteProduct();
   const can = useCan();
-  const canManage = can(CATALOGUE_PERMISSION);
+  const readOnly = useReadOnly();
+  const canManage = can(CATALOGUE_PERMISSION) && !readOnly;
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -99,7 +104,7 @@ export default function ProductsPage() {
       {
         id: 'type',
         header: 'Type',
-        value: (product) => (product.type ? typeLabel(product.type) : null),
+        value: (product) => product.type?.name ?? null,
       },
       { id: 'unit', header: 'Unit', value: (product) => product.unit?.name ?? null },
       {
@@ -207,7 +212,7 @@ export default function ProductsPage() {
       <FilterTabs
         label="Filter products by status"
         value={filter.value}
-        hrefFor={(value) => statusHref(PATH, value)}
+        hrefFor={(value) => statusHref(pathname, value)}
         tabs={tabs.map((option) => ({
           value: option.value,
           label: option.label,
@@ -250,6 +255,7 @@ export default function ProductsPage() {
         <ProductFormDialog
           key={dialog.kind === 'edit' ? dialog.product.id : 'add'}
           product={dialog.kind === 'edit' ? dialog.product : undefined}
+          types={types}
           brands={brands}
           units={units}
           onClose={() => {

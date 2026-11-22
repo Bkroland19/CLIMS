@@ -50,7 +50,7 @@ describe('role-based access in the shell', () => {
   });
 
   it('explains, rather than shows, a page from another role’s workspace', async () => {
-    renderAs('/dcfp/orders', ['jms'], ['orders:read']);
+    renderAs('/dcfp/stockouts', ['jms'], ['orders:read']);
 
     expect(
       await screen.findByText('This page is in the District focal person workspace'),

@@ -59,7 +59,7 @@ export function RowActions({ label, actions, triggerRef }: RowActionsProps) {
           <EllipsisVertical aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      {/* The menu sizes to its labels; the default, the 32px trigger's width, wraps each one. */}
+      {/* The menu sizes to its labels; the default, the 28px trigger's width, wraps each one. */}
       <DropdownMenuContent align="end" className="w-auto min-w-44">
         {items.map((item, index) =>
           item === ROW_ACTION_SEPARATOR ? (

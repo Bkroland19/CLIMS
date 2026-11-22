@@ -11,15 +11,16 @@ import { DetailHeader } from '@/components/DetailHeader';
 import { DetailList } from '@/components/DetailList';
 import { TextareaField } from '@/components/form/TextareaField';
 import { RecordView } from '@/components/RecordView';
+import { ErrorState } from '@/components/states/ErrorState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { WriteAction } from '@/components/WriteAction';
-import { HotspotSupply } from '@/features/district/HotspotSupply';
-import { Loaded, useMe } from '@/features/district/parts';
-import { DCFP_PATHS } from '@/features/district/tasks';
+import { useCurrentUser } from '@/features/auth/hooks';
+import { DCFP_PATHS } from '@/features/dcfp/orders';
 import { getErrorMessage } from '@/lib/api';
 import { formatText, formatTimestamp } from '@/lib/format';
 
@@ -83,7 +84,7 @@ const COMMENT_LABEL: Record<HotspotComment['action'], string> = {
 
 function HotspotView({ hotspot }: { hotspot: HotspotDetail }) {
   const now = new Date();
-  const me = useMe();
+  const me = useCurrentUser()?.id ?? null;
   const events = useHotspotEvents(hotspot.id);
   const [deciding, setDeciding] = useState<HotspotDecision | null>(null);
   const decisions = DECISIONS_FROM[hotspot.review_status];
@@ -94,7 +95,7 @@ function HotspotView({ hotspot }: { hotspot: HotspotDetail }) {
   const thread = [...hotspot.comments]
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .map((comment) => {
-      const { who, role } = whoOf(comment.user_id, me.id, hotspot, comment.action !== 'comment');
+      const { who, role } = whoOf(comment.user_id, me, hotspot, comment.action !== 'comment');
       return {
         id: comment.id,
         text: <span className="wrap-anywhere whitespace-pre-line">{comment.comment}</span>,
@@ -107,7 +108,7 @@ function HotspotView({ hotspot }: { hotspot: HotspotDetail }) {
     [...list]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((event) => {
-        const { who, role } = whoOf(event.actor_id, me.id, hotspot, DECISIONS.has(event.action));
+        const { who, role } = whoOf(event.actor_id, me, hotspot, DECISIONS.has(event.action));
         return {
           id: event.id,
           text: EVENT_TEXT[event.action] ?? event.action,
@@ -169,28 +170,21 @@ function HotspotView({ hotspot }: { hotspot: HotspotDetail }) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Supply</CardTitle>
-              <CardDescription>What the district store has sent this hotspot.</CardDescription>
-            </CardHeader>
-            <CardContent className="px-0">
-              <HotspotSupply hotspotId={hotspot.id} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>History</CardTitle>
             </CardHeader>
             <CardContent>
-              <Loaded
-                isPending={events.isPending}
-                error={events.error}
-                errorTitle="Could not load the history"
-                onRetry={() => void events.refetch()}
-                isRetrying={events.isRefetching}
-              >
-                <ActivityTimeline entries={history(events.data ?? [])} />
-              </Loaded>
+              {events.error ? (
+                <ErrorState
+                  title="Could not load the history"
+                  error={events.error}
+                  onRetry={() => void events.refetch()}
+                  isRetrying={events.isRefetching}
+                />
+              ) : events.isPending ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                <ActivityTimeline entries={history(events.data)} />
+              )}
             </CardContent>
           </Card>
         </div>

@@ -15,6 +15,7 @@ import { useStore, useUnread } from "@/lib/store";
 import { useColumn, useResponsive } from "@/hooks/useResponsive";
 import Icon, { type IconName } from "./Icon";
 import { Txt } from "./kit";
+import { TYPE } from "@/lib/fonts";
 
 export interface ScreenAction {
   label: string;
@@ -193,9 +194,9 @@ export default function Screen({
             style={{
               paddingHorizontal: 16,
               paddingBottom: 8,
-              fontSize: isCompact ? 30 : 34,
+              fontSize: isCompact ? 26 : 30,
               fontWeight: "700",
-              lineHeight: isCompact ? 36 : 40,
+              lineHeight: isCompact ? 32 : 36,
             }}
           >
             {title}
@@ -236,7 +237,7 @@ export default function Screen({
         <Txt
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ flex: 1, fontSize: isCompact ? 20 : 22, lineHeight: 28 }}
+          style={{ flex: 1, fontSize: isCompact ? 19 : 20, lineHeight: 28 }}
         >
           {title}
         </Txt>
@@ -264,7 +265,7 @@ export default function Screen({
             ]}
           >
             <Icon name="wifiOff" size={16} color={T.warnFg} />
-            <Txt style={{ flex: 1, color: T.warnFg, fontSize: 13, fontWeight: "500" }}>
+            <Txt style={{ flex: 1, color: T.warnFg, ...TYPE.footnote, fontWeight: "500" }}>
               {nq
                 ? `Offline · ${nq} action${nq > 1 ? "s" : ""} saved on this phone`
                 : "Offline · your work is saved on this phone"}

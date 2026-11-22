@@ -67,7 +67,7 @@ export function RolePicker({
       {isLoading ? (
         <div className="grid gap-2 sm:grid-cols-2" aria-hidden="true">
           {Array.from({ length: 6 }, (_, index) => (
-            <Skeleton key={index} className="h-14" />
+            <Skeleton key={index} className="h-12" />
           ))}
         </div>
       ) : !loadError && list.length === 0 ? (

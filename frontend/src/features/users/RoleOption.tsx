@@ -18,7 +18,7 @@ export function RoleOption({ role, selected, children }: RoleOptionProps) {
   return (
     <label
       className={cn(
-        'flex h-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors',
+        'flex h-full cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors',
         selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent',
       )}
     >

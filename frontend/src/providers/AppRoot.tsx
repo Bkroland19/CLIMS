@@ -38,7 +38,8 @@ function createApp(): App {
   // these must be spelled out rather than read from `process.env` as a whole.
   const config = parseConfig({
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    NEXT_PUBLIC_MAP_TILES: process.env.NEXT_PUBLIC_MAP_TILES,
+    NEXT_PUBLIC_MAP_ATTRIBUTION: process.env.NEXT_PUBLIC_MAP_ATTRIBUTION,
   });
   const storage = getBrowserStorage();
   // Before the app renders, so a dark-theme user never sees it in light.

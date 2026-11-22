@@ -63,7 +63,7 @@ export function ActivityTimeline({
         <li
           key={entry.id}
           data-role={entry.role}
-          className={cn('flex', isConnected ? 'gap-3' : 'gap-2.5 pb-3.5')}
+          className={cn('flex', isConnected ? 'gap-3' : 'gap-2.5 pb-3')}
         >
           <span aria-hidden="true" className="flex flex-col items-center">
             <span
@@ -75,7 +75,7 @@ export function ActivityTimeline({
             />
             {isConnected ? <span className="bg-border my-1 w-px flex-1" /> : null}
           </span>
-          <span className={cn('min-w-0', isConnected && 'pb-3.5')}>
+          <span className={cn('min-w-0', isConnected && 'pb-3')}>
             <span
               className={cn('block leading-snug', isConnected ? 'text-sm' : 'text-[0.8125rem]')}
             >

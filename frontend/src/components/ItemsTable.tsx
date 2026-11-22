@@ -70,7 +70,7 @@ export function ItemsTable<Row>({
               key={column.id}
               className={cn(
                 EDGE,
-                'text-muted-foreground h-auto py-2 text-xs font-semibold tracking-wider uppercase',
+                'text-muted-foreground h-auto py-1.5 text-[0.6875rem] font-semibold tracking-wider uppercase',
                 column.numeric && 'text-right',
               )}
             >
@@ -88,7 +88,7 @@ export function ItemsTable<Row>({
           <TableRow className="hover:bg-transparent">
             <TableCell
               colSpan={columns.length}
-              className="text-muted-foreground px-4 py-6 text-center whitespace-normal"
+              className="text-muted-foreground px-4 py-4 text-center whitespace-normal"
             >
               {emptyText}
             </TableCell>
@@ -104,7 +104,7 @@ export function ItemsTable<Row>({
                   key={column.id}
                   className={cn(
                     EDGE,
-                    'py-2.5 align-top',
+                    'py-1.5 align-top',
                     column.numeric && 'text-right tabular-nums',
                   )}
                 >

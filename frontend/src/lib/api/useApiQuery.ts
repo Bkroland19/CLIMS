@@ -4,15 +4,12 @@ import type { ApiError } from './errors';
 import type { HttpClient } from './http';
 import { useHttp } from './HttpProvider';
 
-export interface ApiQueryOptions {
+interface ApiQueryOptions {
   /** How long a result is served from cache before it is refetched. */
   staleTime?: number;
   /** False holds the request back, e.g. until the screen that needs it is open. Defaults to true. */
   enabled?: boolean;
-  /**
-   * Refetches on this interval in milliseconds while the tab is visible, for
-   * figures that change without the user doing anything, e.g. an unread count.
-   */
+  /** Refetch this often, in ms, while the query is in use, e.g. to check for new notifications. */
   refetchInterval?: number;
 }
 

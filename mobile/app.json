@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "last_mile_condom_distribution",
-    "slug": "lmd",
-    "version": "2.2.0",
+    "name": "CLIMS",
+    "slug": "clims-app",
+    "version": "2.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lmd",
@@ -33,12 +33,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 190,
+          "image": "./assets/images/splash-logo.png",
+          "imageWidth": 192,
           "resizeMode": "contain",
           "backgroundColor": "#f7faf3",
           "dark": {
-            "image": "./assets/images/splash-icon.png",
+            "image": "./assets/images/splash-logo-dark.png",
             "backgroundColor": "#10140f"
           },
           "ios": {
@@ -54,7 +54,8 @@
             }
           }
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
@@ -64,9 +65,10 @@
         "origin": false
       },
       "eas": {
-        "projectId": "34fc2cbe-c7f6-460e-ae08-a69ce4573a85"
+        "projectId": "d680bffa-d623-48a1-b8b8-aea07cfc200c"
       },
-      "releaseVersion": "2.2.0"
-    }
+      "releaseVersion": "2.2.1"
+    },
+    "owner": "wafula3"
   }
 }

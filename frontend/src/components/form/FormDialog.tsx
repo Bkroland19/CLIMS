@@ -68,7 +68,7 @@ export function FormDialog({
           if (isDirty) event.preventDefault();
         }}
       >
-        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-6">
+        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle className="wrap-anywhere">{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
@@ -80,7 +80,7 @@ export function FormDialog({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+          <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
           <DialogFooter>
             <Button
               type="button"

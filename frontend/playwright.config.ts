@@ -68,8 +68,9 @@ export default defineConfig({
         NEXT_DIST_DIR: '.next-e2e',
         BACKEND_URL: MOCK_URL,
         NEXT_PUBLIC_API_BASE_URL: '/api/v1',
-        // No map key: the map pages show their notice, so runs never depend on Google.
-        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: '',
+        // No base map: the map pages draw hotspots on a plain background, so runs never
+        // depend on OpenStreetMap's tile servers.
+        NEXT_PUBLIC_MAP_TILES: 'off',
       },
       reuseExistingServer: REUSE_SERVERS,
       timeout: 180_000,

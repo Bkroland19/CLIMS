@@ -213,7 +213,7 @@ function RequestDetail({ request, store, bannerRef }: RequestDetailProps) {
   const history = activity.data ? historyOf(activity.data, [request.id]) : [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <DetailHeader
         title={request.id}
         status={<StatusBadge status={status.label} tone={status.tone} />}
@@ -222,8 +222,8 @@ function RequestDetail({ request, store, bannerRef }: RequestDetailProps) {
         <StepTracker aria-label="Request progress" steps={warehouseSteps(request, check, now)} />
       </DetailHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="gap-section flex min-w-0 flex-col">
           <Alert ref={bannerRef} tabIndex={-1} variant={banner.variant} role="status">
             <AlertTitle>{banner.title}</AlertTitle>
             <AlertDescription>{banner.body}</AlertDescription>
@@ -312,7 +312,7 @@ function RequestDetail({ request, store, bannerRef }: RequestDetailProps) {
                   on the waybill.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-5">
+              <CardContent className="flex flex-col gap-3">
                 <div className="grid gap-4 sm:grid-cols-3">
                   {(Object.keys(FIELD_LABELS) as (keyof DispatchFields)[]).map((field) => {
                     const inputId = `dispatch-${field}`;
@@ -420,7 +420,7 @@ function RequestDetail({ request, store, bannerRef }: RequestDetailProps) {
           {request.receipt ? <ReceiptCard request={request} now={now} /> : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <Card>
             <CardHeader>
               <CardTitle>Request</CardTitle>

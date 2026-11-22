@@ -72,7 +72,7 @@ export function RadioCardGroup<Value extends string>({
             <label
               key={option.value}
               className={cn(
-                'bg-card flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
+                'bg-card flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors',
                 'has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-primary has-[:checked]:ring-1',
                 'has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2',
                 'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60',

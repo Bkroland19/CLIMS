@@ -124,7 +124,7 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 	// Seeing a hotspot to request stock for doesn't open its thread to the VHT.
 	request("POST", "/hotspots/"+active+"/comments", map[string]any{"comment": "Hello"}, vht, 404)
 
-	// Alerts: accepted for the active district hotspot, refused for the others.
+	// Reports: accepted for the active district hotspot, refused for the others.
 	alert := func(hotSpot string, want int) map[string]any {
 		t.Helper()
 		return request("POST", "/orders/stockouts", map[string]any{
@@ -132,14 +132,11 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 		}, vht, want)
 	}
 	raised := alert(active, 201)["data"].(map[string]any)
-	if raised["order_status"] != "queued" || raised["hot_spot_id"] != active {
-		t.Fatalf("district alert should be queued for the hotspot: %v", raised)
+	if raised["hot_spot_id"] != active || raised["comment"] != "Out of stock" {
+		t.Fatalf("district report should name the hotspot and carry the message: %v", raised)
 	}
 	alert(inactive, 403)
 	alert(elsewhere, 403)
-	// Later checks total the open alerts, so withdraw this one and its history.
-	exec(`DELETE FROM order_events WHERE order_id = $1`, raised["id"])
-	exec(`DELETE FROM orders WHERE id = $1`, raised["id"])
 
 	// orders:stockout alone still means the assigned hotspot only.
 	request("PUT", "/roles/"+roleID("healthy facility")+"/permissions",

@@ -8,6 +8,7 @@ import { choose, expectToast, open } from './support/ui';
  * and the DCFP activates or rejects it, and can later deactivate it; every decision needs a
  * comment. The mock seeds Kajjansi Weekly Market and Bwebajja Nite Spot (submitted), Kasenyi
  * Landing Site and three more active hotspots, and Nansana Taxi Park (rejected), all in Wakiso.
+ * The hotspots it generates for the map, in other districts, come after them in the list.
  */
 
 test.beforeEach(async ({ request }) => {

@@ -62,7 +62,7 @@ function useInvalidateHotspots() {
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: hotspotsKey }),
-      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+      queryClient.invalidateQueries({ queryKey: notificationKeys.inbox }),
     ]);
 }
 

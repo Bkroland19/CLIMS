@@ -1,5 +1,15 @@
 # Plan: the DCFP workspace on the real API
 
+> **Superseded (2026-11-22).** `main` replaced the orders workflow this plan built on: stockouts
+> became notifications that the district delivers against and the hotspot acknowledges, the DCFP
+> orders from NMS or JMS with `POST /orders/warehouse-requests`, and `request-replenishment`, rider
+> `dispatch` and `deliver` were removed. Merging `main` into `frontend` kept main's DCFP screens
+> (`src/features/dcfp`) and bell, and dropped `src/features/district` (except `DistrictContext`),
+> the inbox bell, the orders and inbox mocks, and the riders endpoint. What survives from this plan
+> is the hotspot review work (statuses, decisions with a comment, the comment thread, history and
+> the `/dcfp/hotspots/[id]` page), `readAllPages`, and `store_id` on the session. The rest is kept
+> below as history.
+
 Goal: a district condom focal person (DCFP, role `dfcp`) can do their whole job in the web app
 against the Go API, with no mock in the path. That job is to review hotspots, act on stockout
 alerts, restock from the warehouse, receive shipments, keep the district store's figures right and

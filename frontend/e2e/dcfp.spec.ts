@@ -1,119 +1,79 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { resetMock } from './support/mock';
-import { choose, expectToast, open } from './support/ui';
+import { expectToast, open } from './support/ui';
 
 /*
- * The district focal person's stockout alerts and district store, against the mock's seeded
- * Wakiso (`dev/mock/orders.mts`, on the Go API's paths and rules). The store holds Engabu boxes
- * but no FC2 pieces. Queued: Kitende Trading Centre (Engabu), Namasuba Lodge (FC2) and Katabi
- * Fish Market (Engabu). On hold: Kasenyi Landing Site (FC2), waiting on a JMS shipment of 450
- * pieces that is on its way, and Namasuba Lodge (Engabu), for an NMS request that is short.
+ * The district focal person's two flows, against the mock's Wakiso district (dev/mock/dcfp.mts):
+ * hotspots report stockouts, which reach the DCFP as notifications, and the DCFP orders stock
+ * from NMS or JMS. Seeded: three stockout reports, the newest from Kisenyi Landing Site
+ * (FC2 Free Female, "Dispenser empty since Monday"); an order NMS has dispatched (480 boxes)
+ * waiting to be received.
  */
+
+const DISPATCHED = '/dcfp/restock/00000000-0000-4000-8301-000000000003';
 
 test.beforeEach(async ({ request }) => {
   await resetMock(request);
 });
 
-/** Opens a queued alert from the alert list. */
-async function openQueued(page: Page, hotspot: string) {
-  await open(page, '/dcfp/orders', 'Orders');
-  await page.getByRole('link', { name: hotspot }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Stockout alert' })).toBeVisible();
-}
-
-/** Sends `quantity` from the district store with `rider`, on an alert's page. */
-async function send(page: Page, quantity: string, rider: string) {
-  const form = page.getByRole('form', { name: 'Send from the district store' });
-  await form.getByRole('textbox', { name: 'Quantity' }).fill(quantity);
-  await choose(page, 'Rider', new RegExp(`^${rider}`));
-  await form.getByRole('button', { name: 'Send stock' }).click();
-  await expectToast(page, 'Stock sent. The rider can now deliver it.');
-  await expect(page.getByRole('heading', { name: 'Outcome' })).toBeVisible();
-  await expect(page.getByText(new RegExp(`^${rider}`))).toBeVisible();
-}
-
-test('sends stock for an alert from the district store with a rider', async ({ page }) => {
-  await openQueued(page, 'Kitende Trading Centre');
-
-  // The store has Engabu boxes, so sending is the choice already made.
-  await expect(page.getByRole('radio', { name: /Send from the district store/ })).toBeChecked();
-  await send(page, '3', 'Peter Okello');
-
-  await open(page, '/dcfp/dispatch', 'Deliveries');
-  await expect(page.getByRole('row', { name: /Kitende Trading Centre/ })).toBeVisible();
-});
-
-test('asks a warehouse for stock the store does not have; the alert waits on hold', async ({
+test('shows a stockout with the hotspot’s details and message, and orders stock for it', async ({
   page,
 }) => {
-  await openQueued(page, 'Namasuba Lodge');
+  await open(page, '/dcfp/stockouts', 'Stockout notifications');
+  const row = page.getByRole('row').filter({ hasText: 'Kisenyi Landing Site' });
+  await expect(row).toContainText('Kisenyi, Katabi Town Council, Wakiso');
+  await expect(row).toContainText('Dispenser empty since Monday');
+  await expect(row).toContainText('Peter Okello · 0772 123456');
 
-  // No FC2 pieces in the store: sending is closed, asking the warehouse is the choice.
-  await expect(page.getByRole('radio', { name: /Send from the district store/ })).toBeDisabled();
-  const form = page.getByRole('form', { name: 'Ask the warehouse' });
-  await choose(page, 'Warehouse', 'Joint Medical Store');
-  await choose(page, 'Unit', 'Piece');
-  await form.getByRole('textbox', { name: 'Quantity' }).fill('300');
-  await form.getByRole('button', { name: 'Ask the warehouse' }).click();
+  await row.getByRole('button', { name: 'Actions for Kisenyi Landing Site' }).click();
+  await page.getByRole('menuitem', { name: 'Order stock from a warehouse' }).click();
 
-  await expectToast(
-    page,
-    'Request sent to the warehouse. The alert waits on hold until the stock arrives.',
-  );
-  await expect(page.getByRole('link', { name: 'Open the request' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'New warehouse order' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Product' })).toContainText('FC2');
+  await page.getByRole('radio', { name: /^JMS/ }).check();
+  await page.getByRole('textbox', { name: 'Quantity' }).fill('500');
+  await page.getByRole('button', { name: 'Send order to JMS' }).click();
 
-  await open(page, '/dcfp/orders/held', 'Orders');
-  const row = page.getByRole('row', { name: /Namasuba Lodge/ }).filter({ hasText: 'FC2' });
-  await expect(row).toContainText('Joint Medical Store');
+  await expectToast(page, 'Order sent to the warehouse');
+  await expect(page).toHaveURL(/\/dcfp\/restock\/[0-9a-f-]{36}$/);
+  await expect(page.getByText('Sent', { exact: true }).first()).toBeVisible();
 });
 
-test('receives a shipment that came short, then sends the held alert', async ({ page }) => {
-  await open(page, '/dcfp/orders/held', 'Orders');
-  const held = page.getByRole('row', { name: /Kasenyi Landing Site/ });
-  await held.getByRole('link', { name: 'Joint Medical Store' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Warehouse request' })).toBeVisible();
+test('refuses an order without a quantity', async ({ page }) => {
+  await open(page, '/dcfp/restock/new', 'New warehouse order');
+  await page.getByRole('button', { name: 'Send order to JMS' }).click();
 
-  const receive = page.getByRole('form', { name: 'Receive the shipment' });
-  const count = receive.getByRole('textbox', { name: 'Quantity received' });
-  await expect(count).toHaveValue('450');
-  await count.fill('440');
-  await receive.getByRole('button', { name: 'Receive shipment' }).click();
-  await expect(
-    receive.getByText('450 were sent. Say what happened to the difference.'),
-  ).toBeVisible();
-
-  await receive
-    .getByRole('textbox', { name: 'What happened to the difference' })
-    .fill('Ten pieces were damp when the carton was opened.');
-  await receive.getByRole('button', { name: 'Receive shipment' }).click();
-  await expectToast(page, 'Shipment received. District stock updated.');
-
-  // The pieces are in the store now, so the alert that waited for them can be sent.
-  await open(page, '/dcfp/orders/held', 'Orders');
-  await page.getByRole('link', { name: 'Kasenyi Landing Site' }).click();
-  await expect(page.getByRole('radio', { name: /Send from the district store/ })).toBeChecked();
-  await send(page, '200', 'Musa Kato');
+  await expect(page.getByText('Choose the product to order.')).toBeVisible();
+  await expect(page.getByText('Enter how many to order, as a whole number.')).toBeVisible();
+  await expect(page).toHaveURL(/\/dcfp\/restock\/new$/);
 });
 
-test('records an adjustment after a count, which needs a reason', async ({ page }) => {
-  await open(page, '/dcfp/restock/store', 'Restock');
-  await page.getByRole('button', { name: 'Record stock' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Record stock' });
+test('receives a consignment that came in short, with the reason', async ({ page }) => {
+  await open(page, DISPATCHED, 'Warehouse order');
+  const counted = page.getByRole('textbox', { name: 'Quantity counted' });
+  await expect(counted).toHaveValue('480');
+  await counted.fill('470');
+  await page.getByRole('button', { name: 'Record receipt' }).click();
+  await expect(page.getByText('Say why the count differs from what was dispatched.')).toBeVisible();
 
-  await dialog.getByRole('radio', { name: /Adjustment/ }).check();
-  await choose(page, 'Product', /FC2/);
-  await choose(page, 'Unit', 'Piece');
-  await dialog.getByRole('textbox', { name: 'Change' }).fill('5');
-  await dialog.getByRole('button', { name: 'Record stock' }).click();
+  await page.getByLabel('Why the count differs').fill('One box damaged in transit');
+  await page.getByRole('button', { name: 'Record receipt' }).click();
+
+  await expectToast(page, 'Receipt recorded; the district store is updated');
+  await expect(page.getByText('One box damaged in transit')).toBeVisible();
+  await expect(counted).toBeHidden();
+});
+
+test('lists stockout notifications in the bell and opens them', async ({ page }) => {
+  await open(page, '/dcfp', 'District dashboard');
+  await page.getByRole('button', { name: /^Notifications, \d+ new$/ }).click();
+  await page
+    .getByRole('link', { name: /Kisenyi Landing Site.*Dispenser empty since Monday/ })
+    .click();
+
+  await expect(page).toHaveURL(/\/dcfp\/stockouts$/);
   await expect(
-    dialog.getByText('Say why the stock changed, for example what the count found.'),
+    page.getByRole('heading', { level: 1, name: 'Stockout notifications' }),
   ).toBeVisible();
-
-  await dialog.getByRole('textbox', { name: 'Note' }).fill('The count found five more pieces.');
-  await dialog.getByRole('button', { name: 'Record stock' }).click();
-
-  await expectToast(page, 'Stock recorded.');
-  await expect(dialog).toBeHidden();
-  await expect(page.getByRole('row', { name: /The count found five more pieces/ })).toBeVisible();
 });

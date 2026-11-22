@@ -25,6 +25,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { handleDcfp, seedDcfp } from './mock/dcfp.mts';
 import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
 import { handleWarehouse, seedWarehouse } from './mock/warehouse.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
@@ -32,8 +33,6 @@ import { handleOnboarding, seedOnboarding } from './mock/onboarding.mts';
 import { handleAdmin, handleAuth, seedAdmin, signedInUser } from './mock/admin.mts';
 import { handleReports, seedReports } from './mock/reports.mts';
 import { handleHotspots, seedHotspotsMock } from './mock/hotspots.mts';
-import { handleNotifications, seedNotificationsMock } from './mock/notifications.mts';
-import { handleOrders, seedOrdersMock } from './mock/orders.mts';
 
 type Body = Record<string, unknown>;
 interface Reply {
@@ -75,17 +74,14 @@ if (!isDatasetName(DATASET)) {
  * end-to-end tests (`e2e/`) call before each test so no test sees another's changes.
  */
 function seedAll(dataset: (typeof datasets)[number]): void {
-  // The inbox first, because the hotspot and order seeds add to it; orders last, because they
-  // read the hotspots, accounts and catalogue.
-  seedNotificationsMock();
   seedHotspotsMock(dataset);
   seedFulfilment(dataset);
+  seedDcfp(dataset);
   seedWarehouse(dataset);
   seedMoh(dataset);
   seedOnboarding();
   seedAdmin(dataset);
   seedReports(dataset);
-  seedOrdersMock(dataset);
 }
 seedAll(DATASET);
 const lookups: Record<string, readonly unknown[]> = { organizationUnits };
@@ -180,6 +176,14 @@ async function route(request: IncomingMessage): Promise<Reply> {
   if (admin) return admin;
   if (Object.hasOwn(lookups, resource)) return reply(200, lookups[resource]);
 
+  // The DCFP's stockout reports and warehouse orders, and the inbox, in the Go API's shapes.
+  const dcfp = handleDcfp(
+    request.method ?? 'GET',
+    parts,
+    body,
+    new URL(request.url ?? '/', 'http://mock').searchParams,
+  );
+  if (dcfp) return dcfp;
   const fulfilment = handleFulfilment(request.method ?? 'GET', parts, body);
   if (fulfilment) return fulfilment;
   const warehouse = handleWarehouse(request.method ?? 'GET', parts, body);
@@ -205,20 +209,6 @@ async function route(request: IncomingMessage): Promise<Reply> {
     new URL(request.url ?? '/', 'http://mock').searchParams,
   );
   if (hotspots) return hotspots;
-  // Stockout alerts, warehouse requests, the district store and the inbox, on the Go API's paths.
-  const orders = handleOrders(
-    request.method ?? 'GET',
-    parts,
-    body,
-    new URL(request.url ?? '/', 'http://mock').searchParams,
-  );
-  if (orders) return orders;
-  const inbox = handleNotifications(
-    request.method ?? 'GET',
-    parts,
-    new URL(request.url ?? '/', 'http://mock').searchParams,
-  );
-  if (inbox) return inbox;
 
   return reply(404, { message: 'Not found' });
 }

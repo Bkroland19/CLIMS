@@ -15,12 +15,11 @@
  * decisions only from the review statuses in `DECISIONS` (409 otherwise), and a comment of
  * 1 to 2000 characters on every decision and comment (422 otherwise).
  *
- * The signed-in user's inbox (`notifications.mts`) gets what the API sends Wakiso's DCFP: a
- * hotspot submitted in Wakiso, and the VHT's comments on one.
+ * Besides the demo hotspots, a few hundred generated ones around five towns feed the hotspot
+ * map's clusters, heatmap and filters (`mapHotspots`).
  */
 
 import type { Reply } from './fulfilment.mts';
-import { notify } from './notifications.mts';
 
 type Body = Record<string, unknown>;
 type ReviewStatus = 'submitted' | 'rejected' | 'active' | 'deactivated';
@@ -305,7 +304,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       updated_at: daysAgo(10),
       comments: [comment('rejected', 'Already registered as Nansana Stage.', daysAgo(10))],
     }),
-    // Active hotspots the orders mock raises stockout alerts from.
+    // More active hotspots in Wakiso.
     hotspot({
       name: 'Kitende Trading Centre',
       type: 'Trading centre',
@@ -354,7 +353,7 @@ function seedHotspots(dataset: string): Hotspot[] {
       ],
     }),
   ];
-  if (dataset !== 'worst') return demo;
+  if (dataset !== 'worst') return [...demo, ...mapHotspots()];
   // The values that break layouts come first, because the first rows are what is on screen.
   return [
     // A converted legacy hotspot: no place, no contact, no coordinates.
@@ -379,7 +378,148 @@ function seedHotspots(dataset: string): Hotspot[] {
       comments: [comment('deactivated', 'x'.repeat(2000), daysAgo(3))],
     }),
     ...demo,
+    ...mapHotspots(),
   ];
+}
+
+/*
+ * A few hundred hotspots around five towns, for the map's clusters, heatmap and
+ * filters. Generated from a fixed seed, so every run draws the same map. Wakiso
+ * and Kampala are left alone: other screens' tests rely on what those hold.
+ */
+const MAP_TOWNS = [
+  {
+    district: placeId(2, 3),
+    centre: [2.7746, 32.299],
+    count: 90,
+    villages: ['Laroo', 'Pece', 'Bardege', 'Layibi', 'Koro', 'Unyama', 'Awach', 'Bobi', 'Lalogi'],
+  },
+  {
+    district: placeId(2, 4),
+    centre: [0.4244, 33.2042],
+    count: 110,
+    villages: ['Bugembe', 'Walukuba', 'Masese', 'Mpumudde', 'Budondo', 'Kakira', 'Mafubira'],
+  },
+  {
+    district: MUKONO,
+    centre: [0.3533, 32.7553],
+    count: 80,
+    villages: ['Seeta', 'Namilyango', 'Goma', 'Kyetume', 'Nakisunga', 'Ntenjeru', 'Katosi'],
+  },
+  {
+    district: placeId(2, 2),
+    centre: [0.8492, 32.4731],
+    count: 50,
+    villages: ['Bombo', 'Wobulenzi', 'Kasana', 'Zirobwe', 'Kikyusa', 'Katikamu'],
+  },
+  {
+    district: placeId(2, 1),
+    centre: [0.225, 32.3136],
+    count: 40,
+    villages: ['Buwama', 'Kammengo', 'Nkozi', 'Kituntu', 'Muduuma'],
+  },
+] as const;
+
+const VENUES = [
+  'Bar',
+  'Bar',
+  'Lodge',
+  'Guest House',
+  'Boda Stage',
+  'Landing Site',
+  'Market',
+  'Restaurant',
+  'Massage Parlour',
+  'Night Club',
+  'New',
+  'Old',
+];
+const CONTACTS = ['Achen Grace', 'Okot Denis', 'Nabirye Sarah', 'Waiswa Peter', 'Namubiru Joan'];
+
+function mapHotspots(): Hotspot[] {
+  // mulberry32: a tiny seeded generator.
+  let seed = 20261121;
+  const random = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T;
+  // Points cluster around the town and a few trading centres near it.
+  const spread = () => (random() + random() + random() - 1.5) * 0.09;
+
+  // Two positions the map must not draw, as seen in real data: latitude and
+  // longitude swapped, and a phone emulator's default location in California.
+  const misplaced = [
+    hotspot(
+      {
+        name: 'Walukuba Lodge 111',
+        type: 'Lodge',
+        village: 'Walukuba',
+        latitude: 33.2042,
+        longitude: 0.4244,
+        review_status: 'active',
+        created_at: daysAgo(90),
+      },
+      placeId(2, 4),
+    ),
+    hotspot(
+      {
+        name: 'Kakira Market 112',
+        type: 'Market',
+        village: 'Kakira',
+        latitude: 37.4221,
+        longitude: -122.0839,
+        review_status: 'submitted',
+        created_at: daysAgo(6),
+      },
+      placeId(2, 4),
+    ),
+  ];
+
+  return MAP_TOWNS.flatMap((town) => {
+    const centres = Array.from({ length: 4 }, () => [
+      town.centre[0] + spread() * 2,
+      town.centre[1] + spread() * 2,
+    ]);
+    return Array.from({ length: town.count }, (_, index) => {
+      const village = pick(town.villages);
+      const venue = pick(VENUES);
+      const roll = random();
+      const reviewStatus: ReviewStatus =
+        roll < 0.78
+          ? 'active'
+          : roll < 0.88
+            ? 'deactivated'
+            : roll < 0.96
+              ? 'submitted'
+              : 'rejected';
+      const has = random();
+      const centre = index % 3 === 0 ? town.centre : pick(centres);
+      const placed = random() > 0.08;
+      // The draws below keep their order (contact, phone, dispenser condition, position), so
+      // every run draws the same map.
+      return hotspot(
+        {
+          name: `${village} ${venue === 'New' || venue === 'Old' ? 'Hotspot' : venue} ${String(index + 1)}`,
+          type: venue,
+          village,
+          contact_person: contact(
+            pick(CONTACTS),
+            `+2567${String(Math.floor(10_000_000 + random() * 89_999_999))}`,
+          ),
+          has_condom_dispenser: has < 0.4 ? true : has < 0.9 ? false : null,
+          dispenser_condition: has < 0.4 ? pick(['Good', 'Good', 'Good', 'Poor', 'Broken']) : null,
+          latitude: placed ? Number((centre[0] + spread()).toFixed(5)) : null,
+          longitude: placed ? Number((centre[1] + spread()).toFixed(5)) : null,
+          review_status: reviewStatus,
+          created_at: daysAgo(10 + Math.floor(random() * 700)),
+        },
+        town.district,
+      );
+    });
+  }).concat(misplaced);
 }
 
 const state = { hotspots: [] as Hotspot[], events: [] as HotspotEvent[] };
@@ -396,56 +536,7 @@ function record(target: Hotspot, action: string, actorId: string, createdAt: str
   });
 }
 
-/** A hotspot by id, for the orders mock. */
-export function mockHotspotById(id: string): Hotspot | undefined {
-  return state.hotspots.find((candidate) => candidate.id === id);
-}
-
-/** A seeded hotspot by name, for the orders mock to raise alerts from. */
-export function mockHotspotByName(name: string): Hotspot | undefined {
-  return state.hotspots.find((candidate) => candidate.name === name);
-}
-
-/** Whether a notification seeded at `at` has been read: anything older than a day and a half. */
-const seenBy = (at: string) => Date.now() - Date.parse(at) > 1.5 * 86_400_000;
-
-/** `hotspot.submitted`, sent to the DCFPs of the hotspot's district: here, Wakiso's. */
-function notifySubmitted(target: Hotspot, at: string): void {
-  if (target.district?.id !== WAKISO) return;
-  const data = { name: target.name ?? 'An unnamed hotspot', district: target.district.name };
-  notify({
-    type: 'hotspot.submitted',
-    title: `New hotspot to verify: ${data.name}`,
-    body: `${data.name} in ${data.district} was submitted and is waiting for verification.`,
-    resource: { type: 'hotspot', id: target.id },
-    actorId: VHT,
-    data,
-    at,
-    read: seenBy(at),
-  });
-}
-
-/** `hotspot.commented`, for a VHT's comment on a hotspot in Wakiso. */
-function notifyCommented(target: Hotspot, note: Comment): void {
-  if (target.district?.id !== WAKISO) return;
-  const data = {
-    name: target.name ?? 'An unnamed hotspot',
-    district: target.district.name,
-    comment: note.comment,
-  };
-  notify({
-    type: 'hotspot.commented',
-    title: `New comment on ${data.name}`,
-    body: note.comment,
-    resource: { type: 'hotspot', id: target.id },
-    actorId: note.user_id,
-    data,
-    at: note.created_at,
-    read: seenBy(note.created_at),
-  });
-}
-
-/** Seeds the hotspots. Seed the inbox (`seedNotificationsMock`) first: this adds to it. */
+/** Seeds the hotspots. */
 export function seedHotspotsMock(dataset: string): void {
   sequence = 0;
   threads.clear();
@@ -453,11 +544,9 @@ export function seedHotspotsMock(dataset: string): void {
   state.events = [];
   for (const target of [...state.hotspots].reverse()) {
     record(target, 'submitted', VHT, target.created_at);
-    if (target.review_status === 'submitted') notifySubmitted(target, target.created_at);
     for (const note of threadOf(target)) {
       const action = note.action === 'comment' ? 'commented' : note.action;
       record(target, action, note.user_id ?? DCFP, note.created_at);
-      if (note.action === 'comment' && note.user_id === VHT) notifyCommented(target, note);
     }
   }
   state.events.sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -530,7 +619,6 @@ function submit(body: Body): Reply {
   );
   state.hotspots.unshift(created);
   record(created, 'submitted', VHT, now);
-  notifySubmitted(created, now);
   return ok(created, 201);
 }
 

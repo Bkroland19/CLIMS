@@ -36,8 +36,12 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/", rbac.RequirePermission("orders:read"), h.list)
 	group.Post("/", rbac.RequirePermission("orders:create"), h.create)
 	group.Post("/stockouts", rbac.RequirePermission("orders:stockout"), h.stockout)
+	group.Get("/stockouts", rbac.RequirePermission("orders:read"), h.stockouts)
+	group.Get("/stockouts/:id", rbac.RequirePermission("orders:read"), h.stockoutDetail)
+	group.Post("/stockouts/:id/deliveries", rbac.RequirePermission("orders:supply_hotspots"), h.delivery)
+	group.Post("/stockouts/:id/acknowledgements", rbac.RequirePermission("orders:stockout"), h.acknowledgement)
+	group.Post("/warehouse-requests", rbac.RequirePermission("orders:replenish"), h.warehouseRequest)
 	group.Get("/notifications", rbac.RequirePermission("orders:read"), h.notifications)
-	group.Get("/riders", rbac.RequirePermission("orders:process"), h.listRiders)
 	group.Get("/:id/events", rbac.RequirePermission("orders:read"), h.events)
 	group.Post("/:id/actions/:action", h.action, h.performAction)
 	group.Get("/:id", rbac.RequirePermission("orders:read"), h.get)
@@ -55,12 +59,11 @@ func scopeFor(user *users.User) scope {
 }
 
 func (h *Handler) list(c fiber.Ctx) error {
-	limit, limitErr := strconv.ParseInt(c.Query("limit", "50"), 10, 32)
-	offset, offsetErr := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
-	if limitErr != nil || offsetErr != nil || limit < 1 || limit > 100 || offset < 0 {
-		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
+	limit, offset, ok := page(c)
+	if !ok {
+		return response.Error(c, 400, pageError, nil)
 	}
-	orders, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), int32(limit), int32(offset), c.Query("status"))
+	orders, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), limit, offset, c.Query("status"))
 	if err != nil {
 		return orderError(c, err)
 	}
@@ -174,4 +177,16 @@ func orderError(c fiber.Ctx, err error) error {
 	}
 	slog.Error("orders operation failed", "error", err)
 	return response.Error(c, 500, "orders operation failed", nil)
+}
+
+const pageError = "limit must be between 1 and 100 and offset must be nonnegative"
+
+// page reads a list's limit (default 50, at most 100) and offset (default 0).
+func page(c fiber.Ctx) (int32, int32, bool) {
+	limit, limitErr := strconv.ParseInt(c.Query("limit", "50"), 10, 32)
+	offset, offsetErr := strconv.ParseInt(c.Query("offset", "0"), 10, 32)
+	if limitErr != nil || offsetErr != nil || limit < 1 || limit > 100 || offset < 0 {
+		return 0, 0, false
+	}
+	return int32(limit), int32(offset), true
 }

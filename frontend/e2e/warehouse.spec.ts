@@ -1,11 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
+import { MOCK_URL } from './support/env';
 import { resetMock } from './support/mock';
 import { expectToast, open } from './support/ui';
 
 /*
- * The warehouse forms, on the prototype contract (`dev/mock/fulfilment.mts`); the district
- * side has moved to the live orders API, so the two no longer share requests. The mock seeds WR-2026-0031
+ * The warehouse forms, and a district request reaching the warehouse: the mock seeds WR-2026-0031
  * (new, at JMS), WR-2026-0030 (queued at NMS, for Mukono) and WR-2026-0027 (on hold at JMS,
  * for Lira, awaiting a supplier delivery).
  */
@@ -65,10 +65,10 @@ test('returns a held request to the queue', async ({ page }) => {
   await expect(summary).toContainText('Queued');
 });
 
-test('dispatches a queued request; transport details come first', async ({ page }) => {
-  await open(page, '/warehouse/requests/WR-2026-0030?store=NMS', 'District request');
+/** Fills in transport details and dispatches the request open on the page. */
+async function dispatch(page: Page, id: string): Promise<void> {
   await page.getByRole('button', { name: 'Check stock' }).click();
-  const send = page.getByRole('button', { name: 'Dispatch to Mukono district store' });
+  const send = page.getByRole('button', { name: 'Dispatch to Wakiso district store' });
   await send.click();
   // Transport details are required before anything is sent.
   await expect(page.getByLabel('Waybill number')).toHaveAttribute('aria-invalid', 'true');
@@ -77,6 +77,29 @@ test('dispatches a queued request; transport details come first', async ({ page 
   await page.getByLabel('Vehicle').fill('UBF 112C');
   await page.getByLabel('Driver').fill('Robert Ssali');
   await send.click();
-  await expectToast(page, 'WR-2026-0030 dispatched to Mukono district store.');
+  await expectToast(page, `${id} dispatched to Wakiso district store.`);
+}
+
+test('a district request reaches the warehouse, which accepts and dispatches it', async ({
+  page,
+  request,
+}) => {
+  // District: Wakiso asks NMS for stock. The warehouse screens still read the mock's own
+  // requests, so the request is raised there directly; the DCFP's receipt of a Go API order is
+  // covered in dcfp.spec.ts.
+  const response = await request.post(`${MOCK_URL}/api/v1/warehouse-requests`, {
+    headers: { Authorization: 'Bearer mock-token' },
+    data: { warehouse: 'NMS', items: { male: 6000, female: 0 }, linked_orders: [], note: '' },
+  });
+  expect(response.ok()).toBe(true);
+  const { data } = (await response.json()) as { data: { id: string } };
+  const id = data.id;
+  expect(id).toMatch(/^WR-\d{4}-\d{4}$/);
+
+  // Warehouse: accept, check stock, dispatch.
+  await open(page, `/warehouse/requests/${id}?store=NMS`, 'District request');
+  await page.getByRole('button', { name: 'Accept and queue request' }).click();
+  await expectToast(page, `${id} accepted and queued.`);
+  await dispatch(page, id);
   await expect(page.getByText('WB-NMS-26-1300').first()).toBeVisible();
 });

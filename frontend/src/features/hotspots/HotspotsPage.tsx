@@ -13,16 +13,13 @@ import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
-import { useHotspotStock } from '@/features/district/queries';
-import { DCFP_PATHS } from '@/features/district/tasks';
-import { formatNumber, formatTimestamp } from '@/lib/format';
+import { DCFP_PATHS } from '@/features/dcfp/orders';
 
 import { DECISIONS_FROM, REVIEW_STATUSES, type Hotspot, type HotspotDecision } from './api';
 import { dispenserSummary, hotspotLabel } from './hotspotForm';
 import { DECISION_TEXT, DecisionDialog } from './HotspotDecisionDialog';
 import { HotspotFormDialog } from './HotspotFormDialog';
 import { useAllHotspots, useHotspots } from './queries';
-import { supplyByHotspot } from './supply';
 
 /** `review` is the DCFP's review queue; `submit` is a VHT's own submissions. */
 type Workspace = 'review' | 'submit';
@@ -51,7 +48,6 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
   const own = useHotspots(null, !isReview);
   const district = useAllHotspots({}, { enabled: isReview });
   const hotspots = isReview ? district : own;
-  const supply = useHotspotStock({ enabled: isReview });
   const filter = reviewFilterFrom(useSearchParams().get('review'));
   const [submitting, setSubmitting] = useState(false);
   const [deciding, setDeciding] = useState<{
@@ -60,12 +56,6 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
   } | null>(null);
 
   const all = isReview ? district.data?.items : own.data;
-  const supplied = supply.data ? supplyByHotspot(supply.data) : null;
-  // Until the supply figures load, the columns show the empty marker rather than 0.
-  const supplyOf = (hotspot: Hotspot) =>
-    supplied
-      ? (supplied.get(hotspot.id) ?? { deliveries: 0, lastDelivered: null, openAlerts: 0 })
-      : null;
 
   const columns: DataTableColumn<Hotspot>[] = [
     {
@@ -104,30 +94,6 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
       value: (hotspot) => hotspot.review_status,
       cell: (hotspot) => <StatusBadge status={hotspot.review_status} />,
     },
-    ...(isReview
-      ? [
-          {
-            id: 'deliveries',
-            header: 'Deliveries',
-            numeric: true,
-            value: (hotspot: Hotspot) => supplyOf(hotspot)?.deliveries,
-            cell: (hotspot: Hotspot) => formatNumber(supplyOf(hotspot)?.deliveries),
-          },
-          {
-            id: 'last-delivered',
-            header: 'Last delivered',
-            value: (hotspot: Hotspot) => supplyOf(hotspot)?.lastDelivered,
-            cell: (hotspot: Hotspot) => formatTimestamp(supplyOf(hotspot)?.lastDelivered),
-          },
-          {
-            id: 'open-alerts',
-            header: 'Open alerts',
-            numeric: true,
-            value: (hotspot: Hotspot) => supplyOf(hotspot)?.openAlerts,
-            cell: (hotspot: Hotspot) => formatNumber(supplyOf(hotspot)?.openAlerts),
-          },
-        ]
-      : []),
   ];
 
   const reviewActions = (hotspot: Hotspot): RowAction[] =>

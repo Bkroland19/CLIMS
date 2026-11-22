@@ -1,18 +1,24 @@
-import { Boxes } from 'lucide-react';
+import Image from 'next/image';
 
+import mohSeal from '@/assets/moh-seal.png';
 import { cn } from '@/lib/utils';
 
 interface BrandProps {
   className?: string;
 }
 
-/** The product mark and name. */
+/** The Ministry of Health seal and the product name. */
 export function Brand({ className }: BrandProps) {
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      <div className="bg-foreground text-background flex size-9 shrink-0 items-center justify-center rounded-lg">
-        <Boxes className="size-5" aria-hidden="true" />
-      </div>
+      <Image
+        src={mohSeal}
+        alt="Ministry of Health, Uganda"
+        width={44}
+        height={44}
+        loading="eager"
+        className="size-11 shrink-0"
+      />
       <span translate="no" className="text-lg font-semibold whitespace-nowrap">
         CLIMS
       </span>

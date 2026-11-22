@@ -9,10 +9,10 @@ import { workspaces } from '../../src/navigation/workspaces';
 const SAMPLE_PATHS: Readonly<Record<string, string>> = {
   '/moh/orders/[id]': '/moh/orders/ORD-0141',
   '/moh/reports/[id]': '/moh/reports/RPT-2610-HS0198',
-  // `dev/mock/orders.mts` and `hotspots.mts`: a queued alert from Namasuba Lodge, the JMS
-  // shipment in transit, and Kasenyi Landing Site.
-  '/dcfp/orders/[id]': '/dcfp/orders/00000000-0000-4000-8400-000000000052',
-  '/dcfp/restock/[id]': '/dcfp/restock/00000000-0000-4000-8400-000000000039',
+  '/dcfp/restock/new': '/dcfp/restock/new',
+  // The seeded order NMS has dispatched to Wakiso (dev/mock/dcfp.mts).
+  '/dcfp/restock/[id]': '/dcfp/restock/00000000-0000-4000-8301-000000000003',
+  // Kasenyi Landing Site, a hotspot in dev/mock/hotspots.mts.
   '/dcfp/hotspots/[id]': '/dcfp/hotspots/00000000-0000-4000-8000-000000000009',
   '/dcfp/reports/[id]': '/dcfp/reports/RPT-2610-WAKISO',
   '/warehouse/requests/[id]': '/warehouse/requests/WR-2026-0030?store=NMS',

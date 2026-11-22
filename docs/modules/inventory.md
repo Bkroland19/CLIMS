@@ -15,9 +15,9 @@ The inventory API reports stock across the supply chain: the national warehouse,
 ## Reports
 
 - **Stock** lists each store's balance per product and unit: `on_hand`, `reserved` for confirmed orders, `available` (on hand less reserved) and `incoming` (dispatched to the store by the warehouse and not yet received). Filter by `store_id`, `store_type` (`national` or `district`) or `condom_id`.
-- **Hotspots** reports what each hotspot has been supplied per product: quantity `delivered` and number of `deliveries` in the period, `last_delivered_at`, quantity `in_transit` with a rider, `open_alerts` not yet sent, `on_hold_requests` waiting for the warehouse and `last_stockout_at`. An open alert has no unit until the DCFP acts, so it is reported on a row without one, as it is in the summary. CLIMS does not record consumption at hotspots, so this is supply, not a count of stock on site. Filter by `hot_spot_id` or `condom_id`.
+- **Hotspots** reports what each hotspot was supplied through the alert orders raised before migration 22 (see [orders](orders.md#alert-orders-raised-before-migration-22)); stockout reports are not orders and do not appear. Per product: quantity `delivered` and number of `deliveries` in the period, `last_delivered_at`, quantity `in_transit` with a rider, `open_alerts` not yet sent, `on_hold_requests` waiting for the warehouse and `last_stockout_at`. An open alert has no unit until the DCFP acts, so it is reported on a row without one, as it is in the summary. CLIMS does not record consumption at hotspots, so this is supply, not a count of stock on site. Filter by `hot_spot_id` or `condom_id`.
 - **Movements** is the ledger behind the balances: every change to a store's on-hand stock, newest first, with `on_hand_after`. Reasons are `opening`, `receipt`, `adjustment`, `dispatch` and `order_receipt`; the last two are written by the [order workflow](orders.md) and link the order. Filter by `store_id`, `condom_id` or `reason`, and page with `limit` and `offset`.
-- **Summary** totals each product nationally: warehouse and district stock on hand and available, stock in transit, quantity delivered to hotspots in the period, and open and held hotspot requests.
+- **Summary** totals each product nationally: warehouse and district stock on hand and available, stock in transit, and, from alert orders raised before migration 22, quantity delivered to hotspots in the period and open hotspot requests. Held counts include held warehouse orders.
 
 Hotspot, movement and summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
 
@@ -29,6 +29,12 @@ Hotspot, movement and summary reports accept a period as `from` and `to` dates (
 - `adjustment` corrects stock after a count in either direction and requires a `note`.
 
 Stock cannot fall below what open orders have reserved; such an adjustment returns 409. Order dispatch and receipt continue to move stock themselves and record their own entries.
+
+## Batches and expiry
+
+A store's stock of a product in a unit is held in batches (`stock_batches`), each with an optional `batch_number` and `expiry_date`, adding up to the store total. A receipt or positive adjustment adds to the batch it names; a negative adjustment comes out of it (409 when the batch holds less). Without batch details the stock is in the unknown-expiry batch, which reports do not count as usable until reviewed. Migration 26 put each existing balance in an unknown-expiry batch.
+
+Stock leaves a store first expiry first out: warehouse dispatch and district deliveries to hotspots take the earliest-expiring batch first and unknown expiry last. Expired batches never leave, and a batch with under one calendar month left leaves only with an `expiry_exception_reason`, recorded with who authorised it and the rule version. What left is recorded per batch (`shipment_batches`), and a district's receipt puts the counted quantity into the batches the warehouse shipped: a shortfall comes off the latest-expiring batch, and a surplus goes to an unknown-expiry batch. Warehouse check-stock does not count expired stock as available. See [reports](reports.md#batches-and-expiry).
 
 ## Access
 

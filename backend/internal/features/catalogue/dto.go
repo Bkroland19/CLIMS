@@ -10,7 +10,7 @@ import (
 // left out of a PATCH apart from one being set.
 type ProductFields struct {
 	Category      *string `json:"category" validate:"required,oneof=male female"`
-	Type          *string `json:"type" validate:"required,oneof=free socially_marketed commercial"`
+	TypeID        *string `json:"type_id" validate:"required,uuid_rfc4122"`
 	BrandID       *string `json:"brand_id" validate:"required,uuid_rfc4122"`
 	UnitID        *string `json:"unit_id" validate:"required,uuid_rfc4122"`
 	PiecesPerUnit *int32  `json:"pieces_per_unit" validate:"required,min=1,max=100000"`
@@ -22,17 +22,22 @@ type ProductPatch struct {
 	Active *bool `json:"active"`
 }
 
-// LookupInput creates a brand or unit of measure.
+// LookupInput creates a product type, brand or unit of measure.
 type LookupInput struct {
 	Name string  `json:"name"`
 	Note *string `json:"note"`
 }
 
-// LookupPatch changes any subset of a brand's or unit's fields. An empty note clears it.
+// LookupPatch changes any subset of a type's, brand's or unit's fields. An empty note clears it.
 type LookupPatch struct {
 	Name   *string `json:"name"`
 	Note   *string `json:"note"`
 	Active *bool   `json:"active"`
+}
+
+type typeFields struct {
+	Name string  `json:"name" validate:"required,min=2,max=40"`
+	Note *string `json:"note" validate:"omitempty,max=120"`
 }
 
 type brandFields struct {
@@ -49,8 +54,8 @@ type unitFields struct {
 var productMessages = map[string]string{
 	"category.required":        "Choose a category.",
 	"category.oneof":           "Choose male or female.",
-	"type.required":            "Choose a type.",
-	"type.oneof":               "Choose free, socially marketed or commercial.",
+	"type_id.required":         "Choose a type.",
+	"type_id.uuid_rfc4122":     "Choose a type from the list.",
 	"brand_id.required":        "Choose a brand.",
 	"brand_id.uuid_rfc4122":    "Choose a brand from the list.",
 	"unit_id.required":         "Choose a unit of measure.",
@@ -64,14 +69,14 @@ var lookupMessages = map[string]string{
 
 func (f *ProductFields) Normalize() {
 	f.Category = lowerTrimmed(f.Category)
-	f.Type = lowerTrimmed(f.Type)
+	f.TypeID = lowerTrimmed(f.TypeID)
 	f.BrandID = lowerTrimmed(f.BrandID)
 	f.UnitID = lowerTrimmed(f.UnitID)
 }
 
 // empty reports whether no product field is set.
 func (f ProductFields) empty() bool {
-	return f.Category == nil && f.Type == nil && f.BrandID == nil && f.UnitID == nil && f.PiecesPerUnit == nil
+	return f.Category == nil && f.TypeID == nil && f.BrandID == nil && f.UnitID == nil && f.PiecesPerUnit == nil
 }
 
 // overlay returns current with every field that patch sets replaced.
@@ -79,8 +84,8 @@ func (f ProductFields) overlay(patch ProductFields) ProductFields {
 	if patch.Category != nil {
 		f.Category = patch.Category
 	}
-	if patch.Type != nil {
-		f.Type = patch.Type
+	if patch.TypeID != nil {
+		f.TypeID = patch.TypeID
 	}
 	if patch.BrandID != nil {
 		f.BrandID = patch.BrandID

@@ -1,7 +1,7 @@
 'use client';
 
 import { Ban, CircleCheck, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { useCan } from '@/features/auth/queries';
 import { formatNumber } from '@/lib/format';
+import { useReadOnly } from '@/navigation/useAccess';
 
 import { CATALOGUE_PERMISSION, type Lookup, type LookupKind } from './api';
 import { LookupFormDialog } from './LookupFormDialog';
@@ -31,19 +32,23 @@ type Dialog = { kind: 'add' } | { kind: 'edit'; lookup: Lookup } | null;
 
 interface LookupsPageProps {
   kind: LookupKind;
-  /** The page's address, for its filter links. */
-  path: string;
 }
 
-/** The list of brands or units of measure: they share their shape, rules and actions. */
-export function LookupsPage({ kind, path }: LookupsPageProps) {
+/**
+ * The list of product types, brands or units of measure: they share their shape,
+ * rules and actions. Changes need `catalogue:manage` and a workspace the person
+ * may act in.
+ */
+export function LookupsPage({ kind }: LookupsPageProps) {
   const text = LOOKUP_TEXT[kind];
   const { heading } = text;
   const lookups = useLookups(kind);
   const setActive = useSetLookupActive(kind);
   const deleteLookup = useDeleteLookup(kind);
   const can = useCan();
-  const canManage = can(CATALOGUE_PERMISSION);
+  const readOnly = useReadOnly();
+  const canManage = can(CATALOGUE_PERMISSION) && !readOnly;
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [lookupToDelete, setLookupToDelete] = useState<Lookup | null>(null);
@@ -160,7 +165,7 @@ export function LookupsPage({ kind, path }: LookupsPageProps) {
       <FilterTabs
         label={`Filter ${text.plural} by status`}
         value={filter.value}
-        hrefFor={(value) => statusHref(path, value)}
+        hrefFor={(value) => statusHref(pathname, value)}
         tabs={FILTERS.map((option) => ({
           value: option.value,
           label: option.label,
