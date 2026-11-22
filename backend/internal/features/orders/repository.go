@@ -20,8 +20,11 @@ type Order struct {
 	DiscrepancyNote  *string `json:"discrepancy_note"`
 	DeliveryNote     *string `json:"delivery_note"`
 	ID               string  `json:"id"`
-	CondomID         string  `json:"condom_id"`
-	QuantityNeeded   *int32  `json:"quantity_needed"`
+	// CondomID is the product; a warehouse request has none until the warehouse chooses one at review.
+	CondomID *string `json:"condom_id"`
+	// CondomCategory is the type requested, male or female.
+	CondomCategory *string `json:"condom_category"`
+	QuantityNeeded *int32  `json:"quantity_needed"`
 	// QuantityApproved is what the warehouse approved at review; the request keeps QuantityNeeded.
 	QuantityApproved   *int32    `json:"quantity_approved"`
 	QuantityIssued     *int32    `json:"quantity_issued"`
@@ -60,7 +63,8 @@ func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier, auditor au
 const columns = `id, condom_id, quantity_needed, quantity_issued, order_status,
 to_char(order_date, 'YYYY-MM-DD'), ordered_by_id, handled_by_id, ordered_for_store_id,
 ordered_from_store_id, unit_of_measure_id, comment, created_at, updated_at,
-hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note, quantity_approved`
+hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note, quantity_approved,
+condom_category`
 
 func scanOrder(row pgx.Row) (Order, error) {
 	var order Order
@@ -69,7 +73,7 @@ func scanOrder(row pgx.Row) (Order, error) {
 		&order.OrderedForStoreID, &order.OrderedFromStoreID, &order.UnitOfMeasureID,
 		&order.Comment, &order.CreatedAt, &order.UpdatedAt, &order.HotSpotID,
 		&order.ParentOrderID, &order.RiderID, &order.QuantityReceived, &order.DiscrepancyNote, &order.DeliveryNote,
-		&order.QuantityApproved)
+		&order.QuantityApproved, &order.CondomCategory)
 	return order, err
 }
 
@@ -115,24 +119,16 @@ func checkOrderable(ctx context.Context, q interface {
 }
 
 func (r *Repository) create(ctx context.Context, actorID string, input createRequest) (Order, error) {
-	var order Order
-	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if err := checkOrderable(ctx, tx, input.CondomID); err != nil {
-			return err
-		}
-		var err error
-		order, err = scanOrder(tx.QueryRow(ctx, `
-			INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
-				ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment)
-			VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8)
-			RETURNING `+columns, input.CondomID, input.QuantityNeeded, input.Date, actorID,
-			input.OrderedForStoreID, input.OrderedFromStoreID, input.UnitOfMeasureID, input.Comment))
-		if err != nil {
-			return err
-		}
-		return r.recordAudit(ctx, tx, "order.created", nil, order)
-	})
-	return order, err
+	if err := checkOrderable(ctx, r.db, input.CondomID); err != nil {
+		return Order{}, err
+	}
+	return scanOrder(r.db.QueryRow(ctx, `
+		INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
+			ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment, condom_category)
+		VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8,
+			(SELECT category FROM condoms WHERE id = $1 AND category IN ('male', 'female')))
+		RETURNING `+columns, input.CondomID, input.QuantityNeeded, input.Date, actorID,
+		input.OrderedForStoreID, input.OrderedFromStoreID, input.UnitOfMeasureID, input.Comment))
 }
 
 func (r *Repository) fulfill(ctx context.Context, access scope, id, actorID string, quantity int32) (Order, error) {

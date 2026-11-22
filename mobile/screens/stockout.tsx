@@ -20,15 +20,13 @@ import {
 import { isNetworkError, listHotspotsPage, toLocalHotspot } from "@/lib/hotspots";
 import { useNav } from "@/lib/nav";
 import {
+  CATEGORY_LABEL,
   COMMENT_MAX,
-  listProducts,
-  ProductsUnavailable,
-  productsProblemMessage,
   reportStockout,
   stockoutComment,
   stockoutErrorMessage,
   toLocalOrder,
-  type Product,
+  type Category,
 } from "@/lib/orders";
 import { useMe } from "@/lib/session";
 import { useStore } from "@/lib/store";
@@ -38,8 +36,8 @@ import { matches } from "./common";
 type Reason = "Out of stock" | "Running low";
 
 /**
- * A signed-in VHT's stock request: a stockout alert for a hotspot and product
- * (POST /orders/stockouts). The district's DCFP decides the quantity.
+ * A signed-in VHT's stock request: a stockout alert for a hotspot and a condom category, male,
+ * female or both (POST /orders/stockouts). The district's DCFP decides what to send and how much.
  */
 export function StockoutForm({
   hotspotId,
@@ -59,8 +57,6 @@ export function StockoutForm({
   const [hasMore, setHasMore] = useState(false);
   const [loadingHotspots, setLoadingHotspots] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [products, setProducts] = useState<Product[] | null>(null);
-  const [productsErr, setProductsErr] = useState("");
 
   const loadPage = useCallback(
     async (offset: number) => {
@@ -99,15 +95,6 @@ export function StockoutForm({
         // Offline or refused: keep the phone's copy.
       })
       .finally(() => live && setLoadingHotspots(false));
-    listProducts()
-      .then((list) => live && setProducts(list))
-      .catch((e: unknown) => {
-        if (!live) return;
-        setProducts([]);
-        setProductsErr(
-          productsProblemMessage(e instanceof ProductsUnavailable ? e.problem : "error"),
-        );
-      });
     return () => {
       live = false;
     };
@@ -118,8 +105,7 @@ export function StockoutForm({
   const [selId, setSel] = useState<string | undefined>(hotspotId);
   // Opened from a hotspot's page, it may not be in the pages loaded so far.
   const sel = hotspots.find((h) => h.id === selId) ?? s.hotspots.find((h) => h.id === selId);
-  const [productId, setProduct] = useState("");
-  const product = products?.find((p) => p.id === productId);
+  const [category, setCategory] = useState<Category | "">("");
   const [reason, setReason] = useState<Reason>("Out of stock");
   const [comment, setComment] = useState("");
   const [pick, setPick] = useState(false);
@@ -134,19 +120,18 @@ export function StockoutForm({
     fixed
       ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
       : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
-  const chosenProduct = product ?? (products?.length === 1 ? products[0] : undefined);
   const tooLong = comment.trim().length > COMMENT_MAX;
-  const ready = !!hotspot && !!chosenProduct && !tooLong && !busy;
+  const ready = !!hotspot && !!category && !tooLong && !busy;
 
   const submit = async () => {
-    if (!hotspot || !chosenProduct) return;
+    if (!hotspot || !category) return;
     setRefused("");
     const request = {
       hot_spot_id: hotspot.id,
-      condom_id: chosenProduct.id,
-      comment: stockoutComment(reason, comment),
+      condom_category: category,
+      message: stockoutComment(reason, comment),
     };
-    const names = { hotspot: hotspot.name, product: chosenProduct.name };
+    const names = { hotspot: hotspot.name, product: CATEGORY_LABEL[category] };
     const label = `Stock request · ${hotspot.name}`;
     if (offline) {
       queue("stockout", { request, ...names }, label);
@@ -176,7 +161,7 @@ export function StockoutForm({
         {done === "sent" ? (
           <Done
             title="Stock request sent"
-            body={`${hotspot?.district || "The district"} focal person is notified about ${chosenProduct?.name} at ${hotspot?.name} and decides how much to send.`}
+            body={`${hotspot?.district || "The district"} focal person is notified about ${category ? CATEGORY_LABEL[category].toLowerCase() : "condoms"} at ${hotspot?.name} and decides how much to send.`}
           />
         ) : (
           <Done
@@ -202,7 +187,6 @@ export function StockoutForm({
   return (
     <Screen title="Request stock" backLabel="Back">
       {refused ? <Banner tone="danger" title="Couldn't send" body={refused} /> : null}
-      {productsErr ? <Banner tone="warning" title="No product list" body={productsErr} /> : null}
       {fixed ? null : (
         <Fields h="Hotspot">
           <Pick
@@ -225,11 +209,13 @@ export function StockoutForm({
       ) : null}
       <Fields h="What's needed" f="The district focal person decides how much to send.">
         <Select
-          label="Product"
-          value={chosenProduct?.id ?? ""}
-          options={(products ?? []).map((p) => ({ v: p.id, l: p.name }))}
-          onChange={setProduct}
-          loading={products === null}
+          label="Condom type"
+          value={category}
+          options={(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => ({
+            v: c,
+            l: CATEGORY_LABEL[c],
+          }))}
+          onChange={(v) => setCategory(v as Category)}
         />
         <Seg
           label="What's happening?"

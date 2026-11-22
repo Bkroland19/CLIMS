@@ -18,8 +18,6 @@ import { api, login, setTokens, toStoredTokens, tokenClient } from "../api";
 import { listHotspotsPage } from "../hotspots";
 import {
   listOrders,
-  listProducts,
-  ProductsUnavailable,
   reportStockout,
   stockoutComment,
   stockoutErrorMessage,
@@ -49,19 +47,16 @@ live("stockout alerts against a running backend", () => {
   jest.setTimeout(60_000);
   afterAll(() => setTokens(null));
 
-  it("as a VHT: lists active hotspots, explains the product list, and handles the send", async () => {
+  it("as a VHT: lists active hotspots and handles the send", async () => {
     await signIn(env.CLIMS_LIVE_LOGIN, env.CLIMS_LIVE_PASSWORD);
     const hotspots = (await listHotspotsPage({ offset: 0, status: "active" })).items;
     expect(hotspots.every((h) => h.status === "active")).toBe(true);
     expect(hotspots.length).toBeGreaterThan(0);
 
-    const products = await listProducts().catch((e: unknown) => e);
-    if (products instanceof ProductsUnavailable) expect(products.problem).toBe("forbidden");
-
     const body = {
       hot_spot_id: hotspots[0].id,
-      condom_id: env.CLIMS_LIVE_PRODUCT_ID ?? "",
-      comment: stockoutComment("Out of stock", "VHT live check"),
+      condom_category: "male" as const,
+      message: stockoutComment("Out of stock", "VHT live check"),
     };
     const res = await reportStockout(body).catch((e: unknown) => e);
     if (isAxiosError(res)) {
@@ -70,7 +65,10 @@ live("stockout alerts against a running backend", () => {
       expect(stockoutErrorMessage(res)).toMatch(/isn't allowed to send stock requests/);
     } else {
       // Accepted once VHTs may report for their district (or the role has orders:all_stores).
-      expect(res).toMatchObject({ hot_spot_id: body.hot_spot_id, order_status: "queued" });
+      expect(res).toMatchObject({
+        hot_spot_id: body.hot_spot_id,
+        order_status: "queued",
+      });
       expect(toLocalOrder(res as never, { hotspot: "h", product: "p" }, "me").source).toBe("api");
     }
   });
@@ -80,13 +78,12 @@ live("stockout alerts against a running backend", () => {
     const user = await signIn(env.CLIMS_LIVE_HM_LOGIN, env.CLIMS_LIVE_HM_PASSWORD);
     const body = {
       hot_spot_id: user.hot_spot_id!,
-      condom_id: env.CLIMS_LIVE_PRODUCT_ID ?? "",
-      comment: stockoutComment("Running low", "Hotspot manager live check"),
+      condom_category: "female" as const,
+      message: stockoutComment("Running low", "Hotspot manager live check"),
     };
     const res = await reportStockout(body);
     expect(res).toMatchObject({
       hot_spot_id: body.hot_spot_id,
-      condom_id: body.condom_id,
       order_status: "queued",
       comment: "Running low. Hotspot manager live check",
     });

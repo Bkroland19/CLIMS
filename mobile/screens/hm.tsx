@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import Screen from "@/components/m/Screen";
 import { Banner, Btn, Hero, List, Row, SkeletonList } from "@/components/m/kit";
 import { isNetworkError } from "@/lib/hotspots";
-import { listOrders, listProducts, toLocalOrder } from "@/lib/orders";
+import { CATEGORY_LABEL, listOrders, toLocalOrder } from "@/lib/orders";
 import { useT } from "@/lib/theme";
 import { ago, chip, items, orderChip } from "@/lib/format";
 import { useNav } from "@/lib/nav";
@@ -98,7 +98,11 @@ function HmOrdersSample() {
     <Screen
       title="Orders"
       root
-      fab={{ label: "Report stockout", icon: "megaphone", onPress: () => nav.go("request") }}
+      fab={{
+        label: "Report stockout",
+        icon: "megaphone",
+        onPress: () => nav.go("request"),
+      }}
     >
       {q0.length ? (
         <List h="Waiting to send">
@@ -145,17 +149,19 @@ function useApiOrders() {
   useFocusEffect(
     useCallback(() => {
       let live = true;
-      Promise.all([listOrders(), listProducts().catch(() => [])])
-        .then(([orders, products]) => {
+      listOrders()
+        .then((orders) => {
           if (!live) return;
-          const name = new Map(products.map((p) => [p.id, p.name]));
           syncApiOrders(
             orders
               .filter((o) => o.hot_spot_id)
               .map((o) =>
                 toLocalOrder(
                   o,
-                  { hotspot: "Your hotspot", product: name.get(o.condom_id) ?? "Condoms" },
+                  {
+                    hotspot: "Your hotspot",
+                    product: o.condom_category ? CATEGORY_LABEL[o.condom_category] : "Condoms",
+                  },
                   me.name,
                   "Hotspot manager",
                 ),
@@ -262,7 +268,11 @@ function HmOrdersLive() {
     <Screen
       title="Orders"
       root
-      fab={{ label: "Report stockout", icon: "megaphone", onPress: () => nav.go("request") }}
+      fab={{
+        label: "Report stockout",
+        icon: "megaphone",
+        onPress: () => nav.go("request"),
+      }}
     >
       <LoadBanner load={load} any={orders.length > 0} />
       {queued.length ? (
