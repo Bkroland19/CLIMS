@@ -19,3 +19,5 @@ node_modules/
 .venv/
 .ruff_cache/
 .idea/
+website/build/
+website/.docusaurus/

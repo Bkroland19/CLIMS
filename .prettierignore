@@ -7,6 +7,8 @@ mobile/.expo/
 mobile/dist/
 docs/api/assets/
 artifacts/
+website/build/
+website/.docusaurus/
 **/package-lock.json
 .vscode/
 .agents/
