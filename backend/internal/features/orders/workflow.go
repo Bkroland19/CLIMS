@@ -149,12 +149,8 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 				return Order{}, errWorkflowInput
 			}
 			var eligible bool
-			err := tx.QueryRow(ctx, `SELECT EXISTS (
-				SELECT FROM users u JOIN role_user ru ON ru.user_id = u.id
-				JOIN role_permission rp ON rp.role_id = ru.role_id
-				JOIN permissions p ON p.id = rp.permission_id
-				WHERE u.id = $1 AND u.status = 'active' AND u.store_id = $2
-					AND p.name = 'orders:deliver')`, input.RiderID, order.OrderedFromStoreID).Scan(&eligible)
+			err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT FROM users u WHERE u.id = $1 AND `+riderAt("$2")+`)`,
+				input.RiderID, order.OrderedFromStoreID).Scan(&eligible)
 			if err != nil {
 				return Order{}, err
 			}

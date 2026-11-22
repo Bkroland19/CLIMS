@@ -379,6 +379,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
 	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
+	testRiders(t, pool, request, login, adminToken, destinationID, condomID, unitID)
 	testCatalogue(t, request, adminToken, userToken, sourceID, destinationID)
 	testStoreAssignment(t, pool, request, adminToken, userToken)
 
