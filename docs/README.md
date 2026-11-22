@@ -29,3 +29,12 @@ See [creating PostgreSQL migrations](migrations.md) for pinned CLI scaffolding, 
 Run `make setup` and `make docker-up` from the repository root. Swagger UI is available at <http://localhost:8080/docs/> and its OpenAPI document at <http://localhost:8080/docs/openapi.json>.
 
 The API contract is maintained in [`api/openapi.json`](api/openapi.json). It documents the implemented backend; it does not describe planned frontend, inventory, or organization-scoped features.
+
+## Documentation site
+
+These files are also published as a Docusaurus site from [`website/`](../website/docusaurus.config.ts). Run `make docs-serve` to preview it with live reload, or `make docs-build` to build it; the build fails on broken links and anchors.
+
+- Write plain Markdown (`.md`). It is parsed as CommonMark, so `<`, `>` and `{` need no escaping. Only `.mdx` files are parsed as MDX.
+- Keep links relative to the file, as on GitHub. Links to files outside `docs/` are rewritten to GitHub when the site is built, and links to `api/openapi.json` go to the copy the site publishes. The site's [API reference](api/reference.mdx) page shows this folder's Swagger UI, with the same settings (`api/swagger-config.js`) as the API's `/docs/` page.
+- New files in `modules/`, `adr/` and `releases/` appear in the sidebar automatically. Add a new top-level guide to [`website/sidebars.ts`](../website/sidebars.ts), or it is published without a sidebar entry.
+- `website/package.json` pins every dependency exactly. Its `overrides` force patched versions of `tinypool`, `serialize-javascript` and `uuid`, which Docusaurus 3.10.2 uses only to build and serve the site, so `npm audit` is clean. When upgrading Docusaurus, drop each override its new release already covers.

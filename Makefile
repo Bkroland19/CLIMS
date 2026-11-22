@@ -71,6 +71,8 @@ help:
 	@echo "    make check-stack     - Verify selected environment routes (dev includes Metro)"
 	@echo "    make check-environments - Verify dev/prod Docker and Compose conventions"
 	@echo "    make docs-check      - Validate OpenAPI, documentation links, and Swagger assets"
+	@echo "    make docs-serve      - Preview the documentation site with live reload"
+	@echo "    make docs-build      - Build the documentation site (fails on broken links)"
 
 # --- Backend Targets ---
 build-backend:
@@ -154,6 +156,13 @@ test-integration:
 docs-check:
 	$(PYTHON) scripts/check_docs.py
 	docker run --rm -v "$(CURDIR)/docs:/docs:ro" python:3.13-alpine sh -c 'pip install --disable-pip-version-check --quiet openapi-spec-validator==0.7.2 && python -m openapi_spec_validator /docs/api/openapi.json'
+
+.PHONY: docs-serve docs-build
+docs-serve:
+	cd website && npm ci && npm start
+
+docs-build:
+	cd website && npm ci && npm run build
 
 .PHONY: install-mobile run-mobile check-mobile check-stack
 install-mobile:

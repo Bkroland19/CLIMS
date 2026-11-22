@@ -10,7 +10,7 @@ Run all commands from the repository root. `ENVIRONMENT=dev` is the default. Sel
 
 `infra/compose/docker-compose.yml` contains shared configuration. Always combine it with exactly one of `docker-compose.dev.yml` or `docker-compose.prod.yml` in that directory. The Makefile does this automatically. The old MariaDB and PostgreSQL Compose entrypoints have been retired; PostgreSQL is the database for both environments.
 
-Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<service>/`:
+Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<service>/`, except the production-only documentation site:
 
 | Service   | Development                                                         | Production                                            |
 | --------- | ------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -20,6 +20,7 @@ Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<se
 | postgres  | PostgreSQL 16, localhost database port                              | PostgreSQL 16, internal database port only            |
 | seaweedfs | SeaweedFS object storage, localhost S3 port 8333                    | SeaweedFS object storage, internal S3 port only       |
 | nginx     | Mounted development config, HTTP and Metro listeners                | Baked configuration, HTTP listener only               |
+| docs      | None: preview with `make docs-serve`                                | Static Docusaurus site under `/handbook/`             |
 
 Both PostgreSQL Dockerfiles intentionally use the same upstream image. Runtime configuration belongs in Compose. Images are tagged `clims-<service>:dev` or `clims-<service>:prod`.
 
@@ -49,7 +50,7 @@ make prod-down
 
 Set `DB_PASSWORD`, a strong `JWT_SECRET`, and `S3_ACCESS_KEY`/`S3_SECRET_KEY` in `infra/env/prod.env`; empty values fail Compose validation. SeaweedFS serves an S3-compatible API at `http://seaweedfs:8333` on the container network; use any S3 client with path-style addressing and those credentials. Objects persist in the `seaweedfs_data` volume. The env file is ignored by Git. Set `NGINX_PORT` and `BIND_ADDRESS` for the deployment. The example binds localhost:8088, allowing both stacks to run on the same machine. To expose HTTP directly, configure the bind address explicitly. The supplied gateway serves HTTP; configure a TLS edge or certificates for an HTTPS deployment.
 
-Production uses project name `clims-prod` and volume `clims-prod_postgres_data`, separate from development. It starts PostgreSQL, API, frontend, and Nginx. Server services have no source/config bind mounts, and only Nginx publishes a host port. Source and config changes require rebuilding the images. Existing database passwords are not changed by editing the env file: PostgreSQL initialization variables apply only to a new data directory.
+Production uses project name `clims-prod` and volume `clims-prod_postgres_data`, separate from development. It starts PostgreSQL, API, frontend, documentation site, and Nginx. Server services have no source/config bind mounts, and only Nginx publishes a host port. Source and config changes require rebuilding the images. Existing database passwords are not changed by editing the env file: PostgreSQL initialization variables apply only to a new data directory.
 
 The API records the client's address (in login sessions, the request log and the per-IP rate limits) from the `X-Real-IP` header that nginx sets, and trusts that header only from the private container network, where nginx reaches it. Set `TRUSTED_PROXIES` to a comma-separated list of IPs or CIDR ranges to trust specific addresses instead; an invalid entry stops the API at startup. If a load balancer sits in front of nginx, configure nginx's `real_ip` module (`set_real_ip_from` the balancer, `real_ip_header X-Forwarded-For`) so nginx passes on the client's address rather than the balancer's.
 

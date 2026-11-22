@@ -94,7 +94,7 @@ JWT middleware also returns `{"error":"Unauthorized: missing or invalid token"}`
 
 Local Go execution defaults `DOCS_DIR` to `../docs`, relative to the backend working directory. For a standalone binary, ship the root docs folder and set `DOCS_DIR` to its absolute path. Docker builds copy `docs/api` into the image and set `DOCS_DIR=/app/docs`. Documentation-file failures return 404 for docs assets and do not prevent the API from starting.
 
-Swagger UI's exact version, upstream source, and SHA-256 hashes are recorded in [`assets/manifest.json`](assets/manifest.json); its license is included in [`assets/LICENSE`](assets/LICENSE). Update the bundle, stylesheet, license, and manifest together when upgrading.
+Swagger UI's exact version, upstream source, and SHA-256 hashes are recorded in [`assets/manifest.json`](assets/manifest.json); its license is included in [`assets/LICENSE`](assets/LICENSE). Update the bundle, stylesheet, license, and manifest together when upgrading. Swagger UI settings are in `swagger-config.js`, shared by this page and the documentation site's [API reference](reference.mdx); `swagger-initializer.js` only starts this page.
 
 When changing an endpoint, update its operation, request/response schemas, security requirement, status codes, and `x-required-permissions` metadata. Permission arrays mean **all** listed permissions are required; they are not OAuth scopes. Keep module guides in sync.
 

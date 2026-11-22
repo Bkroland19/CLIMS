@@ -21,6 +21,7 @@ func RegisterRoutes(router fiber.Router, assets fs.FS) {
 	})
 	files := map[string]string{
 		"/docs/openapi.json":                "openapi.json",
+		"/docs/swagger-config.js":           "swagger-config.js",
 		"/docs/swagger-initializer.js":      "swagger-initializer.js",
 		"/docs/assets/swagger-ui-bundle.js": "assets/swagger-ui-bundle.js",
 		"/docs/assets/swagger-ui.css":       "assets/swagger-ui.css",

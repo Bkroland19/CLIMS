@@ -4,7 +4,7 @@
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It uses read-only repository permissions and requires no repository secrets. A newer run on the same ref cancels the older run.
 
-The workflow is also reusable by [tagged image releases](releases.md), which run the same checks before publishing. The quality job checks shared application version consistency and tests release version validation and digest manifest assembly. A separate image workflow builds the three application production Dockerfiles on pull requests without publishing.
+The workflow is also reusable by [tagged image releases](releases.md), which run the same checks before publishing. The quality job checks shared application version consistency and tests release version validation and digest manifest assembly. A separate image workflow builds the four application production Dockerfiles on pull requests without publishing.
 
 | Check                           | Coverage                                                                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -12,6 +12,7 @@ The workflow is also reusable by [tagged image releases](releases.md), which run
 | Go lint and PostgreSQL tests    | `gofmt`, `go vet`, race-enabled unit/integration tests against PostgreSQL 16, and command builds                            |
 | frontend lint, types, and build | Prettier, ESLint with zero warnings, TypeScript, tests with coverage thresholds, Next.js production build, and audit        |
 | mobile lint, types, and build   | ESLint with zero warnings, TypeScript, and Expo iOS/Android JavaScript export                                               |
+| Documentation site build        | Docusaurus production build of `docs/`, failing on broken links and anchors                                                 |
 
 The database job supplies `TEST_DATABASE_URL`, so integration tests run instead of skipping. Tests create and drop their own database, exercise migrations and legacy imports, and check authentication and RBAC. Its PostgreSQL service is disposable and uses CI-only credentials.
 
@@ -40,6 +41,7 @@ python scripts/check_docs.py
 python -m unittest discover -s scripts -p 'test_*.py'
 python -m openapi_spec_validator docs/api/openapi.json
 make check-environments
+make docs-build
 ```
 
 For the race-enabled database tests, use an isolated PostgreSQL server with permission to create databases:

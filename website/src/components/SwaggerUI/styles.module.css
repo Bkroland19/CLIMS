@@ -1,0 +1,17 @@
+/* Swagger UI is styled for a light page; keep it readable in dark mode too. */
+.swagger {
+  background: #fff;
+  border-radius: var(--ifm-global-radius);
+  color: #3b4151;
+  min-height: 20rem;
+}
+
+/* The docs theme styles every <pre>; Swagger's version badges are <pre> elements. */
+.swagger :global(pre.version) {
+  background: none;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+  margin: 0;
+  padding: 0;
+}

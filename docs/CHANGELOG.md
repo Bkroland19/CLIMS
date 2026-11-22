@@ -41,6 +41,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **Documentation site at `/handbook/`.** `docs/` is published as a Docusaurus site, with search,
+  served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
+  It updates with each stable release. Preview it with `make docs-serve`. See
+  [ADR 0004](adr/0004-documentation-site.md).
 - **VHT stockout alerts for their district.** A VHT with the new `orders:stockout_district` permission can
   raise a stockout alert for any active hotspot in the district they work in (assigned store's district,
   or else assigned subcounty's). Inactive hotspots and other districts are refused.

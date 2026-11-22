@@ -10,7 +10,9 @@ from urllib.parse import urlsplit
 
 from project_version import synchronize, validate
 
-SERVICES = ("backend", "frontend", "mobile")
+SERVICES = ("backend", "frontend", "mobile", "docs")
+# Built from the repository root because they read files outside their own folder.
+ROOT_CONTEXT = ("backend", "docs")
 
 
 def metadata(repository, ref, api_url=""):
@@ -77,7 +79,10 @@ def main():
         result["matrix"] = json.dumps(
             {
                 "include": [
-                    {"service": service, "context": "." if service == "backend" else f"./{service}"}
+                    {
+                        "service": service,
+                        "context": "." if service in ROOT_CONTEXT else f"./{service}",
+                    }
                     for service in SERVICES
                 ]
             }
