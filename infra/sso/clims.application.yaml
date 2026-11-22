@@ -15,6 +15,6 @@ spec:
   category: Laboratory
   launch:
     mode: external
-    url: https://clims.example.org/
+    url: https://clims.example.org/api/v1/auth/sso/start
   access:
     roles: [clims_access]

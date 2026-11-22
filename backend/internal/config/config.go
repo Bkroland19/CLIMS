@@ -17,6 +17,13 @@ type Config struct {
 	DBName    string `mapstructure:"DB_NAME"`
 	DBSSLMode string `mapstructure:"DB_SSLMODE"`
 	JWTSecret string `mapstructure:"JWT_SECRET"`
+	// Portal sign-in through Keycloak. Leave OIDC_CLIENT_ID empty to turn it off.
+	OIDCIssuer       string `mapstructure:"OIDC_ISSUER"`
+	OIDCClientID     string `mapstructure:"OIDC_CLIENT_ID"`
+	OIDCClientSecret string `mapstructure:"OIDC_CLIENT_SECRET"`
+	OIDCPublicOrigin string `mapstructure:"OIDC_PUBLIC_ORIGIN"`
+	// The dashboard's reconciler client. Leave empty to turn identity sync off.
+	IdentitySyncClientID string `mapstructure:"IDENTITY_SYNC_CLIENT_ID"`
 }
 
 func LoadConfig() (cfg Config, err error) {
@@ -26,7 +33,8 @@ func LoadConfig() (cfg Config, err error) {
 	v.SetDefault("DB_HOST", "localhost")
 	v.SetDefault("DB_SSLMODE", "disable")
 	// Binding includes environment-only keys in Unmarshal.
-	for _, key := range []string{"PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "JWT_SECRET"} {
+	for _, key := range []string{"PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "JWT_SECRET",
+		"OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_PUBLIC_ORIGIN", "IDENTITY_SYNC_CLIENT_ID"} {
 		if err := v.BindEnv(key); err != nil {
 			return cfg, err
 		}

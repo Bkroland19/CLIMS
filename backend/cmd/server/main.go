@@ -77,13 +77,22 @@ func main() {
 	jwtAuthMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
 	userRepo := users.NewRepository(dbPool)
-	if client := os.Getenv("IDENTITY_SYNC_CLIENT_ID"); client != "" {
+	if cfg.IdentitySyncClientID != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, os.Getenv("OIDC_ISSUER"), client)
+		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, cfg.OIDCIssuer, cfg.IdentitySyncClientID)
 		cancel()
 		if err != nil {
 			log.Fatalf("CLIMS identity sync configuration: %v", err)
 		}
+	}
+	if cfg.OIDCClientID != "" {
+		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		sso, err := auth.NewSSO(discoveryCtx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCPublicOrigin, cfg.JWTSecret, userRepo)
+		cancel()
+		if err != nil {
+			log.Fatalf("CLIMS portal sign-in configuration: %v", err)
+		}
+		sso.Register(app)
 	}
 	userService := users.NewService(userRepo)
 	roleRepo := rbac.NewRepository(dbPool)

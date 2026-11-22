@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError, createHttpClient } from '@/lib/api';
 import { createFakeAdapter } from '@/test/fakeAdapter';
 
-import { signIn } from './api';
+import { completePortalSignIn, signIn } from './api';
 
 function setup(...script: Parameters<typeof createFakeAdapter>) {
   const { adapter, requests } = createFakeAdapter(...script);
@@ -91,6 +91,45 @@ describe('signIn against the Go API', () => {
     await expect(signIn(http, { login: 'u@example.org', password: 'wrong' })).rejects.toMatchObject(
       { kind: 'unauthorized', message: 'invalid credentials' },
     );
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+});
+
+describe('completePortalSignIn', () => {
+  it('claims the handed-off session without sending a stored token', async () => {
+    const { http, requests } = setup({
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          token: 'tok_sso',
+          refresh_token: 'refresh_sso',
+          user: {
+            id: '6f1c2a7e-0000-4000-8000-000000000001',
+            username: 'akello',
+            role: { id: 2, name: 'dcfp', permissions: [] },
+          },
+        },
+      },
+    });
+
+    const session = await completePortalSignIn(http);
+
+    expect(session).toMatchObject({
+      token: 'tok_sso',
+      refresh_token: 'refresh_sso',
+      user: { username: 'akello' },
+    });
+    expect(requests[0]).toMatchObject({ method: 'POST', url: '/auth/sso/exchange' });
+    expect(requests[0]?.authorization).toBeNull();
+  });
+
+  it('rejects an expired or reused handoff without ending a local session', async () => {
+    const { http, onUnauthorized } = setup({
+      status: 401,
+      body: { success: false, message: 'start sign-in again from the portal' },
+    });
+    await expect(completePortalSignIn(http)).rejects.toBeInstanceOf(ApiError);
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 });

@@ -172,15 +172,19 @@ func (h *Handler) Refresh(c fiber.Ctx) error {
 	return response.Success(c, 200, "session refreshed", tokens)
 }
 
-// issueTokens signs a short-lived access token for the session. It never outlives the session.
 func (h *Handler) issueTokens(session users.IssuedSession) (fiber.Map, error) {
+	return signTokens(h.JWTSecret, session)
+}
+
+// signTokens signs a short-lived access token for the session. It never outlives the session.
+func signTokens(secret string, session users.IssuedSession) (fiber.Map, error) {
 	now := time.Now()
 	expires := now.Add(users.AccessTokenLifetime)
 	if session.ExpiresAt.Before(expires) {
 		expires = session.ExpiresAt
 	}
 	claims := jwt.MapClaims{"sub": session.UserID, "sid": session.ID, "iat": now.Unix(), "exp": expires.Unix()}
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.JWTSecret))
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
 	if err != nil {
 		return nil, err
 	}

@@ -37,3 +37,12 @@ export async function signIn(http: HttpClient, credentials: Credentials): Promis
   const body = await http.post('/auth/login', credentials, { anonymous: true });
   return parseBody(sessionSchema, body, 'login');
 }
+
+/**
+ * Claims the session that portal sign-in started. The API reads it from an
+ * HttpOnly cookie it set on the callback, and the claim works once.
+ */
+export async function completePortalSignIn(http: HttpClient): Promise<Session> {
+  const body = await http.post('/auth/sso/exchange', undefined, { anonymous: true });
+  return parseBody(sessionSchema, body, 'portal sign-in');
+}
