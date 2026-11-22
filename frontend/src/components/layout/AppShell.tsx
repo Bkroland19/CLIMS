@@ -5,7 +5,6 @@ import { useRef, type CSSProperties, type ReactNode } from 'react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import type { AppNotification } from '@/components/layout/NotificationsBell';
 import { PageHeading } from '@/components/layout/PageHeading';
 import { TopBar } from '@/components/layout/TopBar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -20,8 +19,8 @@ interface AppShellProps {
   storage: StorageLike;
   /** Badge counts by page path, for the sidebar and tabs. */
   counts?: NavCounts;
-  /** The bell's list; leave out while there is no notification feed. */
-  notifications?: readonly AppNotification[];
+  /** The notifications bell for the top bar, e.g. one fed by the user's inbox. */
+  bell?: ReactNode;
   /** The heading for an address that has no page in `workspaces`, e.g. one the person may not open. */
   fallbackTitle?: string;
   /** The routed page. */
@@ -33,7 +32,7 @@ export function AppShell({
   workspaces,
   storage,
   counts,
-  notifications,
+  bell,
   fallbackTitle,
   children,
 }: AppShellProps) {
@@ -59,7 +58,7 @@ export function AppShell({
       >
         Skip to content
       </a>
-      <TopBar notifications={notifications} />
+      <TopBar bell={bell} />
       <div className="flex flex-1">
         <AppSidebar workspaces={workspaces} location={location} counts={counts} />
         <SidebarInset
