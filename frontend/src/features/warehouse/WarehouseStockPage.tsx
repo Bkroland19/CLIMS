@@ -134,7 +134,7 @@ export default function WarehouseStockPage() {
   const reserved = requests.data ? reservedByOpenRequests(requests.data) : null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <div className="flex flex-col gap-4">
         <StoreSwitch store={store} hrefFor={(code) => withStore(WAREHOUSE_PATHS.stock, code)} />
         <SampleDataNotice subject="The stock figures" />
@@ -159,7 +159,7 @@ export default function WarehouseStockPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {productStock(stock.data.batches, now).map((summary) => (
             <Card key={summary.product} className="min-w-0">
-              <CardContent className="flex flex-col gap-5">
+              <CardContent className="flex flex-col gap-3">
                 <StockLevel
                   size="large"
                   product={summary.product}

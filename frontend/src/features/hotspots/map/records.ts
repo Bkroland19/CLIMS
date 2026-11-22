@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { optionalNumber, optionalText } from '@/lib/api';
 
+import { isInUganda } from './uganda';
+
 /*
  * Hotspots as the map needs them, read from the Go API's list
  * (`GET /hotspots`, `backend/internal/features/hotspots/model.go`):
@@ -128,7 +130,7 @@ const hotspotSchema = z
     updated_at: optionalText,
   })
   .transform((raw): MapHotspot => {
-    const position = coordinatesOf(raw.latitude, raw.longitude);
+    const position = positionOf(raw.latitude, raw.longitude);
     return {
       id: raw.id,
       name: raw.name,
@@ -138,8 +140,11 @@ const hotspotSchema = z
       region: raw.region,
       district: raw.district,
       subcounty: raw.subcounty,
-      latitude: position?.latitude ?? null,
-      longitude: position?.longitude ?? null,
+      position: position.check,
+      latitude: position.check === 'placed' ? position.latitude : null,
+      longitude: position.check === 'placed' ? position.longitude : null,
+      recordedLatitude: raw.latitude,
+      recordedLongitude: raw.longitude,
       review: reviewOf(raw.review_status ?? raw.status),
       hasDispenser: raw.has_condom_dispenser,
       dispenserCondition: raw.dispenser_condition,
@@ -163,9 +168,14 @@ export interface MapHotspot {
   region: MapPlace | null;
   district: MapPlace | null;
   subcounty: MapPlace | null;
-  /** Both `null` when the record has no usable position. */
+  /** Whether the recorded position is drawn, and if not, why. */
+  position: PositionCheck;
+  /** Both `null` unless the position is `placed`. */
   latitude: number | null;
   longitude: number | null;
+  /** The position as recorded, usable or not, so a wrong one can be shown and fixed. */
+  recordedLatitude: number | null;
+  recordedLongitude: number | null;
   review: ReviewStatus;
   hasDispenser: boolean | null;
   dispenserCondition: string | null;
@@ -186,18 +196,33 @@ export function isPlaced(hotspot: MapHotspot): hotspot is PlacedHotspot {
 }
 
 /**
- * A position that can be drawn, or `null`. Out-of-range values and (0, 0), a real
- * place in the Gulf of Guinea that legacy rows use for "unknown", are left off
- * rather than plotted somewhere misleading.
+ * What a recorded position is worth. Only `placed` is drawn:
+ *
+ *   missing  no position, half of one, or (0, 0), which legacy rows use for "unknown"
+ *   swapped  latitude and longitude the wrong way round: reversed, it is in Uganda
+ *   outside  anywhere else outside Uganda: a phone emulator's default location in
+ *            California, the corner of a web map (85.05, -180), another country
  */
-export function coordinatesOf(
+export type PositionCheck = 'placed' | 'missing' | 'swapped' | 'outside';
+
+export const POSITION_LABELS: Record<PositionCheck, string> = {
+  placed: 'On the map',
+  missing: 'No position',
+  swapped: 'Swapped position',
+  outside: 'Outside Uganda',
+};
+
+export function positionOf(
   latitude: number | null,
   longitude: number | null,
-): { latitude: number; longitude: number } | null {
-  if (latitude === null || longitude === null) return null;
-  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
-  if (latitude === 0 && longitude === 0) return null;
-  return { latitude, longitude };
+):
+  | { check: 'placed'; latitude: number; longitude: number }
+  | { check: Exclude<PositionCheck, 'placed'> } {
+  if (latitude === null || longitude === null) return { check: 'missing' };
+  if (latitude === 0 && longitude === 0) return { check: 'missing' };
+  if (isInUganda(latitude, longitude)) return { check: 'placed', latitude, longitude };
+  if (isInUganda(longitude, latitude)) return { check: 'swapped' };
+  return { check: 'outside' };
 }
 
 export function reviewOf(value: string | null | undefined): ReviewStatus {

@@ -24,7 +24,7 @@ import { DCFP_PATHS } from '@/features/dcfp/orders';
 export default function DistrictStorePage() {
   const store = useDistrictStore();
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="The stock figures" />
       <RecordView
         query={store}

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
+  Easing,
   KeyboardAvoidingView,
   Image,
   Modal,
@@ -27,6 +28,7 @@ import { MAX_SHEET_WIDTH, useResponsive } from "@/hooks/useResponsive";
 import type { ChipDef, Tone } from "@/lib/format";
 import { FONT, TYPE, fontFor, trackingFor, useFontsReady } from "@/lib/fonts";
 import Icon, { type IconName } from "./Icon";
+import { FadeInUp, useEntrance, usePressScale, useReducedMotion } from "./motion";
 
 /* ───────────── Text ───────────── */
 
@@ -151,7 +153,7 @@ export function List({
           }}
         >
           {kids.map((k, i) => (
-            <View key={i}>
+            <FadeInUp key={i} index={i}>
               {k}
               {i < kids.length - 1 ? (
                 <View
@@ -164,7 +166,7 @@ export function List({
                   }}
                 />
               ) : null}
-            </View>
+            </FadeInUp>
           ))}
         </View>
       ) : empty ? (
@@ -378,7 +380,8 @@ export function Hero({
                 }}
               >
                 <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{x.label}</Txt>
-                <Txt
+                <CountUp
+                  value={x.value}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.6}
@@ -388,9 +391,7 @@ export function Hero({
                     color: x.fg ?? T.fg,
                     fontVariant: ["tabular-nums"],
                   }}
-                >
-                  {x.value}
-                </Txt>
+                />
                 {x.meter ? <Meter {...x.meter} label={`${x.label}: ${x.note ?? x.value}`} /> : null}
                 {x.note ? (
                   <Txt style={{ ...TYPE.footnote, color: x.fg ?? T.fg2 }}>{x.note}</Txt>
@@ -407,6 +408,63 @@ export function Hero({
   );
 }
 
+const withCommas = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+/**
+ * A number that counts up from zero to its value when it first appears ("1,400"). Anything that
+ * is not a plain number ("out of stock") is shown as it is.
+ */
+export function CountUp({
+  value,
+  style,
+  ...rest
+}: { value: string; style?: TextStyle } & Omit<
+  React.ComponentProps<typeof Txt>,
+  "style" | "children"
+>) {
+  const reduce = useReducedMotion();
+  const target = /^\d[\d,]*$/.test(value) ? Number(value.replace(/,/g, "")) : null;
+  const [shown, setShown] = useState(value);
+  const first = useRef(true);
+  useEffect(() => {
+    // Count only on first appearance; later changes (a sync) show the new value straight away.
+    if (target == null || reduce || !first.current || target === 0) {
+      setShown(value);
+      first.current = false;
+      return;
+    }
+    first.current = false;
+    const v = new Animated.Value(0);
+    const id = v.addListener(({ value: x }) => setShown(withCommas(x)));
+    Animated.timing(v, {
+      toValue: target,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => setShown(value));
+    return () => {
+      v.removeListener(id);
+      v.stopAnimation();
+    };
+  }, [value, target, reduce]);
+  return (
+    <Txt style={style} accessibilityLabel={value} {...rest}>
+      {shown}
+    </Txt>
+  );
+}
+
+/** 0 → 1 on a spring when the component appears, for a result badge. */
+function useSpringIn(): Animated.Value {
+  const reduce = useReducedMotion();
+  const [v] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (reduce) return v.setValue(1);
+    Animated.spring(v, { toValue: 1, damping: 11, stiffness: 180, useNativeDriver: true }).start();
+  }, [v, reduce]);
+  return v;
+}
+
 /** A stock level bar: filled to `fill`, with a tick at `mark` (both 0–1). */
 export function Meter({
   fill,
@@ -420,6 +478,7 @@ export function Meter({
   label: string;
 }) {
   const T = useT();
+  const grow = useEntrance(150, 650);
   const pct = (v: number) => `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%` as const;
   return (
     <View
@@ -429,13 +488,15 @@ export function Meter({
       accessibilityValue={{ min: 0, max: 100, now: Math.round(Math.min(1, fill) * 100) }}
       style={{ height: 6, borderRadius: 3, backgroundColor: T.meterBg, marginVertical: 6 }}
     >
-      <View
+      <Animated.View
         style={{
           width: pct(fill),
           minWidth: fill > 0 ? 6 : 0,
           height: 6,
           borderRadius: 3,
           backgroundColor: color,
+          transformOrigin: "left",
+          transform: [{ scaleX: grow }],
         }}
       />
       <View
@@ -468,7 +529,7 @@ export function Steps({ items }: { items: StepItem[] }) {
         }[it.st] as string[];
         const last = i === items.length - 1;
         return (
-          <View key={it.label} style={{ flexDirection: "row", gap: 12 }}>
+          <FadeInUp key={it.label} index={i} style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ alignItems: "center", width: 24 }}>
               <View
                 style={{
@@ -501,7 +562,7 @@ export function Steps({ items }: { items: StepItem[] }) {
               </Txt>
               {it.sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{it.sub}</Txt> : null}
             </View>
-          </View>
+          </FadeInUp>
         );
       })}
     </View>
@@ -600,6 +661,7 @@ export function Done({
   body?: string;
 }) {
   const T = useT();
+  const pop = useSpringIn();
   const tn = T.tones[tone];
   return (
     <Section>
@@ -612,7 +674,7 @@ export function Done({
           gap: 12,
         }}
       >
-        <View
+        <Animated.View
           style={{
             width: 72,
             height: 72,
@@ -620,10 +682,12 @@ export function Done({
             backgroundColor: tn.bg,
             alignItems: "center",
             justifyContent: "center",
+            opacity: pop,
+            transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
           }}
         >
           <Icon name={icon} size={34} color={tn.fg} />
-        </View>
+        </Animated.View>
         <Txt style={{ fontSize: 20, lineHeight: 26, fontWeight: "700", textAlign: "center" }}>
           {title}
         </Txt>
@@ -678,41 +742,45 @@ export function Btn({
     danger: ["transparent", T.danger, T.ios ? 0 : 1, T.danger],
     text: ["transparent", T.tint, 0, "transparent"],
   }[kind] as [string, string, number, string];
+  const press = usePressScale(dis ? 1 : 0.97);
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={dis}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!dis }}
-      style={({ pressed }) => ({
-        // minHeight, not height: large system text wraps the label instead of clipping it.
-        minHeight: small ? 40 : T.btnH,
-        paddingVertical: 6,
-        borderRadius: T.btnR,
-        backgroundColor: K[0],
-        borderWidth: K[2],
-        borderColor: K[3],
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        paddingHorizontal: 20,
-        opacity: dis ? 0.38 : pressed ? 0.75 : 1,
-      })}
-    >
-      {icon ? <Icon name={icon} size={18} color={K[1]} /> : null}
-      <Txt
-        style={{
-          flexShrink: 1,
-          textAlign: "center",
-          color: K[1],
-          fontSize: small ? 15 : T.btnFs,
-          fontWeight: T.btnFw,
-        }}
+    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+      <Pressable
+        onPress={onPress}
+        disabled={dis}
+        {...press.handlers}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !!dis }}
+        style={({ pressed }) => ({
+          // minHeight, not height: large system text wraps the label instead of clipping it.
+          minHeight: small ? 40 : T.btnH,
+          paddingVertical: 6,
+          borderRadius: T.btnR,
+          backgroundColor: K[0],
+          borderWidth: K[2],
+          borderColor: K[3],
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingHorizontal: 20,
+          opacity: dis ? 0.38 : pressed ? 0.88 : 1,
+        })}
       >
-        {label}
-      </Txt>
-    </Pressable>
+        {icon ? <Icon name={icon} size={18} color={K[1]} /> : null}
+        <Txt
+          style={{
+            flexShrink: 1,
+            textAlign: "center",
+            color: K[1],
+            fontSize: small ? 15 : T.btnFs,
+            fontWeight: T.btnFw,
+          }}
+        >
+          {label}
+        </Txt>
+      </Pressable>
+    </Animated.View>
   );
 }
 

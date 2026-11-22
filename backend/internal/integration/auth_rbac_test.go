@@ -25,6 +25,7 @@ import (
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
+	"clims-backend/internal/features/reports"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -153,6 +154,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier), jwtMiddleware, activeUser)
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier), jwtMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
+	reports.RegisterRoutes(v1, reports.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)
@@ -460,18 +462,19 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	// Migration 18 deliberately grants catalogue:manage to moh; every other non-admin grant is the custom one.
-	var mohManagesCatalogue bool
+	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms; every other
+	// non-admin grant is the custom one.
+	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'),
-		EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
-			JOIN permissions p ON p.id = rp.permission_id WHERE r.name='moh' AND p.name='catalogue:manage')`).Scan(
-		&userCount, &roleCount, &mohManagesCatalogue); err != nil {
+		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
+			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
+		&userCount, &roleCount, &catalogueManagers); err != nil {
 		t.Fatal(err)
 	}
-	if userCount != 455 || roleCount != 1 || !mohManagesCatalogue {
-		t.Fatal("upgrade changed user count, lost custom permission grants or did not grant moh the catalogue")
+	if userCount != 455 || roleCount != 1 || catalogueManagers != "jms,moh,nms" {
+		t.Fatalf("upgrade changed user count, lost custom permission grants or granted the catalogue to %q", catalogueManagers)
 	}
 	// Upgrading a database that already holds the backup resolves the same duplicates.
 	assertUniqueIdentifiers(t, upgrade)

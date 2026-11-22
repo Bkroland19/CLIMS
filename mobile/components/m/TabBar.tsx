@@ -90,8 +90,9 @@ export default function TabBar({ state, emitter, navigateToTab }: BottomTabBarPr
     <View
       style={{
         backgroundColor: T.tabBg,
-        borderTopWidth: T.ios ? StyleSheet.hairlineWidth : 0,
-        borderTopColor: T.tabBd,
+        // A hairline edge, matching the header's, so both bars frame the page the same way.
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: T.ios ? T.tabBd : T.cardBd,
         paddingTop: beside ? 6 : T.ios ? 6 : 12,
         paddingBottom: Math.max(insets.bottom, beside ? 6 : T.ios ? 6 : 16),
         paddingLeft: insets.left,

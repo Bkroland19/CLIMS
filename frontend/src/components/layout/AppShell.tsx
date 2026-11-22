@@ -54,7 +54,7 @@ export function AppShell({
       open={isSidebarOpen}
       onOpenChange={setIsSidebarOpen}
       className="flex-col"
-      style={{ '--sidebar-width': '15.5rem', '--sidebar-width-icon': '3.5rem' } as CSSProperties}
+      style={{ '--sidebar-width': '14rem', '--sidebar-width-icon': '3rem' } as CSSProperties}
     >
       <a
         href="#main"
@@ -72,9 +72,9 @@ export function AppShell({
           className="bg-canvas min-w-0 outline-none"
         >
           <PageHeading location={location} counts={counts} fallbackTitle={fallbackTitle} />
-          <div className="w-full flex-1 px-4 pt-4 pb-10 md:px-5">
+          <div className="w-full flex-1 px-4 pt-3 pb-8">
             <ErrorBoundary resetKey={pathname}>
-              <div className="flex w-full flex-col gap-6">{children}</div>
+              <div className="gap-section flex w-full flex-col">{children}</div>
             </ErrorBoundary>
           </div>
         </SidebarInset>

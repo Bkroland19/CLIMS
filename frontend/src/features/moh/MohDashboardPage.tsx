@@ -54,7 +54,7 @@ export default function MohDashboardPage() {
   const summary = useNationalSummary(district);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="Stock, orders and deliveries" />
       {!context && (
         <DistrictFilter
@@ -83,7 +83,7 @@ export default function MohDashboardPage() {
       <LatestOrder district={district} />
 
       {!district && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="gap-section grid lg:grid-cols-3">
           <TrendChart
             title="National warehouse stock"
             description="Male condoms at NMS and JMS, last 12 weeks"
@@ -119,7 +119,7 @@ export default function MohDashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">
+      <div className="gap-section grid lg:grid-cols-[22rem_minmax(0,1fr)]">
         <Pipeline summary={summary} district={district} />
         <DistrictStores district={district} />
       </div>
@@ -246,7 +246,7 @@ function LatestOrder({ district }: { district: string | null }) {
 function Pipeline({ summary, district }: { summary: SummaryQuery; district: string | null }) {
   if (summary.isPending) {
     return (
-      <div role="status" className="bg-card rounded-card border p-5">
+      <div role="status" className="bg-card rounded-card border p-4">
         <Skeleton className="h-64 w-full" />
         <span className="sr-only">Loading orders by stage…</span>
       </div>

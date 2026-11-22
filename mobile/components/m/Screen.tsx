@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
@@ -16,6 +18,7 @@ import { useColumn, useResponsive } from "@/hooks/useResponsive";
 import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import Icon, { type IconName } from "./Icon";
 import { Txt } from "./kit";
+import { usePressScale, useReducedMotion } from "./motion";
 import { TYPE } from "@/lib/fonts";
 
 export interface ScreenAction {
@@ -60,11 +63,28 @@ export default function Screen({
   const unread = useUnread();
   const showBell = !!root && !noHeader;
   const setScroll = useKeyboardScroll(scrollRef);
-  // Tab roots sit under the Ministry green band; detail pages keep a plain
-  // header so the band marks "you are at the top of a section".
-  const band = !!root && !noHeader;
-  const hdrBg = band ? T.brand : T.hdrBg;
-  const hdrFg = band ? T.brandFg : T.fg;
+  // The main action slides away while the user scrolls down a list and returns on the way up,
+  // so it never sits over the last rows.
+  const reduce = useReducedMotion();
+  const [fabIn] = useState(() => new Animated.Value(1));
+  const fabShown = useRef(true);
+  const lastY = useRef(0);
+  const fabPress = usePressScale(0.95);
+  const showFab = (show: boolean) => {
+    if (fabShown.current === show) return;
+    fabShown.current = show;
+    if (reduce) return fabIn.setValue(1);
+    Animated.timing(fabIn, {
+      toValue: show ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+  // The header takes the tab bar's surface, so the top and bottom bars frame the page alike; a
+  // hairline separates each from the content, and the status bar icons follow the theme.
+  const hdrBg = T.tabBg;
+  const hdrFg = T.fg;
   const { isCompact, isShort, width } = useResponsive();
   const col = useColumn();
   // Short windows (split screen) get an inline title instead of the 52dp large title.
@@ -82,12 +102,12 @@ export default function Screen({
         borderRadius: 24,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: pressed && !T.ios ? (band ? T.brandPress : T.rowPress) : "transparent",
+        backgroundColor: pressed && !T.ios ? T.rowPress : "transparent",
         opacity: pressed && T.ios ? 0.5 : 1,
         zIndex: 1,
       })}
     >
-      <Icon name="bell" size={24} color={band ? T.brandFg : T.ios ? T.tint : T.fg} />
+      <Icon name="bell" size={24} color={T.ios ? T.tint : T.fg} />
       {unread > 0 ? (
         <View
           style={{
@@ -120,8 +140,8 @@ export default function Screen({
       style={{
         paddingTop: insets.top,
         backgroundColor: hdrBg,
-        borderBottomWidth: hasBack ? StyleSheet.hairlineWidth : 0,
-        borderBottomColor: T.hdrBd,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: T.cardBd,
       }}
     >
       <View
@@ -186,7 +206,7 @@ export default function Screen({
                 zIndex: 1,
               }}
             >
-              <Icon name="plus" size={26} color={band ? T.brandFg : T.tint} />
+              <Icon name="plus" size={26} color={T.tint} />
             </Pressable>
           ) : null}
         </View>
@@ -213,7 +233,14 @@ export default function Screen({
       ) : null}
     </View>
   ) : (
-    <View style={{ paddingTop: insets.top, backgroundColor: hdrBg }}>
+    <View
+      style={{
+        paddingTop: insets.top,
+        backgroundColor: hdrBg,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: T.cardBd,
+      }}
+    >
       <View
         style={[
           col.style,
@@ -250,7 +277,7 @@ export default function Screen({
             fontSize: isCompact ? 19 : 20,
             lineHeight: 28,
             color: hdrFg,
-            fontWeight: band ? "600" : "400",
+            fontWeight: root ? "600" : "500",
           }}
         >
           {title}
@@ -263,7 +290,7 @@ export default function Screen({
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
-      <StatusBar style={band || T.dark ? "light" : "dark"} />
+      <StatusBar style={T.dark ? "light" : "dark"} />
       {header}
       {offline ? (
         <View style={{ backgroundColor: T.offBg }}>
@@ -294,15 +321,23 @@ export default function Screen({
         <ScrollView
           ref={setScroll}
           keyboardShouldPersistTaps="handled"
-          scrollEventThrottle={250}
+          scrollEventThrottle={fab ? 64 : 250}
           onScroll={
-            onEndReached
+            onEndReached || (fab && !T.ios)
               ? (e) => {
                   const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                  if (fab && !T.ios) {
+                    const y = contentOffset.y;
+                    const dy = y - lastY.current;
+                    if (y < 24 || dy < -6) showFab(true);
+                    else if (dy > 6) showFab(false);
+                    lastY.current = y;
+                  }
                   // Start loading a screen's height before the end, so scrolling rarely waits.
                   if (
+                    onEndReached &&
                     layoutMeasurement.height + contentOffset.y >=
-                    contentSize.height - layoutMeasurement.height
+                      contentSize.height - layoutMeasurement.height
                   )
                     onEndReached();
                 }
@@ -320,38 +355,50 @@ export default function Screen({
         </ScrollView>
       </KeyboardAvoidingView>
       {fab && !T.ios ? (
-        <Pressable
-          onPress={fab.onPress}
-          accessibilityRole="button"
-          accessibilityLabel={fab.label}
-          style={({ pressed }) => ({
+        <Animated.View
+          pointerEvents="box-none"
+          style={{
             position: "absolute",
             right: col.right + 16,
             bottom: 16,
             maxWidth: Math.max(0, width - col.right * 2 - 32),
-            minHeight: 56,
-            paddingVertical: 8,
-            borderRadius: 16,
-            paddingHorizontal: 18,
-            backgroundColor: pressed ? T.fabPress : T.fabBg,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            elevation: 3,
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 6,
-            shadowOffset: { width: 0, height: 3 },
-          })}
+            opacity: fabIn,
+            transform: [
+              { translateY: fabIn.interpolate({ inputRange: [0, 1], outputRange: [96, 0] }) },
+              { scale: fabPress.scale },
+            ],
+          }}
         >
-          <Icon name={fab.icon ?? "plus"} size={22} color={T.fabFg} />
-          <Txt
-            numberOfLines={1}
-            style={{ flexShrink: 1, color: T.fabFg, fontSize: 15, fontWeight: "500" }}
+          <Pressable
+            onPress={fab.onPress}
+            {...fabPress.handlers}
+            accessibilityRole="button"
+            accessibilityLabel={fab.label}
+            style={({ pressed }) => ({
+              minHeight: 56,
+              paddingVertical: 8,
+              borderRadius: 16,
+              paddingHorizontal: 18,
+              backgroundColor: pressed ? T.fabPress : T.fabBg,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              elevation: 3,
+              shadowColor: "#000",
+              shadowOpacity: 0.2,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 3 },
+            })}
           >
-            {fab.label}
-          </Txt>
-        </Pressable>
+            <Icon name={fab.icon ?? "plus"} size={22} color={T.fabFg} />
+            <Txt
+              numberOfLines={1}
+              style={{ flexShrink: 1, color: T.fabFg, fontSize: 15, fontWeight: "500" }}
+            >
+              {fab.label}
+            </Txt>
+          </Pressable>
+        </Animated.View>
       ) : null}
     </View>
   );

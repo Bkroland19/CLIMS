@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Maximize2, Minimize2, Search, X } from 'lucide-react';
+import { ChevronDown, Maximize2, Minimize2, Search, X, type LucideIcon } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,8 @@ export interface FacetOption<Key extends string> {
   count: number;
   /** A colour swatch, when the choice is also a map colour. */
   colour?: string;
+  /** The glyph the choice's pins carry on the map. */
+  icon?: LucideIcon;
 }
 
 interface FacetMenuProps<Key extends string> {
@@ -100,6 +102,9 @@ export function FacetMenu<Key extends string>({
                 className="size-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: option.colour }}
               />
+            ) : null}
+            {option.icon ? (
+              <option.icon aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
             ) : null}
             <span className="min-w-0 flex-1 truncate">{option.label}</span>
             <span className="text-muted-foreground text-xs tabular-nums">

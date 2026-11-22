@@ -25,4 +25,15 @@ describe('mapSummary', () => {
   ])('describes $onMap of $total', ({ onMap, total, expected }) => {
     expect(mapSummary(onMap, total)).toBe(expected);
   });
+
+  it.each([
+    {
+      outside: 1,
+      expected:
+        '8 of 10 hotspots are on the map. 1 has no position recorded and 1 has one outside Uganda.',
+    },
+    { outside: 2, expected: '8 of 10 hotspots are on the map. 2 have a position outside Uganda.' },
+  ])('says how many have a position outside Uganda ($outside)', ({ outside, expected }) => {
+    expect(mapSummary(8, 10, outside)).toBe(expected);
+  });
 });

@@ -71,7 +71,7 @@ export function NotificationsBell({ notifications, actions }: NotificationsBellP
           className="text-muted-foreground hover:text-foreground relative"
           aria-label={count > 0 ? `Notifications, ${count} new` : 'Notifications'}
         >
-          <Bell className="size-4.5" aria-hidden="true" />
+          <Bell className="size-4" aria-hidden="true" />
           {count > 0 ? (
             <span
               aria-hidden="true"
@@ -87,7 +87,7 @@ export function NotificationsBell({ notifications, actions }: NotificationsBellP
         sideOffset={8}
         className="rounded-card w-95 max-w-[calc(100vw-2rem)] overflow-hidden p-0"
       >
-        <div className="flex items-center justify-between border-b px-3 py-3.5">
+        <div className="flex items-center justify-between border-b px-3 py-2.5">
           <h2 className="text-sm font-semibold">Notifications</h2>
           {actions && count > 0 ? (
             <Button
@@ -133,7 +133,7 @@ export function NotificationsBell({ notifications, actions }: NotificationsBellP
                     >
                       {notification.text}
                     </p>
-                    <p className="text-muted-foreground mt-1 text-xs">{notification.meta}</p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">{notification.meta}</p>
                   </div>
                 </>
               );
@@ -147,7 +147,7 @@ export function NotificationsBell({ notifications, actions }: NotificationsBellP
                     <Link
                       href={notification.href}
                       onClick={openItem}
-                      className="hover:bg-accent focus-visible:bg-accent flex gap-3 px-3 py-3 outline-none"
+                      className="hover:bg-accent focus-visible:bg-accent flex gap-3 px-3 py-2.5 outline-none"
                     >
                       {content}
                     </Link>
@@ -155,12 +155,12 @@ export function NotificationsBell({ notifications, actions }: NotificationsBellP
                     <button
                       type="button"
                       onClick={openItem}
-                      className="hover:bg-accent focus-visible:bg-accent flex w-full gap-3 px-3 py-3 text-left outline-none"
+                      className="hover:bg-accent focus-visible:bg-accent flex w-full gap-3 px-3 py-2.5 text-left outline-none"
                     >
                       {content}
                     </button>
                   ) : (
-                    <div className="flex gap-3 px-3 py-3">{content}</div>
+                    <div className="flex gap-3 px-3 py-2.5">{content}</div>
                   )}
                 </li>
               );

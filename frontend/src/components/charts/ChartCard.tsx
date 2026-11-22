@@ -58,8 +58,8 @@ export function ChartCard({
   const [isTable, setIsTable] = useState(false);
 
   return (
-    <section className={cn('bg-card rounded-card flex min-w-0 flex-col border p-5', className)}>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+    <section className={cn('bg-card rounded-card flex min-w-0 flex-col border p-4', className)}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold">{title}</h2>

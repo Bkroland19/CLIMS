@@ -12,6 +12,7 @@ import type { ColourBy } from './filters';
 import {
   DISPENSER_SHORT_LABELS,
   DISPENSER_TONES,
+  POSITION_LABELS,
   REVIEW_LABELS,
   VENUE_LABELS,
   type MapHotspot,
@@ -28,6 +29,18 @@ export function placeLine(hotspot: MapHotspot): string {
   );
 }
 
+const coordinate = (value: number) => value.toFixed(4);
+
+/** "Wakiso · 37.4221, -122.0839": where it should be, and what was recorded. */
+export function recordedPosition(hotspot: MapHotspot): string {
+  const { recordedLatitude: latitude, recordedLongitude: longitude } = hotspot;
+  const recorded =
+    latitude === null || longitude === null
+      ? 'No position recorded'
+      : `${coordinate(latitude)}, ${coordinate(longitude)}`;
+  return [hotspot.district?.name, recorded].filter(Boolean).join(' · ');
+}
+
 export function hotspotName(hotspot: Pick<MapHotspot, 'name'>): string {
   return hotspot.name ?? 'Unnamed hotspot';
 }
@@ -41,6 +54,8 @@ interface HotspotListProps {
   emptyHint: string;
   onSelect: (id: string) => void;
   onHighlight: (id: string | null) => void;
+  /** Rows say why each hotspot is not on the map, with the position as recorded. */
+  showPosition?: boolean;
   /** Starts the list from the top again when it changes. */
   resetKey: string;
 }
@@ -56,6 +71,7 @@ export function HotspotList(props: HotspotListProps) {
 
 function HotspotRows({
   hotspots,
+  showPosition = false,
   colourBy,
   colourOf,
   emptyTitle,
@@ -117,9 +133,17 @@ function HotspotRows({
                 >
                   {hotspotName(hotspot)}
                 </span>
-                <span className="text-muted-foreground truncate text-xs">{placeLine(hotspot)}</span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {showPosition ? recordedPosition(hotspot) : placeLine(hotspot)}
+                </span>
               </span>
-              {colourBy === 'review' ? (
+              {showPosition ? (
+                <StatusBadge
+                  status={POSITION_LABELS[hotspot.position]}
+                  tone={hotspot.position === 'missing' ? 'neutral' : 'caution'}
+                  className="shrink-0"
+                />
+              ) : colourBy === 'review' ? (
                 // Most hotspots are active; only the exceptions carry a chip, so they stand out.
                 hotspot.review === 'active' ? (
                   <span className="sr-only">Active</span>

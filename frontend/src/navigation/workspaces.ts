@@ -1,4 +1,5 @@
 import {
+  ChartColumn,
   ClipboardCheck,
   ClipboardList,
   HeartPulse,
@@ -10,6 +11,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Store,
+  Tags,
   Truck,
   Users,
   UsersRound,
@@ -48,6 +50,74 @@ function monthlyReports(path: string, description: string): NavItem {
     icon: ClipboardCheck,
     pages: [{ path, tab: 'Reports', title: 'Monthly reports', description, layout: 'table' }],
     details: [{ path: `${path}/[id]`, label: 'Monthly report', layout: 'form' }],
+  };
+}
+
+/**
+ * Programme reports from the Go API: notification fulfilment, warehouse
+ * requests, stock, expiry, HMIS 105 and approved versions, with downloads.
+ */
+function programmeReports(path: string, description: string): NavItem {
+  return {
+    id: 'programme-reports',
+    label: 'Programme reports',
+    icon: ChartColumn,
+    pages: [
+      {
+        path,
+        tab: 'Programme reports',
+        title: 'Programme reports',
+        description,
+        layout: 'table',
+        permission: 'reports:read',
+      },
+    ],
+  };
+}
+
+/**
+ * The condom catalogue (products and the types, brands and units they use). It
+ * is national master data, so MOH and the warehouse workspace show the same
+ * screens; who may change it follows `catalogue:manage`, set per role.
+ */
+function catalogue(path: string): NavItem {
+  return {
+    id: 'catalogue',
+    label: 'Product catalogue',
+    icon: Tags,
+    pages: [
+      {
+        path,
+        tab: 'Condoms',
+        title: 'Product catalogue',
+        description:
+          'Condom products, each a brand, category and type in one unit. Orders and stock pick from the active ones.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/types`,
+        tab: 'Types',
+        title: 'Product types',
+        description:
+          'How condom products reach people, such as free public-sector supply, social marketing or commercial sale.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/brands`,
+        tab: 'Brands',
+        title: 'Brands',
+        description: 'Brands condom products are distributed or sold under.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/units`,
+        tab: 'Units of measure',
+        title: 'Units of measure',
+        description:
+          'Units condoms are packed and counted in. Each product says how many condoms its unit holds.',
+        layout: 'table',
+      },
+    ],
   };
 }
 
@@ -109,6 +179,10 @@ export const workspaces: readonly Workspace[] = [
             ],
             details: [{ path: '/moh/reports/[id]', label: 'Report', layout: 'detail' }],
           },
+          programmeReports(
+            '/moh/programme-reports',
+            'Notification fulfilment, warehouse requests, stock, expiry and HMIS 105 readiness from CLIMS records, with downloads and approved versions.',
+          ),
           // Distribution, procurement and the hotspot map predate the prototype, which has no
           // equivalent for them. They stay until it is decided whether MOH still needs them.
           {
@@ -181,36 +255,7 @@ export const workspaces: readonly Workspace[] = [
               },
             ],
           },
-          {
-            id: 'catalogue',
-            label: 'Product catalogue',
-            icon: Package,
-            pages: [
-              {
-                path: '/moh/catalogue',
-                tab: 'Condoms',
-                title: 'Product catalogue',
-                description:
-                  'Condom products, each a brand, category and type in one unit. Orders and stock pick from the active ones.',
-                layout: 'table',
-              },
-              {
-                path: '/moh/catalogue/brands',
-                tab: 'Brands',
-                title: 'Brands',
-                description: 'Brands condom products are distributed or sold under.',
-                layout: 'table',
-              },
-              {
-                path: '/moh/catalogue/units',
-                tab: 'Units of measure',
-                title: 'Units of measure',
-                description:
-                  'Units condoms are packed and counted in. Each product says how many condoms its unit holds.',
-                layout: 'table',
-              },
-            ],
-          },
+          catalogue('/moh/catalogue'),
           {
             id: 'locations',
             label: 'Stores & locations',
@@ -349,6 +394,10 @@ export const workspaces: readonly Workspace[] = [
             '/dcfp/reports',
             'Send the monthly district stock report to MOH. CLIMS checks the figures before they are sent.',
           ),
+          programmeReports(
+            '/dcfp/programme-reports',
+            "Your district's notification fulfilment, warehouse requests, stock, expiry and HMIS 105 readiness, with downloads and approved versions.",
+          ),
         ],
       },
     ],
@@ -410,6 +459,7 @@ export const workspaces: readonly Workspace[] = [
               },
             ],
           },
+          catalogue('/warehouse/catalogue'),
         ],
       },
       {
@@ -418,6 +468,10 @@ export const workspaces: readonly Workspace[] = [
           monthlyReports(
             '/warehouse/reports',
             'Send the monthly warehouse stock report to MOH. CLIMS checks the figures before they are sent.',
+          ),
+          programmeReports(
+            '/warehouse/programme-reports',
+            'Warehouse requests, store stock and expiry from CLIMS records, with downloads and approved versions.',
           ),
         ],
       },

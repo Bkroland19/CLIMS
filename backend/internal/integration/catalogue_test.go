@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// testCatalogue covers products, brands and units after the legacy import: the converted
+// testCatalogue covers products, types, brands and units after the legacy import: the converted
 // rows, every write rule and each error response. reader is an active user without
 // catalogue:manage; the stores are used to place an order for a catalogue product.
 func testCatalogue(t *testing.T, request func(string, string, any, string, int) map[string]any,
@@ -60,8 +60,10 @@ func testCatalogue(t *testing.T, request func(string, string, any, string, int) 
 	if got := len(list("/catalogue/products", reader)); got != 4 {
 		t.Fatalf("legacy products listed: %d, want 4", got)
 	}
+	list("/catalogue/types", reader)
 	list("/catalogue/brands", reader)
 	list("/catalogue/units", reader)
+	request("POST", "/catalogue/types", map[string]any{"name": "Donated"}, reader, 403)
 	request("POST", "/catalogue/brands", map[string]any{"name": "Engabu"}, reader, 403)
 	request("PATCH", "/catalogue/products/"+uuid.NewString(), map[string]any{"active": false}, reader, 403)
 	request("DELETE", "/catalogue/units/"+uuid.NewString(), nil, reader, 403)
@@ -82,9 +84,34 @@ func testCatalogue(t *testing.T, request func(string, string, any, string, int) 
 			legacy = product
 		}
 	}
-	if legacy == nil || legacy["type"] != "free" {
+	legacyType, _ := legacy["type"].(map[string]any)
+	if legacy == nil || legacyType["name"] != "Free" {
 		t.Fatalf("female legacy product not converted: %v", active)
 	}
+
+	// Types: the three distribution channels are seeded and behave like brands.
+	typeIDs := map[string]string{}
+	for _, productType := range list("/catalogue/types", admin) {
+		typeIDs[productType["name"].(string)] = productType["id"].(string)
+	}
+	freeID, commercialID := typeIDs["Free"], typeIDs["Commercial"]
+	if len(typeIDs) != 3 || freeID == "" || commercialID == "" || typeIDs["Socially marketed"] == "" {
+		t.Fatalf("seeded types: %v", typeIDs)
+	}
+	if free := find("/catalogue/types", freeID); free["in_use"] != true || free["product_count"] != float64(1) {
+		t.Fatalf("legacy product not counted under its type: %v", free)
+	}
+	expectMessage("duplicate type", request("POST", "/catalogue/types", map[string]any{"name": "FREE"}, admin, 409),
+		"A type with this name already exists.")
+	expectFields("short type", request("POST", "/catalogue/types", map[string]any{"name": "x"}, admin, 422),
+		map[string]string{"name": "Use at least 2 characters."})
+	donated := data(request("POST", "/catalogue/types", map[string]any{"name": " Donated ", "note": "Given by partners"}, admin, 201))
+	donatedID := donated["id"].(string)
+	if donated["name"] != "Donated" || donated["active"] != true || donated["in_use"] != false {
+		t.Fatalf("unexpected new type: %v", donated)
+	}
+	expectMessage("used type", request("DELETE", "/catalogue/types/"+freeID, nil, admin, 409),
+		"This type is used by products. Deactivate it instead.")
 
 	// Brands.
 	brand := data(request("POST", "/catalogue/brands", map[string]any{"name": "  Engabu ", "note": " Public sector "}, admin, 201))
@@ -129,29 +156,30 @@ func testCatalogue(t *testing.T, request func(string, string, any, string, int) 
 	// Products: every missing or invalid field is reported under its name.
 	expectFields("empty product", request("POST", "/catalogue/products", map[string]any{"category": "male"}, admin, 422),
 		map[string]string{
-			"type": "Choose a type.", "brand_id": "Choose a brand.", "unit_id": "Choose a unit of measure.",
+			"type_id": "Choose a type.", "brand_id": "Choose a brand.", "unit_id": "Choose a unit of measure.",
 			"pieces_per_unit": "Enter how many condoms one unit holds.",
 		})
 	valid := func(changes map[string]any) map[string]any {
-		body := map[string]any{"category": "male", "type": "free", "brand_id": brandID, "unit_id": unitID, "pieces_per_unit": 3}
+		body := map[string]any{"category": "male", "type_id": freeID, "brand_id": brandID, "unit_id": unitID, "pieces_per_unit": 3}
 		for field, value := range changes {
 			body[field] = value
 		}
 		return body
 	}
 	expectFields("invalid product", request("POST", "/catalogue/products",
-		valid(map[string]any{"category": "unisex", "type": "donated", "pieces_per_unit": 100001, "unit_id": "box"}), admin, 422),
+		valid(map[string]any{"category": "unisex", "type_id": "donated", "pieces_per_unit": 100001, "unit_id": "box"}), admin, 422),
 		map[string]string{
-			"category": "Choose male or female.", "type": "Choose free, socially marketed or commercial.",
+			"category": "Choose male or female.", "type_id": "Choose a type from the list.",
 			"pieces_per_unit": "Must be at most 100,000.", "unit_id": "Choose a unit of measure from the list.",
 		})
 	expectFields("unknown brand", request("POST", "/catalogue/products",
 		valid(map[string]any{"brand_id": uuid.NewString()}), admin, 422), map[string]string{"brand_id": "Choose an existing brand."})
 	product := data(request("POST", "/catalogue/products", valid(map[string]any{"category": " Male "}), admin, 201))
 	productID := product["id"].(string)
+	productType, _ := product["type"].(map[string]any)
 	productBrand, _ := product["brand"].(map[string]any)
 	productUnit, _ := product["unit"].(map[string]any)
-	if product["category"] != "male" || productBrand["name"] != "Engabu" || productUnit["name"] != "Pack of 3" ||
+	if product["category"] != "male" || productType["name"] != "Free" || productBrand["name"] != "Engabu" || productUnit["name"] != "Pack of 3" ||
 		product["pieces_per_unit"] != float64(3) || product["active"] != true || product["in_use"] != false {
 		t.Fatalf("unexpected new product: %v", product)
 	}
@@ -173,14 +201,30 @@ func testCatalogue(t *testing.T, request func(string, string, any, string, int) 
 		t.Fatal("deactivating a brand changed its products")
 	}
 
+	// Types follow the same rules: an inactive one cannot be newly chosen.
+	request("PATCH", "/catalogue/types/"+donatedID, map[string]any{"active": false}, admin, 200)
+	expectFields("inactive type", request("PATCH", "/catalogue/products/"+productID,
+		map[string]any{"type_id": donatedID}, admin, 422),
+		map[string]string{"type_id": "This type is inactive. Choose an active type."})
+	expectFields("unknown type", request("PATCH", "/catalogue/products/"+productID,
+		map[string]any{"type_id": uuid.NewString()}, admin, 422), map[string]string{"type_id": "Choose an existing type."})
+	retyped := data(request("PATCH", "/catalogue/products/"+productID, map[string]any{"type_id": commercialID}, admin, 200))
+	if retypedType, _ := retyped["type"].(map[string]any); retypedType["name"] != "Commercial" {
+		t.Fatalf("type not changed: %v", retyped)
+	}
+	request("PATCH", "/catalogue/products/"+productID, map[string]any{"type_id": freeID}, admin, 200)
+	request("DELETE", "/catalogue/types/"+donatedID, nil, admin, 200)
+	request("DELETE", "/catalogue/types/"+donatedID, nil, admin, 404)
+
 	// Incomplete legacy products can be deactivated, but activating or editing one needs every field.
 	legacyPath := "/catalogue/products/" + legacy["id"].(string)
 	request("PATCH", legacyPath, map[string]any{"active": false}, admin, 200)
 	expectFields("activate incomplete", request("PATCH", legacyPath, map[string]any{"active": true}, admin, 422),
 		map[string]string{"unit_id": "Choose a unit of measure.", "pieces_per_unit": "Enter how many condoms one unit holds."})
-	request("PATCH", legacyPath, map[string]any{"type": "commercial"}, admin, 422)
+	request("PATCH", legacyPath, map[string]any{"type_id": commercialID}, admin, 422)
 	completed := data(request("PATCH", legacyPath, map[string]any{"unit_id": unitID, "pieces_per_unit": 144, "active": true}, admin, 200))
-	if completed["active"] != true || completed["pieces_per_unit"] != float64(144) || completed["type"] != "free" {
+	if completedType, _ := completed["type"].(map[string]any); completed["active"] != true ||
+		completed["pieces_per_unit"] != float64(144) || completedType["name"] != "Free" {
 		t.Fatalf("legacy product not completed: %v", completed)
 	}
 

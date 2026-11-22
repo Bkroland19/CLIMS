@@ -12,7 +12,8 @@ export const DCFP_PATHS = {
   store: '/dcfp/restock/store',
   newOrder: '/dcfp/restock/new',
   /** The new-order form with the product of a stockout report chosen. */
-  newOrderFor: (productId: string) => `/dcfp/restock/new?product=${encodeURIComponent(productId)}`,
+  newOrderFor: (productId: string | null) =>
+    productId ? `/dcfp/restock/new?product=${encodeURIComponent(productId)}` : '/dcfp/restock/new',
   order: (id: string) => `/dcfp/restock/${encodeURIComponent(id)}`,
 } as const;
 

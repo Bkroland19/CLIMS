@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  coordinatesOf,
-  dispenserOf,
-  isPlaced,
-  mapHotspotSchema,
-  reviewOf,
-  venueOf,
-} from './records';
+import { dispenserOf, isPlaced, mapHotspotSchema, positionOf, reviewOf, venueOf } from './records';
 
 const wire = {
   id: '6f1e2c50-9d8a-4f3b-8c1e-2b7a9d0c4e11',
@@ -40,8 +33,11 @@ describe('mapHotspotSchema', () => {
       region: { id: 'r1', name: 'Central' },
       district: { id: 'd1', name: 'Wakiso' },
       subcounty: null,
+      position: 'placed',
       latitude: 0.3295,
       longitude: 32.6016,
+      recordedLatitude: 0.3295,
+      recordedLongitude: 32.6016,
       review: 'deactivated',
       hasDispenser: true,
       dispenserCondition: 'Good',
@@ -75,15 +71,42 @@ describe('mapHotspotSchema', () => {
   });
 });
 
-describe('coordinatesOf', () => {
+describe('positionOf', () => {
   it.each([
-    [0.3, 32.5, { latitude: 0.3, longitude: 32.5 }],
-    [null, 32.5, null],
-    [0, 0, null],
-    [91, 32, null],
-    [1, -181, null],
-  ])('(%s, %s)', (latitude, longitude, expected) => {
-    expect(coordinatesOf(latitude, longitude)).toEqual(expected);
+    // In Uganda, including a Lake Victoria island and border towns.
+    [0.3295, 32.6016, 'placed'],
+    [-0.32, 32.29, 'placed'],
+    [0.4604, 34.1045, 'placed'],
+    [-1.0, 31.42, 'placed'],
+    // Nothing usable recorded.
+    [null, 32.5, 'missing'],
+    [37.4221, null, 'missing'],
+    [0, 0, 'missing'],
+    // Latitude and longitude the wrong way round (seen in legacy rows).
+    [32.4, 0.09, 'swapped'],
+    [32.3454, 0.2343, 'swapped'],
+    // Elsewhere: an emulator's default location, a web map's corner, Nairobi, Juba, Goma.
+    [37.4221, -122.0839, 'outside'],
+    [85.0511, -180, 'outside'],
+    [-1.2676, 36.8079, 'outside'],
+    [4.85, 31.6, 'outside'],
+    [-1.68, 29.22, 'outside'],
+    [32.5346, 32.4648, 'outside'],
+    [91, 32, 'outside'],
+  ] as const)('(%s, %s) is %s', (latitude, longitude, expected) => {
+    expect(positionOf(latitude, longitude).check).toBe(expected);
+  });
+
+  it('keeps the recorded position of a hotspot it leaves off the map', () => {
+    const hotspot = mapHotspotSchema.parse({ id: 'x', latitude: 37.4221, longitude: -122.0839 });
+    expect(hotspot).toMatchObject({
+      position: 'outside',
+      latitude: null,
+      longitude: null,
+      recordedLatitude: 37.4221,
+      recordedLongitude: -122.0839,
+    });
+    expect(isPlaced(hotspot)).toBe(false);
   });
 });
 

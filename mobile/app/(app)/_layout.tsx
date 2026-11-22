@@ -36,7 +36,11 @@ function Signed() {
   return (
     <View style={{ flex: 1 }}>
       {/* Every role's tabs are registered; TabBar shows only the signed-in role's. */}
-      <Tabs tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+      {/* Tabs cross-fade on switch instead of cutting. */}
+      <Tabs
+        tabBar={(p) => <TabBar {...p} />}
+        screenOptions={{ headerShown: false, animation: "fade" }}
+      >
         {TAB_ROUTES.map((n) => (
           <Tabs.Screen key={n} name={n} />
         ))}

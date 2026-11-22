@@ -18,6 +18,13 @@ func NotificationTypes() []notifications.Type {
 			Title: "Stockout at {{.hotspot}}",
 			Body: "{{.hotspot}}{{with .place}}, {{.}},{{end}} is out of {{.product}}." +
 				"{{with .message}} Message: \"{{.}}\"{{end}} Reported by {{.reporter}}.{{with .contact}} Contact: {{.}}.{{end}}"},
+		{Name: "order.hotspot_delivery", Channels: inApp,
+			Title: "Stock on the way to {{.hotspot}}",
+			Body:  "The district sent {{.pieces}} for your stockout notification. Acknowledge the pieces you receive."},
+		{Name: "order.delivery_acknowledged", Channels: inApp,
+			Title: "{{.hotspot}} acknowledged its delivery",
+			Body: "{{.hotspot}} has acknowledged {{.pieces}} received." +
+				"{{if .fulfilled}} The notification is fulfilled.{{else}} The notification stays open until every selected type is received.{{end}}"},
 		{Name: "order.replenishment_requested", Channels: inApp,
 			Title: "Stock order from {{.to_store}}",
 			Body:  "{{.to_store}} ordered {{.quantity}} {{.unit}} of {{.product}}."},
@@ -48,8 +55,7 @@ func notification(action string) (string, string, bool) {
 // productLabel names a product the same way as the inventory reports: brand,
 // distribution channel and category, e.g. "Engabu Free Male".
 const productLabel = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id = c.brand_id),
-	CASE c.type WHEN 'free' THEN 'Free' WHEN 'socially_marketed' THEN 'Socially marketed'
-		WHEN 'commercial' THEN 'Commercial' END,
+	(SELECT pt.name FROM product_types pt WHERE pt.id = c.type_id),
 	CASE c.category WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female' END)`
 
 // record writes a workflow step to order_events, the order's history, and notifies the people
@@ -58,9 +64,9 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID
 	// The notify columns keep the deprecated /orders/notifications inbox working until
 	// clients use the central one.
 	var eventID string
-	if err := tx.QueryRow(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, notify_store_id)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		order.ID, actorID, action, order.Status, notifyStore).Scan(&eventID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO order_events (order_id, actor_id, action, status, notify_store_id, quantity)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		order.ID, actorID, action, order.Status, notifyStore, quantityFor(order, action)).Scan(&eventID); err != nil {
 		return err
 	}
 	typeName, permission, notifies := notification(action)
@@ -96,10 +102,12 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, order Order, actorID
 	})
 }
 
-// quantityFor is the quantity a step is about: ordered, issued or counted on arrival.
+// quantityFor is the quantity a step is about: ordered, approved, issued or counted on arrival.
 func quantityFor(order Order, action string) int32 {
 	value := order.QuantityNeeded
 	switch action {
+	case "review":
+		value = order.QuantityApproved
 	case "dispatch":
 		value = order.QuantityIssued
 	case "receive":

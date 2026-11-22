@@ -8,7 +8,15 @@ export default function TabStack({ tab }: { tab: TabKey }) {
   const T = useT();
   return (
     <TabContext.Provider value={tab}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: T.bg } }} />
+      {/* Detail pages slide in from the right and back out, on both platforms. */}
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: T.bg },
+          animation: "slide_from_right",
+          animationDuration: 260,
+        }}
+      />
     </TabContext.Provider>
   );
 }

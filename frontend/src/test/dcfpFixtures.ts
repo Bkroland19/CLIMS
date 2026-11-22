@@ -26,7 +26,7 @@ const stamp = '2026-11-01T08:00:00Z';
 export const FEMALE: Product = {
   id: 'p-female',
   category: 'female',
-  type: 'free',
+  type: { id: 't-free', name: 'Free' },
   brand: { id: 'b1', name: 'Engabu' },
   unit: { id: 'u-box', name: 'box' },
   pieces_per_unit: 100,

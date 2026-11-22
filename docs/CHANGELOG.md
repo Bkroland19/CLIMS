@@ -66,6 +66,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   ones and marking those without a unit or pack size as incomplete. See `docs/modules/catalogue.md`.
 - The catalogue screens use that API: edit, activate, deactivate and delete products, brands and
   units, a Brands tab, status filters and an Incomplete badge for legacy products.
+- Product types are managed catalogue records like brands and units (`/api/v1/catalogue/types`, a
+  Types tab), instead of a fixed list. Migration 23 seeds Free, Socially marketed and Commercial,
+  keeps every product's type and grants `catalogue:manage` to `nms` and `jms`. Products now send
+  `type_id` and return `type` as `{ id, name }`.
+- NMS and JMS manage the catalogue from the warehouse workspace (`/warehouse/catalogue`). Who may
+  change it is the `catalogue:manage` switch under Users & access → Roles & permissions; a
+  workspace opened read-only (MOH looking at the warehouse) shows the catalogue without changes.
 - Every response carries an `X-Request-ID`, which the request log records.
 - Store assignment: `GET /api/v1/locations/stores` lists the national warehouses and district
   stores, and accounts get a store on creation or through `PATCH /api/v1/users/{id}/store`
@@ -73,12 +80,15 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   warehouse staff, DCFPs and delivery agents. In the web app, the new-user form sets the store from
   the role and district, and Users has a **Change store** action.
 - The hotspot map runs on OpenStreetMap with MapLibre GL and reads the Go hotspot endpoints.
-  Hotspots cluster into rings split by review status or dispenser state, with heatmap and
-  point views, a key that doubles as a filter, search, status, dispenser, venue and region
-  filters, a list of the hotspots in view, and a detail panel with the contact person,
-  directions, the nearest hotspots, comments and history. A national user's map loads district by
-  district, so the database never pages through the whole table. The view is kept in the page
-  address, and the hotspots shown export to Excel. See `docs/modules/hotspots.md`.
+  Hotspots cluster into rings split by review status or dispenser state; a single hotspot is a
+  pin carrying its venue's glyph. Heatmap and point views, a key that doubles as a filter,
+  search, status, dispenser, venue and region filters, a list of the hotspots in view, and a
+  detail panel with the contact person, directions, the nearest hotspots, comments and history. A
+  national user's map loads district by district, so the database never pages through the whole
+  table. The view is kept in the page address, and the hotspots shown export to Excel. The map is
+  held to Uganda with the rest of the world dimmed, and draws only positions inside the country
+  (with 3 km for border towns); missing, swapped and out-of-country positions are listed for
+  correction instead. See `docs/modules/hotspots.md`.
 
 ### Changed
 
@@ -103,6 +113,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   by the optional `NEXT_PUBLIC_MAP_TILES` (empty for OpenStreetMap, `off`, or a tile server's URL)
   and `NEXT_PUBLIC_MAP_ATTRIBUTION`. The Content-Security-Policy names the tile servers instead of
   Google, and `Permissions-Policy` allows location on the app's own pages, for "show my location".
+- The new Ministry of Health seal replaces the placeholder product icon in the web app (top bar,
+  sign-in, onboarding and access screens, favicon and a new Apple touch icon) and the crest on the
+  mobile sign-in screen. On a phone the web top bar shows the seal and "CLIMS"; the ministry's
+  name stays for screen readers. The mobile splash screen and app icon keep the crest.
 
 ### Removed
 

@@ -15,14 +15,13 @@ import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import { TYPE } from "@/lib/fonts";
 
 export default function SignIn() {
-  const { T, scheme } = useTheme();
+  const { T } = useTheme();
   const insets = useSafeAreaInsets();
   const { signIn, signInDemo } = useSession();
   const col = useColumn(MAX_FORM_WIDTH);
   const { isShort, isCompact } = useResponsive();
-  // The MoH crest with its wordmark, sized like the EMS app's sign-in (448×408 source).
-  const logoH = isShort ? 80 : isCompact ? 104 : 120;
-  const logoW = Math.round((logoH * 448) / 408);
+  // The Ministry of Health seal, the same as the web app's, sized like the EMS app's crest.
+  const seal = isShort ? 80 : isCompact ? 104 : 120;
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,7 +74,9 @@ export default function SignIn() {
             gap: isShort ? 4 : 6,
           }}
         >
-          <View
+          {/* The seal carries its own white field and ring, so it needs no card in dark mode. */}
+          <Image
+            source={require("../../assets/images/moh-seal.png")}
             accessible
             accessibilityRole="image"
             accessibilityLabel="The Republic of Uganda, Ministry of Health"

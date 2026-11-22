@@ -169,8 +169,8 @@ func fail(c fiber.Ctx, err error, t texts) error {
 	case errors.Is(err, errDuplicateName):
 		return response.Error(c, 409, t.duplicate, map[string]string{"name": t.duplicate})
 	case errors.As(err, &dbError) && dbError.Code == "23503":
-		// The brand or unit was deleted between the check and the write.
-		return response.Error(c, 422, "A linked brand or unit of measure no longer exists. Reload and try again.", nil)
+		// The type, brand or unit was deleted between the check and the write.
+		return response.Error(c, 422, "A linked type, brand or unit of measure no longer exists. Reload and try again.", nil)
 	}
 	slog.Error("catalogue operation failed", "error", err, "method", c.Method(), "path", c.Path(),
 		"request_id", requestid.FromContext(c))

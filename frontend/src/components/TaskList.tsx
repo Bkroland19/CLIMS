@@ -68,7 +68,7 @@ export function TaskList({
   const hasFailed = error !== undefined && error !== null;
   return (
     <Card className={cn('min-w-0 gap-0 py-0', className)}>
-      <CardHeader className="border-b py-4">
+      <CardHeader className="border-b py-3">
         <CardTitle className="flex items-center gap-2">
           {title}
           {tasks && !isLoading && !hasFailed ? (
@@ -81,10 +81,10 @@ export function TaskList({
       {hasFailed ? (
         <ErrorState title={errorTitle} error={error} onRetry={onRetry} isRetrying={isRetrying} />
       ) : isLoading || !tasks ? (
-        <div className="flex flex-col gap-3 p-4" role="status">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+        <div className="flex flex-col gap-2 p-4" role="status">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
           <span className="sr-only">{loadingLabel}</span>
         </div>
       ) : tasks.length === 0 ? (
@@ -94,7 +94,7 @@ export function TaskList({
           {tasks.map((task) => (
             <li
               key={task.id}
-              className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4"
+              className="flex flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-3"
             >
               <StatusBadge
                 status={task.status.label}

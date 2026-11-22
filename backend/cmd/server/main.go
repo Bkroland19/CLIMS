@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"clims-backend/internal/config"
 	"clims-backend/internal/database"
@@ -18,6 +19,7 @@ import (
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
+	"clims-backend/internal/features/reports"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -81,6 +83,14 @@ func main() {
 	jwtAuthMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
 	userRepo := users.NewRepository(dbPool)
+	if client := os.Getenv("IDENTITY_SYNC_CLIENT_ID"); client != "" {
+		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, os.Getenv("OIDC_ISSUER"), client)
+		cancel()
+		if err != nil {
+			log.Fatalf("CLIMS identity sync configuration: %v", err)
+		}
+	}
 	userService := users.NewService(userRepo)
 	roleRepo := rbac.NewRepository(dbPool)
 	activeUser := users.ActiveUser(userRepo)
@@ -96,6 +106,7 @@ func main() {
 	orders.RegisterRoutes(v1, orders.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(dbPool, notifier), jwtAuthMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
+	reports.RegisterRoutes(v1, reports.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(dbPool), jwtAuthMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool), jwtAuthMiddleware, activeUser)

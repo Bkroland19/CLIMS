@@ -70,7 +70,7 @@ export function DeviceSessionList({ sessions, label, action, ref }: DeviceSessio
           <li key={session.id} className="flex items-center gap-3 px-3 py-2.5">
             <span
               aria-hidden="true"
-              className="bg-secondary text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg"
+              className="bg-secondary text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg"
             >
               <Icon className="size-4" />
             </span>
@@ -106,7 +106,7 @@ export function DeviceSessionListSkeleton() {
     >
       {[0, 1, 2].map((row) => (
         <div key={row} className="flex items-center gap-3 px-3 py-2.5">
-          <Skeleton className="size-9 rounded-lg" />
+          <Skeleton className="size-8 rounded-lg" />
           <div className="flex flex-1 flex-col gap-1.5">
             <Skeleton className="h-4 w-36" />
             <Skeleton className="h-3 w-56 max-w-full" />

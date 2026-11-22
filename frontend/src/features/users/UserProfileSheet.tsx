@@ -112,7 +112,7 @@ export function UserProfileSheet({
           </div>
         </SheetHeader>
 
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain p-4">
+        <div className="gap-section flex flex-1 flex-col overflow-y-auto overscroll-contain p-4">
           <Section title="Contact">
             <DetailList
               items={[

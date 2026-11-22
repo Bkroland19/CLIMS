@@ -67,7 +67,7 @@ export default function WarehouseDashboardPage() {
   const filtered = (value: FilterValue) => href(WAREHOUSE_PATHS.requestsWithStatus(value));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <div className="flex flex-col gap-4">
         <StoreSwitch store={store} hrefFor={(code) => withStore(WAREHOUSE_PATHS.dashboard, code)} />
         <SampleDataNotice subject="District requests, stock and activity" />
@@ -108,7 +108,7 @@ export default function WarehouseDashboardPage() {
         />
       </StatCardGrid>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_22rem]">
         <TaskList
           title="Needs your action"
           tasks={
@@ -133,7 +133,7 @@ export default function WarehouseDashboardPage() {
           }}
         />
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <Card>
             <CardHeader>
               <CardTitle>Stock at {store}</CardTitle>
@@ -143,7 +143,7 @@ export default function WarehouseDashboardPage() {
                 </Button>
               </CardAction>
             </CardHeader>
-            <CardContent className="flex flex-col gap-5">
+            <CardContent className="flex flex-col gap-3">
               {stock.isPending ? (
                 <Skeleton className="h-24 w-full" />
               ) : stock.isError ? (
@@ -195,7 +195,7 @@ export default function WarehouseDashboardPage() {
       </div>
 
       {!district && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="gap-section grid lg:grid-cols-2">
           <ColumnChart
             title="Male condoms dispatched"
             description="Pieces dispatched to district stores per week, last 8 weeks"

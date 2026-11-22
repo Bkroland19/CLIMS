@@ -2,6 +2,8 @@ package inventory
 
 import (
 	"context"
+
+	"clims-backend/internal/features/stock"
 	"errors"
 	"time"
 
@@ -31,11 +33,10 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-// productName labels a condom product as brand, distribution channel and category,
+// productName labels a condom product as brand, type and category,
 // e.g. "Engabu Free Male". Parts a legacy product lacks are left out.
 const productName = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id = c.brand_id),
-	CASE c.type WHEN 'free' THEN 'Free' WHEN 'socially_marketed' THEN 'Socially marketed'
-		WHEN 'commercial' THEN 'Commercial' END,
+	(SELECT pt.name FROM product_types pt WHERE pt.id = c.type_id),
 	CASE c.category WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female' END)`
 
 type StockBalance struct {
@@ -131,7 +132,7 @@ func (r *Repository) hotspots(ctx context.Context, access scope, f HotspotFilter
 		LEFT JOIN unit_of_measures um ON um.id = o.unit_of_measure_id
 		WHERE ($1::boolean OR o.hot_spot_id = $2::uuid OR o.ordered_from_store_id = $3::uuid)
 			AND ($4::uuid IS NULL OR o.hot_spot_id = $4) AND ($5::uuid IS NULL OR o.condom_id = $5)
-		GROUP BY h.id, h.name, h.district_id, o.condom_id, c.brand_id, c.type, c.category, o.unit_of_measure_id, um.name
+		GROUP BY h.id, h.name, h.district_id, o.condom_id, c.brand_id, c.type_id, c.category, o.unit_of_measure_id, um.name
 		ORDER BY h.name, 5, um.name NULLS FIRST`,
 		access.allStores, access.hotSpotID, access.storeID, f.HotSpotID, f.CondomID, f.Period.from, f.Period.to)
 	if err != nil {
@@ -199,6 +200,10 @@ type MovementInput struct {
 	Reason          string  `json:"reason"`
 	Quantity        int64   `json:"quantity"`
 	Note            *string `json:"note"`
+	// BatchNumber and ExpiryDate name the batch the stock is in; omitted, it is the unknown-expiry batch.
+	BatchNumber *string `json:"batch_number"`
+	ExpiryDate  *string `json:"expiry_date"`
+	expiry      *time.Time
 }
 
 func (r *Repository) record(ctx context.Context, actorID string, in MovementInput) (Movement, error) {
@@ -219,11 +224,22 @@ func (r *Repository) record(ctx context.Context, actorID string, in MovementInpu
 		if err != nil {
 			return err
 		}
+		// The batches add up to the store total: a receipt or a positive count fills the named batch, and
+		// a negative count must come out of it.
+		var batchID string
+		if in.Quantity > 0 {
+			batchID, err = stock.Add(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, in.Quantity)
+		} else {
+			batchID, err = stock.Remove(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, -in.Quantity)
+		}
+		if err != nil {
+			return err
+		}
 		var id string
 		if err = tx.QueryRow(ctx, `INSERT INTO inventory_movements
-				(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, actor_id, note)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Reason, in.Quantity, onHand, actorID, in.Note).Scan(&id); err != nil {
+				(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, actor_id, note, stock_batch_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+			in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Reason, in.Quantity, onHand, actorID, in.Note, batchID).Scan(&id); err != nil {
 			return err
 		}
 		rows, err := tx.Query(ctx, `SELECT `+movementColumns+movementJoins+` WHERE m.id = $1`, id)

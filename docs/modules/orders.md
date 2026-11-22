@@ -23,18 +23,24 @@ Two separate flows replace the earlier hotspot alert orders (migration 22). Heal
 
 ### 1. A hotspot reports a stockout to its DCFPs
 
-A hotspot manager, or a VHT on the hotspot's behalf, sends `POST /api/v1/orders/stockouts` with the hotspot, the product and an optional message (`comment`). It carries no quantity and **creates no order**. CLIMS records a stockout report (`stockout_reports`) addressed to the store of the hotspot's district and sends that district's DCFPs an `order.stockout_reported` notification. The notification gives the hotspot's name, village, subcounty and district, its latest contact person and phone number, the product, who reported it and the message. Its resource is the hotspot. Other districts are not notified. A hotspot without a district cannot report (422) until its district is set.
+A hotspot manager, or a VHT on the hotspot's behalf, sends `POST /api/v1/orders/stockouts` with the hotspot, a `selection` of `male`, `female` or `both`, and an optional message (`comment`). Older clients may send one product (`condom_id`) instead, whose category becomes the selection. It carries no quantity and **creates no order**. If the hotspot already has an open notification, the message is counted against it rather than raising a second one (200): its `repeat_count` rises, and naming another type widens its selection (Male then Female is Both). Its history keeps every message. CLIMS records a stockout report (`stockout_reports`) addressed to the store of the hotspot's district and sends that district's DCFPs an `order.stockout_reported` notification. The notification gives the hotspot's name, village, subcounty and district, its latest contact person and phone number, the product, who reported it and the message. Its resource is the hotspot. Other districts are not notified. A hotspot without a district cannot report (422) until its district is set.
 
 `GET /api/v1/orders/stockouts` lists reports newest first: those sent to your district store, about your hotspot, or sent by you (`orders:all_stores`: all). `hot_spot_id` narrows it to one hotspot. Lists use `limit` (default 50, maximum 100) and `offset`.
 
 The report is kept so a retried request still notifies nobody twice, and so a report survives when the district has no DCFP yet. What to order in response is the DCFP's decision, made in flow 2.
+
+### 1a. The district delivers and the hotspot manager acknowledges
+
+The DCFP records each delivery against the notification with `POST /api/v1/orders/stockouts/{id}/deliveries` (`orders:supply_hotspots` at the notification's district store): one or more lines of a product of a selected type and a `quantity` in the product's catalogue unit, an optional `note`, and an optional `client_reference` so a retried send records the delivery once. Each line is converted to pieces with the product's `pieces_per_unit`, taken out of the store's available stock (409 when too little) and written to the inventory ledger as a `hotspot_delivery`. The hotspot's manager accounts are notified (`order.hotspot_delivery`); a contact person without an account is not.
+
+The hotspot's manager acknowledges what arrived with `POST /api/v1/orders/stockouts/{id}/acknowledgements`, giving the pieces actually received per delivery line (zero when nothing came). Only a user assigned to the hotspot can acknowledge: district and national users cannot complete fulfilment. Sending a line's count again is accepted once; a different count returns 409, since corrections must stay visible. The notification is **fulfilled** once every selected type has a positive acknowledgement, and the district is notified (`order.delivery_acknowledged`). Until then its status is `awaiting_supply`, `awaiting_acknowledgement` or `partly_received`. A fulfilled notification accepts no further deliveries, and the hotspot's next stockout opens a new one. `GET /api/v1/orders/stockouts/{id}` shows the deliveries, acknowledgements and history behind the status. [Reports](reports.md) count these records.
 
 A hotspot manager may report for their assigned hotspot (`users.hot_spot_id`). A VHT with `orders:stockout_district` may report for any **active** hotspot in the district they work in: their assigned store's district, or else their assigned subcounty's (`users.DistrictOfUser`). Reports for inactive hotspots or other districts return 403. `orders:all_stores` may report for any hotspot. Products come from the catalogue (`GET /api/v1/catalogue/products`).
 
 ### 2. The DCFP orders stock from NMS or JMS
 
 1. The DCFP sends `POST /api/v1/orders/warehouse-requests` with `warehouse_store_id` (NMS or JMS, the national stores from `GET /api/v1/locations/stores`), `condom_id` and `quantity`, e.g. 500 of a female product, and optionally a `comment`. The product fixes the condom type. `unit_of_measure_id` defaults to the product's catalogue unit and is required for a product without one (422). The order is for the DCFP's assigned district store; an account without one is refused (403), even with `orders:all_stores`. It starts `queued`, and the warehouse is notified.
-2. Warehouse staff `review` the order, `check-stock` (which reserves it, or holds it `on_hold` until stock arrives, when they rerun `check-stock`) and `dispatch` it, optionally with a smaller `quantity_issued`.
+2. Warehouse staff `review` the order, optionally approving a smaller `quantity_approved` (the request keeps the original `quantity_needed`), `check-stock` (which reserves the approved quantity, or holds it `on_hold` until stock arrives, when they rerun `check-stock`) and `dispatch` it, optionally with a smaller `quantity_issued`. Dispatch takes batches first expiry first out and never takes expired stock; a batch with under one month left needs an `expiry_exception_reason` ([inventory](inventory.md#batches-and-expiry)). Each step's quantity is kept in the order's events, so the original request and any revision stay visible.
 3. The district runs `receive` on the dispatched order with the counted `quantity_received`; a mismatch requires a `discrepancy_note`. Receipt credits the counted quantity to the district store.
 
 Workflow actions use `POST /api/v1/orders/{id}/actions/{action}`: `review`, `check-stock` and `dispatch` with `orders:process` at the warehouse, `receive` with `orders:receive` at the district store. Run `GET /api/v1/orders?status=on_hold` to review held orders and `GET /api/v1/orders/{id}/events` for audit history.
@@ -50,6 +56,8 @@ Every step notifies people through the shared [notification service](notificatio
 | Type                            | Sent to                                                    | Resource |
 | ------------------------------- | ---------------------------------------------------------- | -------- |
 | `order.stockout_reported`       | `orders:replenish` at the hotspot's district store (DCFPs) | hotspot  |
+| `order.hotspot_delivery`        | The hotspot's manager accounts                             | hotspot  |
+| `order.delivery_acknowledged`   | `orders:supply_hotspots` at the district store             | hotspot  |
 | `order.replenishment_requested` | `orders:process` at the warehouse                          | order    |
 | `order.shipment_dispatched`     | `orders:receive` at the district store                     | order    |
 | `order.shipment_received`       | `orders:replenish` at the district store                   | order    |
@@ -58,13 +66,13 @@ Every step notifies people through the shared [notification service](notificatio
 
 ### Permissions
 
-Migration 21 adds `orders:stockout_district` and `hotspots:read_district`. As with every role, grant permissions through the RBAC API:
+Migration 21 adds `orders:stockout_district` and `hotspots:read_district`; migration 24 adds `orders:supply_hotspots` and `reports:read`. As with every role, grant permissions through the RBAC API:
 
 | Who                  | Permissions                                                                                                 |
 | -------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Hotspot manager      | `orders:read`, `orders:stockout`                                                                            |
 | VHT (field app)      | `hotspots:read`, `hotspots:submit`, `hotspots:read_district`, `orders:stockout`, `orders:stockout_district` |
-| DCFP                 | `orders:read`, `orders:replenish`, `orders:receive`                                                         |
+| DCFP                 | `orders:read`, `orders:replenish`, `orders:receive`, `orders:supply_hotspots`, `reports:read`               |
 | Warehouse (NMS, JMS) | `orders:read`, `orders:process`                                                                             |
 
 A VHT without `orders:read` can send reports but not list them. `orders:deliver` is no longer used. Assign the corresponding hotspot or store to each user. Record verified opening balances per store, product and unit as receipts with `POST /api/v1/inventory/movements` before warehouses check stock (see [inventory](inventory.md)). Dispatch and receipt add their own entries to the inventory ledger.
