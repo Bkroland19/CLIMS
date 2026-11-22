@@ -163,6 +163,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	notifier := notifications.NewService()
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
+	notifier.MustRegister(inventory.NotificationTypes()...)
 	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier, auditor), jwtMiddleware, activeUser)
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier, auditor), jwtMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(pool, auditor), jwtMiddleware, activeUser)

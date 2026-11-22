@@ -51,6 +51,11 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
   It updates with each stable release. Preview it with `make docs-serve`. See
   [ADR 0004](adr/0004-documentation-site.md).
+- **Batch expiry alerts.** Every hour the server tells the people who manage a store's stock
+  (`inventory:manage` at the store), at NMS, JMS and district stores alike, once when a batch with
+  stock comes within 3 months of its expiry date (`inventory.batch_expiring`) and once when it
+  expires (`inventory.batch_expired`).
+
 - **NMS and JMS can reject a district's order.** `POST /api/v1/orders/{id}/actions/reject` with a
   required `reason`, at any step before dispatch. The order becomes `rejected`, keeps
   `rejection_reason` and releases anything `check-stock` reserved (migration 31).

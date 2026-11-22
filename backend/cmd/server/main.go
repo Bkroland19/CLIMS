@@ -105,6 +105,7 @@ func main() {
 	notifier := notifications.NewService()
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
+	notifier.MustRegister(inventory.NotificationTypes()...)
 
 	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret, auditor), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
@@ -117,6 +118,10 @@ func main() {
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool, auditor), jwtAuthMiddleware, activeUser)
+
+	// Tells each store when a batch it holds is about to expire, and when it has. Every replica may run
+	// it: each batch is announced once per state.
+	go inventory.NewExpiryAlerts(dbPool, notifier).Watch(ctx, time.Hour)
 
 	log.Printf("Server starting on port %s (Version: %s, Commit: %s)...", cfg.Port, Version, CommitHash)
 	if err := app.Listen(":" + cfg.Port); err != nil {

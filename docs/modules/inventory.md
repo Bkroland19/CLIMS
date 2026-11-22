@@ -36,6 +36,17 @@ A store's stock of a product in a unit is held in batches (`stock_batches`), eac
 
 Stock leaves a store first expiry first out: warehouse dispatch and district deliveries to hotspots take the earliest-expiring batch first and unknown expiry last. Expired batches never leave, and a batch with under one calendar month left leaves only with an `expiry_exception_reason`, recorded with who authorised it and the rule version. What left is recorded per batch (`shipment_batches`), and a district's receipt puts the counted quantity into the batches the warehouse shipped: a shortfall comes off the latest-expiring batch, and a surplus goes to an unknown-expiry batch. Warehouse check-stock does not count expired stock as available. See [reports](reports.md#batches-and-expiry).
 
+### Expiry alerts
+
+The server checks batches every hour (`inventory.ExpiryAlerts`, started from `cmd/server/main.go`). The people who manage a store's stock (`inventory:manage` at the store), at NMS, JMS and district stores alike, are told once when a batch with stock comes within 3 months of its expiry date (`inventory.batch_expiring`, the `under_3_months` band and below) and once more when it expires (`inventory.batch_expired`). The batch ID is the idempotency key, so a restart or a second server never repeats one. A batch with nothing left, or with no expiry date, is not announced. A store with nobody to tell stores nothing, so its batches are announced once someone there manages its stock.
+
+| Type                       | Sent to                         | Resource      |
+| -------------------------- | ------------------------------- | ------------- |
+| `inventory.batch_expiring` | `inventory:manage` at the store | `stock_batch` |
+| `inventory.batch_expired`  | `inventory:manage` at the store | `stock_batch` |
+
+Their `data` has `store`, `store_id`, `product`, `unit`, `quantity` (on hand when announced), `batch` (the number, or empty), `batch_label` ("batch TGL24155" or "a batch with no number"), `expiry` ("31 Mar 2027") and `expiry_date` (`YYYY-MM-DD`).
+
 ## Access
 
 Users see and record stock for their assigned store (`users.store_id`), and a hotspot manager sees their hotspot. District users also see the hotspots their store supplies. `orders:all_stores` extends this to every store and hotspot and is required for the national summary.
