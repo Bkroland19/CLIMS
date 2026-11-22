@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Image, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme";
@@ -11,6 +11,7 @@ import { ROLE_LABEL, useSession } from "@/lib/session";
 import type { AppRole } from "@/lib/types";
 import { call } from "@/screens/common";
 import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
+import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import { TYPE } from "@/lib/fonts";
 
 export default function SignIn() {
@@ -27,6 +28,7 @@ export default function SignIn() {
   const [err, setErr] = useState("");
   const [forgot, setForgot] = useState(false);
   const [demo, setDemo] = useState(false);
+  const setScroll = useKeyboardScroll();
 
   const enter = async () => {
     setErr("");
@@ -48,11 +50,11 @@ export default function SignIn() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: T.bg }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    // Padding on both platforms: Android draws edge to edge, so without it the keyboard covers the
+    // sign-in fields; the focused field is then scrolled into view above the keyboard.
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior="padding">
       <ScrollView
+        ref={setScroll}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           col.style,
@@ -83,7 +85,10 @@ export default function SignIn() {
           />
           <Txt
             accessibilityRole="header"
-            style={{ fontSize: isShort || isCompact ? 28 : 32, fontWeight: "700" }}
+            style={{
+              fontSize: isShort || isCompact ? 28 : 32,
+              fontWeight: "700",
+            }}
           >
             CLIMS
           </Txt>
@@ -139,7 +144,13 @@ export default function SignIn() {
         />
       </ScrollView>
 
-      <Sheet visible={forgot} title="Forgot password" onClose={() => setForgot(false)}>
+      <Sheet
+        visible={forgot}
+        title="Forgot password"
+        icon="shield"
+        tone="info"
+        onClose={() => setForgot(false)}
+      >
         <Txt
           style={{
             marginHorizontal: 24,
@@ -163,7 +174,7 @@ export default function SignIn() {
         </Btns>
       </Sheet>
 
-      <Sheet visible={demo} title="Sample data" onClose={() => setDemo(false)}>
+      <Sheet visible={demo} title="Sample data" icon="user" onClose={() => setDemo(false)}>
         <List
           h="Sign in as"
           f="Development builds only. Sample Wakiso data is kept on this phone; the API has no hotspot or order endpoints yet."

@@ -55,7 +55,7 @@ func testAudit(t *testing.T, pool *pgxpool.Pool, repo *users.Repository, service
 		for key, value := range headers {
 			req.Header.Set(key, value)
 		}
-		res, err := app.Test(req)
+		res, err := app.Test(req, slowRequests)
 		if err != nil {
 			t.Fatal(err)
 		}

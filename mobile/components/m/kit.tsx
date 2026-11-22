@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
+  Easing,
+  KeyboardAvoidingView,
   Image,
   Modal,
   Platform,
@@ -26,6 +28,7 @@ import { MAX_SHEET_WIDTH, useResponsive } from "@/hooks/useResponsive";
 import type { ChipDef, Tone } from "@/lib/format";
 import { FONT, TYPE, fontFor, trackingFor, useFontsReady } from "@/lib/fonts";
 import Icon, { type IconName } from "./Icon";
+import { FadeInUp, useEntrance, usePressScale, useReducedMotion } from "./motion";
 
 /* ───────────── Text ───────────── */
 
@@ -144,34 +147,26 @@ export function List({
             borderRadius: T.listR,
             overflow: "hidden",
             gap: T.listGap,
+            backgroundColor: T.rowBg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: T.cardBd,
           }}
         >
           {kids.map((k, i) => (
-            <View
-              key={i}
-              style={
-                T.ios
-                  ? undefined
-                  : {
-                      borderTopLeftRadius: i === 0 ? T.listR : 4,
-                      borderTopRightRadius: i === 0 ? T.listR : 4,
-                      borderBottomLeftRadius: i === kids.length - 1 ? T.listR : 4,
-                      borderBottomRightRadius: i === kids.length - 1 ? T.listR : 4,
-                      overflow: "hidden",
-                    }
-              }
-            >
+            <FadeInUp key={i} index={i}>
               {k}
-              {T.ios && i < kids.length - 1 ? (
+              {i < kids.length - 1 ? (
                 <View
                   style={{
                     height: StyleSheet.hairlineWidth,
                     backgroundColor: T.sep,
-                    marginLeft: 16,
+                    // Rows with a leading icon start their divider at the text, as native lists do.
+                    marginLeft:
+                      React.isValidElement<{ ic?: unknown }>(k) && k.props.ic ? 28 + T.icBox : 16,
                   }}
                 />
               ) : null}
-            </View>
+            </FadeInUp>
           ))}
         </View>
       ) : empty ? (
@@ -181,6 +176,8 @@ export function List({
             padding: 20,
             borderRadius: T.listR,
             backgroundColor: T.rowBg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: T.cardBd,
           }}
         >
           <Txt style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}>{empty}</Txt>
@@ -310,6 +307,11 @@ export interface Stat {
   value: string;
   fg?: string;
   note?: string;
+  /**
+   * How full the stock is, 0–1, with a tick where "running low" starts, so a glance at the bar
+   * says how close a hotspot is to needing a delivery.
+   */
+  meter?: { fill: number; mark: number; color: string };
 }
 export interface StepItem {
   label: string;
@@ -344,6 +346,8 @@ export function Hero({
           marginHorizontal: 16,
           backgroundColor: T.cardBg,
           borderRadius: T.cardR,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: T.cardBd,
           padding: 16,
           gap: 12,
         }}
@@ -376,7 +380,8 @@ export function Hero({
                 }}
               >
                 <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{x.label}</Txt>
-                <Txt
+                <CountUp
+                  value={x.value}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.6}
@@ -386,9 +391,8 @@ export function Hero({
                     color: x.fg ?? T.fg,
                     fontVariant: ["tabular-nums"],
                   }}
-                >
-                  {x.value}
-                </Txt>
+                />
+                {x.meter ? <Meter {...x.meter} label={`${x.label}: ${x.note ?? x.value}`} /> : null}
                 {x.note ? (
                   <Txt style={{ ...TYPE.footnote, color: x.fg ?? T.fg2 }}>{x.note}</Txt>
                 ) : null}
@@ -404,13 +408,120 @@ export function Hero({
   );
 }
 
+const withCommas = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+/**
+ * A number that counts up from zero to its value when it first appears ("1,400"). Anything that
+ * is not a plain number ("out of stock") is shown as it is.
+ */
+export function CountUp({
+  value,
+  style,
+  ...rest
+}: { value: string; style?: TextStyle } & Omit<
+  React.ComponentProps<typeof Txt>,
+  "style" | "children"
+>) {
+  const reduce = useReducedMotion();
+  const target = /^\d[\d,]*$/.test(value) ? Number(value.replace(/,/g, "")) : null;
+  const [shown, setShown] = useState(value);
+  const first = useRef(true);
+  useEffect(() => {
+    // Count only on first appearance; later changes (a sync) show the new value straight away.
+    if (target == null || reduce || !first.current || target === 0) {
+      setShown(value);
+      first.current = false;
+      return;
+    }
+    first.current = false;
+    const v = new Animated.Value(0);
+    const id = v.addListener(({ value: x }) => setShown(withCommas(x)));
+    Animated.timing(v, {
+      toValue: target,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => setShown(value));
+    return () => {
+      v.removeListener(id);
+      v.stopAnimation();
+    };
+  }, [value, target, reduce]);
+  return (
+    <Txt style={style} accessibilityLabel={value} {...rest}>
+      {shown}
+    </Txt>
+  );
+}
+
+/** 0 → 1 on a spring when the component appears, for a result badge. */
+function useSpringIn(): Animated.Value {
+  const reduce = useReducedMotion();
+  const [v] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (reduce) return v.setValue(1);
+    Animated.spring(v, { toValue: 1, damping: 11, stiffness: 180, useNativeDriver: true }).start();
+  }, [v, reduce]);
+  return v;
+}
+
+/** A stock level bar: filled to `fill`, with a tick at `mark` (both 0–1). */
+export function Meter({
+  fill,
+  mark,
+  color,
+  label,
+}: {
+  fill: number;
+  mark: number;
+  color: string;
+  label: string;
+}) {
+  const T = useT();
+  const grow = useEntrance(150, 650);
+  const pct = (v: number) => `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%` as const;
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(Math.min(1, fill) * 100) }}
+      style={{ height: 6, borderRadius: 3, backgroundColor: T.meterBg, marginVertical: 6 }}
+    >
+      <Animated.View
+        style={{
+          width: pct(fill),
+          minWidth: fill > 0 ? 6 : 0,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: color,
+          transformOrigin: "left",
+          transform: [{ scaleX: grow }],
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          left: pct(mark),
+          top: -2,
+          width: 2,
+          height: 10,
+          marginLeft: -1,
+          borderRadius: 1,
+          backgroundColor: T.fg3,
+        }}
+      />
+    </View>
+  );
+}
+
 export function Steps({ items }: { items: StepItem[] }) {
   const T = useT();
   return (
     <View>
       {items.map((it, i) => {
         const S = {
-          done: [T.tint, T.tint, T.b1Fg, "✓", T.fg, "500", T.tint],
+          done: [T.b1Bg, T.b1Bg, T.b1Fg, "✓", T.fg, "500", T.b1Bg],
           cur: [T.cardBg, T.tint, T.tint, String(i + 1), T.fg, "600", T.sep],
           warn: [T.stepWarnBg, T.warnBd, T.warnBd, "!", T.warnFg, "600", T.sep],
           todo: ["transparent", T.sep, T.fg3, String(i + 1), T.fg2, "400", T.sep],
@@ -418,7 +529,7 @@ export function Steps({ items }: { items: StepItem[] }) {
         }[it.st] as string[];
         const last = i === items.length - 1;
         return (
-          <View key={it.label} style={{ flexDirection: "row", gap: 12 }}>
+          <FadeInUp key={it.label} index={i} style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ alignItems: "center", width: 24 }}>
               <View
                 style={{
@@ -451,7 +562,7 @@ export function Steps({ items }: { items: StepItem[] }) {
               </Txt>
               {it.sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{it.sub}</Txt> : null}
             </View>
-          </View>
+          </FadeInUp>
         );
       })}
     </View>
@@ -478,41 +589,48 @@ export function Banner({
   const T = useT();
   const tn = T.tones[tone];
   return (
-    <Section h={h}>
+    <Section h={h} style={{ marginBottom: 12 }}>
       <View
         accessibilityRole="alert"
         style={{
           marginHorizontal: 16,
           backgroundColor: tn.bg,
-          borderRadius: T.cardR,
-          padding: 14,
-          gap: 8,
+          borderRadius: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          gap: 4,
         }}
       >
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Icon name={tn.icon as IconName} size={20} color={tn.fg} />
-          <View style={{ flex: 1, gap: 2 }}>
-            <Txt style={{ color: tn.fg, fontWeight: "600", ...TYPE.subhead }}>{title}</Txt>
-            {body ? <Txt style={{ color: T.fg, ...TYPE.subhead }}>{body}</Txt> : null}
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+          <View style={{ height: TYPE.footnote.lineHeight, justifyContent: "center" }}>
+            <Icon name={tn.icon as IconName} size={15} color={tn.fg} />
           </View>
+          <Txt style={{ flex: 1, color: T.fg, ...TYPE.footnote }}>
+            <Txt style={{ color: tn.fg, fontWeight: "600" }}>
+              {body && !/[.!?:…]$/.test(title) ? `${title}.` : title}
+            </Txt>
+            {body ? ` ${body}` : null}
+          </Txt>
         </View>
         {items?.map((e) => (
           <Pressable
             key={e.where + e.msg}
             onPress={e.onPress}
-            style={{ marginLeft: 30, paddingVertical: 4 }}
+            style={{ marginLeft: 23, paddingVertical: 2 }}
           >
-            <Txt style={{ ...TYPE.subhead, fontWeight: "600", color: tn.fg }}>{e.where}</Txt>
-            <Txt style={{ ...TYPE.footnote, color: T.fg }}>{e.msg}</Txt>
+            <Txt style={{ ...TYPE.footnote, color: T.fg }}>
+              <Txt style={{ fontWeight: "600", color: tn.fg }}>{e.where}</Txt> {e.msg}
+            </Txt>
           </Pressable>
         ))}
         {act ? (
           <Pressable
             onPress={act.onPress}
-            style={{ marginLeft: 30, paddingVertical: 4 }}
+            hitSlop={8}
+            style={{ marginLeft: 23, paddingVertical: 2 }}
             accessibilityRole="button"
           >
-            <Txt style={{ color: T.tint, fontWeight: "600", ...TYPE.subhead }}>{act.label}</Txt>
+            <Txt style={{ color: T.tint, fontWeight: "600", ...TYPE.footnote }}>{act.label}</Txt>
           </Pressable>
         ) : null}
       </View>
@@ -532,6 +650,7 @@ export function Done({
   body?: string;
 }) {
   const T = useT();
+  const pop = useSpringIn();
   const tn = T.tones[tone];
   return (
     <Section>
@@ -544,7 +663,7 @@ export function Done({
           gap: 12,
         }}
       >
-        <View
+        <Animated.View
           style={{
             width: 72,
             height: 72,
@@ -552,10 +671,12 @@ export function Done({
             backgroundColor: tn.bg,
             alignItems: "center",
             justifyContent: "center",
+            opacity: pop,
+            transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
           }}
         >
           <Icon name={icon} size={34} color={tn.fg} />
-        </View>
+        </Animated.View>
         <Txt style={{ fontSize: 20, lineHeight: 26, fontWeight: "700", textAlign: "center" }}>
           {title}
         </Txt>
@@ -607,44 +728,48 @@ export function Btn({
   const K = {
     primary: [T.b1Bg, T.b1Fg, 0, "transparent"],
     secondary: [T.b2Bg, T.b2Fg, T.b2Bw, T.b2Bd],
-    danger: ["transparent", T.danger, T.ios ? 0 : 1, T.danger],
+    danger: [T.ios ? "transparent" : T.tones.danger.bg, T.danger, 0, "transparent"],
     text: ["transparent", T.tint, 0, "transparent"],
   }[kind] as [string, string, number, string];
+  const press = usePressScale(dis ? 1 : 0.97);
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={dis}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!dis }}
-      style={({ pressed }) => ({
-        // minHeight, not height: large system text wraps the label instead of clipping it.
-        minHeight: small ? 40 : T.btnH,
-        paddingVertical: 6,
-        borderRadius: T.btnR,
-        backgroundColor: K[0],
-        borderWidth: K[2],
-        borderColor: K[3],
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        paddingHorizontal: 20,
-        opacity: dis ? 0.38 : pressed ? 0.75 : 1,
-      })}
-    >
-      {icon ? <Icon name={icon} size={18} color={K[1]} /> : null}
-      <Txt
-        style={{
-          flexShrink: 1,
-          textAlign: "center",
-          color: K[1],
-          fontSize: small ? 15 : T.btnFs,
-          fontWeight: T.btnFw,
-        }}
+    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+      <Pressable
+        onPress={onPress}
+        disabled={dis}
+        {...press.handlers}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !!dis }}
+        style={({ pressed }) => ({
+          // minHeight, not height: large system text wraps the label instead of clipping it.
+          minHeight: small ? 40 : T.btnH,
+          paddingVertical: 6,
+          borderRadius: T.btnR,
+          backgroundColor: K[0],
+          borderWidth: K[2],
+          borderColor: K[3],
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingHorizontal: 20,
+          opacity: dis ? 0.38 : pressed ? 0.88 : 1,
+        })}
       >
-        {label}
-      </Txt>
-    </Pressable>
+        {icon ? <Icon name={icon} size={18} color={K[1]} /> : null}
+        <Txt
+          style={{
+            flexShrink: 1,
+            textAlign: "center",
+            color: K[1],
+            fontSize: small ? 15 : T.btnFs,
+            fontWeight: T.btnFw,
+          }}
+        >
+          {label}
+        </Txt>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -686,7 +811,14 @@ export function Fields({
           overflow: "hidden",
           gap: T.fGap,
           backgroundColor: mdCard ? T.rowBg : T.fRowBg,
-          ...(mdCard ? { paddingHorizontal: 16, paddingVertical: 12 } : null),
+          ...(mdCard
+            ? {
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: T.cardBd,
+              }
+            : null),
         }}
       >
         {kids.map((k, i) => (
@@ -768,6 +900,9 @@ function FieldBox({
 /** Rows a text area shows before it scrolls, and their height. */
 const AREA_LINE = 22;
 
+/** A colour at about 45% opacity, for rings that mark state without a hard edge. */
+const soft = (hex: string) => (/^#[0-9a-f]{6}$/i.test(hex) ? `${hex}73` : hex);
+
 const inputStyle = (
   T: Tokens,
   err?: string,
@@ -776,10 +911,12 @@ const inputStyle = (
   rows = 3,
 ): TextStyle => ({
   minHeight: multiline ? rows * AREA_LINE + (T.ios ? 8 : 20) : T.inH,
-  // Material fields thicken and take the brand colour on focus; iOS cells stay borderless.
-  borderWidth: focused && !T.ios ? 2 : err ? 1.5 : T.inBw,
-  borderColor: err ? T.danger : focused && !T.ios ? T.tint : T.inBd,
+  // Material fields are borderless wells; focus and errors show as a soft ring of constant width,
+  // so the text doesn't shift. iOS cells stay borderless.
+  borderWidth: T.ios ? (err ? 1.5 : 0) : 1.5,
+  borderColor: err ? soft(T.danger) : focused && !T.ios ? soft(T.tint) : "transparent",
   borderRadius: T.inR,
+  backgroundColor: err && !T.ios ? T.tones.danger.bg : T.inBg,
   paddingHorizontal: T.ios ? 0 : 12,
   paddingVertical: multiline ? (T.ios ? 4 : 10) : 0,
   fontSize: 16,
@@ -910,7 +1047,7 @@ export function ReadOnly({ label, value, sub }: { label: string; value: string; 
           inputStyle(T),
           {
             justifyContent: "center",
-            borderColor: T.ios ? "transparent" : T.sep,
+            borderColor: "transparent",
             backgroundColor: T.roBg,
           },
         ]}
@@ -929,7 +1066,8 @@ export function Seg<K extends string>({
 }: {
   label: string;
   options: [K, string][];
-  value: K;
+  /** Nothing is selected while undefined, so a required choice must be made. */
+  value: K | undefined;
   onChange: (k: K) => void;
 }) {
   const T = useT();
@@ -941,15 +1079,13 @@ export function Seg<K extends string>({
           flexDirection: "row",
           minHeight: T.segH,
           borderRadius: T.segR,
-          backgroundColor: T.ios ? T.segBg : "transparent",
-          padding: T.ios ? 2 : 0,
-          borderWidth: T.ios ? 0 : 1,
-          borderColor: T.outline,
+          backgroundColor: T.segBg,
+          padding: T.ios ? 2 : 3,
           overflow: "hidden",
           marginTop: T.ios ? 6 : 0,
         }}
       >
-        {options.map(([k, l], i) => {
+        {options.map(([k, l]) => {
           const on = k === value;
           return (
             <Pressable
@@ -965,11 +1101,10 @@ export function Seg<K extends string>({
                 gap: 6,
                 paddingHorizontal: 6,
                 paddingVertical: 4,
-                borderRadius: T.ios ? 7 : 0,
-                backgroundColor: on ? T.segOn : T.ios ? "transparent" : T.segBg,
-                borderLeftWidth: !T.ios && i > 0 ? 1 : 0,
-                borderLeftColor: T.outline,
-                ...(T.ios && on
+                borderRadius: T.ios ? 7 : T.segR - 3,
+                backgroundColor: on ? T.segOn : "transparent",
+                // A raised pill on light tracks; dark tracks show the selection by colour.
+                ...(on && (T.ios || !T.dark)
                   ? {
                       shadowColor: "#000",
                       shadowOpacity: 0.12,
@@ -1035,8 +1170,6 @@ export function Stepper({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: T.stepperBg,
-        borderWidth: T.ios ? 0 : 1,
-        borderColor: T.outline,
       }}
     >
       <Icon name={icon} size={18} color={T.fg} />
@@ -1073,8 +1206,8 @@ export function Stepper({
               color: T.fg,
               borderRadius: T.ios ? 8 : 10,
               backgroundColor: T.stepperInBg,
-              borderWidth: err ? 1.5 : T.ios ? 0 : 1,
-              borderColor: err ? T.danger : T.outline,
+              borderWidth: err ? 1.5 : 0,
+              borderColor: err ? soft(T.danger) : "transparent",
             },
             semibold,
           ]}
@@ -1199,6 +1332,7 @@ export function Pick({
           borderWidth: T.inBw,
           borderColor: T.inBd,
           borderRadius: T.inR,
+          backgroundColor: T.inBg,
           paddingHorizontal: T.ios ? 0 : 14,
           paddingVertical: T.ios ? 0 : 8,
         }}
@@ -1397,32 +1531,57 @@ export function PhotoView({ uri, h = 200 }: { uri: string; h?: number }) {
 export function Sheet({
   visible,
   title,
+  sub,
+  icon,
+  tone = "success",
   onClose,
   children,
 }: {
   visible: boolean;
   title: string;
+  /** One line under the title saying what the sheet is for. */
+  sub?: string;
+  /** Alert-style sheets lead with a tinted icon badge in the tone's colour. */
+  icon?: IconName;
+  tone?: Tone;
   onClose: () => void;
   children?: React.ReactNode;
 }) {
   const T = useT();
   const insets = useSafeAreaInsets();
   const { isShort } = useResponsive();
+  const tn = T.tones[tone];
+  // The scrim fades while the sheet rises on a soft spring, rather than both sliding together.
+  const [rise] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!visible) return;
+    rise.setValue(0);
+    Animated.spring(rise, {
+      toValue: 1,
+      damping: 22,
+      stiffness: 220,
+      mass: 0.9,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, rise]);
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: T.scrim }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: T.scrim }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
-        <View
+        <Animated.View
           style={{
             backgroundColor: T.sheetBg,
             borderTopLeftRadius: T.sheetR,
             borderTopRightRadius: T.sheetR,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderBottomWidth: 0,
+            borderColor: T.cardBd,
             // Centred and capped on tablets; taller on short windows so content still fits.
             width: "100%",
             maxWidth: MAX_SHEET_WIDTH,
@@ -1431,60 +1590,83 @@ export function Sheet({
             paddingBottom: insets.bottom + 12,
             paddingLeft: insets.left,
             paddingRight: insets.right,
+            transform: [
+              { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [64, 0] }) },
+            ],
+            opacity: rise.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
           }}
         >
           <View style={{ alignItems: "center", paddingTop: 8 }}>
             <View
               style={{
-                width: T.ios ? 36 : 32,
-                height: T.ios ? 5 : 4,
-                borderRadius: 3,
+                width: 36,
+                height: 4,
+                borderRadius: 2,
                 backgroundColor: T.grab,
+                opacity: 0.5,
               }}
             />
           </View>
           <View
             style={{
               flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 10,
+              alignItems: icon || sub ? "flex-start" : "center",
+              gap: 12,
+              paddingLeft: 20,
+              paddingRight: 12,
+              paddingTop: 12,
+              paddingBottom: 14,
             }}
           >
-            <Txt
-              accessibilityRole="header"
-              style={{
-                flex: 1,
-                fontSize: T.ios ? 17 : 22,
-                fontWeight: T.ios ? "600" : "400",
-                textAlign: T.ios ? "center" : "left",
-                marginLeft: T.ios ? 48 : 0,
-              }}
-            >
-              {title}
-            </Txt>
+            {icon ? (
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: tn.bg,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon name={icon} size={20} color={tn.fg} />
+              </View>
+            ) : null}
+            <View style={{ flex: 1, gap: 2, paddingTop: icon ? 1 : 0 }}>
+              <Txt
+                accessibilityRole="header"
+                style={{ fontSize: 18, lineHeight: 24, fontWeight: "600" }}
+              >
+                {title}
+              </Txt>
+              {sub ? <Txt style={{ ...TYPE.footnote, color: T.fg2 }}>{sub}</Txt> : null}
+            </View>
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
+              accessibilityLabel="Close"
               hitSlop={8}
-              style={{ minWidth: 48, alignItems: "flex-end" }}
+              style={({ pressed }) => ({
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? T.rowPress : T.meterBg,
+              })}
             >
-              <Txt
-                style={{
-                  color: T.tint,
-                  fontSize: T.ios ? 17 : 14,
-                  fontWeight: T.ios ? "600" : "500",
-                }}
-              >
-                {T.ios ? "Done" : "Close"}
-              </Txt>
+              <Icon name="x" size={16} color={T.fg2} />
             </Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8 }}>
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: T.sep }} />
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingTop: 12 }}
+          >
             {children}
           </ScrollView>
-        </View>
-      </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -5,19 +5,18 @@
  *   CLIMS_LIVE_API=http://localhost:8080/api/v1 \
  *   CLIMS_LIVE_LOGIN=<vht login> CLIMS_LIVE_PASSWORD=<password> \
  *   CLIMS_LIVE_HM_LOGIN=<hotspot manager login> CLIMS_LIVE_HM_PASSWORD=<password> \
- *   CLIMS_LIVE_PRODUCT_ID=<condom uuid> \
  *   npx jest lib/__tests__/orders.live --watchAll=false
  *
  * Today the API accepts alerts only from a hotspot's assigned manager, so a VHT's attempt is refused and
  * the test checks the message; if the backend accepts it (district rule, or orders:all_stores), the test
- * checks the queued alert instead.
- * CLIMS_LIVE_PRODUCT_ID stands in for the product list the API doesn't offer to these accounts yet.
+ * checks the notification instead. A hotspot with an open notification has the message counted
+ * against it (200), so a repeated run is accepted too.
  */
 import { isAxiosError } from "axios";
 import { api, login, setTokens, toStoredTokens, tokenClient } from "../api";
 import { listHotspotsPage } from "../hotspots";
 import {
-  listOrders,
+  listStockouts,
   reportStockout,
   stockoutComment,
   stockoutErrorMessage,
@@ -60,20 +59,18 @@ live("stockout alerts against a running backend", () => {
     };
     const res = await reportStockout(body).catch((e: unknown) => e);
     if (isAxiosError(res)) {
-      // Today's rule: only the hotspot's assigned manager may report, so a VHT is refused.
+      // A VHT without orders:stockout_district, or a hotspot outside their district, is refused.
       expect(res.response?.status).toBe(403);
       expect(stockoutErrorMessage(res)).toMatch(/isn't allowed to send stock requests/);
     } else {
-      // Accepted once VHTs may report for their district (or the role has orders:all_stores).
-      expect(res).toMatchObject({
-        hot_spot_id: body.hot_spot_id,
-        order_status: "queued",
-      });
-      expect(toLocalOrder(res as never, { hotspot: "h", product: "p" }, "me").source).toBe("api");
+      const { report } = res as Awaited<ReturnType<typeof reportStockout>>;
+      expect(report.hot_spot_id).toBe(body.hot_spot_id);
+      expect(["male", "both"]).toContain(report.selection);
+      expect(toLocalOrder(report, "me").source).toBe("api");
     }
   });
 
-  it("as the hotspot manager: the app's request is accepted and queued for the DCFP", async () => {
+  it("as the hotspot manager: the request is accepted and listed for the manager", async () => {
     if (!env.CLIMS_LIVE_HM_LOGIN) return;
     const user = await signIn(env.CLIMS_LIVE_HM_LOGIN, env.CLIMS_LIVE_HM_PASSWORD);
     const body = {
@@ -81,15 +78,13 @@ live("stockout alerts against a running backend", () => {
       condom_category: "female" as const,
       message: stockoutComment("Running low", "Hotspot manager live check"),
     };
-    const res = await reportStockout(body);
-    expect(res).toMatchObject({
-      hot_spot_id: body.hot_spot_id,
-      order_status: "queued",
-      comment: "Running low. Hotspot manager live check",
-    });
-    expect(toLocalOrder(res, { hotspot: "h", product: "p" }, "me").status).toBe("queued");
-    // The manager's Orders tab lists it from GET /orders.
-    const orders = await listOrders();
-    expect(orders.map((o) => o.id)).toContain(res.id);
+    const { report, repeated } = await reportStockout(body);
+    expect(report.hot_spot_id).toBe(body.hot_spot_id);
+    // A repeat is counted against the open notification and widens its selection.
+    expect(["female", "both"]).toContain(report.selection);
+    if (!repeated) expect(report.status).toBe("awaiting_supply");
+    // The manager's Orders tab lists it from GET /orders/stockouts.
+    const reports = await listStockouts();
+    expect(reports.map((r) => r.id)).toContain(report.id);
   });
 });

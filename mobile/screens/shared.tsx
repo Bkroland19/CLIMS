@@ -193,7 +193,13 @@ export function Me() {
           }}
         />
       </List>
-      <Sheet visible={outbox} title="Waiting to send" onClose={() => setOutbox(false)}>
+      <Sheet
+        visible={outbox}
+        title="Waiting to send"
+        icon="clock"
+        tone={offline ? "warning" : "info"}
+        onClose={() => setOutbox(false)}
+      >
         {offline ? (
           <Txt style={{ marginHorizontal: 24, marginBottom: 12, color: T.fg2, ...TYPE.subhead }}>
             These will send automatically when the phone is back online.

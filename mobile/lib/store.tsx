@@ -20,6 +20,8 @@ import {
   toLocalHotspot,
 } from "./hotspots";
 import {
+  acknowledgeErrorMessage,
+  acknowledgeStockout,
   currentStockoutRequest,
   reportStockout,
   stockoutErrorMessage,
@@ -163,8 +165,9 @@ function apply(
         },
       };
     }
-    case "stockout": {
-      // `p.order` comes from toLocalOrder: the API's alert with its UUID.
+    case "stockout":
+    case "acknowledge": {
+      // `p.order` comes from toLocalOrder: the API's copy of the notification, by its UUID.
       const order = p.order as DomainState["orders"][number];
       return {
         id: order.id,
@@ -385,8 +388,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (it.type === "stockout" && it.payload?.request) {
           const { request, hotspot, product } = it.payload;
           try {
-            const res = await reportStockout(currentStockoutRequest(request, product));
-            const order = toLocalOrder(res, { hotspot, product }, me.name);
+            const { report } = await reportStockout(currentStockoutRequest(request, product));
+            const order = toLocalOrder(
+              report,
+              me.name,
+              it.role === "hm" ? "Hotspot manager" : "VHT",
+            );
             commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
           } catch (err) {
             if (isNetworkError(err)) break;
@@ -402,6 +409,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   role: "System",
                   actor: "CLIMS",
                   text: `Couldn't send the stock request for ${hotspot}. ${stockoutErrorMessage(err)}`,
+                  to: [it.role],
+                },
+                ...cur.events,
+              ],
+            });
+          }
+          continue;
+        }
+        if (it.type === "acknowledge" && it.payload?.request) {
+          const { id, request, hotspot } = it.payload;
+          try {
+            const d = await acknowledgeStockout(id, request);
+            const order = toLocalOrder(d, me.name, "Hotspot manager");
+            commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
+          } catch (err) {
+            if (isNetworkError(err)) break;
+            const cur = drop(ref.current);
+            const now = Date.now();
+            commit({
+              ...cur,
+              events: [
+                {
+                  id: `EV-${now}-${it.id}`,
+                  t: now,
+                  ref: id,
+                  role: "System",
+                  actor: "CLIMS",
+                  text: `Couldn't record what arrived at ${hotspot}. ${acknowledgeErrorMessage(err)}`,
                   to: [it.role],
                 },
                 ...cur.events,

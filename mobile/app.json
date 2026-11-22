@@ -36,10 +36,10 @@
           "image": "./assets/images/splash-logo.png",
           "imageWidth": 192,
           "resizeMode": "contain",
-          "backgroundColor": "#f7faf3",
+          "backgroundColor": "#f2f4ef",
           "dark": {
             "image": "./assets/images/splash-logo-dark.png",
-            "backgroundColor": "#10140f"
+            "backgroundColor": "#0a0e0a"
           },
           "ios": {
             "backgroundColor": "#f2f2f7",
@@ -48,9 +48,9 @@
             }
           },
           "android": {
-            "backgroundColor": "#f7faf3",
+            "backgroundColor": "#f2f4ef",
             "dark": {
-              "backgroundColor": "#10140f"
+              "backgroundColor": "#0a0e0a"
             }
           }
         }

@@ -208,9 +208,17 @@ export function submitErrorMessage(err: unknown): string {
 
 const CACHE = "clims.places.v1.";
 
-/** GET a lookup list, falling back to the last copy saved on this phone when offline. */
-async function places(path: string, params?: Record<string, string>): Promise<Place[]> {
-  const key = CACHE + path + (params ? `?${new URLSearchParams(params)}` : "");
+/**
+ * GET a lookup list from the shared location API (GET /locations/*), falling back to the last copy
+ * saved on this phone when offline. `cacheAs` keeps the key lists were saved under before the
+ * /hotspots/* lookups were removed, so places already on the phone still work offline.
+ */
+async function places(
+  path: string,
+  cacheAs: string,
+  params?: Record<string, string>,
+): Promise<Place[]> {
+  const key = CACHE + cacheAs + (params ? `?${new URLSearchParams(params)}` : "");
   try {
     const { data } = await api.get<{ data: Place[] }>(path, { params });
     const list = [...data.data].sort((a, b) => a.name.localeCompare(b.name));
@@ -223,11 +231,11 @@ async function places(path: string, params?: Record<string, string>): Promise<Pl
   }
 }
 
-export const listRegions = () => places("/hotspots/regions");
+export const listRegions = () => places("/locations/regions", "/hotspots/regions");
 export const listDistricts = (regionId: string) =>
-  places("/hotspots/districts", { region_id: regionId });
+  places("/locations/districts", "/hotspots/districts", { region_id: regionId });
 export const listSubcounties = (districtId: string) =>
-  places("/hotspots/subcounties", { district_id: districtId });
+  places("/locations/subcounties", "/hotspots/subcounties", { district_id: districtId });
 
 /** Sample places for demo sign-ins, which have no API session. */
 export const DEMO_PLACES = {

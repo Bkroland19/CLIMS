@@ -37,6 +37,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// slowRequests gives each API call in these tests time to finish. Accounts made through the API
+// hash passwords at bcrypt's default cost, which takes over a second per hash under -race, beyond
+// app.Test's one-second default.
+var slowRequests = fiber.TestConfig{Timeout: 30 * time.Second, FailOnTimeout: true}
+
 func TestAuthRBACIntegration(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
@@ -181,7 +186,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 		if token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
-		res, err := app.Test(req)
+		res, err := app.Test(req, slowRequests)
 		if err != nil {
 			t.Fatal(err)
 		}

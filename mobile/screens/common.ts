@@ -14,11 +14,22 @@ export const stockTone = (T: Tokens, q: number, k: ProductKey): [string, string]
       ? [T.warnFg, "Running low"]
       : [T.fg, "In stock"];
 
+/**
+ * Stock tiles for a hotspot. The meter is full at twice the running-low level, so the low tick
+ * sits in the middle and a half-empty bar means "order soon".
+ */
 export const stockStats = (T: Tokens, h: Hotspot): Stat[] =>
   PRODUCTS.map((p) => {
     const q = h.stock[p.k];
     const [fg, note] = stockTone(T, q, p.k);
-    return { label: `${p.short} condoms`, value: num(q), fg, note };
+    const color = q === 0 ? T.danger : q < LOW[p.k] ? T.warnFg : T.tint;
+    return {
+      label: `${p.short} condoms`,
+      value: num(q),
+      fg,
+      note,
+      meter: { fill: q / (2 * LOW[p.k]), mark: 0.5, color },
+    };
   });
 
 export const firstName = (n: string) => n.split(" ")[0] ?? n;

@@ -126,7 +126,7 @@ export interface OutboxItem {
 }
 
 export type ActionType =
-  "notify" | "stockout" | "mapHotspot" | "confirmReceipt" | "pickup" | "deliver";
+  "notify" | "stockout" | "acknowledge" | "mapHotspot" | "confirmReceipt" | "pickup" | "deliver";
 
 export interface DomainState {
   hotspots: Hotspot[];

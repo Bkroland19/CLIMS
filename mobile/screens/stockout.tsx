@@ -13,7 +13,6 @@ import {
   Row,
   Search,
   Seg,
-  Select,
   Sheet,
   SkeletonList,
 } from "@/components/m/kit";
@@ -36,8 +35,8 @@ import { matches } from "./common";
 type Reason = "Out of stock" | "Running low";
 
 /**
- * A signed-in VHT's stock request: a stockout alert for a hotspot and a condom category, male,
- * female or both (POST /orders/stockouts). The district's DCFP decides what to send and how much.
+ * A signed-in VHT's or hotspot manager's stock request: a stockout notification for a hotspot naming
+ * Male, Female or Both (POST /orders/stockouts). The district's DCFP decides what and how much to send.
  */
 export function StockoutForm({
   hotspotId,
@@ -105,14 +104,14 @@ export function StockoutForm({
   const [selId, setSel] = useState<string | undefined>(hotspotId);
   // Opened from a hotspot's page, it may not be in the pages loaded so far.
   const sel = hotspots.find((h) => h.id === selId) ?? s.hotspots.find((h) => h.id === selId);
-  const [category, setCategory] = useState<Category | "">("");
+  const [category, setCategory] = useState<Category | null>(null);
   const [reason, setReason] = useState<Reason>("Out of stock");
   const [comment, setComment] = useState("");
   const [pick, setPick] = useState(false);
   const [pq, setPq] = useState("");
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState("");
-  const [done, setDone] = useState<"sent" | "queued" | null>(null);
+  const [done, setDone] = useState<"sent" | "repeated" | "queued" | null>(null);
 
   // Pick the only choices for the VHT.
   const hotspot:
@@ -122,6 +121,7 @@ export function StockoutForm({
       : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
   const tooLong = comment.trim().length > COMMENT_MAX;
   const ready = !!hotspot && !!category && !tooLong && !busy;
+  const what = category ? CATEGORY_LABEL[category].toLowerCase() : "condoms";
 
   const submit = async () => {
     if (!hotspot || !category) return;
@@ -140,9 +140,10 @@ export function StockoutForm({
     }
     setBusy(true);
     try {
-      const res = await reportStockout(request);
-      send("stockout", { order: toLocalOrder(res, names, me.name) }, label);
-      setDone("sent");
+      const { report, repeated } = await reportStockout(request);
+      const byRole = fixed ? "Hotspot manager" : "VHT";
+      send("stockout", { order: toLocalOrder(report, me.name, byRole) }, label);
+      setDone(repeated ? "repeated" : "sent");
     } catch (e) {
       if (isNetworkError(e)) {
         queue("stockout", { request, ...names }, label);
@@ -161,7 +162,12 @@ export function StockoutForm({
         {done === "sent" ? (
           <Done
             title="Stock request sent"
-            body={`${hotspot?.district || "The district"} focal person is notified about ${category ? CATEGORY_LABEL[category].toLowerCase() : "condoms"} at ${hotspot?.name} and decides how much to send.`}
+            body={`${hotspot?.district || "The district"} focal person is notified that ${hotspot?.name} needs ${what} and decides how much to send.`}
+          />
+        ) : done === "repeated" ? (
+          <Done
+            title="Added to the open request"
+            body={`${hotspot?.name} already has a request the district hasn't fulfilled yet. Your message was added to it, so the focal person sees it's still needed.`}
           />
         ) : (
           <Done
@@ -208,14 +214,15 @@ export function StockoutForm({
         <Note text="Only active hotspots can get stock. New hotspots become active when the district focal person approves them." />
       ) : null}
       <Fields h="What's needed" f="The district focal person decides how much to send.">
-        <Select
-          label="Condom type"
-          value={category}
-          options={(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => ({
-            v: c,
-            l: CATEGORY_LABEL[c],
-          }))}
-          onChange={(v) => setCategory(v as Category)}
+        <Seg
+          label="Out of"
+          options={[
+            ["male", "Male"],
+            ["female", "Female"],
+            ["both", "Both"],
+          ]}
+          value={category ?? undefined}
+          onChange={setCategory}
         />
         <Seg
           label="What's happening?"

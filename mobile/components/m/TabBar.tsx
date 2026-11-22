@@ -1,5 +1,5 @@
-import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { AccessibilityInfo, Animated, Pressable, StyleSheet, View } from "react-native";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -36,6 +36,45 @@ function useBadges(): Partial<Record<TabKey, number>> {
   };
 }
 
+/** The selected tab's pill: grows in from the centre when the tab becomes active. */
+function Pill({ on, width }: { on: boolean; width: number }) {
+  const T = useT();
+  const [v] = useState(() => new Animated.Value(on ? 1 : 0));
+  useEffect(() => {
+    let live = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .catch(() => false)
+      .then((reduce) => {
+        if (!live) return;
+        if (reduce) v.setValue(on ? 1 : 0);
+        else
+          Animated.spring(v, {
+            toValue: on ? 1 : 0,
+            damping: 18,
+            stiffness: 260,
+            useNativeDriver: true,
+          }).start();
+      });
+    return () => {
+      live = false;
+    };
+  }, [on, v]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        width,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: T.tabPill,
+        opacity: v,
+        transform: [{ scaleX: v.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
+      }}
+    />
+  );
+}
+
 export default function TabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const T = useT();
   const insets = useSafeAreaInsets();
@@ -51,8 +90,9 @@ export default function TabBar({ state, emitter, navigateToTab }: BottomTabBarPr
     <View
       style={{
         backgroundColor: T.tabBg,
-        borderTopWidth: T.ios ? StyleSheet.hairlineWidth : 0,
-        borderTopColor: T.tabBd,
+        // A hairline edge, matching the header's, so both bars frame the page the same way.
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: T.ios ? T.tabBd : T.cardBd,
         paddingTop: beside ? 6 : T.ios ? 6 : 12,
         paddingBottom: Math.max(insets.bottom, beside ? 6 : T.ios ? 6 : 16),
         paddingLeft: insets.left,
@@ -101,26 +141,36 @@ export default function TabBar({ state, emitter, navigateToTab }: BottomTabBarPr
                 paddingHorizontal: 2,
               }}
             >
-              {/* Active tab: icon and label turn the brand colour; no background pill. */}
+              {/* Active tab: a tinted pill grows in behind the icon, which takes the brand colour. */}
               <View
                 style={{
-                  width: 32,
-                  height: T.ios ? 28 : 32,
+                  width: beside ? 48 : 64,
+                  height: 32,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Icon name={d.icon} size={T.ios ? 25 : 24} color={fg} strokeWidth={on ? 2.4 : 2} />
+                <Pill on={on} width={beside ? 48 : 64} />
+                {/* Own layer, so the pill behind never paints over the icon. */}
+                <View style={{ zIndex: 1 }}>
+                  <Icon
+                    name={d.icon}
+                    size={T.ios ? 25 : 24}
+                    color={fg}
+                    strokeWidth={on ? 2.4 : 2}
+                  />
+                </View>
                 {b > 0 ? (
                   <View
                     style={{
                       position: "absolute",
-                      top: T.ios ? -2 : 0,
-                      left: 20,
+                      top: -2,
+                      left: beside ? 28 : 36,
                       minWidth: 18,
                       height: 18,
                       borderRadius: 9,
                       paddingHorizontal: 5,
+                      zIndex: 2,
                       backgroundColor: T.ios ? "#ff3b30" : "#ba1a1a",
                       alignItems: "center",
                       justifyContent: "center",
