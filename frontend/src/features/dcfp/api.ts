@@ -27,8 +27,9 @@ const stockoutReportSchema = z.object({
     contact_name: text,
     contact_phone: text,
   }),
-  condom_id: z.string(),
-  /** The product as the API names it, e.g. "Engabu Free Female". */
+  /** Null for a notification sent as Male, Female or Both rather than for one product. */
+  condom_id: z.string().nullable(),
+  /** The product as the API names it, e.g. "Engabu Free Female", or the selection, e.g. "male condoms". */
   product: z.string(),
   district_store_id: z.string(),
   reported_by_id: z.string(),

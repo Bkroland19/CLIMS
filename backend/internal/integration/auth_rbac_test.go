@@ -25,6 +25,7 @@ import (
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
+	"clims-backend/internal/features/reports"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -153,6 +154,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	orders.RegisterRoutes(v1, orders.NewRepository(pool, notifier), jwtMiddleware, activeUser)
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(pool, notifier), jwtMiddleware, activeUser)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(pool), jwtMiddleware, activeUser)
+	reports.RegisterRoutes(v1, reports.NewRepository(pool), jwtMiddleware, activeUser)
 	locations.RegisterRoutes(v1, locations.NewHandler(pool), jwtMiddleware, activeUser)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(pool), jwtMiddleware, activeUser)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(pool), jwtMiddleware, activeUser)

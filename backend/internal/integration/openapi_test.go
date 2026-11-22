@@ -18,6 +18,7 @@ import (
 	"clims-backend/internal/features/notifications"
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
+	"clims-backend/internal/features/reports"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -38,6 +39,7 @@ func documentationApp() *fiber.App {
 	orders.RegisterRoutes(v1, orders.NewRepository(nil, notifications.NewService()), jwt, active)
 	hotspots.RegisterRoutes(v1, hotspots.NewRepository(nil, notifications.NewService()), jwt, active)
 	inventory.RegisterRoutes(v1, inventory.NewRepository(nil), jwt, active)
+	reports.RegisterRoutes(v1, reports.NewRepository(nil), jwt, active)
 	locations.RegisterRoutes(v1, locations.NewHandler(nil), jwt, active)
 	notifications.RegisterRoutes(v1, notifications.NewRepository(nil), jwt, active)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(nil), jwt, active)

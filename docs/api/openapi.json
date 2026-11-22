@@ -40,6 +40,9 @@
       "name": "Notifications"
     },
     {
+      "name": "Reports"
+    },
+    {
       "name": "Health"
     }
   ],
@@ -115,10 +118,20 @@
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Report a hotspot stockout to its district's DCFPs",
-        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a product, with an optional message, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the product, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`.",
+        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a product, with an optional message, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the product, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. Inactive products are rejected with 422 and `error.condom_id`. The notification names Male, Female or Both (selection) and no quantity. If the hotspot already has an open notification, the message is counted against it (200): its repeat_count rises and its selection widens when a new type is named (Male then Female is Both), and the history keeps both.",
         "responses": {
           "201": {
             "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutReportResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Counted against the hotspot's open notification",
             "content": {
               "application/json": {
                 "schema": {
@@ -424,9 +437,7 @@
           {
             "name": "status",
             "in": "query",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "limit",
@@ -3633,6 +3644,423 @@
           }
         ]
       }
+    },
+    "/api/v1/orders/stockouts/{id}": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "getStockoutReport",
+        "summary": "Get a stockout notification with its deliveries and history",
+        "description": "Requires orders:read and the same visibility as the list. Shows the deliveries, per-line acknowledgements and every event behind the notification's status.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/stockouts/{id}/deliveries": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "recordHotspotDelivery",
+        "summary": "Record a district delivery to the hotspot",
+        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Each line is a product of a selected type in its catalogue unit, converted to pieces; it comes out of the store's available stock (409 when too little) and is written to the inventory ledger as a hotspot_delivery. The hotspot's manager accounts are notified. A fulfilled notification refuses deliveries (409).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotspotDeliveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "A retried send matched an existing delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/stockouts/{id}/acknowledgements": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "acknowledgeHotspotDelivery",
+        "summary": "Acknowledge pieces received at the hotspot",
+        "description": "Requires orders:stockout and the notification's hotspot as your assigned hotspot. Only the hotspot's manager acknowledges: district and national users cannot complete fulfilment. Each line records the pieces actually received. Sending a line's count again is accepted once; a different count for an acknowledged line returns 409. The notification is fulfilled when every selected type has a positive acknowledgement, and the district is notified.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/notifications": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getNotificationReport",
+        "summary": "Hotspot notification fulfilment",
+        "description": "Notifications raised in the period, their fulfilment (manager acknowledgement of every selected type), fulfilment rate, product components, response time, deadline progress, the earlier backlog, overdue acknowledgements and a comparison by district, all calculated from source records on request. Requires reports:read. orders:all_stores sees every notification; others see their district store's, their hotspot's, the ones they sent and, with orders:stockout_district, the district they work in. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "description": "One hotspot.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Assess one product type: notifications that include it, and its component.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "deadline_days",
+            "in": "query",
+            "description": "Days within which acknowledgement counts as on time.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 7
+            }
+          },
+          {
+            "name": "target_percent",
+            "in": "query",
+            "description": "On-time target.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 80
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/notifications/records": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listNotificationRecords",
+        "summary": "Notifications behind the report totals",
+        "description": "The notifications behind /reports/notifications for the same filters, newest first, with delivered and acknowledged pieces per type. Requires reports:read. orders:all_stores sees every notification; others see their district store's, their hotspot's, the ones they sent and, with orders:stockout_district, the district they work in. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hot_spot_id",
+            "in": "query",
+            "description": "One hotspot.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Assess one product type: notifications that include it, and its component.",
+            "schema": {
+              "type": "string",
+              "enum": ["male", "female"]
+            }
+          },
+          {
+            "name": "deadline_days",
+            "in": "query",
+            "description": "Days within which acknowledgement counts as on time.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 7
+            }
+          },
+          {
+            "name": "target_percent",
+            "in": "query",
+            "description": "On-time target.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 80
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "One status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fulfilled",
+                "partly_received",
+                "awaiting_acknowledgement",
+                "awaiting_supply"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3648,15 +4076,21 @@
       "OrderStockoutRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["hot_spot_id", "condom_id"],
+        "required": ["hot_spot_id"],
         "properties": {
           "hot_spot_id": {
             "type": "string",
             "format": "uuid"
           },
+          "selection": {
+            "type": "string",
+            "enum": ["male", "female", "both"],
+            "description": "Male, Female or Both. Required unless condom_id is sent."
+          },
           "condom_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Older clients: one product, whose category becomes the selection."
           },
           "comment": {
             "type": "string",
@@ -3665,7 +4099,7 @@
             "description": "The message the DCFP reads in the notification."
           }
         },
-        "description": "A stockout report names the hotspot and product, with an optional message for the DCFP. It carries no quantity: the DCFP decides what to order from the warehouse."
+        "description": "A stockout notification names Male, Female or Both and no quantity."
       },
       "OrderActionRequest": {
         "type": "object",
@@ -6212,13 +6646,17 @@
           "id",
           "hot_spot_id",
           "hot_spot",
-          "condom_id",
           "product",
           "district_store_id",
           "reported_by_id",
           "reported_by",
           "comment",
-          "created_at"
+          "created_at",
+          "selection",
+          "repeat_count",
+          "last_reported_at",
+          "status",
+          "fulfilled_at"
         ],
         "properties": {
           "id": {
@@ -6268,7 +6706,9 @@
           },
           "condom_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Set only for notifications sent by product."
           },
           "product": {
             "type": "string",
@@ -6294,6 +6734,29 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "selection": {
+            "type": "string",
+            "enum": ["male", "female", "both"]
+          },
+          "repeat_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Messages repeated against this open notification."
+          },
+          "last_reported_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply"]
+          },
+          "fulfilled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the last acknowledgement needed for every selected type was recorded."
           }
         }
       },
@@ -6326,6 +6789,524 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StockoutReport"
+            }
+          }
+        }
+      },
+      "StockoutDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StockoutReport"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "deliveries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "delivered_by_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "client_reference": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": ["male", "female"]
+                          },
+                          "condom_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "product": {
+                            "type": "string"
+                          },
+                          "unit_of_measure_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          },
+                          "pieces": {
+                            "type": "integer"
+                          },
+                          "acknowledged_pieces": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "acknowledged_by_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "acknowledged_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "actor_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "raised",
+                        "repeated",
+                        "selection_changed",
+                        "delivered",
+                        "acknowledged"
+                      ]
+                    },
+                    "selection": {
+                      "type": "string",
+                      "enum": ["male", "female", "both"]
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "StockoutDetailResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockoutDetail"
+          }
+        }
+      },
+      "HotspotDeliveryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lines"],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["condom_id", "quantity"],
+              "properties": {
+                "condom_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "unit_of_measure_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Must be the product's catalogue unit, which is the default."
+                }
+              }
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          },
+          "client_reference": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "description": "Chosen by the client; a retried send with the same reference records the delivery once (200)."
+          }
+        }
+      },
+      "AcknowledgementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lines"],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["line_id", "pieces"],
+              "properties": {
+                "line_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "pieces": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000000,
+                  "description": "Pieces actually received; zero when nothing arrived."
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotificationSummary": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "data_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgements_through": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Acknowledgements recorded up to this time are included."
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "notifications_raised": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Distinct notifications raised in the period; repeats are not counted again."
+          },
+          "by_selection": {
+            "type": "object",
+            "properties": {
+              "male": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "female": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "both": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "notifications_fulfilled": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Raised in the period and fully acknowledged by data_updated_at."
+          },
+          "partly_received": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "awaiting_acknowledgement": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "awaiting_supply": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fulfilment_rate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+          },
+          "component": {
+            "type": "object",
+            "nullable": true,
+            "description": "With category: that type's part of each notification including it. A Both notification counts under each type, so the two components exceed unique notifications.",
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "notifications": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "fulfilled": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "rate": {
+                "type": "number",
+                "nullable": true,
+                "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+              }
+            }
+          },
+          "response": {
+            "type": "object",
+            "properties": {
+              "median_hours": {
+                "type": "number",
+                "nullable": true,
+                "description": "Median time from notification to the last acknowledgement needed, among fulfilled notifications."
+              },
+              "fulfilled_included": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "pending": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "oldest_pending_hours": {
+                "type": "number",
+                "nullable": true
+              }
+            }
+          },
+          "deadline": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer"
+              },
+              "target_percent": {
+                "type": "integer"
+              },
+              "fulfilled_on_time": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "on_time_rate": {
+                "type": "number",
+                "nullable": true,
+                "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+              },
+              "target_met": {
+                "type": "boolean",
+                "nullable": true
+              },
+              "late_pending": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Still open and past the deadline."
+              }
+            }
+          },
+          "backlog": {
+            "type": "object",
+            "description": "Open notifications raised before the period, kept apart from it.",
+            "properties": {
+              "open": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "oldest_raised_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          },
+          "acknowledgement_overdue": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Quality issue: notifications with a delivery unacknowledged for longer than the deadline."
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "district_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "district": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "notifications_raised": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "notifications_fulfilled": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "fulfilment_rate": {
+                  "type": "number",
+                  "nullable": true,
+                  "description": "Percentage to one decimal; null is Not applicable (no notifications)."
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotificationRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot": {
+            "type": "string",
+            "nullable": true
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "selection": {
+            "type": "string",
+            "enum": ["male", "female", "both"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply"]
+          },
+          "raised_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_reported_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repeat_count": {
+            "type": "integer"
+          },
+          "delivered_male_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delivered_female_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "received_male_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "received_female_pieces": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fulfilled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "response_hours": {
+            "type": "number",
+            "nullable": true
+          },
+          "acknowledgement_overdue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificationSummaryResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationSummary"
+          }
+        }
+      },
+      "NotificationRecordListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationRecord"
             }
           }
         }

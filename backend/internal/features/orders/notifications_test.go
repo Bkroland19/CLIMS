@@ -53,12 +53,12 @@ func TestNotifyingStepsHaveRegisteredTypes(t *testing.T) {
 func TestStockoutData(t *testing.T) {
 	text := func(value string) *string { return &value }
 	full := StockoutReport{
-		ID: "r1", HotSpotID: "h1", CondomID: "c1", Product: "Engabu Free Female", ReportedBy: "Grace Nakato",
+		ID: "r1", HotSpotID: "h1", CondomID: text("c1"), Product: "Engabu Free Female", ReportedBy: "Grace Nakato",
 		Comment: text("  Dispenser empty since Monday "), CreatedAt: time.Now(),
 		HotSpot: StockoutHotSpot{Name: "Kisenyi Landing", Village: text("Kisenyi"), Subcounty: text("Central"),
 			District: text("Kampala"), ContactName: text("Peter"), ContactPhone: text("0700000000")},
 	}
-	bare := StockoutReport{ID: "r2", HotSpotID: "h2", CondomID: "c1", Product: "condoms", ReportedBy: "a VHT",
+	bare := StockoutReport{ID: "r2", HotSpotID: "h2", CondomID: text("c1"), Product: "condoms", ReportedBy: "a VHT",
 		HotSpot: StockoutHotSpot{Name: "Bar 7", ContactPhone: text("0711111111")}}
 	cases := []struct {
 		name   string
@@ -110,4 +110,53 @@ func render(t *testing.T, text string, data map[string]any) string {
 		t.Fatal(err)
 	}
 	return out.String()
+}
+
+func TestSelections(t *testing.T) {
+	for _, tc := range []struct{ open, reported, want string }{
+		{"male", "male", "male"}, {"male", "female", "both"}, {"female", "male", "both"},
+		{"both", "male", "both"}, {"female", "both", "both"},
+	} {
+		if got := combineSelections(tc.open, tc.reported); got != tc.want {
+			t.Errorf("%s then %s = %s, want %s", tc.open, tc.reported, got, tc.want)
+		}
+	}
+	if !selected("both", "female") || !selected("male", "male") || selected("male", "female") {
+		t.Error("selected does not match the selection rules")
+	}
+	for _, s := range []string{"male", "female", "both"} {
+		if !ValidSelection(s) {
+			t.Errorf("%s should be valid", s)
+		}
+	}
+	if ValidSelection("Male") || ValidSelection("") {
+		t.Error("selections are lower case and required")
+	}
+}
+
+func TestDeliveryNotifications(t *testing.T) {
+	pieces := func(n int32) *int32 { return &n }
+	lines := []DeliveryLine{{Category: "male", Pieces: 300, AcknowledgedPieces: pieces(290)},
+		{Category: "female", Pieces: 100}}
+	if got := piecesSummary(lines, false); got != "300 male and 100 female pieces" {
+		t.Errorf("delivered summary %q", got)
+	}
+	if got := piecesSummary(lines, true); got != "290 male pieces" {
+		t.Errorf("acknowledged summary %q", got)
+	}
+	types := map[string]string{}
+	for _, typ := range NotificationTypes() {
+		types[typ.Name] = typ.Body
+	}
+	if body := render(t, types["order.hotspot_delivery"], map[string]any{"report_id": "r", "hotspot": "Bar 7",
+		"pieces": "300 male pieces"}); !strings.Contains(body, "300 male pieces") {
+		t.Errorf("delivery body %q", body)
+	}
+	for fulfilled, want := range map[bool]string{true: "is fulfilled", false: "stays open"} {
+		body := render(t, types["order.delivery_acknowledged"], map[string]any{"report_id": "r", "hotspot": "Bar 7",
+			"pieces": "290 male pieces", "fulfilled": fulfilled})
+		if !strings.Contains(body, want) {
+			t.Errorf("acknowledged body %q lacks %q", body, want)
+		}
+	}
 }
