@@ -54,8 +54,8 @@ live("stockout alerts against a running backend", () => {
 
     const body = {
       hot_spot_id: hotspots[0].id,
-      selection: "male" as const,
-      comment: stockoutComment("Out of stock", "VHT live check"),
+      condom_category: "male" as const,
+      message: stockoutComment("Out of stock", "VHT live check"),
     };
     const res = await reportStockout(body).catch((e: unknown) => e);
     if (isAxiosError(res)) {
@@ -75,8 +75,8 @@ live("stockout alerts against a running backend", () => {
     const user = await signIn(env.CLIMS_LIVE_HM_LOGIN, env.CLIMS_LIVE_HM_PASSWORD);
     const body = {
       hot_spot_id: user.hot_spot_id!,
-      selection: "female" as const,
-      comment: stockoutComment("Running low", "Hotspot manager live check"),
+      condom_category: "female" as const,
+      message: stockoutComment("Running low", "Hotspot manager live check"),
     };
     const { report, repeated } = await reportStockout(body);
     expect(report.hot_spot_id).toBe(body.hot_spot_id);

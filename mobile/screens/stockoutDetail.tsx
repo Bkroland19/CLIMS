@@ -23,7 +23,7 @@ import {
   acknowledgeStockout,
   getStockout,
   savedStockout,
-  SELECTION_LABEL,
+  CATEGORY_LABEL,
   stockoutProduct,
   toLocalOrder,
   unacknowledged,
@@ -37,9 +37,9 @@ import { usePending, useStore } from "@/lib/store";
 type Load = "loading" | "ok" | "offline" | "forbidden" | "missing" | "error";
 
 const EVENT_TEXT: Record<StockoutEvent["action"], (e: StockoutEvent) => string> = {
-  raised: (e) => `Reported out of ${SELECTION_LABEL[e.selection].toLowerCase()}`,
+  raised: (e) => `Reported out of ${CATEGORY_LABEL[e.selection].toLowerCase()}`,
   repeated: () => "Reported again",
-  selection_changed: (e) => `Now asking for ${SELECTION_LABEL[e.selection].toLowerCase()}`,
+  selection_changed: (e) => `Now asking for ${CATEGORY_LABEL[e.selection].toLowerCase()}`,
   delivered: () => "District recorded a delivery",
   acknowledged: () => "Hotspot manager confirmed what arrived",
 };
@@ -317,7 +317,7 @@ export function StockoutScreen({ id }: { id: string }) {
         </List>
       ))}
       <List h="Request">
-        <Row t="Out of" v={SELECTION_LABEL[d.selection]} />
+        <Row t="Out of" v={CATEGORY_LABEL[d.selection]} />
         <Row t="Raised by" v={d.reported_by === me.name ? "You" : d.reported_by} />
         {d.repeat_count > 0 ? (
           <Row

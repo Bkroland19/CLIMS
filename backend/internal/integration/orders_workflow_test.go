@@ -82,9 +82,13 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	// 1. A stockout is a report with a message. It carries no quantity and creates no order.
 	var ordersBefore int
 	scalar(&ordersBefore, `SELECT count(*) FROM orders`)
-	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": product, "quantity_needed": 50}, hotspotToken, 400)
+	// Requests name a condom category; the product's category is the one these checks use.
+	var category string
+	scalar(&category, `SELECT category FROM condoms WHERE id = $1`, product)
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_category": category, "quantity_needed": 50}, hotspotToken, 400)
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": product}, hotspotToken, 400)
 	report := request("POST", "/orders/stockouts", map[string]any{
-		"hot_spot_id": hotSpot, "condom_id": product, "comment": "Dispenser empty since Monday",
+		"hot_spot_id": hotSpot, "condom_category": category, "message": "Dispenser empty since Monday",
 	}, hotspotToken, 201)["data"].(map[string]any)
 	reportID := report["id"].(string)
 	if report["district_store_id"] != district || report["hot_spot_id"] != hotSpot || report["order_status"] != nil ||
@@ -129,12 +133,12 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	// A hotspot without a district cannot route a report.
 	var noDistrictHotSpot string
 	scalar(&noDistrictHotSpot, `SELECT id FROM hot_spots WHERE district_id IS NULL LIMIT 1`)
-	if message := request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": noDistrictHotSpot, "condom_id": product},
+	if message := request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": noDistrictHotSpot, "condom_category": category},
 		admin, 422)["message"]; message != "hotspot has no district with a store; set the hotspot's district" {
 		t.Fatalf("hotspot without a district: %v", message)
 	}
 
-	// 2. The DCFP orders a product and quantity from NMS or JMS for the district store.
+	// 2. The DCFP orders a condom category and quantity from NMS or JMS for the district store.
 	order := func(token string, body map[string]any, code int) map[string]any {
 		t.Helper()
 		result := request("POST", "/orders/warehouse-requests", body, token, code)
@@ -148,7 +152,8 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	scalar(&catalogueUnit, `SELECT unit_id FROM condoms WHERE id = $1`, product)
 	defer exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, catalogueUnit)
 	exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, unit)
-	valid := map[string]any{"warehouse_store_id": warehouse, "condom_id": product, "quantity": 50, "comment": "Two hotspots are out"}
+	valid := map[string]any{"warehouse_store_id": warehouse, "condom_category": category, "quantity": 50,
+		"unit_of_measure_id": unit, "comment": "Two hotspots are out"}
 	with := func(changes map[string]any) map[string]any {
 		body := map[string]any{}
 		for k, v := range valid {
@@ -165,25 +170,23 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		t.Fatalf("a district store was accepted as the warehouse: %v", res)
 	}
 	order(districtToken, with(map[string]any{"quantity": 0}), 422)
-	order(districtToken, with(map[string]any{"condom_id": "not-a-uuid"}), 422)
+	if res := order(districtToken, with(map[string]any{"condom_category": "both"}), 422); res["error"].(map[string]any)["condom_category"] == nil {
+		t.Fatalf("a warehouse request must name male or female: %v", res)
+	}
+	order(districtToken, with(map[string]any{"unit_of_measure_id": ""}), 422)
+	order(districtToken, with(map[string]any{"condom_id": product}), 400) // the warehouse chooses the product
 	order(districtToken, with(map[string]any{"hot_spot_id": hotSpot}), 400)
-	order(districtToken, with(map[string]any{"condom_id": "00000000-0000-4000-8000-000000000001"}), 422)
-	// Without a unit, the order uses the product's catalogue unit; a product without one needs it given.
 	created := order(districtToken, valid, 201)
 	if created["order_status"] != "queued" || created["ordered_for_store_id"] != district || created["ordered_from_store_id"] != warehouse ||
 		created["quantity_needed"] != float64(50) || created["unit_of_measure_id"] != unit || created["hot_spot_id"] != nil ||
-		created["parent_order_id"] != nil || created["comment"] != "Two hotspots are out" {
+		created["parent_order_id"] != nil || created["comment"] != "Two hotspots are out" ||
+		created["condom_id"] != nil || created["condom_category"] != category {
 		t.Fatalf("unexpected warehouse order: %v", created)
 	}
-	exec(`UPDATE condoms SET unit_id = NULL WHERE id = $1`, product)
-	if res := order(districtToken, valid, 422); res["error"].(map[string]any)["unit_of_measure_id"] == nil {
-		t.Fatalf("an order without a unit was accepted: %v", res)
-	}
-	exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, unit)
 	orderID := created["id"].(string)
 	orderPath := "/orders/" + orderID
 	if requested := inbox(warehouseToken, "order", orderID, "order.replenishment_requested"); requested == nil ||
-		!strings.Contains(requested["body"].(string), "ordered 50 ") {
+		!strings.Contains(requested["body"].(string), "ordered 50 ") || !strings.Contains(requested["body"].(string), category+" condoms") {
 		t.Fatalf("warehouse order notification: %v", requested)
 	}
 
@@ -208,7 +211,17 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		request("POST", orderPath+"/actions/"+gone, nil, districtToken, 404)
 	}
 	act("check-stock", warehouseToken, nil, 409, "")
-	act("review", warehouseToken, nil, 200, "reviewed")
+	// The warehouse chooses the product, of the category requested.
+	act("review", warehouseToken, nil, 422, "")
+	act("review", warehouseToken, map[string]any{"condom_id": "not-a-uuid"}, 422, "")
+	var otherCategory *string
+	scalar(&otherCategory, `SELECT (SELECT id::text FROM condoms WHERE category IN ('male', 'female') AND category <> $1 LIMIT 1)`, category)
+	if otherCategory != nil {
+		act("review", warehouseToken, map[string]any{"condom_id": *otherCategory}, 422, "")
+	}
+	if reviewed := act("review", warehouseToken, map[string]any{"condom_id": product}, 200, "reviewed"); reviewed["condom_id"] != product {
+		t.Fatalf("the warehouse's product choice was not kept: %v", reviewed)
+	}
 	act("check-stock", warehouseToken, nil, 200, "on_hold")
 	// Warehouse stock arrives through the inventory API, so the ledger accounts for every unit.
 	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": product,

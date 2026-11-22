@@ -5,29 +5,27 @@ import type { Order, OrderStatus } from "./types";
 
 /**
  * Hotspot stockout notifications against the Go API (docs/api/openapi.json, `OrderStockoutRequest`
- * and `StockoutReport`, and docs/modules/orders.md). A notification names a hotspot and what it is out
- * of (Male, Female or Both) and no quantity; the district's DCFP decides what to send. A hotspot with
- * an open notification doesn't raise a second one: the API counts the message against the open one
- * (200 instead of 201) and widens its selection, so Male then Female becomes Both.
+ * and `StockoutReport`, and docs/modules/orders.md). A notification names a hotspot and a condom
+ * category (male, female or both) and no product or quantity; the district's DCFP decides what to
+ * send. A hotspot with an open notification doesn't raise a second one: the API counts the message
+ * against the open one (200 instead of 201) and widens its category, so male then female is both.
+ * The report returns the category as `selection` and the message as `comment`.
  */
 
-export type Selection = "male" | "female" | "both";
+/** The condom category an alert names. */
+export type Category = "male" | "female" | "both";
 
-export const SELECTION_LABEL: Record<Selection, string> = {
+export const CATEGORY_LABEL: Record<Category, string> = {
   male: "Male condoms",
   female: "Female condoms",
   both: "Male and female condoms",
 };
 
-/**
- * `OrderStockoutRequest`. `selection` is what the app sends; `condom_id` remains only so requests
- * saved offline by an older version of the app still go out (the API takes the product's category).
- */
+/** `OrderStockoutRequest`. */
 export interface StockoutRequest {
   hot_spot_id: string;
-  selection?: Selection;
-  condom_id?: string;
-  comment: string | null;
+  condom_category: Category;
+  message: string | null;
 }
 
 /** Where a notification is in its fulfilment. */
@@ -42,7 +40,8 @@ export interface StockoutReport {
   /** Set only for notifications sent by product (older clients). */
   condom_id: string | null;
   product: string;
-  selection: Selection;
+  /** The category asked for (the request's condom_category, widened by repeats). */
+  selection: Category;
   reported_by: string;
   comment: string | null;
   repeat_count: number;
@@ -75,7 +74,7 @@ export interface HotspotDelivery {
 export interface StockoutEvent {
   id: string;
   action: "raised" | "repeated" | "selection_changed" | "delivered" | "acknowledged";
-  selection: Selection;
+  selection: Category;
   created_at: string;
 }
 
@@ -173,9 +172,8 @@ export function stockoutErrorMessage(err: unknown): string {
       return "CLIMS didn't accept this request: your account isn't allowed to send stock requests for this hotspot yet. Your district focal person can tell you when it's switched on, or ask the hotspot manager to send it.";
     if (s === 422) {
       const msg = String((err.response?.data as { message?: unknown } | undefined)?.message ?? "");
-      if (/categor/i.test(msg))
-        return "That product has no Male or Female type in CLIMS. Choose Male, Female or Both and send it again.";
-      if (/selection|comment|uuid/i.test(msg))
+      // Field checks (condom_category, message, hotspot UUID); otherwise the hotspot has no district.
+      if (/condom_category|message|uuid/i.test(msg))
         return "Some details weren't accepted. Check the form and try again.";
       return "This hotspot isn't linked to a district yet, so the request has nowhere to go. Call your district focal person.";
     }
@@ -196,7 +194,7 @@ const STATUS: Record<StockoutStatus, OrderStatus> = {
 
 /** What a notification asks for: its product for older by-product notifications, else the selection. */
 export function stockoutProduct(r: Pick<StockoutReport, "condom_id" | "product" | "selection">) {
-  return r.condom_id && r.product ? r.product : (SELECTION_LABEL[r.selection] ?? r.product);
+  return r.condom_id && r.product ? r.product : (CATEGORY_LABEL[r.selection] ?? r.product);
 }
 
 /** The app's local copy of a stockout notification the API accepted. */
@@ -222,4 +220,38 @@ export function toLocalOrder(r: StockoutReport, by: string, byRole = "VHT"): Ord
 export function stockoutComment(reason: string, comment: string): string {
   const c = comment.trim();
   return c ? `${reason}. ${c}` : reason;
+}
+
+/** Shapes older versions of the app saved in the outbox before alerts named a condom_category. */
+type SavedStockoutRequest =
+  | StockoutRequest
+  | { hot_spot_id: string; selection?: Category; condom_id?: string; comment?: string | null };
+
+/**
+ * A request saved on the phone in an older shape, in today's, so it is not lost when it is finally
+ * sent: {selection, comment} keeps its category; {condom_id, comment} takes the category from the
+ * product name saved with it, and a name without one asks for both.
+ */
+export function currentStockoutRequest(
+  request: SavedStockoutRequest,
+  product: string,
+): StockoutRequest {
+  if ("condom_category" in request) return request;
+  if (request.selection)
+    return {
+      hot_spot_id: request.hot_spot_id,
+      condom_category: request.selection,
+      message: request.comment ?? null,
+    };
+  const name = product.toLowerCase();
+  const condom_category: Category = /\bfemale\b/.test(name)
+    ? "female"
+    : /\bmale\b/.test(name)
+      ? "male"
+      : "both";
+  return {
+    hot_spot_id: request.hot_spot_id,
+    condom_category,
+    message: request.comment ?? null,
+  };
 }

@@ -3,6 +3,7 @@ import { api } from "../api";
 import {
   acknowledgeErrorMessage,
   acknowledgeStockout,
+  currentStockoutRequest,
   getStockout,
   listStockouts,
   savedStockout,
@@ -60,14 +61,22 @@ function serve(routes: Record<string, { status: number; data?: unknown }>) {
 describe("reportStockout", () => {
   it("sends the selection and reports a new notification", async () => {
     const sent = serve({ "POST /orders/stockouts": { status: 201, data: { data: report } } });
-    const body = { hot_spot_id: "h1", selection: "female" as const, comment: "Out of stock" };
+    const body = {
+      hot_spot_id: "h1",
+      condom_category: "female" as const,
+      message: "Out of stock",
+    };
     await expect(reportStockout(body)).resolves.toEqual({ report, repeated: false });
     expect(sent[0].data).toEqual(body);
   });
   it("says when the message was counted against the hotspot's open notification", async () => {
     const both = { ...report, selection: "both" as const, repeat_count: 1 };
     serve({ "POST /orders/stockouts": { status: 200, data: { data: both } } });
-    const res = await reportStockout({ hot_spot_id: "h1", selection: "male", comment: null });
+    const res = await reportStockout({
+      hot_spot_id: "h1",
+      condom_category: "male",
+      message: null,
+    });
     expect(res).toEqual({ report: both, repeated: true });
   });
 });
@@ -143,15 +152,11 @@ describe("stockoutErrorMessage", () => {
   it("explains a hotspot without a district", () => {
     expect(stockoutErrorMessage(err(422))).toMatch(/isn't linked to a district/);
   });
-  it("asks for a type when an old by-product request has no category", () => {
-    expect(
-      stockoutErrorMessage(
-        err(422, "this product has no Male or Female category; send selection instead"),
-      ),
-    ).toMatch(/Choose Male, Female or Both/);
-  });
   it("points at the form for other refused details", () => {
-    expect(stockoutErrorMessage(err(422, "selection must be male, female or both"))).toMatch(
+    expect(stockoutErrorMessage(err(422, "condom_category must be male, female or both"))).toMatch(
+      /Check the form/,
+    );
+    expect(stockoutErrorMessage(err(422, "message must be at most 4000 characters"))).toMatch(
       /Check the form/,
     );
   });
@@ -192,9 +197,67 @@ describe("stockoutProduct", () => {
   });
 });
 
+describe("currentStockoutRequest", () => {
+  it("keeps a request that already names a category", () => {
+    const request = {
+      hot_spot_id: "h1",
+      condom_category: "male" as const,
+      message: null,
+    };
+    expect(currentStockoutRequest(request, "Male condoms")).toBe(request);
+  });
+  it("converts one saved with a selection, keeping its category and message", () => {
+    expect(
+      currentStockoutRequest(
+        { hot_spot_id: "h1", selection: "both", comment: "Running low" },
+        "Male and female condoms",
+      ),
+    ).toEqual({ hot_spot_id: "h1", condom_category: "both", message: "Running low" });
+  });
+  it("converts one saved with a product, reading the category from its name", () => {
+    const saved = {
+      hot_spot_id: "h1",
+      condom_id: "p1",
+      comment: "Out of stock",
+    };
+    expect(currentStockoutRequest(saved, "Engabu female · Free")).toEqual({
+      hot_spot_id: "h1",
+      condom_category: "female",
+      message: "Out of stock",
+    });
+    expect(currentStockoutRequest(saved, "Engabu male · Free").condom_category).toBe("male");
+    expect(currentStockoutRequest(saved, "Trust · Commercial").condom_category).toBe("both");
+  });
+});
+
 describe("stockoutComment", () => {
   it("leads with what's happening", () => {
     expect(stockoutComment("Running low", "  Busy weekend ")).toBe("Running low. Busy weekend");
     expect(stockoutComment("Out of stock", "")).toBe("Out of stock");
+  });
+});
+
+describe("currentStockoutRequest", () => {
+  it("keeps a request that already names a category", () => {
+    const request = {
+      hot_spot_id: "h1",
+      condom_category: "male" as const,
+      message: null,
+    };
+    expect(currentStockoutRequest(request, "Male condoms")).toBe(request);
+  });
+  it("converts one saved with a product, reading the category from its name", () => {
+    const saved = {
+      hot_spot_id: "h1",
+      condom_id: "p1",
+      comment: "Out of stock",
+    };
+    expect(currentStockoutRequest(saved, "Engabu female · Free")).toEqual({
+      hot_spot_id: "h1",
+      condom_category: "female",
+      message: "Out of stock",
+    });
+    expect(currentStockoutRequest(saved, "Engabu male · Free").condom_category).toBe("male");
+    expect(currentStockoutRequest(saved, "Trust · Commercial").condom_category).toBe("both");
   });
 });

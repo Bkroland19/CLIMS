@@ -19,13 +19,13 @@ import {
 import { isNetworkError, listHotspotsPage, toLocalHotspot } from "@/lib/hotspots";
 import { useNav } from "@/lib/nav";
 import {
+  CATEGORY_LABEL,
   COMMENT_MAX,
   reportStockout,
-  SELECTION_LABEL,
   stockoutComment,
   stockoutErrorMessage,
   toLocalOrder,
-  type Selection,
+  type Category,
 } from "@/lib/orders";
 import { useMe } from "@/lib/session";
 import { useStore } from "@/lib/store";
@@ -104,7 +104,7 @@ export function StockoutForm({
   const [selId, setSel] = useState<string | undefined>(hotspotId);
   // Opened from a hotspot's page, it may not be in the pages loaded so far.
   const sel = hotspots.find((h) => h.id === selId) ?? s.hotspots.find((h) => h.id === selId);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [category, setCategory] = useState<Category | null>(null);
   const [reason, setReason] = useState<Reason>("Out of stock");
   const [comment, setComment] = useState("");
   const [pick, setPick] = useState(false);
@@ -120,18 +120,18 @@ export function StockoutForm({
       ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
       : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
   const tooLong = comment.trim().length > COMMENT_MAX;
-  const ready = !!hotspot && !!selection && !tooLong && !busy;
-  const what = selection ? SELECTION_LABEL[selection].toLowerCase() : "condoms";
+  const ready = !!hotspot && !!category && !tooLong && !busy;
+  const what = category ? CATEGORY_LABEL[category].toLowerCase() : "condoms";
 
   const submit = async () => {
-    if (!hotspot || !selection) return;
+    if (!hotspot || !category) return;
     setRefused("");
     const request = {
       hot_spot_id: hotspot.id,
-      selection,
-      comment: stockoutComment(reason, comment),
+      condom_category: category,
+      message: stockoutComment(reason, comment),
     };
-    const names = { hotspot: hotspot.name, product: SELECTION_LABEL[selection] };
+    const names = { hotspot: hotspot.name, product: CATEGORY_LABEL[category] };
     const label = `Stock request · ${hotspot.name}`;
     if (offline) {
       queue("stockout", { request, ...names }, label);
@@ -221,8 +221,8 @@ export function StockoutForm({
             ["female", "Female"],
             ["both", "Both"],
           ]}
-          value={selection ?? undefined}
-          onChange={setSelection}
+          value={category ?? undefined}
+          onChange={setCategory}
         />
         <Seg
           label="What's happening?"

@@ -11,9 +11,11 @@ export const DCFP_PATHS = {
   orders: '/dcfp/restock',
   store: '/dcfp/restock/store',
   newOrder: '/dcfp/restock/new',
-  /** The new-order form with the product of a stockout report chosen. */
-  newOrderFor: (productId: string | null) =>
-    productId ? `/dcfp/restock/new?product=${encodeURIComponent(productId)}` : '/dcfp/restock/new',
+  /** The new-order form with the condom category of a stockout report chosen. */
+  newOrderFor: (selection: string | null) =>
+    selection === 'male' || selection === 'female'
+      ? `/dcfp/restock/new?category=${selection}`
+      : '/dcfp/restock/new',
   order: (id: string) => `/dcfp/restock/${encodeURIComponent(id)}`,
 } as const;
 
@@ -59,6 +61,13 @@ export function warehouseOrders(
 
 export function isWithWarehouse(order: Order): boolean {
   return WITH_WAREHOUSE.has(order.order_status);
+}
+
+/** "Male condoms" or "Female condoms", for an order whose product the warehouse has not chosen. */
+export function categoryLabel(category: string | null): string | null {
+  if (category === 'male') return 'Male condoms';
+  if (category === 'female') return 'Female condoms';
+  return null;
 }
 
 /** "NMS" or "JMS", or the store's name for any other warehouse. */
@@ -201,7 +210,10 @@ export interface DcfpTask {
 export function dcfpTasks(
   reports: readonly StockoutReport[],
   orders: readonly Order[],
-  names: { product: (id: string) => string; warehouse: (id: string) => string },
+  names: {
+    product: (id: string | null, category: string | null) => string;
+    warehouse: (id: string) => string;
+  },
   now: Date,
   formatTime: (iso: string) => string,
 ): DcfpTask[] {
@@ -210,7 +222,7 @@ export function dcfpTasks(
     .map((order) => ({
       id: `receive-${order.id}`,
       status: ORDER_STATUS.dispatched,
-      title: `${names.product(order.condom_id)} from ${names.warehouse(order.ordered_from_store_id)}`,
+      title: `${names.product(order.condom_id, order.condom_category)} from ${names.warehouse(order.ordered_from_store_id)}`,
       detail: `Dispatched ${formatTime(order.updated_at)}. Count it and record the receipt.`,
       action: 'Record receipt',
       href: DCFP_PATHS.order(order.id),
@@ -218,7 +230,9 @@ export function dcfpTasks(
   for (const report of recentReports(reports, now)) {
     const reported = Date.parse(report.created_at);
     const answered = orders.some(
-      (order) => order.condom_id === report.condom_id && Date.parse(order.created_at) >= reported,
+      (order) =>
+        (report.selection === 'both' || order.condom_category === report.selection) &&
+        Date.parse(order.created_at) >= reported,
     );
     if (answered) continue;
     tasks.push({
@@ -229,7 +243,7 @@ export function dcfpTasks(
         .filter(Boolean)
         .join(' · '),
       action: 'Order stock',
-      href: DCFP_PATHS.newOrderFor(report.condom_id),
+      href: DCFP_PATHS.newOrderFor(report.selection),
     });
   }
   return tasks;

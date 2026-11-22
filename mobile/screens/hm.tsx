@@ -98,7 +98,11 @@ function HmOrdersSample() {
     <Screen
       title="Orders"
       root
-      fab={{ label: "Report stockout", icon: "megaphone", onPress: () => nav.go("request") }}
+      fab={{
+        label: "Report stockout",
+        icon: "megaphone",
+        onPress: () => nav.go("request"),
+      }}
     >
       {q0.length ? (
         <List h="Waiting to send">
@@ -253,7 +257,11 @@ function HmOrdersLive() {
     <Screen
       title="Orders"
       root
-      fab={{ label: "Report stockout", icon: "megaphone", onPress: () => nav.go("request") }}
+      fab={{
+        label: "Report stockout",
+        icon: "megaphone",
+        onPress: () => nav.go("request"),
+      }}
     >
       <LoadBanner load={load} any={orders.length > 0} />
       {queued.length ? (

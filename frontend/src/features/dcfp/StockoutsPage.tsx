@@ -91,7 +91,7 @@ export default function StockoutsPage() {
                     label: 'Order stock from a warehouse',
                     icon: PackagePlus,
                     onSelect: () => {
-                      router.push(DCFP_PATHS.newOrderFor(report.condom_id));
+                      router.push(DCFP_PATHS.newOrderFor(report.selection));
                     },
                   },
                 ]}
