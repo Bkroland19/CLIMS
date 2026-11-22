@@ -17,6 +17,8 @@ export const DCFP_PATHS = {
       ? `/dcfp/restock/new?category=${selection}`
       : '/dcfp/restock/new',
   order: (id: string) => `/dcfp/restock/${encodeURIComponent(id)}`,
+  hotspots: '/dcfp/hotspots',
+  hotspot: (id: string) => `/dcfp/hotspots/${encodeURIComponent(id)}`,
 } as const;
 
 /** What each status means to the DCFP who placed the order. */

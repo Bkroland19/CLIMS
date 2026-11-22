@@ -119,16 +119,25 @@ func checkOrderable(ctx context.Context, q interface {
 }
 
 func (r *Repository) create(ctx context.Context, actorID string, input createRequest) (Order, error) {
-	if err := checkOrderable(ctx, r.db, input.CondomID); err != nil {
-		return Order{}, err
-	}
-	return scanOrder(r.db.QueryRow(ctx, `
-		INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
-			ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment, condom_category)
-		VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8,
-			(SELECT category FROM condoms WHERE id = $1 AND category IN ('male', 'female')))
-		RETURNING `+columns, input.CondomID, input.QuantityNeeded, input.Date, actorID,
-		input.OrderedForStoreID, input.OrderedFromStoreID, input.UnitOfMeasureID, input.Comment))
+	var order Order
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		if err := checkOrderable(ctx, tx, input.CondomID); err != nil {
+			return err
+		}
+		var err error
+		order, err = scanOrder(tx.QueryRow(ctx, `
+			INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
+				ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment, condom_category)
+			VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8,
+				(SELECT category FROM condoms WHERE id = $1 AND category IN ('male', 'female')))
+			RETURNING `+columns, input.CondomID, input.QuantityNeeded, input.Date, actorID,
+			input.OrderedForStoreID, input.OrderedFromStoreID, input.UnitOfMeasureID, input.Comment))
+		if err != nil {
+			return err
+		}
+		return r.recordAudit(ctx, tx, "order.created", nil, order)
+	})
+	return order, err
 }
 
 func (r *Repository) fulfill(ctx context.Context, access scope, id, actorID string, quantity int32) (Order, error) {
@@ -170,8 +179,11 @@ func (r *Repository) recordAudit(ctx context.Context, tx pgx.Tx, action string, 
 	} else {
 		changes = audit.Diff(*before, after)
 	}
-	related := []audit.Subject{{Type: "store", ID: after.OrderedFromStoreID}, {Type: "store", ID: after.OrderedForStoreID},
-		{Type: "product", ID: after.CondomID}}
+	related := []audit.Subject{{Type: "store", ID: after.OrderedFromStoreID}, {Type: "store", ID: after.OrderedForStoreID}}
+	// A category request has no product until the warehouse chooses one at review.
+	if after.CondomID != nil {
+		related = append(related, audit.Subject{Type: "product", ID: *after.CondomID})
+	}
 	if after.HotSpotID != nil {
 		related = append(related, audit.Subject{Type: "hotspot", ID: *after.HotSpotID})
 	}

@@ -373,8 +373,9 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'List',
                 title: 'Hotspots',
                 description:
-                  'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.',
+                  'Hotspots in your district. Review the ones VHTs submit, then activate or reject each with a comment.',
                 layout: 'table',
+                permission: 'hotspots:read',
               },
               {
                 path: '/dcfp/hotspot-map',
@@ -382,8 +383,10 @@ export const workspaces: readonly Workspace[] = [
                 title: 'Hotspot map',
                 description: DESCRIPTIONS.hotspotMap,
                 layout: 'dashboard',
+                permission: 'hotspots:read',
               },
             ],
+            details: [{ path: '/dcfp/hotspots/[id]', label: 'Hotspot', layout: 'detail' }],
           },
         ],
       },

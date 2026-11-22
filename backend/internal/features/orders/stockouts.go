@@ -214,8 +214,8 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, sel
 			entry.Details["repeat_count"] = report.RepeatCount
 			entry.Details["combined_selection"] = report.Selection
 		}
-		if condomID != nil {
-			entry.Related = append(entry.Related, audit.Subject{Type: "product", ID: *condomID})
+		if report.CondomID != nil {
+			entry.Related = append(entry.Related, audit.Subject{Type: "product", ID: *report.CondomID})
 		}
 		if err = r.audit.Record(ctx, tx, entry); err != nil {
 			return err

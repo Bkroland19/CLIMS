@@ -34,6 +34,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 - Two migrations shared version 20, so the API failed at start-up ("duplicate migration file").
   `vht_district_stockouts` is now migration 21.
+- The audit log and condom category requests both added migration 29, and the API no longer
+  compiled: the audit entries still expected every order and stockout report to name a product.
+  `order_condom_category` is now migration 30, and a category request is recorded without a
+  product until the warehouse chooses one.
 
 ### Added
 
@@ -109,6 +113,12 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 - New orders and stockout requests reject inactive products.
 - A product's type is its distribution channel (free, socially marketed or commercial), and its
   brand is chosen from the brand list. The product minimum level is removed.
+- The web app's hotspot screens follow the hotspot API: a DCFP activates or rejects a submitted
+  hotspot and can deactivate an active one, each with a comment, and the separate verify step is
+  gone. The VHT's submission form asks for what the API requires: type, region, district,
+  subcounty, coordinates, and the hotspot manager's name and phone.
+- The VHT district stockout migration is number 21. It was numbered 20, like the store assignment
+  migration, which stopped migrations from running.
 - The hotspot map no longer needs a Google Maps key: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is replaced
   by the optional `NEXT_PUBLIC_MAP_TILES` (empty for OpenStreetMap, `off`, or a tile server's URL)
   and `NEXT_PUBLIC_MAP_ATTRIBUTION`. The Content-Security-Policy names the tile servers instead of
