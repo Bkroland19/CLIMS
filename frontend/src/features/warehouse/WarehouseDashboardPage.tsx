@@ -142,10 +142,17 @@ export default function WarehouseDashboardPage() {
           }}
           isRetrying={orders.isRefetching || batches.isRefetching}
           loadingLabel="Loading tasks…"
-          empty={{
-            title: 'Nothing needs you right now',
-            description: 'New orders from district stores will appear here.',
-          }}
+          empty={
+            district
+              ? {
+                  title: `Nothing from ${district} needs you right now`,
+                  description: `New orders from ${district} will appear here.`,
+                }
+              : {
+                  title: 'Nothing needs you right now',
+                  description: 'New orders from district stores will appear here.',
+                }
+          }
         />
 
         <div className="gap-section flex min-w-0 flex-col">
@@ -218,7 +225,11 @@ export default function WarehouseDashboardPage() {
                   isRetrying={movements.isRefetching}
                 />
               ) : recent.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Nothing has happened yet.</p>
+                <p className="text-muted-foreground text-sm">
+                  {district
+                    ? `Nothing has happened on orders from ${district} yet.`
+                    : 'Nothing has happened yet.'}
+                </p>
               ) : (
                 <ActivityTimeline variant="compact" entries={recent} />
               )}

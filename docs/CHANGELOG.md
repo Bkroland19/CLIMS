@@ -61,6 +61,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- **NMS and JMS switch the warehouse dashboard and district orders to any district**, as MOH can.
+  The District menu lists every district instead of only those that have ordered from the store, so
+  a district with no order yet can be picked. A district with no orders says so, and the sidebar
+  counts still cover the whole store.
 - **The DCFP orders from the warehouse without choosing a unit.** `POST /api/v1/orders/warehouse-requests`
   takes `warehouse_store_id`, `condom_category`, `quantity` and an optional `comment`; a body with
   `unit_of_measure_id` is refused (400). The order's `unit_of_measure_id` stays null until the

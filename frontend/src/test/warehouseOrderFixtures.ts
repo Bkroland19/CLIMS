@@ -104,6 +104,8 @@ export interface WarehouseOrderData {
   products?: Product[];
   movements?: Movement[];
   summary?: StoreSummary;
+  /** What `GET /locations/districts` lists; by default the three district stores and Kotido. */
+  districts?: { id: string; name: string }[];
 }
 
 /** A product's line in a store summary: 910 boxes of Engabu Free Female at NMS. */
@@ -176,6 +178,15 @@ export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<strin
       return found
         ? { status: 200, body: envelope(found) }
         : { status: 404, body: { success: false, message: 'order not found' } };
+    }
+    if (path === '/locations/districts') {
+      const districts =
+        data.districts ??
+        ['Gulu', 'Kotido', 'Mukono', 'Wakiso'].map((name) => ({
+          id: `d-${name.toLowerCase()}`,
+          name,
+        }));
+      return { status: 200, body: envelope(districts) };
     }
     if (path === '/locations/stores') {
       const national = [NMS, JMS].map((store) => ({

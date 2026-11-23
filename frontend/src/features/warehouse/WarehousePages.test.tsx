@@ -16,6 +16,10 @@ import {
   warehouseOrderApi,
 } from '@/test/warehouseOrderFixtures';
 
+function sidebarLink(name: RegExp) {
+  return within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name });
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-20T09:00:00Z') });
 });
@@ -127,6 +131,29 @@ describe('District requests', () => {
         { name: /Waiting for stock/ },
       ),
     ).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('narrows the list to the district in the address', async () => {
+    renderOrders('/warehouse/requests?store=NMS&district=Mukono');
+    const table = await screen.findByRole('table', { name: 'District orders at NMS' });
+    expect(await within(table).findByRole('link', { name: 'Mukono' })).toHaveAttribute(
+      'href',
+      '/warehouse/requests/o-mukono?store=NMS',
+    );
+    expect(within(table).queryByText('Gulu')).not.toBeInTheDocument();
+  });
+
+  it('names the district when it has ordered nothing from the store, and keeps the badge store-wide', async () => {
+    renderOrders('/warehouse/requests?store=NMS&district=Kotido');
+
+    expect(await screen.findByText('No orders from Kotido at NMS yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Choose All districts in the District menu to see every order at NMS.'),
+    ).toBeInTheDocument();
+    // The badge is the work waiting at NMS, whichever district is in view.
+    await waitFor(() => {
+      expect(sidebarLink(/District requests/)).toHaveTextContent('2');
+    });
   });
 });
 
@@ -691,5 +718,31 @@ describe('Warehouse dashboard', () => {
       'href',
       '/warehouse/stock?band=expired&store=NMS',
     );
+  });
+
+  it('says when nothing from the picked district needs doing, and keeps the badge store-wide', async () => {
+    renderApp(<AppUnderTest />, {
+      route: '/warehouse?store=NMS&district=Kotido',
+      signedIn: true,
+      replies: [
+        warehouseOrderApi({
+          orders: [
+            aWarehouseOrder({ id: 'o-gulu', ordered_for_store_id: 'store-gulu' }),
+            aWarehouseOrder({
+              id: 'o-mukono',
+              ordered_for_store_id: 'store-mukono',
+              order_status: 'confirmed',
+              quantity_approved: 300,
+            }),
+          ],
+        }),
+      ],
+    });
+
+    expect(await screen.findByText('Nothing from Kotido needs you right now')).toBeInTheDocument();
+    expect(screen.getByText('New orders from Kotido will appear here.')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(sidebarLink(/District requests/)).toHaveTextContent('2');
+    });
   });
 });

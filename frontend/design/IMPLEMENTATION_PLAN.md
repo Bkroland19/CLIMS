@@ -197,6 +197,24 @@ a movement. Receiving adds the accepted pieces by batch and records a movement a
   sends no district.
 - Monthly reports for the DCFP come in Phase 8.
 
+### Phase 5 notes (warehouse workspace)
+
+**District filter.** NMS and JMS users, and MOH and administrators looking in, can narrow the
+dashboard and the district requests list to one district from the District menu. The menu lists
+every district from `GET /locations/districts`, as MOH's does, because NMS and JMS serve the
+whole country rather than a fixed set of districts. Until the warehouse endpoints exist, the
+client filters the store's requests by district name in the browser. When
+`GET /warehouses/{code}/requests` is built, it should:
+
+- accept an optional `?district_id=` (an id from `/locations/districts`) and return only that
+  district's requests;
+- return `district_id` on each request beside `district`, and spell `district` as
+  `/locations/districts` does (for example "Wakiso District"), so the client can match by id.
+
+Stock, monthly reports and request detail are not filtered: the stock belongs to the warehouse,
+and the reports are per store. The sidebar badges count the work waiting at the whole store,
+whichever district is picked.
+
 ### Phase 10 notes (hardening)
 
 **Retired routes.** `/hotspot-manager`, `/delivery`, `/suppliers`, `/nms`, `/jms` and `/store` are
