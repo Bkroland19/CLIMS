@@ -33,7 +33,7 @@ describe('StockoutsPage', () => {
     }
   });
 
-  it('starts a warehouse order for the reported condom type', async () => {
+  it('opens the request from each row', async () => {
     const user = userEvent.setup();
     renderApp(<StockoutsPage />, {
       route: '/dcfp/stockouts',
@@ -41,10 +41,43 @@ describe('StockoutsPage', () => {
       replies: [dcfpApi({ reports: [aReport()] })],
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Actions for Kisenyi Landing' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Order stock from a warehouse' }));
+    expect(
+      await screen.findByRole('link', { name: /^(Manage|View) Kisenyi Landing$/ }),
+    ).toHaveAttribute('href', '/dcfp/stockouts/r1');
+    await user.click(screen.getByRole('link', { name: 'Kisenyi Landing' }));
+    expect(testRouter.location).toBe('/dcfp/stockouts/r1');
+  });
 
-    expect(testRouter.location).toBe('/dcfp/restock/new?category=female');
+  it('filters by status, counting each, and keeps fulfilled requests out of Open', async () => {
+    renderApp(<StockoutsPage />, {
+      route: '/dcfp/stockouts',
+      signedIn: true,
+      replies: [
+        dcfpApi({
+          reports: [
+            aReport(),
+            aReport({
+              id: 'r2',
+              hot_spot: { ...aReport().hot_spot, name: 'Owino' },
+              status: 'fulfilled',
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const table = await screen.findByRole('table', { name: 'Stockout notifications' });
+    expect(await within(table).findByText('Kisenyi Landing')).toBeInTheDocument();
+    expect(within(table).queryByText('Owino')).not.toBeInTheDocument();
+    const filters = screen.getByRole('navigation', { name: 'Filter stockouts by status' });
+    expect(within(filters).getByRole('link', { name: /Open\s*1/ })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(within(filters).getByRole('link', { name: /Fulfilled\s*1/ })).toHaveAttribute(
+      'href',
+      '/dcfp/stockouts?status=fulfilled',
+    );
   });
 
   it('says so when no hotspot has reported', async () => {

@@ -44,13 +44,18 @@ export function DetailHeader({
       {...props}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-        <h2 id={headingId} className="text-lg leading-snug font-semibold tracking-tight break-all">
+        <h2
+          id={headingId}
+          className="text-lg leading-snug font-semibold tracking-tight wrap-anywhere"
+        >
           {title}
         </h2>
         {status}
         {actions ? <div className="ml-auto flex flex-wrap gap-2">{actions}</div> : null}
         {description ? (
-          <p className="text-muted-foreground basis-full text-[0.8125rem]">{description}</p>
+          <p className="text-muted-foreground basis-full text-[0.8125rem] wrap-anywhere">
+            {description}
+          </p>
         ) : null}
       </div>
       {children ? <div className="bg-muted/40 border-t px-4 pt-2 pb-3">{children}</div> : null}

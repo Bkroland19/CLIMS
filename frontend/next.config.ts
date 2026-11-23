@@ -44,6 +44,14 @@ const nextConfig: NextConfig = {
         destination: '/warehouse/stock?register=1',
         permanent: false,
       },
+      // The Dispatch tab became each request's own page; old links keep working.
+      {
+        source: '/dcfp/stockouts/dispatch',
+        has: [{ type: 'query', key: 'report', value: '(?<report>[^&]+)' }],
+        destination: '/dcfp/stockouts/:report',
+        permanent: false,
+      },
+      { source: '/dcfp/stockouts/dispatch', destination: '/dcfp/stockouts', permanent: false },
     ];
   },
   rewrites() {

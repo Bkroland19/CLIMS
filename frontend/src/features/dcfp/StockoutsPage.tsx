@@ -1,31 +1,81 @@
 'use client';
 
-import { PackagePlus, Truck } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { RowActions } from '@/components/data-table/RowActions';
+import { FilterTabs } from '@/components/FilterTabs';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Button } from '@/components/ui/button';
 import { useCan } from '@/features/auth/queries';
 import { useCurrentUser } from '@/features/auth/hooks';
-import { EMPTY_VALUE, formatTimestamp } from '@/lib/format';
+import { EMPTY_VALUE, formatNumber, formatTimestamp } from '@/lib/format';
 import { useReadOnly } from '@/navigation/useAccess';
 
 import type { StockoutReport } from './api';
-import { contactOf, DCFP_PATHS, placeOf, STOCKOUT_STATUS } from './orders';
+import {
+  contactOf,
+  DCFP_PATHS,
+  matchesStockoutFilter,
+  placeOf,
+  STOCKOUT_FILTERS,
+  STOCKOUT_STATUS,
+  stockoutStatus,
+  type StockoutFilter,
+} from './orders';
 import { useStockouts } from './queries';
 
+const EMPTY: Record<StockoutFilter, { title: string; description: string }> = {
+  open: {
+    title: 'No open stockouts',
+    description:
+      'Every hotspot that reported has confirmed what it received. New reports appear here and in your notifications.',
+  },
+  awaiting_supply: {
+    title: 'Nothing waiting for stock',
+    description: 'Every open report has had stock sent. Check Awaiting receipt for confirmations.',
+  },
+  awaiting_acknowledgement: {
+    title: 'Nothing waiting for confirmation',
+    description: 'Stock you send shows here until the hotspot manager confirms what arrived.',
+  },
+  partly_received: {
+    title: 'No partly received deliveries',
+    description: 'A delivery shows here when the hotspot confirms less than was sent.',
+  },
+  fulfilled: {
+    title: 'No fulfilled requests yet',
+    description: 'A request is fulfilled once the hotspot confirms everything it asked for.',
+  },
+  all: {
+    title: 'No stockouts reported',
+    description:
+      'When a hotspot in your district runs out, its report appears here and in your notifications.',
+  },
+};
+
 /**
- * Stockout notifications from the district's hotspots: which hotspot, where, who to call, and
- * the hotspot's message. The DCFP can dispatch district stock or order from a warehouse.
+ * Stockout notifications from the district's hotspots, open ones first. Each row leads to the
+ * request, where the DCFP sends district stock or orders more from a warehouse.
  */
 export default function StockoutsPage() {
   const reports = useStockouts();
-  const router = useRouter();
+  const params = useSearchParams();
   const readOnly = useReadOnly();
   const can = useCan();
   const storeId = useCurrentUser()?.store_id;
+  const filter: StockoutFilter =
+    STOCKOUT_FILTERS.find((item) => item.value === params.get('status'))?.value ?? 'open';
+  const rows = reports.data?.filter((report) => matchesStockoutFilter(report, filter));
+  const tabs = STOCKOUT_FILTERS.map((tab) => ({
+    ...tab,
+    count: reports.data?.filter((report) => matchesStockoutFilter(report, tab.value)).length,
+  }));
+  const canSend = !readOnly && can('orders:supply_hotspots');
+  // With no reports at all, say so whatever the filter; otherwise say what the filter keeps.
+  const empty = reports.data?.length === 0 ? EMPTY.all : EMPTY[filter];
 
   const columns = useMemo<DataTableColumn<StockoutReport>[]>(
     () => [
@@ -35,7 +85,12 @@ export default function StockoutsPage() {
         value: (report) => `${report.hot_spot.name} ${placeOf(report)}`,
         cell: (report) => (
           <div className="min-w-0">
-            <div className="font-medium">{report.hot_spot.name}</div>
+            <Link
+              href={DCFP_PATHS.stockout(report.id)}
+              className="font-medium underline-offset-4 hover:underline"
+            >
+              {report.hot_spot.name}
+            </Link>
             <div className="text-muted-foreground truncate text-xs">
               {placeOf(report) || EMPTY_VALUE}
             </div>
@@ -47,15 +102,16 @@ export default function StockoutsPage() {
         id: 'status',
         filter: 'select',
         header: 'Status',
-        value: (report) => STOCKOUT_STATUS[report.status ?? 'awaiting_supply'].label,
+        value: (report) => STOCKOUT_STATUS[stockoutStatus(report)].label,
         cell: (report) => {
-          const status = STOCKOUT_STATUS[report.status ?? 'awaiting_supply'];
+          const status = STOCKOUT_STATUS[stockoutStatus(report)];
           return <StatusBadge status={status.label} tone={status.tone} />;
         },
       },
       {
         id: 'message',
         header: 'Message',
+        hideable: true,
         value: (report) => report.comment ?? '',
         cell: (report) =>
           report.comment ? (
@@ -67,66 +123,81 @@ export default function StockoutsPage() {
       {
         id: 'contact',
         header: 'Contact',
+        hideable: true,
         value: (report) => contactOf(report),
         cell: (report) => contactOf(report) || EMPTY_VALUE,
       },
-      { id: 'reporter', header: 'Reported by', value: (report) => report.reported_by },
+      {
+        id: 'reporter',
+        header: 'Reported by',
+        hideable: true,
+        value: (report) => report.reported_by,
+      },
       {
         id: 'reported',
         filter: 'date',
         header: 'Reported',
         value: (report) => report.created_at,
-        cell: (report) => formatTimestamp(report.created_at),
+        cell: (report) => (
+          <div>
+            <div>{formatTimestamp(report.created_at)}</div>
+            {report.repeat_count ? (
+              <div className="text-muted-foreground text-xs">
+                {repeatsLabel(report.repeat_count)}
+              </div>
+            ) : null}
+          </div>
+        ),
       },
     ],
     [],
   );
 
   return (
-    <DataTable
-      label="Stockout notifications"
-      preferencesKey="dcfp-stockouts"
-      columns={columns}
-      rows={reports.data}
-      getRowId={(report) => report.id}
-      isLoading={reports.isPending}
-      error={reports.error}
-      onRetry={() => void reports.refetch()}
-      isRetrying={reports.isRefetching}
-      searchPlaceholder="Search hotspots, products, messages…"
-      emptyTitle="No stockouts reported"
-      emptyDescription="When a hotspot in your district runs out, its report appears here and in your notifications."
-      rowActions={
-        readOnly
-          ? undefined
-          : (report) => (
-              <RowActions
-                label={`Actions for ${report.hot_spot.name}`}
-                actions={[
-                  ...(can('orders:supply_hotspots') &&
-                  report.district_store_id === storeId &&
-                  report.status !== 'fulfilled'
-                    ? [
-                        {
-                          label: 'Dispatch to hotspot',
-                          icon: Truck,
-                          onSelect: () => {
-                            router.push(DCFP_PATHS.dispatchFor(report.id));
-                          },
-                        },
-                      ]
-                    : []),
-                  {
-                    label: 'Order stock from a warehouse',
-                    icon: PackagePlus,
-                    onSelect: () => {
-                      router.push(DCFP_PATHS.newOrderFor(report.selection));
-                    },
-                  },
-                ]}
-              />
-            )
-      }
-    />
+    <div className="gap-section flex flex-col">
+      <FilterTabs
+        label="Filter stockouts by status"
+        tabs={tabs}
+        value={filter}
+        hrefFor={(value) => `${DCFP_PATHS.stockouts}?status=${value}`}
+      />
+      <DataTable
+        label="Stockout notifications"
+        preferencesKey="dcfp-stockouts"
+        columns={columns}
+        rows={rows}
+        getRowId={(report) => report.id}
+        isLoading={reports.isPending}
+        error={reports.error}
+        onRetry={() => void reports.refetch()}
+        isRetrying={reports.isRefetching}
+        searchPlaceholder="Search hotspots, products, messages…"
+        emptyTitle={empty.title}
+        emptyDescription={empty.description}
+        rowActions={(report) => {
+          // Sending needs the permission and the report's own district store; anyone can look.
+          const manage =
+            canSend &&
+            report.district_store_id === storeId &&
+            stockoutStatus(report) !== 'fulfilled';
+          return (
+            <Button variant={manage ? 'outline' : 'ghost'} size="sm" asChild>
+              <Link
+                href={DCFP_PATHS.stockout(report.id)}
+                aria-label={`${manage ? 'Manage' : 'View'} ${report.hot_spot.name}`}
+              >
+                {manage ? 'Manage' : 'View'}
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
+          );
+        }}
+      />
+    </div>
   );
+}
+
+/** "Reported again", "Reported 3 more times". */
+export function repeatsLabel(repeats: number): string {
+  return repeats === 1 ? 'Reported again' : `Reported ${formatNumber(repeats)} more times`;
 }

@@ -1,0 +1,340 @@
+'use client';
+
+import { PackagePlus, Phone, Truck } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+
+import { ActivityTimeline, type ActivityEntry } from '@/components/ActivityTimeline';
+import { DetailHeader } from '@/components/DetailHeader';
+import { DetailList } from '@/components/DetailList';
+import { RecordView } from '@/components/RecordView';
+import { StatusBadge } from '@/components/StatusBadge';
+import { StepTracker } from '@/components/StepTracker';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCurrentUser } from '@/features/auth/hooks';
+import { useCan } from '@/features/auth/queries';
+import { useFocusWhenLost } from '@/hooks/useFocusWhenLost';
+import { formatNumber, formatTimestamp } from '@/lib/format';
+import { useReadOnly } from '@/navigation/useAccess';
+
+import type { StockoutDetail } from './api';
+import { DCFP_PATHS, placeOf, STOCKOUT_STATUS, stockoutStatus, stockoutSteps } from './orders';
+import { useStockout } from './queries';
+import { SendStockForm } from './SendStockForm';
+import { repeatsLabel } from './StockoutsPage';
+
+/** One hotspot's stockout request: what it asked for, sending it stock, and what it confirmed. */
+export default function StockoutRequestPage() {
+  const { id } = useParams<{ id: string }>();
+  const report = useStockout(id);
+  // Sending replaces the form (or closes it); focus goes to the banner that says what is true now.
+  const bannerRef = useRef<HTMLDivElement>(null);
+  useFocusWhenLost(
+    bannerRef,
+    report.data
+      ? `${stockoutStatus(report.data)}:${String(report.data.deliveries.length)}`
+      : undefined,
+  );
+  return (
+    <RecordView
+      query={report}
+      layout="detail"
+      noun="stockout request"
+      back={{ href: DCFP_PATHS.stockouts, label: 'Back to stockouts' }}
+    >
+      {(data) => (
+        <RequestDetail
+          key={`${data.id}:${stockoutStatus(data)}:${String(data.deliveries.length)}`}
+          report={data}
+          bannerRef={bannerRef}
+        />
+      )}
+    </RecordView>
+  );
+}
+
+function RequestDetail({
+  report,
+  bannerRef,
+}: {
+  report: StockoutDetail;
+  bannerRef: RefObject<HTMLDivElement | null>;
+}) {
+  const storeId = useCurrentUser()?.store_id ?? undefined;
+  const can = useCan();
+  const readOnly = useReadOnly();
+  const [sendingMore, setSendingMore] = useState(false);
+  // Cancelling removes the form; focus goes back to the button that opened it.
+  const sendMoreRef = useRef<HTMLButtonElement>(null);
+  const wasSendingMore = useRef(false);
+  useEffect(() => {
+    if (wasSendingMore.current && !sendingMore) sendMoreRef.current?.focus();
+    wasSendingMore.current = sendingMore;
+  }, [sendingMore]);
+  const status = stockoutStatus(report);
+  const ownStore = storeId !== undefined && report.district_store_id === storeId;
+  const canSend = !readOnly && can('orders:supply_hotspots') && ownStore && status !== 'fulfilled';
+  const contact = report.hot_spot.contact_name?.trim() || null;
+  const phone = report.hot_spot.contact_phone?.trim();
+  const banner = bannerFor(report, status, contact, canSend);
+  const described = [
+    placeOf(report),
+    `Reported ${formatTimestamp(report.created_at)}`,
+    report.repeat_count ? repeatsLabel(report.repeat_count).toLowerCase() : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="gap-section flex flex-col">
+      <DetailHeader
+        title={report.hot_spot.name}
+        status={
+          <StatusBadge status={STOCKOUT_STATUS[status].label} tone={STOCKOUT_STATUS[status].tone} />
+        }
+        description={described.join(' · ')}
+      >
+        <StepTracker aria-label="Request progress" steps={stockoutSteps(status)} />
+      </DetailHeader>
+
+      {/* Below lg the request and contact come before the history, so Call is not at the bottom. */}
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr]">
+        <div className="gap-section flex min-w-0 flex-col">
+          <Alert ref={bannerRef} tabIndex={-1} variant={banner.variant} role="status">
+            <AlertTitle>{banner.title}</AlertTitle>
+            <AlertDescription className="break-words">{banner.body}</AlertDescription>
+          </Alert>
+          {canSend && storeId ? (
+            status === 'awaiting_supply' ? (
+              <SendStockForm report={report} storeId={storeId} />
+            ) : sendingMore ? (
+              <SendStockForm
+                report={report}
+                storeId={storeId}
+                onCancel={() => {
+                  setSendingMore(false);
+                }}
+                onSent={() => {
+                  setSendingMore(false);
+                }}
+              />
+            ) : (
+              <div>
+                <Button
+                  ref={sendMoreRef}
+                  variant="outline"
+                  onClick={() => {
+                    setSendingMore(true);
+                  }}
+                >
+                  <Truck aria-hidden="true" />
+                  Send more stock
+                </Button>
+              </div>
+            )
+          ) : null}
+          {!ownStore && !readOnly && can('orders:supply_hotspots') ? (
+            <Alert variant="info">
+              <AlertTitle>Another district store answers this request</AlertTitle>
+              <AlertDescription>
+                Only the hotspot&apos;s own district store can send it stock.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+
+        <div className="gap-section flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Request</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <DetailList
+                items={[
+                  { label: 'Asked for', value: capitalise(report.product) },
+                  { label: 'Message', value: report.comment || 'No message' },
+                  { label: 'Reported by', value: report.reported_by },
+                  ...(report.repeat_count && report.last_reported_at
+                    ? [{ label: 'Last reported', value: formatTimestamp(report.last_reported_at) }]
+                    : []),
+                ]}
+              />
+              {!readOnly && can('orders:replenish') && status !== 'fulfilled' ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={DCFP_PATHS.newOrderFor(report.selection)}>
+                    <PackagePlus aria-hidden="true" />
+                    Order from a warehouse
+                  </Link>
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm wrap-anywhere">
+              <div>
+                <p className="font-medium">
+                  {report.hot_spot.contact_name?.trim() || 'No contact recorded'}
+                </p>
+                <p className="text-muted-foreground">{placeOf(report) || '—'}</p>
+              </div>
+              {phone ? (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`tel:${phone.replace(/\s+/g, '')}`}>
+                    <Phone aria-hidden="true" />
+                    Call {phone}
+                  </a>
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="min-w-0 lg:col-start-1 lg:self-start">
+          <History report={report} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function bannerFor(
+  report: StockoutDetail,
+  status: ReturnType<typeof stockoutStatus>,
+  contact: string | null,
+  canSend: boolean,
+): { variant: 'info' | 'success' | 'warning'; title: string; body: string } {
+  // Who confirms receipt, to start a sentence.
+  const subject = contact ?? 'The hotspot manager';
+  switch (status) {
+    case 'awaiting_supply':
+      return {
+        variant: 'warning',
+        title: `${report.hot_spot.name} is out of ${report.product}`,
+        body: canSend
+          ? `Send what you can from the district store below. ${subject} confirms what arrives.`
+          : 'Waiting for the district store to send stock.',
+      };
+    case 'awaiting_acknowledgement':
+      return {
+        variant: 'info',
+        title: 'Stock is on its way',
+        body: `${subject} confirms what arrives. Send more only if the hotspot still needs it.`,
+      };
+    case 'partly_received':
+      return {
+        variant: 'warning',
+        title: 'The hotspot has not confirmed everything sent',
+        body: `Check the history below. Call ${contact ?? 'the hotspot manager'} if something went missing, or send more.`,
+      };
+    case 'fulfilled':
+      return {
+        variant: 'success',
+        title: `${report.hot_spot.name} has what it asked for`,
+        body: `${subject} confirmed what arrived for each type requested. Nothing more is needed.`,
+      };
+  }
+}
+
+/** Reports, stock sent and receipts, newest first. Amounts are single pieces. */
+function History({ report }: { report: StockoutDetail }) {
+  const entries: (ActivityEntry & { at: string })[] = [];
+  for (const event of report.events) {
+    if (event.action === 'delivered') continue; // Shown from the deliveries, with products.
+    const comment = event.data?.comment?.trim();
+    const quoted = comment ? ` — “${comment}”` : '';
+    const text =
+      event.action === 'raised'
+        ? `Reported out of ${selectionLabel(event.selection)}${quoted}`
+        : event.action === 'selection_changed'
+          ? `Reported again, now out of ${selectionLabel(event.selection)}${quoted}`
+          : event.action === 'repeated'
+            ? `Reported again${quoted}`
+            : event.action === 'acknowledged'
+              ? `Confirmed ${formatNumber((event.data?.lines ?? []).reduce((sum, line) => sum + line.pieces, 0))} pieces received`
+              : event.action;
+    entries.push({
+      id: event.id,
+      at: event.created_at,
+      text,
+      meta: `Hotspot · ${formatTimestamp(event.created_at)}`,
+      role: 'hotspot-manager',
+    });
+  }
+  if (report.events.length === 0) {
+    entries.push({
+      id: 'reported',
+      at: report.created_at,
+      text: `Reported out of ${report.product}${report.comment ? ` — “${report.comment}”` : ''}`,
+      meta: `${report.reported_by} · ${formatTimestamp(report.created_at)}`,
+      role: 'hotspot-manager',
+    });
+  }
+  for (const delivery of report.deliveries) {
+    entries.push({
+      id: delivery.id,
+      at: delivery.created_at,
+      text: (
+        <div className="flex flex-col gap-1">
+          <span>
+            Sent {formatNumber(delivery.lines.reduce((sum, line) => sum + line.pieces, 0))} pieces
+          </span>
+          <ul className="text-muted-foreground text-xs">
+            {delivery.lines.map((line) => (
+              <li key={line.id}>
+                {line.product}: {formatNumber(line.pieces)} sent ·{' '}
+                {line.acknowledged_at === null ? (
+                  'awaiting confirmation'
+                ) : (line.acknowledged_pieces ?? 0) < line.pieces ? (
+                  <span className="text-warning">
+                    {formatNumber(line.acknowledged_pieces ?? 0)} received
+                  </span>
+                ) : (
+                  `${formatNumber(line.acknowledged_pieces ?? 0)} received`
+                )}
+              </li>
+            ))}
+          </ul>
+          {delivery.rider ? (
+            <span className="text-muted-foreground text-xs">
+              Carried by {delivery.rider.name}
+              {delivery.rider.phone ? ` · ${delivery.rider.phone}` : ''}
+            </span>
+          ) : null}
+          {delivery.note ? (
+            <span className="text-muted-foreground text-xs">Note: {delivery.note}</span>
+          ) : null}
+        </div>
+      ),
+      meta: `District store · ${formatTimestamp(delivery.created_at)}`,
+      role: 'dcfp',
+    });
+  }
+  entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>History</CardTitle>
+        <CardDescription>
+          Reports from the hotspot, stock sent and what it confirmed, in single pieces.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ActivityTimeline entries={entries} className="wrap-anywhere" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function selectionLabel(selection: string): string {
+  if (selection === 'both') return 'male and female condoms';
+  return `${selection} condoms`;
+}
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

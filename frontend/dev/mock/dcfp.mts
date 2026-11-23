@@ -2,8 +2,9 @@
  * The DCFP's flows for the mock API, in the Go API's shapes (docs/modules/orders.md):
  *
  * - `GET/POST /orders/stockouts`: hotspot stockout reports. A report notifies the district's
- *   DCFPs; it is not an order. `GET /orders/stockouts/:id` adds deliveries and history, and
- *   `POST /orders/stockouts/:id/deliveries` records a delivery without changing mock inventory.
+ *   DCFPs; it is not an order. `GET /orders/stockouts/:id` adds deliveries and history,
+ *   `GET /orders/stockouts/:id/riders` lists the delivery agents, and
+ *   `POST /orders/stockouts/:id/deliveries` sends stock from the district store.
  * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS,
  *   with no unit; the warehouse chooses the product and the order takes that product's unit.
  * - `POST /orders/district-dispatches`: NMS or JMS sends free stock to a district store before it
@@ -18,7 +19,7 @@
  * and a few other districts' orders for the warehouse screens. Seeded orders start at each
  * status.
  */
-import { mockProductId, mockUnitId } from './admin.mts';
+import { mockProductFacts, mockProductId, mockUnitId } from './admin.mts';
 import { MOCK_STORES, mockDistrictStoreId } from './hotspots.mts';
 import { addTo, log, planTake, reservableFor, reserve, take, type Take } from './inventory.mts';
 
@@ -92,11 +93,10 @@ interface Report {
   reported_by_id: string;
   reported_by: string;
   comment: string | null;
-  created_at: string;
   repeat_count: number;
   last_reported_at: string;
   status: 'awaiting_supply' | 'awaiting_acknowledgement' | 'partly_received' | 'fulfilled';
-  fulfilled_at: string | null;
+  created_at: string;
 }
 
 interface Rider {
@@ -111,18 +111,17 @@ const riders = (): Rider[] => [
   { id: id(11, 2), name: 'Sarah Achieng', phone: null },
 ];
 
-interface Delivery {
+/** Stock the district sent a hotspot against a report, in the Go API's shape. */
+interface HotspotDelivery {
   id: string;
-  delivered_by_id: string;
   note: string | null;
   created_at: string;
+  /** The delivery agent carrying it, when one was named. */
   rider: Rider | null;
   lines: {
     id: string;
-    category: 'male' | 'female';
-    condom_id: string;
     product: string;
-    unit_of_measure_id: string;
+    category: 'male' | 'female';
     quantity: number;
     pieces: number;
     acknowledged_pieces: number | null;
@@ -132,9 +131,9 @@ interface Delivery {
 
 interface ReportEvent {
   id: string;
-  actor_id: string | null;
   action: 'raised' | 'repeated' | 'selection_changed' | 'delivered' | 'acknowledged';
-  selection: Report['selection'];
+  selection: string;
+  data: { comment?: string | null; lines?: { category: 'male' | 'female'; pieces: number }[] };
   created_at: string;
 }
 
@@ -184,9 +183,10 @@ const state = {
   orders: [] as Order[],
   events: [] as Event[],
   reports: [] as Report[],
-  /** Each report's deliveries and history, by report id. */
-  deliveries: {} as Record<string, Delivery[]>,
-  reportEvents: {} as Record<string, ReportEvent[]>,
+  deliveries: new Map<string, HotspotDelivery[]>(),
+  reportEvents: new Map<string, ReportEvent[]>(),
+  /** Client references already recorded, so a retried send is saved once. */
+  deliveryRefs: new Set<string>(),
   notifications: [] as Notification[],
   /** The batches each dispatched order took, for the district's receipt. */
   shipments: new Map<string, Take[]>(),
@@ -280,97 +280,82 @@ function report(n: number, values: Partial<Report>, hours: number): Report {
     reported_by_id: id(4, n),
     reported_by: 'Grace Nakato',
     comment: null,
-    created_at: hoursAgo(hours),
     repeat_count: 0,
     last_reported_at: hoursAgo(hours),
     status: 'awaiting_supply',
-    fulfilled_at: null,
+    created_at: hoursAgo(hours),
     ...values,
   };
 }
 
-/** A report with its deliveries and history, as `GET /orders/stockouts/:id` returns it. */
-function stockoutDetail(r: Report) {
-  return {
-    ...r,
-    deliveries: state.deliveries[r.id] ?? [],
-    events: state.reportEvents[r.id] ?? [
-      {
-        id: `${r.id}-raised`,
-        actor_id: r.reported_by_id,
-        action: 'raised',
-        selection: r.selection,
-        created_at: r.created_at,
-      },
-    ],
-  };
+/** Where a report stands from its deliveries, as the Go API derives it. */
+function statusOf(r: Report): Report['status'] {
+  const lines = (state.deliveries.get(r.id) ?? []).flatMap((d) => d.lines);
+  if (lines.length === 0) return 'awaiting_supply';
+  if (lines.some((line) => line.acknowledged_at === null)) return 'awaiting_acknowledgement';
+  const short = lines.some((line) => (line.acknowledged_pieces ?? 0) < line.pieces);
+  const covered = (category: 'male' | 'female') =>
+    r.selection !== 'both' && r.selection !== category
+      ? true
+      : lines.some((line) => line.category === category);
+  return !short && covered('male') && covered('female') ? 'fulfilled' : 'partly_received';
 }
 
-/** Records stock sent to a hotspot. Lines must name seeded products of the report's categories. */
-function deliver(r: Report, body: Body): Reply {
-  if (r.fulfilled_at) return fail(409, 'this notification is already fulfilled');
-  const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
-  if (lines.length === 0 || lines.length > 20)
-    return fail(422, 'a delivery needs between 1 and 20 lines');
-  const now = new Date().toISOString();
-  const deliveryId = id(9, (state.next += 1));
-  const recorded: Delivery['lines'] = [];
-  for (const line of lines) {
-    const productId = text(line.condom_id);
-    const quantity = typeof line.quantity === 'number' ? line.quantity : 0;
-    const product = PRODUCTS[productId];
-    if (!product) return fail(422, 'unknown product');
-    if (!Number.isInteger(quantity) || quantity < 1) {
-      return fail(422, 'each line needs a quantity between 1 and 1000000');
-    }
-    const category = categoryOf(productId);
-    if (r.selection !== 'both' && r.selection !== category) {
-      return fail(422, "a delivery line's product type is not in the notification's selection");
-    }
-    recorded.push({
-      id: id(10, (state.next += 1)),
-      category,
-      condom_id: productId,
-      product: product.name,
-      unit_of_measure_id: product.unit ?? mockUnitId(1),
-      quantity,
-      // The mock does not know pack sizes; 100 a unit keeps the numbers readable.
-      pieces: quantity * 100,
-      acknowledged_pieces: null,
-      acknowledged_at: null,
+function addReportEvent(r: Report, event: Omit<ReportEvent, 'id' | 'selection'>): void {
+  const events = state.reportEvents.get(r.id) ?? [];
+  events.push({ id: `${r.id}-e${String(events.length)}`, selection: r.selection, ...event });
+  state.reportEvents.set(r.id, events);
+}
+
+/** A seeded delivery: already sent (and maybe confirmed), so no stock moves now. */
+function seedDelivery(
+  r: Report,
+  hours: number,
+  lines: {
+    product: string;
+    category: 'male' | 'female';
+    quantity: number;
+    perUnit: number;
+    received?: number;
+  }[],
+  note: string | null = null,
+): void {
+  const at = hoursAgo(hours);
+  const delivery: HotspotDelivery = {
+    id: `${r.id}-d${String((state.deliveries.get(r.id) ?? []).length)}`,
+    note,
+    created_at: at,
+    rider: null,
+    lines: lines.map((line, index) => ({
+      id: `${r.id}-l${String(index)}`,
+      product: line.product,
+      category: line.category,
+      quantity: line.quantity,
+      pieces: line.quantity * line.perUnit,
+      acknowledged_pieces: line.received ?? null,
+      acknowledged_at: line.received === undefined ? null : hoursAgo(hours - 3),
+    })),
+  };
+  state.deliveries.set(r.id, [...(state.deliveries.get(r.id) ?? []), delivery]);
+  addReportEvent(r, {
+    action: 'delivered',
+    data: { lines: delivery.lines.map(({ category, pieces }) => ({ category, pieces })) },
+    created_at: at,
+  });
+  const confirmed = delivery.lines.filter((line) => line.acknowledged_at !== null);
+  if (confirmed.length > 0) {
+    addReportEvent(r, {
+      action: 'acknowledged',
+      data: {
+        lines: confirmed.map((line) => ({
+          category: line.category,
+          pieces: line.acknowledged_pieces ?? 0,
+        })),
+      },
+      created_at: hoursAgo(hours - 3),
     });
   }
-  const riderId = text(body.rider_id);
-  const rider = riderId ? riders().find((candidate) => candidate.id === riderId) : null;
-  if (riderId && !rider) {
-    const message =
-      "the delivery agent must be an active delivery agent working in the hotspot's district";
-    return fail(422, message, { rider_id: message });
-  }
-  const detail = stockoutDetail(r);
-  state.deliveries[r.id] = [
-    ...detail.deliveries,
-    {
-      id: deliveryId,
-      delivered_by_id: ME,
-      note: text(body.note) || null,
-      created_at: now,
-      rider: rider ?? null,
-      lines: recorded,
-    },
-  ];
-  state.reportEvents[r.id] = [
-    ...detail.events,
-    {
-      id: `${deliveryId}-event`,
-      actor_id: ME,
-      action: 'delivered',
-      selection: r.selection,
-      created_at: now,
-    },
-  ];
-  r.status = 'awaiting_acknowledgement';
-  return ok(stockoutDetail(r), 201);
+  r.status = statusOf(r);
 }
 
 function stockoutNotification(r: Report): Notification {
@@ -408,15 +393,11 @@ function stockoutNotification(r: Report): Notification {
 
 export function seedDcfp(dataset: string): void {
   state.next = 100;
+  state.deliveries = new Map();
+  state.reportEvents = new Map();
+  state.deliveryRefs = new Set();
   if (dataset === 'empty') {
-    Object.assign(state, {
-      orders: [],
-      events: [],
-      reports: [],
-      deliveries: {},
-      reportEvents: {},
-      notifications: [],
-    });
+    Object.assign(state, { orders: [], events: [], reports: [], notifications: [] });
     return;
   }
   state.orders = [
@@ -500,8 +481,6 @@ export function seedDcfp(dataset: string): void {
       40,
     ),
   ];
-  state.deliveries = {};
-  state.reportEvents = {};
   state.reports = [
     report(1, { comment: 'Dispenser empty since Monday' }, 2),
     report(
@@ -516,6 +495,7 @@ export function seedDcfp(dataset: string): void {
           contact_phone: '0701 555123',
         },
         condom_id: mockProductId(2),
+        selection: 'male',
         product: 'Engabu Free Male',
         reported_by: 'Moses Kato',
         comment: 'Running low. Weekend market',
@@ -551,13 +531,41 @@ export function seedDcfp(dataset: string): void {
             contact_name: 'Someone With A Very Long Name Indeed',
             contact_phone: '+256 772 000000 ext. 12345',
           },
-          condom_id: mockProductId(99),
-          product: PRODUCTS[mockProductId(99)]?.name ?? 'Condoms',
+          selection: 'both',
+          product: 'male and female condoms',
           comment: 'x'.repeat(600),
+          repeat_count: 1_234,
         },
         1,
       ),
     );
+  }
+  for (const r of state.reports) {
+    addReportEvent(r, { action: 'raised', data: { comment: r.comment }, created_at: r.created_at });
+  }
+  // Kisenyi said it again; Nansana got less than was sent; Kasangati has what it asked for.
+  const [kisenyi, nansana, kasangati] = state.reports.filter((r) => !r.id.endsWith('99'));
+  if (kisenyi) {
+    kisenyi.repeat_count = 1;
+    kisenyi.last_reported_at = hoursAgo(1);
+    addReportEvent(kisenyi, {
+      action: 'repeated',
+      data: { comment: 'Still empty. Clients asking at the bar' },
+      created_at: kisenyi.last_reported_at,
+    });
+  }
+  if (nansana) {
+    seedDelivery(
+      nansana,
+      16,
+      [{ product: 'Engabu Free Male', category: 'male', quantity: 2, perUnit: 144, received: 240 }],
+      'Sent with the VHT on the evening boda',
+    );
+  }
+  if (kasangati) {
+    seedDelivery(kasangati, 24 * 11, [
+      { product: 'FC2 Free Female', category: 'female', quantity: 3, perUnit: 100, received: 300 },
+    ]);
   }
   state.events = state.orders.flatMap(historyOf);
   state.shipments = new Map();
@@ -925,8 +933,100 @@ function reportStockout(body: Body): Reply {
     0,
   );
   state.reports.unshift(created);
+  addReportEvent(created, {
+    action: 'raised',
+    data: { comment: created.comment },
+    created_at: created.created_at,
+  });
   state.notifications.unshift(stockoutNotification(created));
   return ok(created, 201);
+}
+
+/**
+ * `POST /orders/stockouts/:id/deliveries`: the district sends a hotspot stock against its report,
+ * each line in the product's catalogue unit, taken from the district store first expiry first.
+ * All lines or none; a retried `client_reference` is recorded once.
+ */
+function deliverToHotspot(r: Report, body: Body): Reply {
+  const reference = text(body.client_reference);
+  if (reference && state.deliveryRefs.has(reference)) return ok(r, 201);
+  if (r.status === 'fulfilled') return fail(409, 'the report is already fulfilled');
+  const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
+  if (lines.length === 0 || lines.length > 20) return fail(422, 'send between 1 and 20 lines');
+  const reason = text(body.expiry_exception_reason);
+  const planned = [];
+  for (const line of lines) {
+    const condom = text(line.condom_id);
+    const unit = text(line.unit_of_measure_id);
+    const quantity = Number(line.quantity);
+    const facts = mockProductFacts(condom);
+    if (!facts?.active || !facts.category || !facts.unit_id || !facts.pieces_per_unit) {
+      return fail(422, 'a referenced product does not exist or cannot be sent');
+    }
+    if (r.selection !== 'both' && facts.category !== r.selection) {
+      return fail(422, 'the product is not of a type the hotspot asked for');
+    }
+    if (unit !== facts.unit_id) return fail(422, "deliver in the product's catalogue unit");
+    if (!Number.isSafeInteger(quantity) || quantity < 1) {
+      return fail(422, 'quantity must be a positive whole number');
+    }
+    const plan = planTake(r.district_store_id, condom, unit, quantity);
+    if (!plan) return fail(409, 'not enough stock in the district store');
+    if (plan.nearExpiry && !reason) {
+      const message = 'stock expiring within one month needs expiry_exception_reason';
+      return fail(422, message, { expiry_exception_reason: message });
+    }
+    planned.push({
+      condom,
+      unit,
+      quantity,
+      category: facts.category,
+      perUnit: facts.pieces_per_unit,
+      plan,
+    });
+  }
+  const riderId = text(body.rider_id);
+  const rider = riderId ? (riders().find((candidate) => candidate.id === riderId) ?? null) : null;
+  if (riderId && !rider) {
+    const message =
+      "the delivery agent must be an active delivery agent working in the hotspot's district";
+    return fail(422, message, { rider_id: message });
+  }
+  const note = text(body.note) || null;
+  const deliveries = state.deliveries.get(r.id) ?? [];
+  const delivery: HotspotDelivery = {
+    id: `${r.id}-d${String(deliveries.length)}`,
+    note,
+    created_at: new Date().toISOString(),
+    rider,
+    lines: planned.map((item, index) => {
+      for (const taken of item.plan.takes) {
+        log(r.district_store_id, item.condom, item.unit, 'hotspot_delivery', -taken.quantity, {
+          note,
+          batch: taken.batch,
+        });
+      }
+      take(item.plan.takes);
+      return {
+        id: `${r.id}-d${String(deliveries.length)}-l${String(index)}`,
+        product: PRODUCTS[item.condom]?.name ?? 'Condoms',
+        category: item.category,
+        quantity: item.quantity,
+        pieces: item.quantity * item.perUnit,
+        acknowledged_pieces: null,
+        acknowledged_at: null,
+      };
+    }),
+  };
+  state.deliveries.set(r.id, [...deliveries, delivery]);
+  if (reference) state.deliveryRefs.add(reference);
+  addReportEvent(r, {
+    action: 'delivered',
+    data: { lines: delivery.lines.map(({ category, pieces }) => ({ category, pieces })) },
+    created_at: delivery.created_at,
+  });
+  r.status = statusOf(r);
+  return ok(r, 201);
 }
 
 function inbox(method: string, parts: string[], query: URLSearchParams): Reply {
@@ -966,16 +1066,23 @@ export function handleDcfp(
   if (target === undefined)
     return method === 'GET' ? ok(state.orders) : fail(405, 'Method not allowed');
   if (target === 'stockouts') {
-    if (segment !== undefined) {
-      const r = state.reports.find((candidate) => candidate.id === segment);
-      if (!r) return fail(404, 'stockout notification not found');
-      if (method === 'GET' && action === undefined) return ok(stockoutDetail(r));
-      if (method === 'POST' && action === 'deliveries') return deliver(r, body);
-      if (method === 'GET' && action === 'riders') return ok(riders());
-      return fail(404, 'Not found');
+    if (segment === undefined) {
+      if (method === 'GET') return ok(state.reports);
+      if (method === 'POST') return reportStockout(body);
+      return fail(405, 'Method not allowed');
     }
-    if (method === 'GET') return ok(state.reports);
-    if (method === 'POST') return reportStockout(body);
+    const r = state.reports.find((candidate) => candidate.id === segment);
+    if (!r) return fail(404, 'stockout report not found');
+    if (method === 'GET' && action === undefined) {
+      return ok({
+        ...r,
+        deliveries: state.deliveries.get(r.id) ?? [],
+        events: state.reportEvents.get(r.id) ?? [],
+      });
+    }
+    if (method === 'POST' && action === 'deliveries') return deliverToHotspot(r, body);
+    if (method === 'GET' && action === 'riders') return ok(riders());
+    return fail(405, 'Method not allowed');
   }
   if (target === 'warehouse-requests' && method === 'POST') return placeWarehouseOrder(body);
   if (target === 'district-dispatches' && method === 'POST') return districtDispatch(body);

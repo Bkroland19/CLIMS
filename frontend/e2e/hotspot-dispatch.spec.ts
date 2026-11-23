@@ -4,9 +4,7 @@ import { aReport, FEMALE } from '../src/test/dcfpFixtures';
 import { aProductSummary, aStoreSummary } from '../src/test/warehouseOrderFixtures';
 
 // Browser-local API replies exercise the real shell without dispatching development stock.
-test('selects a hotspot from stockouts, dispatches stock and displays the receipt queue', async ({
-  page,
-}) => {
+test('opens a stockout request, sends stock from it and shows it on its way', async ({ page }) => {
   const storeId = 'store-kampala';
   const user = {
     id: 'district-user',
@@ -67,22 +65,20 @@ test('selects a hotspot from stockouts, dispatches stock and displays the receip
       data = aStoreSummary({
         store_id: storeId,
         store_type: 'district',
-        products: [aProductSummary({ usable: sent ? 3 : 5 })],
+        // Far from expiry, so no short-expiry reason is asked for.
+        products: [aProductSummary({ usable: sent ? 3 : 5, next_expiry: '2028-06-30' })],
       });
     await route.fulfill({ json: { success: true, data } });
   });
   await page.goto('/dcfp/stockouts');
-  await expect(page.getByRole('link', { name: 'Dispatch', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Actions for Kisenyi Landing' }).click();
-  await page.getByRole('menuitem', { name: 'Dispatch to hotspot' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Dispatch to hotspots' })).toBeVisible();
-  await page.getByRole('button', { name: 'Dispatch to Kisenyi Landing' }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('spinbutton', { name: /Female/ }).fill('2');
-  await dialog.getByRole('button', { name: 'Record dispatch' }).click();
-  await expect(dialog).not.toBeVisible();
-  await expect(page.getByText('200 pieces sent')).toBeVisible();
-  await expect(page.getByText('3 box', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Manage Kisenyi Landing' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Stockout request' })).toBeVisible();
+  await expect(page.getByText('Kisenyi Landing is out of female condoms')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Engabu · Female · Free' }).fill('2');
+  await page.getByRole('button', { name: 'Send 200 pieces' }).click();
+  await expect(page.getByText('Stock is on its way')).toBeVisible();
+  await expect(page.getByText(/Sent 200 pieces/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send more stock' })).toBeVisible();
   expect(dispatches).toBe(1);
 
   await page.evaluate(() => document.fonts.ready);
@@ -92,7 +88,7 @@ test('selects a hotspot from stockouts, dispatches stock and displays the receip
   expect(await page.evaluate(() => document.fonts.check('400 14px "IBM Plex Sans"'))).toBe(true);
   await page.screenshot({ path: 'test-results/hotspot-dispatch-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('heading', { level: 1, name: 'Dispatch to hotspots' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Stockout request' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
