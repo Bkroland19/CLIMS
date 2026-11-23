@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { ActivityTimeline, type ActivityRole } from '@/components/ActivityTimeline';
 import { DetailHeader } from '@/components/DetailHeader';
+import { AuditHistoryLink } from '@/features/audit/links';
 import { DetailList } from '@/components/DetailList';
 import { TextareaField } from '@/components/form/TextareaField';
 import { RecordView } from '@/components/RecordView';
@@ -124,26 +125,29 @@ function HotspotView({ hotspot }: { hotspot: HotspotDetail }) {
         status={<StatusBadge status={hotspot.review_status} />}
         description={`${formatText(hotspot.type)} · ${place || 'Place not recorded'} · submitted ${formatTimestamp(hotspot.created_at, now)}`}
         actions={
-          decisions.length > 0 ? (
-            <WriteAction>
-              {decisions.map((decision) => {
-                const text = DECISION_TEXT[decision];
-                const Icon = text.icon;
-                return (
-                  <Button
-                    key={decision}
-                    variant={text.destructive ? 'outline' : 'default'}
-                    onClick={() => {
-                      setDeciding(decision);
-                    }}
-                  >
-                    <Icon data-icon="inline-start" />
-                    {text.verb}
-                  </Button>
-                );
-              })}
-            </WriteAction>
-          ) : null
+          <>
+            <AuditHistoryLink subject={{ type: 'hotspot', id: hotspot.id }} />
+            {decisions.length > 0 ? (
+              <WriteAction>
+                {decisions.map((decision) => {
+                  const text = DECISION_TEXT[decision];
+                  const Icon = text.icon;
+                  return (
+                    <Button
+                      key={decision}
+                      variant={text.destructive ? 'outline' : 'default'}
+                      onClick={() => {
+                        setDeciding(decision);
+                      }}
+                    >
+                      <Icon data-icon="inline-start" />
+                      {text.verb}
+                    </Button>
+                  );
+                })}
+              </WriteAction>
+            ) : null}
+          </>
         }
       />
 

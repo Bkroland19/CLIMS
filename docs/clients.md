@@ -36,7 +36,7 @@ On this workstation, use `BUILDX_CONFIG=/tmp/clims-buildx make docker-up` if Doc
 | Expo Metro          | 8081           | Internal, through Nginx                   |
 | PostgreSQL          | 5432           | `localhost:5432` for local database tools |
 
-Nginx routes `/` and Next.js assets to the frontend; `/api`, `/docs`, and `/health` retain their full paths and go to Go. In production, `/handbook/` goes to the documentation site. A separate Nginx listener proxies Metro's root paths and WebSocket upgrades. Docker DNS resolution lets the proxy refresh upstream addresses after container recreation.
+Nginx routes `/` and Next.js assets to the frontend; `/api`, `/docs`, and `/health` retain their full paths and go to Go. `/handbook/` goes to the documentation site, and in development `/ws` goes to its live-reload socket. A separate Nginx listener proxies Metro's root paths and WebSocket upgrades. Docker DNS resolution lets the proxy refresh upstream addresses after container recreation.
 
 The startup sequence waits for PostgreSQL, then the API, then Next.js; Nginx waits for the API, frontend, and Metro health checks. The PostgreSQL named volume is preserved. The API is no longer published directly on host port 8080: Nginx owns that port.
 

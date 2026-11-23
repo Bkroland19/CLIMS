@@ -4,6 +4,7 @@ import {
   Activity,
   Ban,
   CircleCheck,
+  History,
   MonitorSmartphone,
   Plus,
   ShieldCheck,
@@ -31,6 +32,7 @@ import { PageActions } from '@/components/PageActions';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { auditHref } from '@/features/audit/links';
 import { useCurrentUser } from '@/features/auth/hooks';
 import { useCan } from '@/features/auth/queries';
 import { getErrorMessage } from '@/lib/api';
@@ -134,6 +136,7 @@ export default function UsersPage() {
   // Actions the API would refuse are left out, matching each endpoint's permission.
   const canCreate = can('users:create', 'roles:assign');
   const canAssignRoles = can('roles:assign');
+  const canReadAudit = can('audit:read');
   const canUpdate = can('users:update');
 
   const columns = useMemo<DataTableColumn<User>[]>(
@@ -427,6 +430,17 @@ export default function UsersPage() {
                     setDialog({ kind: 'sessions', user });
                   },
                 },
+                ...(canReadAudit
+                  ? ([
+                      {
+                        label: 'Audit history',
+                        icon: History,
+                        onSelect: () => {
+                          router.push(auditHref({ subject: { type: 'user', id: user.id } }));
+                        },
+                      },
+                    ] satisfies RowActionItem[])
+                  : []),
                 ...(isSelf || !canUpdate
                   ? []
                   : ([

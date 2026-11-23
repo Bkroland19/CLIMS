@@ -72,7 +72,7 @@ export function userRoleLabels(user: Pick<User, 'roles' | 'role'>): string[] {
 }
 
 /*
- * Every permission the Go API defines (its migrations 2, 6, 8, 13 and 18), worded
+ * Every permission the Go API defines (its migrations 2, 6, 8, 13, 18 and 29), worded
  * from the server's own descriptions. "Assigned" store, hotspot or district
  * means the one on the user's account; the `all_*` codes lift that limit.
  */
@@ -102,6 +102,7 @@ const PERMISSION_LABELS: Readonly<Record<string, string>> = {
   'reports:read': 'View programme reports and download them',
   'reports:configure': "Set their store's review cycle, receipt deadline and on-time target",
   'reports:approve': 'Approve report versions and record corrections',
+  'audit:read': 'Search the audit log of sign-ins and changes',
 };
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
@@ -112,6 +113,7 @@ const GROUP_LABELS: Readonly<Record<string, string>> = {
   inventory: 'Inventory',
   hotspots: 'Hotspots',
   reports: 'Reports',
+  audit: 'Audit log',
 };
 
 export function permissionLabel(code: string): string {

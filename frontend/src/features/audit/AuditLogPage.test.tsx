@@ -6,71 +6,120 @@ import type { RecordedRequest } from '@/test/fakeAdapter';
 import { testRouter } from '@/test/navigation';
 import { renderApp } from '@/test/renderApp';
 
-import AuditLogPage, { auditFiltersFrom, auditHref } from './AuditLogPage';
+import { actionLabel, auditQuery, NO_FILTERS, PAGE_SIZE, startOfDay, type AuditEntry } from './api';
+import AuditLogPage from './AuditLogPage';
+import { auditFiltersFrom, auditHref } from './links';
 
-const entries = [
+const HOTSPOT = '11111111-1111-4111-8111-111111111111';
+const DISTRICT = '22222222-2222-4222-8222-222222222222';
+const SARAH = '33333333-3333-4333-8333-333333333333';
+const GRACE = '44444444-4444-4444-8444-444444444444';
+
+const base: AuditEntry = {
+  id: 'e-0',
+  occurred_at: '2026-11-20T07:12:00Z',
+  action: 'hotspot.activated',
+  outcome: 'success',
+  reason: null,
+  actor: { id: SARAH, username: 'sarah.namubiru', roles: ['dfcp'] },
+  system_actor: null,
+  target: { type: 'hotspot', id: HOTSPOT },
+  subjects: [
+    { type: 'hotspot', id: HOTSPOT },
+    { type: 'district', id: DISTRICT },
+  ],
+  changes: { review_status: { before: 'pending', after: 'approved' } },
+  details: { comment: 'Visited on Monday' },
+  ip_address: '41.210.1.2',
+  user_agent:
+    'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36',
+  request_id: 'req-42',
+  session_id: null,
+};
+
+const entries: AuditEntry[] = [
+  base,
   {
-    id: 'a-1',
-    at: '2026-11-20T07:12:00Z',
-    actor: 'Sarah Namubiru',
-    action: 'updated',
-    record_type: 'order',
-    record_id: 'ORD-1042',
-    summary: 'Confirmed the order',
-    changes: [{ field: 'order_status', old: 'review', new: 'confirmed' }],
-    source: 'Chrome on Android',
-  },
-  {
-    id: 'a-2',
-    at: '2026-11-14T07:22:00Z',
-    actor: 'Ruth Akello',
-    action: 'created',
-    record_type: 'user',
-    record_id: 'Grace Nakato',
-    summary: 'Created as hotspot manager',
-    changes: [],
-    source: null,
+    ...base,
+    id: 'e-1',
+    occurred_at: '2026-11-19T07:12:00Z',
+    action: 'auth.login_failed',
+    outcome: 'failure',
+    reason: 'wrong_password',
+    actor: null,
+    target: { type: 'user', id: GRACE, name: 'grace' },
+    subjects: [{ type: 'user', id: GRACE, name: 'grace' }],
+    changes: null,
+    details: { identifier: 'grace' },
   },
 ];
 
-/** Answers like the server: applies the `record_type` and `action` filters in the query. */
+const reply = (data: unknown) => ({ status: 200, body: { success: true, data } });
+
+/** Answers like the server for the outcome filter; the rest is checked through the request URL. */
 function api(request: RecordedRequest) {
   const query = new URLSearchParams(request.url.split('?')[1] ?? '');
-  const type = query.get('record_type');
-  const action = query.get('action');
-  return {
-    status: 200,
-    body: {
-      success: true,
-      data: entries.filter(
-        (entry) => (!type || entry.record_type === type) && (!action || entry.action === action),
-      ),
-    },
-  };
+  const outcome = query.get('outcome');
+  return reply(entries.filter((entry) => !outcome || entry.outcome === outcome));
 }
 
+const query = (request: RecordedRequest | undefined) =>
+  new URLSearchParams(request?.url.split('?')[1] ?? '');
+
 describe('audit log filters', () => {
-  it('reads only known filters from the address', () => {
-    expect(auditFiltersFrom(new URLSearchParams('type=user&action=deleted'))).toEqual({
-      recordType: 'user',
-      action: 'deleted',
+  it('reads only well-formed filters from the address', () => {
+    expect(
+      auditFiltersFrom(
+        new URLSearchParams(
+          `area=hotspots&outcome=failure&from=2026-11-01&to=2026-11-20&actor=${SARAH}&subject=hotspot:${HOTSPOT}`,
+        ),
+      ),
+    ).toEqual({
+      area: 'hotspots',
+      outcome: 'failure',
+      from: '2026-11-01',
+      to: '2026-11-20',
+      actor: SARAH,
+      subject: { type: 'hotspot', id: HOTSPOT },
     });
-    expect(auditFiltersFrom(new URLSearchParams('type=nonsense&action=DROP'))).toEqual({
-      recordType: null,
-      action: null,
-    });
+    expect(
+      auditFiltersFrom(
+        new URLSearchParams('area=DROP&outcome=maybe&from=yesterday&actor=nope&subject=nope'),
+      ),
+    ).toEqual(NO_FILTERS);
   });
 
   it('leaves defaults out of the address', () => {
-    expect(auditHref({ recordType: null, action: null })).toBe('/moh/audit');
-    expect(auditHref({ recordType: 'warehouse_order', action: 'updated' })).toBe(
-      '/moh/audit?type=warehouse_order&action=updated',
+    expect(auditHref()).toBe('/moh/audit');
+    expect(auditHref({ area: 'orders', subject: { type: 'order', id: 'o-1' } })).toBe(
+      '/moh/audit?area=orders&subject=order%3Ao-1',
     );
+  });
+
+  it('asks the API for areas as domains, and hides reads of the log by default', () => {
+    expect(auditQuery(NO_FILTERS).get('exclude_domain')).toBe('audit');
+    expect(auditQuery({ ...NO_FILTERS, area: 'access' }).get('domain')).toBe('user,role,access');
+    expect(auditQuery({ ...NO_FILTERS, area: 'audit' }).get('domain')).toBe('audit');
+    expect(auditQuery({ ...NO_FILTERS, area: 'other' }).get('exclude_domain')).toContain(
+      'auth,user,role',
+    );
+    expect(auditQuery(NO_FILTERS, 50).get('offset')).toBe('50');
+  });
+
+  it('sends whole local days, with the exclusive end on the day after', () => {
+    const params = auditQuery({ ...NO_FILTERS, from: '2026-11-01', to: '2026-11-20' });
+    expect(params.get('from')).toBe(startOfDay('2026-11-01'));
+    expect(params.get('to')).toBe(new Date(2026, 10, 21).toISOString());
+  });
+
+  it('names known actions and reads unknown ones from their name', () => {
+    expect(actionLabel('hotspot.activated')).toBe('Hotspot activated');
+    expect(actionLabel('stock_batch.expired')).toBe('Stock batch expired');
   });
 });
 
 describe('AuditLogPage', () => {
-  it('lists every entry with who, what, when and the record, and expands to show what changed', async () => {
+  it('lists who did what to which record, and expands to show what changed and from where', async () => {
     const user = userEvent.setup();
     const { requests } = renderApp(<AuditLogPage />, {
       route: '/moh/audit',
@@ -78,74 +127,92 @@ describe('AuditLogPage', () => {
       replies: [api],
     });
 
-    expect(await screen.findByText('Order ORD-1042')).toBeInTheDocument();
-    expect(screen.getByText('User Grace Nakato')).toBeInTheDocument();
+    expect(await screen.findByText('sarah.namubiru')).toBeInTheDocument();
+    expect(screen.getAllByText('Hotspot activated')).not.toHaveLength(0);
+    expect(screen.getAllByText('Sign-in failed')).not.toHaveLength(0);
+    expect(screen.getByText('Not signed in')).toBeInTheDocument();
+    // A user record reads by its username; a record without a name by the start of its ID.
+    expect(screen.getAllByText('User grace')).not.toHaveLength(0);
+    expect(screen.getAllByText(`Hotspot ${HOTSPOT.slice(0, 8)}`)).not.toHaveLength(0);
     expect(screen.getByText('Showing 1–2 of 2')).toBeInTheDocument();
-    expect(screen.getByText('Sample data')).toBeInTheDocument();
-    expect(requests[0]?.url).toBe('/audit-log');
+    expect(screen.queryByText('Sample data')).not.toBeInTheDocument();
+    expect(requests[0]?.url).toBe('/audit?exclude_domain=audit&limit=50');
 
-    await user.click(screen.getByRole('button', { name: 'Show what changed on order ORD-1042' }));
-    const changes = screen.getByRole('table', { name: 'What changed on order ORD-1042' });
-    expect(within(changes).getByText('confirmed')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /^Show details of hotspot activated at / }),
+    );
+    const changes = screen.getByRole('table', { name: 'What changed: hotspot activated' });
+    expect(within(changes).getByText('approved')).toBeInTheDocument();
+    expect(screen.getAllByText('41.210.1.2 · Chrome on Android')[0]).toBeVisible();
+    expect(screen.getAllByText('Request req-42')[0]).toBeVisible();
   });
 
   it('asks the server for the filters in the address', async () => {
     const { requests } = renderApp(<AuditLogPage />, {
-      route: '/moh/audit?type=user&action=created',
+      route: `/moh/audit?area=hotspots&outcome=failure&subject=hotspot:${HOTSPOT}`,
       signedIn: true,
       replies: [api],
     });
 
-    expect(await screen.findByText('User Grace Nakato')).toBeInTheDocument();
-    expect(screen.queryByText('Order ORD-1042')).not.toBeInTheDocument();
-    expect(requests[0]?.url).toBe('/audit-log?record_type=user&action=created');
-    const actions = screen.getByRole('navigation', { name: 'Filter by action' });
-    expect(within(actions).getByRole('link', { name: 'Created' })).toHaveAttribute(
+    expect(await screen.findAllByText('Sign-in failed')).not.toHaveLength(0);
+    const sent = query(requests[0]);
+    expect(sent.get('domain')).toBe('hotspot');
+    expect(sent.get('outcome')).toBe('failure');
+    expect(sent.get('subject_type')).toBe('hotspot');
+    expect(sent.get('subject_id')).toBe(HOTSPOT);
+    expect(screen.getByText(`History of hotspot ${HOTSPOT.slice(0, 8)}`)).toBeInTheDocument();
+    const outcomes = screen.getByRole('navigation', { name: 'Filter by outcome' });
+    expect(within(outcomes).getByRole('link', { name: 'Failed' })).toHaveAttribute(
       'aria-current',
       'true',
     );
   });
 
-  it('puts an action filter in the address, keeping the record type', async () => {
-    const user = userEvent.setup();
-    const { requests } = renderApp(<AuditLogPage />, {
-      route: '/moh/audit?type=order',
-      signedIn: true,
-      replies: [api],
-    });
-    await screen.findByText('Order ORD-1042');
-
-    const actions = screen.getByRole('navigation', { name: 'Filter by action' });
-    await user.click(within(actions).getByRole('link', { name: 'Deleted' }));
-
-    expect(testRouter.location).toBe('/moh/audit?type=order&action=deleted');
-    expect(await screen.findByText('No entries match these filters')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(requests.at(-1)?.url).toBe('/audit-log?record_type=order&action=deleted');
-    });
-  });
-
-  it('puts a record type in the address from the record menu', async () => {
+  it("shows one record's history from the row menu", async () => {
     const user = userEvent.setup();
     renderApp(<AuditLogPage />, { route: '/moh/audit', signedIn: true, replies: [api] });
-    await screen.findByText('User Grace Nakato');
+    await screen.findByText('sarah.namubiru');
 
-    await user.click(screen.getByRole('button', { name: 'Actions for user Grace Nakato' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Show only users' }));
+    await user.click(screen.getAllByRole('button', { name: /^Actions for hotspot activated/ })[0]!);
+    await user.click(await screen.findByRole('menuitem', { name: "Show this record's history" }));
 
-    expect(testRouter.location).toBe('/moh/audit?type=user');
+    expect(testRouter.location).toBe(`/moh/audit?subject=hotspot%3A${HOTSPOT}`);
+  });
+
+  it('reads the next page on request, and stops after a short page', async () => {
+    const user = userEvent.setup();
+    const page = Array.from({ length: PAGE_SIZE }, (_, n) => ({ ...base, id: `p-${n}` }));
+    const { requests } = renderApp(<AuditLogPage />, {
+      route: '/moh/audit',
+      signedIn: true,
+      replies: [
+        (request: RecordedRequest) =>
+          reply(query(request).get('offset') ? [{ ...base, id: 'last' }] : page),
+      ],
+    });
+
+    expect(
+      await screen.findByText('Showing 1–25 of the 50 entries loaded so far'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more entries' }));
+
+    expect(await screen.findByText('Showing 1–25 of 51')).toBeInTheDocument();
+    expect(query(requests.at(-1)).get('offset')).toBe('50');
+    expect(screen.queryByRole('button', { name: 'Load more entries' })).not.toBeInTheDocument();
   });
 
   it('clears the filters from the empty state', async () => {
     const user = userEvent.setup();
     renderApp(<AuditLogPage />, {
-      route: '/moh/audit?action=deleted',
+      route: '/moh/audit?area=inventory',
       signedIn: true,
-      replies: [api],
+      replies: [reply([])],
     });
 
     await user.click(await screen.findByRole('button', { name: 'Clear filters' }));
-    expect(testRouter.location).toBe('/moh/audit');
+    await waitFor(() => {
+      expect(testRouter.location).toBe('/moh/audit');
+    });
   });
 
   it('shows an error with a retry when the log cannot be loaded', async () => {

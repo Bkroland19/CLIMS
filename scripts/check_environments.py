@@ -41,9 +41,15 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete_on_close=False)
         model = json.loads(result.stdout)
         models[mode] = model
         services = model["services"]
-        applications = {"backend", "frontend", "mobile", "postgres", "seaweedfs", "nginx"}
-        # The documentation site runs only in production; development uses make docs-serve.
-        assert set(services) == (applications | {"docs"} if mode == "prod" else applications), mode
+        assert set(services) == {
+            "backend",
+            "frontend",
+            "mobile",
+            "docs",
+            "postgres",
+            "seaweedfs",
+            "nginx",
+        }, mode
         for name, service in services.items():
             build = service["build"]
             assert build["dockerfile"].endswith(f"Dockerfile.{mode}"), (mode, name)
@@ -54,7 +60,7 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete_on_close=False)
             assert len(services["nginx"]["ports"]) == 2
             assert services["postgres"].get("ports")
             assert services["seaweedfs"].get("ports")
-            for name in ("backend", "frontend", "mobile"):
+            for name in ("backend", "frontend", "mobile", "docs"):
                 assert any(m["type"] == "bind" for m in services[name]["volumes"])
             assert "mobile" in services["nginx"]["depends_on"]
         else:
@@ -107,5 +113,5 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete_on_close=False)
         != models["prod"]["volumes"]["seaweedfs_data"]["name"]
     )
 print(
-    "PASS: dev/prod Dockerfile parity, production-only documentation site, development mounts, production isolation, gateway ports, separate database and object storage volumes, and release image overrides."
+    "PASS: dev/prod Dockerfile parity, development mounts, production isolation, gateway ports, separate database and object storage volumes, and release image overrides."
 )
