@@ -48,23 +48,48 @@ function normalise(text: string): string {
     .toLowerCase();
 }
 
+/** One row's searchable text, normalised once so each keystroke only compares strings. */
+function haystackOf(values: readonly CellValue[]): string {
+  return normalise(values.filter((value) => !isBlank(value)).join(' '));
+}
+
 /** Keeps rows where every word of the query appears somewhere in the row's values. */
 export function filterRows<Row>(
   rows: readonly Row[],
   query: string,
   getValues: (row: Row) => readonly CellValue[],
 ): Row[] {
-  const terms = normalise(query).split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return [...rows];
+  return searchIndex(rows, getValues).search(query);
+}
 
-  return rows.filter((row) => {
-    const haystack = normalise(
-      getValues(row)
-        .filter((value) => !isBlank(value))
-        .join(' '),
-    );
-    return terms.every((term) => haystack.includes(term));
-  });
+export interface SearchIndex<Row> {
+  /** The rows where every word of `query` appears; all of them for a blank query. */
+  search: (query: string) => Row[];
+}
+
+/**
+ * Normalises every row's text up front. Building it is the expensive part, so
+ * a table builds it when its rows change and searches it on every keystroke:
+ * tens of thousands of rows (every hotspot in the country) stay instant.
+ */
+export function searchIndex<Row>(
+  rows: readonly Row[],
+  getValues: (row: Row) => readonly CellValue[],
+): SearchIndex<Row> {
+  let haystacks: string[] | null = null;
+  return {
+    search(query) {
+      const terms = normalise(query).split(/\s+/).filter(Boolean);
+      if (terms.length === 0) return [...rows];
+      // Built on the first real search, so a table nobody searches never pays for it.
+      haystacks ??= rows.map((row) => haystackOf(getValues(row)));
+      const index = haystacks;
+      return rows.filter((_, position) => {
+        const haystack = index[position] ?? '';
+        return terms.every((term) => haystack.includes(term));
+      });
+    },
+  };
 }
 
 export interface Page<Row> {

@@ -190,7 +190,13 @@ export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<strin
     if (path === '/inventory/stock') return { status: 200, body: envelope(data.balances ?? []) };
     if (path === '/inventory/batches') return { status: 200, body: envelope(data.batches ?? []) };
     if (path === '/inventory/movements') {
-      return { status: 200, body: envelope(data.movements ?? []) };
+      // Paged and filtered as the API does it: newest first, at most `limit` from `offset`.
+      const params = new URLSearchParams(request.url.split('?')[1] ?? '');
+      const reason = params.get('reason');
+      const limit = Number(params.get('limit') ?? 50);
+      const offset = Number(params.get('offset') ?? 0);
+      const kept = (data.movements ?? []).filter((m) => !reason || m.reason === reason);
+      return { status: 200, body: envelope(kept.slice(offset, offset + limit)) };
     }
     if (path === '/inventory/store-summary') {
       return { status: 200, body: envelope(data.summary ?? aStoreSummary({ products: [] })) };

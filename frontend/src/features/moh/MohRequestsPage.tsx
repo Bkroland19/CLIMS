@@ -134,6 +134,7 @@ export default function MohRequestsPage() {
       </div>
       <DataTable
         label="Warehouse requests"
+        preferencesKey="moh-warehouse-requests"
         columns={columns}
         rows={rows}
         getRowId={(request) => request.id}

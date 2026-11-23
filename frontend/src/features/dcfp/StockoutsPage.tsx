@@ -70,6 +70,7 @@ export default function StockoutsPage() {
   return (
     <DataTable
       label="Stockout notifications"
+      preferencesKey="dcfp-stockouts"
       columns={columns}
       rows={reports.data}
       getRowId={(report) => report.id}

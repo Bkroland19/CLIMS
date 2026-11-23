@@ -308,6 +308,7 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
 
       <DataTable
         label={`Monthly reports, ${periodLabel(month)}`}
+        preferencesKey="moh-monthly-reports"
         columns={columns}
         rows={rows}
         getRowId={(report) => report.id}

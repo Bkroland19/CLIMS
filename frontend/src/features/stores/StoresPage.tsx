@@ -83,6 +83,7 @@ export default function StoresPage() {
       </PageActions>
       <DataTable
         label="Stores"
+        preferencesKey="stores"
         columns={columns}
         rows={stores.data}
         getRowId={(store) => store.id}

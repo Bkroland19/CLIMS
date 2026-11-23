@@ -5,7 +5,6 @@ import {
   CalendarX2,
   ClockAlert,
   Inbox,
-  Layers,
   Package,
   PackagePlus,
   Scale,
@@ -21,11 +20,17 @@ import { FilterSelect } from '@/components/FilterSelect';
 import { FilterTabs } from '@/components/FilterTabs';
 import { PageActions } from '@/components/PageActions';
 import { StatCard } from '@/components/StatCard';
+import { TaskList } from '@/components/TaskList';
 import { ErrorState } from '@/components/states/ErrorState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
-import type { Movement, ProductSummary, StockBatch } from '@/features/inventory/api';
+import type {
+  Movement,
+  MovementReason,
+  ProductSummary,
+  StockBatch,
+} from '@/features/inventory/api';
 import { BAND_STATUS, batchLabel, shelfLifeLeft } from '@/features/inventory/bands';
 import { formatDate, formatNumber, formatTimestamp } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -35,6 +40,8 @@ import { AdjustBatchDialog } from './AdjustBatchDialog';
 import { useCurrentWarehouse, useStoreBatches } from './orderQueries';
 import { WAREHOUSE_PATHS, withStore } from './paths';
 import { RegisterStockSheet } from './RegisterStockSheet';
+import { ShelfLifeOverview } from './ShelfLifeOverview';
+import { shelfLifeByUnit, stockAttention } from './shelfLife';
 import { ugandaToday } from './receiving';
 import {
   BATCH_FILTERS,
@@ -45,7 +52,7 @@ import {
   signed,
   type BatchFilter,
 } from './stock';
-import { useStoreMovements, useStoreSummary } from './stockQueries';
+import { useMovementLedger, useStoreSummary } from './stockQueries';
 import { StoreSwitch } from './StoreSwitch';
 import {
   dispatchBreakdown,
@@ -64,6 +71,7 @@ import {
   successRate,
   totalsByUnit,
   type Period,
+  type UnitAmount,
 } from './summary';
 
 const VIEWS = [
@@ -81,11 +89,32 @@ function viewFrom(params: URLSearchParams): View {
   return params.get('band') ? 'batches' : 'products';
 }
 
+/** The ledger's filter: every entry, or one reason. `reason` in the address picks one. */
+type ReasonFilter = MovementReason | 'all';
+
+const REASON_FILTERS: readonly { value: ReasonFilter; label: string }[] = [
+  { value: 'all', label: 'Every movement' },
+  ...(['receipt', 'dispatch', 'adjustment', 'order_receipt', 'opening'] as const).map((reason) => ({
+    value: reason,
+    label: MOVEMENT_LABEL[reason].label,
+  })),
+];
+
+function reasonFrom(param: string | null): ReasonFilter {
+  return REASON_FILTERS.find((option) => option.value === param)?.value ?? 'all';
+}
+
 /** The stock page's address for a view, filter and period, keeping the defaults out of it. */
-function stockPath(view: View, band: BatchFilter, period: Period): string {
+function stockPath(
+  view: View,
+  band: BatchFilter,
+  period: Period,
+  reason: ReasonFilter = 'all',
+): string {
   const params = new URLSearchParams();
   if (view !== 'products') params.set('view', view);
   if (view === 'batches' && band !== 'all') params.set('band', band);
+  if (view === 'movements' && reason !== 'all') params.set('reason', reason);
   if (period !== '30d') params.set('period', period);
   const query = params.toString();
   return query ? `${WAREHOUSE_PATHS.stock}?${query}` : WAREHOUSE_PATHS.stock;
@@ -106,6 +135,71 @@ function Flagged({ value, tone }: { value: number; tone: 'warning' | 'destructiv
   );
 }
 
+/** Per-unit amounts on separate lines, for a footer total: units are never added together. */
+function UnitTotals({ amounts }: { amounts: readonly UnitAmount[] }) {
+  if (amounts.length === 0) return <span className="text-muted-foreground">0</span>;
+  return (
+    <span className="flex flex-col items-end text-xs leading-4">
+      {amounts.map((amount) => (
+        <span key={amount.unit} className="whitespace-nowrap">
+          {formatNumber(amount.quantity)}{' '}
+          <span className="text-muted-foreground font-normal">{amount.unit}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** A column's footer: `pick` summed per unit over every matching row. */
+function unitTotal<Row extends { unit: string }>(pick: (row: Row) => number) {
+  return function total(rows: readonly Row[]) {
+    const totals = new Map<string, number>();
+    for (const row of rows) totals.set(row.unit, (totals.get(row.unit) ?? 0) + pick(row));
+    return (
+      <UnitTotals
+        amounts={[...totals.entries()]
+          .filter(([, quantity]) => quantity !== 0)
+          .map(([unit, quantity]) => ({ unit, quantity }))
+          .sort((a, b) => b.quantity - a.quantity || a.unit.localeCompare(b.unit))}
+      />
+    );
+  };
+}
+
+/**
+ * Free stock with a thin meter of what the rest of the shelf is doing: free, reserved for orders,
+ * and expired. Across hundreds of products, a red or blue tail picks out the ones to look at.
+ */
+function FreeStock({ row }: { row: ProductSummary }) {
+  const parts = [
+    { key: 'free', value: row.usable, fill: 'bg-primary', label: 'free' },
+    { key: 'reserved', value: row.reserved, fill: 'bg-info/70', label: 'reserved' },
+    { key: 'expired', value: row.expired, fill: 'bg-destructive', label: 'expired' },
+  ].filter((part) => part.value > 0);
+  const description = parts.map((part) => `${formatNumber(part.value)} ${part.label}`).join(', ');
+  return (
+    <div className="ml-auto flex w-24 flex-col items-end gap-1">
+      <span className="font-semibold tabular-nums">{formatNumber(row.usable)}</span>
+      {row.on_hand > 0 ? (
+        <div
+          role="img"
+          aria-label={`Of ${formatNumber(row.on_hand)} on hand: ${description}`}
+          title={`Of ${formatNumber(row.on_hand)} on hand: ${description}`}
+          className="bg-muted flex h-1 w-full gap-px overflow-hidden rounded-full"
+        >
+          {parts.map((part) => (
+            <div
+              key={part.key}
+              className={cn('h-full min-w-0.5', part.fill)}
+              style={{ flexGrow: part.value, flexBasis: 0 }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
   const phrase = periodPhrase(period);
   return [
@@ -114,7 +208,7 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       header: 'Product',
       value: (row) => `${row.product} ${row.unit}`,
       cell: (row) => (
-        <div className="max-w-56 min-w-0">
+        <div className="max-w-52 min-w-0">
           <div className="truncate font-medium" title={row.product}>
             {row.product}
           </div>
@@ -127,7 +221,8 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       header: 'Free to dispatch',
       numeric: true,
       value: (row) => row.usable,
-      cell: (row) => <span className="font-semibold tabular-nums">{formatNumber(row.usable)}</span>,
+      cell: (row) => <FreeStock row={row} />,
+      total: unitTotal((row) => row.usable),
     },
     {
       id: 'on_hand',
@@ -135,13 +230,16 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       numeric: true,
       value: (row) => row.on_hand,
       cell: (row) => formatNumber(row.on_hand),
+      total: unitTotal((row) => row.on_hand),
     },
     {
       id: 'reserved',
       header: 'Reserved',
       numeric: true,
+      hideable: true,
       value: (row) => row.reserved,
       cell: (row) => formatNumber(row.reserved),
+      total: unitTotal((row) => row.reserved),
     },
     {
       id: 'expiring',
@@ -149,6 +247,7 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       numeric: true,
       value: (row) => row.expiring,
       cell: (row) => <Flagged value={row.expiring} tone="warning" />,
+      total: unitTotal((row) => row.expiring),
     },
     {
       id: 'expired',
@@ -156,11 +255,14 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       numeric: true,
       value: (row) => row.expired,
       cell: (row) => <Flagged value={row.expired} tone="destructive" />,
+      total: unitTotal((row) => row.expired),
     },
     {
       id: 'received',
       header: 'Registered',
       numeric: true,
+      // In the View menu: the period's flows matter less here than what is on the shelf.
+      defaultHidden: true,
       value: (row) => row.received,
       cell: (row) => (
         <span title={`Registered in the ${phrase}`}>{formatNumber(row.received)}</span>
@@ -170,6 +272,7 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       id: 'dispatched',
       header: 'Dispatched',
       numeric: true,
+      defaultHidden: true,
       value: (row) => row.dispatched,
       cell: (row) => (
         <span title={`Dispatched in the ${phrase}`}>{formatNumber(row.dispatched)}</span>
@@ -179,6 +282,7 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       id: 'cover',
       header: 'Stock cover',
       numeric: true,
+      hideable: true,
       value: (row) => stockCover(row) ?? -1,
       cell: (row) => {
         const months = stockCover(row);
@@ -194,6 +298,7 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
     {
       id: 'next_expiry',
       header: 'Next expiry',
+      hideable: true,
       value: (row) => row.next_expiry ?? '9999',
       cell: (row) =>
         row.next_expiry ? (
@@ -268,8 +373,50 @@ const batchColumns: DataTableColumn<StockBatch>[] = [
     numeric: true,
     value: (batch) => batch.on_hand,
     cell: (batch) => formatNumber(batch.on_hand),
+    total: unitTotal((batch) => batch.on_hand),
   },
 ];
+
+/** A product's own batches, without the product column the row above already shows. */
+const PRODUCT_BATCH_COLUMNS = batchColumns.filter((column) => column.id !== 'product');
+
+/** Earliest expiry first, undated last: the order stock leaves the store. */
+function firstExpiryFirst(a: StockBatch, b: StockBatch): number {
+  if (a.expiry_date === b.expiry_date) return 0;
+  if (a.expiry_date === null) return 1;
+  if (b.expiry_date === null) return -1;
+  return a.expiry_date.localeCompare(b.expiry_date);
+}
+
+/** A product row opened up: its batches in the order they leave. */
+function ProductBatches({
+  product,
+  batches,
+  isLoading,
+}: {
+  product: ProductSummary;
+  batches: readonly StockBatch[] | undefined;
+  isLoading: boolean;
+}) {
+  const held = useMemo(
+    () => [...(batches ?? [])].filter((batch) => batch.on_hand > 0).sort(firstExpiryFirst),
+    [batches],
+  );
+  return (
+    <div className="bg-card rounded-card max-w-3xl overflow-hidden border">
+      <DataTable
+        variant="embedded"
+        label={`Batches of ${product.product}, ${product.unit}`}
+        columns={PRODUCT_BATCH_COLUMNS}
+        rows={held}
+        getRowId={(batch) => batch.id}
+        isLoading={isLoading}
+        rowTone={(batch) => (batch.band === 'expired' ? 'negative' : 'default')}
+        emptyTitle="No batches hold this product now."
+      />
+    </div>
+  );
+}
 
 function movementColumns(href: (path: string) => string): DataTableColumn<Movement>[] {
   return [
@@ -359,10 +506,11 @@ function movementColumns(href: (path: string) => string): DataTableColumn<Moveme
 
 const VIEW_DESCRIPTION: Record<View, (period: Period) => string> = {
   products: (period) =>
-    `Each product in each unit. Registered and dispatched cover the ${periodPhrase(period)}; expiring means under three months left; stock cover is free stock over the average month of dispatches in the last 90 days.`,
+    `Each product in each unit; open one to see its batches. Registered and dispatched cover the ${periodPhrase(period)}; expiring means under three months left; stock cover is free stock over the average month of dispatches in the last 90 days.`,
   batches: () =>
     "Each product's batches in the order they are dispatched, earliest expiry first. Expired batches can't leave; write them off once they are disposed of.",
-  movements: () => 'Stock registered, dispatches out and corrections, newest first.',
+  movements: () =>
+    'Stock registered, dispatches out and corrections, newest first. Older entries load a hundred at a time.',
 };
 
 export default function WarehouseStockPage() {
@@ -373,12 +521,15 @@ export default function WarehouseStockPage() {
   const view = viewFrom(params);
   const band = batchFilterFrom(params.get('band'));
   const period = periodFrom(params.get('period'));
+  const reason = reasonFrom(params.get('reason'));
   const today = useMemo(() => ugandaToday(new Date()), []);
   const range = useMemo(() => periodRange(period, today), [period, today]);
   const enabled = warehouse !== undefined;
   const summary = useStoreSummary(warehouse?.id, range, { enabled });
   const batches = useStoreBatches(warehouse?.id ?? '', { enabled });
-  const movements = useStoreMovements(warehouse?.id, { enabled: enabled && view === 'movements' });
+  const ledger = useMovementLedger(warehouse?.id, reason === 'all' ? null : reason, {
+    enabled: enabled && view === 'movements',
+  });
   const [registering, setRegistering] = useState(() => params.get('register') === '1');
   const [startProduct, setStartProduct] = useState<string | null>(null);
   const [adjusting, setAdjusting] = useState<StockBatch | null>(null);
@@ -386,8 +537,15 @@ export default function WarehouseStockPage() {
   const productCols = useMemo(() => productColumns(period), [period]);
   const movementCols = useMemo(() => movementColumns(href), [href]);
   const waiting = stores.isPending || !enabled;
-  const pathFor = (next: { view?: View; band?: BatchFilter; period?: Period }) =>
-    href(stockPath(next.view ?? view, next.band ?? band, next.period ?? period));
+  const pathFor = (next: {
+    view?: View;
+    band?: BatchFilter;
+    period?: Period;
+    reason?: ReasonFilter;
+  }) =>
+    href(
+      stockPath(next.view ?? view, next.band ?? band, next.period ?? period, next.reason ?? reason),
+    );
 
   const openRegister = (productId: string | null = null) => {
     setStartProduct(productId);
@@ -404,9 +562,35 @@ export default function WarehouseStockPage() {
   const figuresLoading = waiting || summary.isPending;
   const amounts = (pick: (row: ProductSummary) => number, none?: string) =>
     products ? formatAmounts(totalsByUnit(products, pick), none) : '—';
+  /** A headline amount: the unit holding most as the figure, any other units on a line under it. */
+  const figure = (pick: (row: ProductSummary) => number, none?: string) => {
+    if (!products) return { value: '—' };
+    const [first, ...rest] = totalsByUnit(products, pick);
+    return {
+      value: formatAmounts(first ? [first] : [], none),
+      ...(rest.length > 0 ? { extra: formatAmounts(rest) } : {}),
+    };
+  };
   const rate = orders ? successRate(orders) : null;
   const expiringNext = products ? nextExpiry(products) : null;
   const expiredBatches = batches.data?.filter((batch) => batch.band === 'expired').length ?? 0;
+  const shelfLife = useMemo(
+    () => (batches.data ? shelfLifeByUnit(batches.data) : undefined),
+    [batches.data],
+  );
+  const attention = useMemo(
+    () => (batches.data && products ? stockAttention(batches.data, products, href) : undefined),
+    [batches.data, products, href],
+  );
+  /** A product's batches, earliest expiry first, for its row's detail. */
+  const batchesOf = useMemo(() => {
+    const byProduct = new Map<string, StockBatch[]>();
+    for (const batch of batches.data ?? []) {
+      const key = `${batch.condom_id}:${batch.unit_of_measure_id}`;
+      byProduct.set(key, [...(byProduct.get(key) ?? []), batch]);
+    }
+    return byProduct;
+  }, [batches.data]);
 
   const registerButton = (
     <WriteAction>
@@ -427,7 +611,7 @@ export default function WarehouseStockPage() {
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <StoreSwitch
           store={code}
-          hrefFor={(other) => withStore(stockPath(view, band, period), other)}
+          hrefFor={(other) => withStore(stockPath(view, band, period, reason), other)}
         />
         <div className="flex flex-wrap items-center gap-3">
           <FilterSelect
@@ -459,11 +643,12 @@ export default function WarehouseStockPage() {
             />
           </div>
         ) : (
-          // Six figures read as two rows of three, or three rows of two on a phone, never 5 + 1.
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          // Six figures read as two rows of three, three rows of two, or one column on a phone
+          // (an amount in several units needs the width), never 5 + 1.
+          <div className="grid grid-cols-1 gap-3 min-[30rem]:grid-cols-2 lg:grid-cols-3">
             <StatCard
               label="On hand"
-              value={amounts((row) => row.on_hand)}
+              {...figure((row) => row.on_hand)}
               detail={
                 products
                   ? `${amounts((row) => row.usable)} free to dispatch · ${amounts((row) => row.reserved)} reserved`
@@ -475,7 +660,7 @@ export default function WarehouseStockPage() {
             />
             <StatCard
               label={`Dispatched, ${periodPhrase(period)}`}
-              value={amounts((row) => row.dispatched)}
+              {...figure((row) => row.dispatched)}
               detail={orders ? dispatchBreakdown(orders, period) : undefined}
               icon={Truck}
               accent="violet"
@@ -484,7 +669,7 @@ export default function WarehouseStockPage() {
             />
             <StatCard
               label="Expired"
-              value={amounts((row) => row.expired, 'None')}
+              {...figure((row) => row.expired, 'None')}
               detail={
                 products && totalsByUnit(products, (row) => row.expired).length > 0
                   ? `${formatNumber(expiredBatches)} ${expiredBatches === 1 ? 'batch' : 'batches'} to write off; can't be dispatched`
@@ -497,7 +682,7 @@ export default function WarehouseStockPage() {
             />
             <StatCard
               label="Expiring within 3 months"
-              value={amounts((row) => row.expiring, 'None')}
+              {...figure((row) => row.expiring, 'None')}
               detail={
                 expiringNext
                   ? `Next expiry ${formatDate(expiringNext)}; earliest goes out first`
@@ -530,6 +715,43 @@ export default function WarehouseStockPage() {
         )}
       </section>
 
+      <div className="gap-section grid xl:grid-cols-2">
+        <ShelfLifeOverview
+          code={code}
+          units={shelfLife}
+          isLoading={waiting || batches.isPending}
+          error={batches.error}
+          onRetry={() => void batches.refetch()}
+          isRetrying={batches.isRefetching}
+          hrefForBand={(next) => pathFor({ view: 'batches', band: next })}
+        />
+        <TaskList
+          title={`Needs attention at ${code}`}
+          tasks={attention}
+          isLoading={figuresLoading || batches.isPending}
+          error={batches.error ?? summary.error}
+          errorTitle={`Could not check the stock at ${code}`}
+          onRetry={() => {
+            void batches.refetch();
+            void summary.refetch();
+          }}
+          isRetrying={batches.isRefetching || summary.isRefetching}
+          loadingLabel="Checking the stock…"
+          empty={
+            shelfLife?.length === 0
+              ? {
+                  title: 'Nothing to check yet',
+                  description: `Register stock at ${code}, and anything about it that needs doing shows here.`,
+                }
+              : {
+                  title: 'Nothing needs attention',
+                  description:
+                    'No expired, undated or month-to-go batches, and every product has a month of stock or more.',
+                }
+          }
+        />
+      </div>
+
       <section aria-labelledby="stock-detail" className="flex flex-col gap-3">
         <h2 id="stock-detail" className="sr-only">
           Stock at {code} in detail
@@ -538,7 +760,7 @@ export default function WarehouseStockPage() {
           <FilterTabs
             label="Show stock by"
             value={view}
-            hrefFor={(next) => pathFor({ view: next, band: 'all' })}
+            hrefFor={(next) => pathFor({ view: next, band: 'all', reason: 'all' })}
             tabs={VIEWS.map((option) => ({
               value: option.value,
               label: option.label,
@@ -557,6 +779,16 @@ export default function WarehouseStockPage() {
             columns={productCols}
             rows={products}
             getRowId={(row) => `${row.condom_id}:${row.unit_of_measure_id}`}
+            preferencesKey="warehouse-stock-products"
+            pageSize={25}
+            renderExpanded={(row) => (
+              <ProductBatches
+                product={row}
+                batches={batchesOf.get(`${row.condom_id}:${row.unit_of_measure_id}`)}
+                isLoading={waiting || batches.isPending}
+              />
+            )}
+            expandLabel={(row) => `Show batches of ${row.product}, ${row.unit}`}
             isLoading={figuresLoading}
             error={summary.error}
             onRetry={() => void summary.refetch()}
@@ -579,15 +811,6 @@ export default function WarehouseStockPage() {
                             openRegister(row.condom_id);
                           },
                         },
-                        {
-                          label: 'See batches',
-                          icon: Layers,
-                          onSelect: () => {
-                            router.push(pathFor({ view: 'batches', band: 'all' }), {
-                              scroll: false,
-                            });
-                          },
-                        },
                       ]}
                     />
                   )
@@ -601,6 +824,9 @@ export default function WarehouseStockPage() {
             columns={batchColumns}
             rows={batches.data?.filter((batch) => keepsBatch(band, batch))}
             getRowId={(batch) => batch.id}
+            preferencesKey="warehouse-stock-batches"
+            pageSize={25}
+            rowTone={(batch) => (batch.band === 'expired' ? 'negative' : 'default')}
             isLoading={waiting || batches.isPending}
             error={batches.error}
             onRetry={() => void batches.refetch()}
@@ -659,15 +885,41 @@ export default function WarehouseStockPage() {
           <DataTable
             label={`Stock movements at ${code}`}
             columns={movementCols}
-            rows={movements.data}
+            rows={ledger.rows}
             getRowId={(movement) => movement.id}
-            isLoading={waiting || movements.isPending}
-            error={movements.error}
-            onRetry={() => void movements.refetch()}
-            isRetrying={movements.isRefetching}
+            preferencesKey="warehouse-stock-movements"
+            pageSize={25}
+            isLoading={waiting || ledger.isPending}
+            error={ledger.error}
+            onRetry={() => void ledger.refetch()}
+            isRetrying={ledger.isRefetching}
             searchPlaceholder="Search movements…"
-            emptyTitle="No stock movements yet"
-            emptyDescription="Stock registered, dispatches and corrections are listed here."
+            more={{
+              hasMore: ledger.hasMore,
+              isLoading: ledger.isLoadingMore,
+              onLoadMore: ledger.loadMore,
+              noun: 'movements',
+            }}
+            toolbar={
+              <FilterSelect
+                label="What"
+                value={reason}
+                options={REASON_FILTERS}
+                onValueChange={(next) => {
+                  router.replace(pathFor({ view: 'movements', reason: next }), { scroll: false });
+                }}
+              />
+            }
+            emptyTitle={
+              reason === 'all'
+                ? 'No stock movements yet'
+                : `No ${MOVEMENT_LABEL[reason].label.toLowerCase()} entries`
+            }
+            emptyDescription={
+              reason === 'all'
+                ? 'Stock registered, dispatches and corrections are listed here.'
+                : 'Choose another kind of movement to see the rest of the ledger.'
+            }
           />
         ) : null}
       </section>

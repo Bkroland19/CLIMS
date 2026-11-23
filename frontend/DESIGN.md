@@ -142,27 +142,55 @@ both themes). Beside the ministry's name it is decorative (`alt=""`); on its own
 
 Reach for these before writing markup.
 
-| Need                      | Use                                                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Page-level buttons        | `components/PageActions` (title and description come from the table)                                             |
-| A list of records         | `components/data-table/DataTable` (search, sort, paging, all states)                                             |
-| Per-row actions           | `components/data-table/RowActions` (`ROW_ACTION_SEPARATOR` groups items)                                         |
-| A headline figure         | `components/StatCard` in a `StatCardGrid` (`trend` adds change and line; `detail` one line of what is behind it) |
-| A record's ID and status  | `components/DetailHeader` (progress goes in its band)                                                            |
-| A record's progress       | `components/StepTracker` (state in words above each step)                                                        |
-| History or recent events  | `components/ActivityTimeline` (`connected` or `compact`; role dots)                                              |
-| Needed vs in stock        | `features/inventory/checkStock` and `StockCheckBadge`                                                            |
-| A create or edit form     | `components/form/FormDialog` with `TextField` and `SelectField`                                                  |
-| A choice from hundreds    | `components/form/ComboboxField` (a select with a search box; label + hint)                                       |
-| Confirming a deletion     | `components/ConfirmDialog` (an alert dialog, never a plain dialog)                                               |
-| A page still loading      | `components/states/PageSkeleton` (`table`, `dashboard`, `detail`, `form`)                                        |
-| Nothing to show           | `components/states/EmptyState`                                                                                   |
-| Failed to load            | `components/states/ErrorState` (says what failed, offers retry)                                                  |
-| A status word             | `components/StatusBadge` (`tone` overrides the word's lookup)                                                    |
-| Change over time          | `components/charts/TrendChart`                                                                                   |
-| A few categories compared | `components/charts/ColumnChart`                                                                                  |
-| Parts of a whole          | `components/charts/ShareList` (labelled bars, not a donut)                                                       |
-| A figure that is not live | `SampleBadge` on it, or `SampleDataNotice` for a whole page                                                      |
+| Need                       | Use                                                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Page-level buttons         | `components/PageActions` (title and description come from the table)                                             |
+| Any table                  | `components/data-table/DataTable`: the only table. See "Tables" below                                            |
+| Per-row actions            | `components/data-table/RowActions` (`ROW_ACTION_SEPARATOR` groups items)                                         |
+| A headline figure          | `components/StatCard` in a `StatCardGrid` (`trend` adds change and line; `detail` one line of what is behind it) |
+| An amount in several units | `StatCard` `extra`: the unit holding most is the figure, the rest one quieter line under it; never add units     |
+| Things to do               | `components/TaskList` (status, title, detail, a button to where it is done; lays out by its own width)           |
+| A record's ID and status   | `components/DetailHeader` (progress goes in its band)                                                            |
+| A record's progress        | `components/StepTracker` (state in words above each step)                                                        |
+| History or recent events   | `components/ActivityTimeline` (`connected` or `compact`; role dots)                                              |
+| Needed vs in stock         | `features/inventory/checkStock` and `StockCheckBadge`                                                            |
+| A create or edit form      | `components/form/FormDialog` with `TextField` and `SelectField`                                                  |
+| A choice from hundreds     | `components/form/ComboboxField` (a select with a search box; label + hint)                                       |
+| Confirming a deletion      | `components/ConfirmDialog` (an alert dialog, never a plain dialog)                                               |
+| A page still loading       | `components/states/PageSkeleton` (`table`, `dashboard`, `detail`, `form`)                                        |
+| Nothing to show            | `components/states/EmptyState`                                                                                   |
+| Failed to load             | `components/states/ErrorState` (says what failed, offers retry)                                                  |
+| A status word              | `components/StatusBadge` (`tone` overrides the word's lookup)                                                    |
+| Change over time           | `components/charts/TrendChart`                                                                                   |
+| A few categories compared  | `components/charts/ColumnChart`                                                                                  |
+| Parts of a whole           | `components/charts/ShareList` (labelled bars, not a donut)                                                       |
+| A figure that is not live  | `SampleBadge` on it, or `SampleDataNotice` for a whole page                                                      |
+
+### Tables
+
+Every table is `DataTable`, so every table looks and behaves the same. Users & access
+(`features/users/UsersPage`) is the reference screen for a list.
+
+- **`variant="list"`** (the default) is a page's records in their own card: search, sorting,
+  paging, the View menu (columns, row height, rows per page) and every state. Give it a
+  `preferencesKey` so the viewer's View choices are remembered. Filters go in `toolbar`;
+  `FilterTabs` for a status sits above it. Mark secondary columns `hideable`, and those few people
+  need `defaultHidden`, so the table fits 1440px without scrolling sideways.
+- **`variant="embedded"`** is a short, fixed set of lines inside a card: an order's products, the
+  batches a dispatch takes, a report's figures, a chart's table view. It shows every row, has no
+  toolbar and no card of its own, and its cells may hold inputs. A column without `value` is a
+  column of inputs or buttons: never sorted, searched or exported.
+- **Scale.** Lists search, sort and page in the browser, over a search index built once per data
+  load, so tens of thousands of rows (every hotspot) stay instant. At 50 or 100 rows a page the
+  table scrolls inside its card and the header stays in view. An endpoint that pages (at most 100
+  a time) uses `more` with a "Load more" button, and the count says how many are loaded, never
+  pretending the first page is everything (the warehouse ledger, `useMovementLedger`). Ticking the
+  page offers "Select all N".
+- **Detail and totals.** `renderExpanded` opens a row onto its detail (an audit entry's changes, a
+  product's batches); the chevron is a real button with `aria-expanded`. A column's `total` sums
+  every matching row, not just the page, in the footer; amounts in different units are listed per
+  unit, never added. `rowTone` tints a row (`caution`, `negative`, `muted`) and the row still says
+  why in words.
 
 `components/ui/` is generated by the shadcn CLI (`npx shadcn@latest add <name>`). Edit a
 primitive only to align it with the tokens above, and keep the edit small so

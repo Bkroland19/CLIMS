@@ -91,6 +91,7 @@ export default function WarehouseOrdersPage() {
       <PageActions>{newOrder}</PageActions>
       <DataTable
         label="Warehouse orders"
+        preferencesKey="dcfp-warehouse-orders"
         columns={columns}
         rows={rows}
         getRowId={(order) => order.id}

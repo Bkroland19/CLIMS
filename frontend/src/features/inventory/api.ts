@@ -140,14 +140,22 @@ const movementSchema = z.object({
 
 export type Movement = z.infer<typeof movementSchema>;
 
-/** The store's ledger, newest first. */
+/** The most entries the API returns at once. */
+export const MOVEMENTS_PAGE_SIZE = 100;
+
+/** The store's ledger, newest first, one page of it (`offset` skips the newest entries). */
 export async function listMovements(
   http: HttpClient,
-  filter: { storeId?: string; limit?: number },
+  filter: { storeId?: string; limit?: number; offset?: number; reason?: MovementReason },
   signal?: AbortSignal,
 ): Promise<Movement[]> {
   const body = await http.get(
-    `/inventory/movements${query({ store_id: filter.storeId, limit: String(filter.limit ?? 100) })}`,
+    `/inventory/movements${query({
+      store_id: filter.storeId,
+      reason: filter.reason,
+      limit: String(filter.limit ?? MOVEMENTS_PAGE_SIZE),
+      offset: filter.offset ? String(filter.offset) : undefined,
+    })}`,
     { signal },
   );
   return parseList(movementSchema, body, 'stock movements');

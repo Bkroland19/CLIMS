@@ -4,11 +4,11 @@ import { useParams } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 
 import { ActivityTimeline, type ActivityEntry } from '@/components/ActivityTimeline';
+import { DataTable } from '@/components/data-table/DataTable';
 import { DetailHeader } from '@/components/DetailHeader';
 import { DetailList } from '@/components/DetailList';
 import { TextField } from '@/components/form/TextField';
 import { InlineMessage } from '@/components/InlineMessage';
-import { ItemsTable } from '@/components/ItemsTable';
 import { RadioCardGroup } from '@/components/RadioCardGroup';
 import { RecordView } from '@/components/RecordView';
 import { ErrorState } from '@/components/states/ErrorState';
@@ -843,7 +843,8 @@ function PlanTable({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <ItemsTable<PlannedTake>
+      <DataTable<PlannedTake>
+        variant="embedded"
         label="Batches this dispatch takes"
         rows={plan}
         getRowId={(take) => take.batch.id}
