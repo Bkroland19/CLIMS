@@ -14,7 +14,8 @@ const baseUrl = "/handbook/";
 // The API reference page renders the repository's own Swagger UI (docs/api: vendored bundle,
 // shared settings and openapi.json), published at /handbook/swagger/. It is copied whenever the
 // config loads, so docs-serve and docs-build both have it; restart docs-serve after changing it.
-const generatedDir = path.join(__dirname, "generated");
+// The dev container points this outside the bind-mounted website/ folder.
+const generatedDir = process.env.DOCS_GENERATED_DIR || path.join(__dirname, "generated");
 const swaggerDir = path.join(generatedDir, "swagger");
 fs.rmSync(generatedDir, { recursive: true, force: true });
 fs.mkdirSync(swaggerDir, { recursive: true });
@@ -38,7 +39,7 @@ const config: Config = {
     hooks: { onBrokenMarkdownLinks: "throw" },
   },
   i18n: { defaultLocale: "en", locales: ["en"] },
-  staticDirectories: ["static", "generated"],
+  staticDirectories: ["static", generatedDir],
 
   presets: [
     [

@@ -138,6 +138,15 @@ func testAudit(t *testing.T, pool *pgxpool.Pool, repo *users.Repository, service
 		wrongPassword["target"].(map[string]any)["id"] != userID || wrongPassword["actor"] != nil {
 		t.Fatalf("wrong password entry: %v", wrongPassword)
 	}
+	// A user record carries the account's current username; other records carry none.
+	if name := wrongPassword["target"].(map[string]any)["name"]; name != "audit-user" {
+		t.Fatalf("wrong password target name = %v, want audit-user", name)
+	}
+	for _, subject := range wrongPassword["subjects"].([]any) {
+		if subject := subject.(map[string]any); subject["type"] == "user" && subject["name"] != "audit-user" {
+			t.Fatalf("user subject name = %v, want audit-user", subject["name"])
+		}
+	}
 	if unknownAccount == nil || unknownAccount["target"] != nil {
 		t.Fatalf("unknown account entry: %v", unknownAccount)
 	}
@@ -342,11 +351,43 @@ func testAudit(t *testing.T, pool *pgxpool.Pool, repo *users.Repository, service
 
 	// Searching needs audit:read, validates its filters, and is itself audited.
 	request("GET", "/audit", nil, login("audit-user@example.test", "audit-password-123", 200), 403)
-	for _, query := range []string{"outcome=maybe", "subject_type=user", "actor_id=nope", "from=yesterday", "limit=101"} {
+	for _, query := range []string{"outcome=maybe", "subject_type=user", "actor_id=nope", "from=yesterday", "limit=101", "domain=Hotspot", "exclude_domain=auth.login", "domain=auth,", "domain=,"} {
 		request("GET", "/audit?"+query, nil, admin, 400)
 	}
 	searches := entries("action=audit.searched&actor_id=" + adminID)
 	if len(searches) == 0 || searches[0]["details"].(map[string]any)["filters"] == nil {
 		t.Fatal("searches of the audit log were not recorded")
+	}
+
+	// A domain filter keeps or leaves out every action before the dot.
+	for _, entry := range entries("domain=auth") {
+		if !strings.HasPrefix(entry["action"].(string), "auth.") {
+			t.Fatalf("domain=auth returned %v", entry["action"])
+		}
+	}
+	if len(entries("domain=auth&action=auth.login_failed")) == 0 {
+		t.Fatal("domain=auth returned no failed logins")
+	}
+	for _, entry := range entries("exclude_domain=audit") {
+		if strings.HasPrefix(entry["action"].(string), "audit.") {
+			t.Fatalf("exclude_domain=audit returned %v", entry["action"])
+		}
+	}
+	if len(entries("exclude_domain=audit&action=audit.searched")) != 0 {
+		t.Fatal("exclude_domain=audit kept searches of the log")
+	}
+	// Both take several domains, separated by commas.
+	for _, entry := range entries("domain=user,role") {
+		if action := entry["action"].(string); !strings.HasPrefix(action, "user.") && !strings.HasPrefix(action, "role.") {
+			t.Fatalf("domain=user,role returned %v", action)
+		}
+	}
+	if find(entries("domain=user,role"), "role.permissions_changed") == nil || find(entries("domain=user,role"), "user.created") == nil {
+		t.Fatal("domain=user,role left out one of its domains")
+	}
+	for _, entry := range entries("exclude_domain=audit,auth") {
+		if action := entry["action"].(string); strings.HasPrefix(action, "audit.") || strings.HasPrefix(action, "auth.") {
+			t.Fatalf("exclude_domain=audit,auth returned %v", action)
+		}
 	}
 }

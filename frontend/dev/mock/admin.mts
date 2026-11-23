@@ -8,8 +8,12 @@
  * validation failures under JSON field names with the validator's messages
  * (`{ "username": "Use at least 3 characters." }`).
  *
- * Geography and the audit log are NOT YET IN THE GO API; stores mirror the live endpoint.
- * Their paths and shapes are the contract in `src/features/{stores,audit}/api.ts`
+ * The audit log mirrors the Go API too (`backend/internal/features/audit`):
+ * `GET /audit` with its filters, entries in the same shape, newest first.
+ * Stores mirror the live endpoint.
+ *
+ * Geography is NOT YET IN THE GO API.
+ * Its path and shape are the contract in `src/features/stores/api.ts`
  * (Phase 7 of `design/IMPLEMENTATION_PLAN.md`). Replies use the Go API's
  * `{ success, data }` envelope and `{ success: false, message, error }` failures.
  */
@@ -114,21 +118,42 @@ interface Geography {
   regions: Region[];
 }
 
-type AuditAction = 'created' | 'updated' | 'deleted';
+interface AuditSubject {
+  type: string;
+  id: string;
+}
+interface AuditActor {
+  id: string;
+  username: string | null;
+  roles: string[];
+}
+type AuditChanges = Record<string, { before: unknown; after: unknown }>;
 interface AuditEntry {
   id: string;
-  at: string;
-  actor: string;
-  action: AuditAction;
-  record_type: string;
-  record_id: string;
-  summary: string;
-  changes: { field: string; old: string | null; new: string | null }[];
-  source: string | null;
+  occurred_at: string;
+  action: string;
+  outcome: 'success' | 'failure';
+  reason: string | null;
+  actor: AuditActor | null;
+  system_actor: string | null;
+  target: AuditSubject | null;
+  subjects: AuditSubject[];
+  changes: AuditChanges | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  request_id: string | null;
+  session_id: string | null;
 }
 
 /** Who the mock says made a change; the mock sign-in is always this person. */
-const ACTOR = 'Sarah Nakato';
+const ACTOR: AuditActor = {
+  id: '00000000-0000-4000-8002-000000000999',
+  username: 'sarah.nakato',
+  roles: ['admin'],
+};
+const MOCK_AGENT =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36';
 
 const ok = (data: unknown, status = 200): Reply => ({ status, body: { success: true, data } });
 const fail = (status: number, message: string, error?: Record<string, string>): Reply => ({
@@ -557,141 +582,130 @@ function seedGeography(dataset: string): Geography {
 function seedAudit(dataset: string): AuditEntry[] {
   if (dataset === 'empty') return [];
   let n = 0;
+  const people: Record<string, AuditActor> = {
+    sarah: ACTOR,
+    grace: { id: uuid(2, 3), username: 'grace.nakato', roles: ['dfcp'] },
+    ruth: { id: uuid(2, 5), username: 'ruth.akello', roles: ['nms'] },
+  };
   const entry = (
     minutes: number,
-    actor: string,
-    action: AuditAction,
-    record_type: string,
-    record_id: string,
-    summary: string,
-    changes: AuditEntry['changes'] = [],
+    who: keyof typeof people | null,
+    action: string,
+    target: AuditSubject | null,
+    extra: {
+      related?: AuditSubject[];
+      changes?: AuditChanges;
+      details?: Record<string, unknown>;
+      reason?: string;
+    } = {},
   ): AuditEntry => {
     n += 1;
     return {
-      id: `audit-${String(n).padStart(4, '0')}`,
-      at: minutesAgo(minutes),
-      actor,
+      id: uuid(90, n),
+      occurred_at: minutesAgo(minutes),
       action,
-      record_type,
-      record_id,
-      summary,
-      changes,
-      source: actor === 'System' ? null : 'Chrome on Android',
+      outcome: extra.reason ? 'failure' : 'success',
+      reason: extra.reason ?? null,
+      actor: who ? (people[who] ?? null) : null,
+      system_actor: null,
+      target,
+      subjects: [...(target ? [target] : []), ...(extra.related ?? [])],
+      changes: extra.changes ?? null,
+      details: extra.details ?? null,
+      ip_address: `41.210.${(n * 7) % 255}.${(n * 13) % 255}`,
+      user_agent:
+        who === 'grace'
+          ? 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36'
+          : MOCK_AGENT,
+      request_id: `req-${String(n).padStart(6, '0')}`,
+      session_id: who ? uuid(91, n) : null,
     };
   };
-  const status = (old: string | null, next: string) => [{ field: 'order_status', old, new: next }];
-  return [
+  const user = (n: number): AuditSubject => ({ type: 'user', id: uuid(2, n) });
+  const hotspot: AuditSubject = { type: 'hotspot', id: uuid(40, 7) };
+  const district: AuditSubject = { type: 'district', id: uuid(41, 2) };
+  const order: AuditSubject = { type: 'order', id: uuid(42, 1042) };
+  const store = (n: number): AuditSubject => ({ type: 'store', id: uuid(43, n) });
+  const product: AuditSubject = { type: 'product', id: uuid(20, 1) };
+  const entries = [
     entry(
-      12,
-      'Sarah Namubiru',
-      'updated',
-      'order',
-      'ORD-1042',
-      'Confirmed the order',
-      status('review', 'confirmed'),
+      4,
+      'sarah',
+      'auth.login_succeeded',
+      { type: 'session', id: uuid(91, 1) },
+      {
+        related: [user(999)],
+      },
     ),
-    entry(
-      25,
-      'Grace Nakato',
-      'created',
-      'order',
-      'ORD-1043',
-      'Notified a stockout at Kireka Truck Stop Lodge',
-    ),
-    entry(
-      48,
-      'Sarah Namubiru',
-      'updated',
-      'order',
-      'ORD-1039',
-      'Put on hold: not enough female condoms',
-      status('review', 'on_hold'),
-    ),
+    entry(9, null, 'auth.login_failed', null, {
+      reason: 'wrong_password',
+      related: [user(3)],
+      details: { identifier: 'grace.nakato' },
+    }),
+    entry(12, 'ruth', 'order.dispatched', order, {
+      related: [store(1), store(4), product],
+      changes: {
+        status: { before: 'approved', after: 'dispatched' },
+        quantity_issued: { before: null, after: 1200 },
+      },
+    }),
+    entry(25, 'grace', 'hotspot.activated', hotspot, {
+      related: [district],
+      changes: {
+        review_status: { before: 'pending', after: 'approved' },
+        status: { before: 'inactive', after: 'active' },
+      },
+      details: { comment: 'Visited on Monday; the lodge owner agreed to stock condoms.' },
+    }),
+    entry(31, 'grace', 'access.denied', null, {
+      reason: 'missing_permission',
+      details: { permission: 'users:update', method: 'PATCH', path: '/api/v1/users/x/status' },
+    }),
+    entry(48, 'sarah', 'user.roles_changed', user(3), {
+      changes: { roles: { before: ['vht'], after: ['dfcp'] } },
+    }),
     entry(
       70,
-      'Musa Kato',
-      'updated',
-      'order',
-      'ORD-1036',
-      'Delivered to the hotspot',
-      status('in_transit', 'delivered'),
+      'ruth',
+      'inventory.movement_recorded',
+      { type: 'inventory_movement', id: uuid(44, 1) },
+      {
+        related: [store(1), product],
+        details: { reason: 'damaged', quantity: -40, on_hand_after: 9560 },
+      },
     ),
     entry(
       95,
-      'Daniel Ochieng',
-      'updated',
-      'warehouse_order',
-      'WR-2207',
-      'Accepted the district request',
-      [{ field: 'request_status', old: 'sent', new: 'queued' }],
+      'sarah',
+      'role.permissions_changed',
+      { type: 'role', id: uuid(1, 2) },
+      {
+        changes: { permissions: { before: ['users:read'], after: ['users:read', 'roles:read'] } },
+        details: { role: 'moh' },
+      },
     ),
+    entry(130, 'sarah', 'product.updated', product, {
+      changes: { pieces_per_unit: { before: 100, after: 144 } },
+    }),
     entry(
-      130,
-      'Sarah Namubiru',
-      'created',
-      'warehouse_order',
-      'WR-2208',
-      'Requested stock from NMS',
+      180,
+      'grace',
+      'stockout.reported',
+      { type: 'stockout_report', id: uuid(45, 3) },
+      {
+        related: [hotspot, store(4)],
+        details: { selection: 'male', comment: 'Out since Friday' },
+      },
     ),
-    entry(200, 'Joseph Ssemwogerere', 'created', 'hotspot', 'HS-0231', 'Mapped and activated', [
-      { field: 'status', old: null, new: 'active' },
-    ]),
-    entry(
-      360,
-      'System',
-      'updated',
-      'hotspot',
-      'HS-0198',
-      'Marked inactive after 60 days without an order',
-      [{ field: 'status', old: 'active', new: 'inactive' }],
-    ),
-    entry(
-      1_440 + 300,
-      'Ruth Akello',
-      'updated',
-      'role',
-      'dfcp',
-      'Granted “List users and view user accounts”',
-      [{ field: 'permission', old: null, new: 'users:read' }],
-    ),
-    entry(
-      1_440 * 6,
-      'Ruth Akello',
-      'created',
-      'user',
-      'Grace Nakato',
-      'Created as hotspot manager',
-      [{ field: 'status', old: null, new: 'active' }],
-    ),
-    entry(
-      1_440 * 18,
-      'Sarah Namubiru',
-      'updated',
-      'user',
-      'Brian Mugisha',
-      'Deactivated: left the rider pool',
-      [{ field: 'status', old: 'active', new: 'disabled' }],
-    ),
-    entry(1_440 * 20, 'Ruth Akello', 'updated', 'product', 'CND-006', 'Deactivated', [
-      { field: 'active', old: 'true', new: 'false' },
-    ]),
-    entry(
-      1_440 * 25,
-      'Ruth Akello',
-      'deleted',
-      'unit',
-      'Dozen',
-      'Removed unit of measure “Dozen”, used by no product',
-    ),
-    entry(
-      1_440 * 31,
-      'Sarah Namubiru',
-      'created',
-      'monthly_report',
-      'RPT-2609-WAK',
-      'Submitted the September report',
-    ),
+    entry(240, 'sarah', 'user.disabled', user(6), {
+      changes: { status: { before: 'active', after: 'inactive' } },
+      details: { sessions_revoked: 2 },
+    }),
+    entry(300, 'sarah', 'audit.searched', null, { details: { filters: {}, limit: 50, offset: 0 } }),
   ];
+  return dataset === 'worst'
+    ? entries.concat(entries.map((e, i) => ({ ...e, id: uuid(92, i) })))
+    : entries;
 }
 
 /** One server session, in the shape `GET /auth/sessions` and `GET /users/:id/sessions` reply with. */
@@ -801,24 +815,37 @@ export function seedAdmin(dataset: string): void {
   state.audit = seedAudit(dataset);
 }
 
+/** Writes an entry as the mock's signed-in person, like the Go API's `Record`. */
 function record(
-  action: AuditAction,
-  record_type: string,
-  record_id: string,
-  summary: string,
-  changes: AuditEntry['changes'] = [],
+  action: string,
+  target: AuditSubject | null,
+  {
+    changes,
+    details,
+    related = [],
+  }: {
+    changes?: AuditChanges;
+    details?: Record<string, unknown>;
+    related?: AuditSubject[];
+  } = {},
 ): void {
   state.nextId += 1;
   state.audit.unshift({
-    id: `audit-${state.nextId}`,
-    at: new Date().toISOString(),
-    actor: ACTOR,
+    id: uuid(93, state.nextId),
+    occurred_at: new Date().toISOString(),
     action,
-    record_type,
-    record_id,
-    summary,
-    changes,
-    source: 'Mock API',
+    outcome: 'success',
+    reason: null,
+    actor: ACTOR,
+    system_actor: null,
+    target,
+    subjects: [...(target ? [target] : []), ...related],
+    changes: changes ?? null,
+    details: details ?? null,
+    ip_address: '127.0.0.1',
+    user_agent: MOCK_AGENT,
+    request_id: `mock-${state.nextId}`,
+    session_id: null,
   });
 }
 
@@ -950,11 +977,14 @@ function handleUsers(
     state.users.push(user);
     const names = state.roles.filter((role) => roleIds.includes(role.id)).map((role) => role.name);
     record(
-      'created',
-      'user',
-      `${user.firstname} ${user.lastname}`.trim() || user.username,
-      `Created as ${names.join(', ')}`,
-      [{ field: 'status', old: null, new: 'active' }],
+      'user.created',
+      { type: 'user', id: user.id },
+      {
+        changes: {
+          username: { before: null, after: user.username },
+          roles: { before: null, after: names },
+        },
+      },
     );
     return ok({ user_id: user.id }, 201);
   }
@@ -964,7 +994,6 @@ function handleUsers(
   if (method === 'GET' && !sub)
     return user ? ok(userView(user)) : fail(404, 'user or role not found');
   if (!user) return fail(404, 'user or role not found');
-  const name = `${user.firstname} ${user.lastname}`.trim() || user.username;
 
   if (sub === 'roles' && method === 'PUT') {
     const roleIds = body.role_ids;
@@ -986,9 +1015,13 @@ function handleUsers(
         .filter((role) => list.includes(role.id))
         .map((role) => role.name)
         .join(', ') || null;
-    record('updated', 'user', name, 'Changed roles', [
-      { field: 'roles', old: roleNames(user.role_ids), new: roleNames(ids) },
-    ]);
+    record(
+      'user.roles_changed',
+      { type: 'user', id: user.id },
+      {
+        changes: { roles: { before: roleNames(user.role_ids), after: roleNames(ids) } },
+      },
+    );
     user.role_ids = ids;
     return ok(null);
   }
@@ -1001,9 +1034,13 @@ function handleUsers(
     const live = sessions.filter((session) => !session.revoked_at && session.expires_at > now);
     for (const session of live) session.revoked_at = now;
     if (live.length > 0) {
-      record('updated', 'user', name, 'Signed out everywhere', [
-        { field: 'sessions', old: String(live.length), new: '0' },
-      ]);
+      record(
+        'user.sessions_revoked',
+        { type: 'user', id: user.id },
+        {
+          details: { sessions_revoked: live.length },
+        },
+      );
     }
     return ok({ revoked: live.length });
   }
@@ -1017,9 +1054,14 @@ function handleUsers(
     const next = typeof body.store_id === 'string' ? body.store_id : null;
     const storeName = (storeId: string | null) =>
       MOCK_STORES.find((store) => store.id === storeId)?.name ?? null;
-    record('updated', 'user', name, 'Changed store', [
-      { field: 'store', old: storeName(user.store_id), new: storeName(next) },
-    ]);
+    record(
+      'user.store_assigned',
+      { type: 'user', id: user.id },
+      {
+        changes: { store: { before: storeName(user.store_id), after: storeName(next) } },
+        related: [user.store_id, next].flatMap((id) => (id ? [{ type: 'store', id }] : [])),
+      },
+    );
     user.store_id = next;
     return ok(null);
   }
@@ -1037,9 +1079,13 @@ function handleUsers(
     ) {
       return fail(409, 'cannot disable or demote the last active admin');
     }
-    record('updated', 'user', name, status === 'active' ? 'Reactivated' : 'Deactivated', [
-      { field: 'status', old: user.status, new: status },
-    ]);
+    record(
+      status === 'active' ? 'user.enabled' : 'user.disabled',
+      { type: 'user', id: user.id },
+      {
+        changes: { status: { before: user.status, after: status } },
+      },
+    );
     user.status = status;
     return ok(null);
   }
@@ -1066,14 +1112,16 @@ function handleRoles(
   if (!codes.every((code) => PERMISSIONS.includes(code))) return fail(422, 'unknown permission');
   const granted = codes.filter((code) => !role.permissions.includes(code));
   const revoked = role.permissions.filter((code) => !codes.includes(code));
-  for (const code of granted)
-    record('updated', 'role', role.name, `Granted ${code}`, [
-      { field: 'permission', old: null, new: code },
-    ]);
-  for (const code of revoked)
-    record('updated', 'role', role.name, `Revoked ${code}`, [
-      { field: 'permission', old: code, new: null },
-    ]);
+  if (granted.length > 0 || revoked.length > 0) {
+    record(
+      'role.permissions_changed',
+      { type: 'role', id: role.id },
+      {
+        changes: { permissions: { before: role.permissions, after: [...new Set(codes)] } },
+        details: { role: role.name },
+      },
+    );
+  }
   role.permissions = [...new Set(codes)];
   return ok(null);
 }
@@ -1258,7 +1306,13 @@ function handleProducts(
       updated_at: now,
     };
     state.products.push(product);
-    record('created', 'product', describeProduct(product), 'Added to the catalogue');
+    record(
+      'product.created',
+      { type: 'product', id: product.id },
+      {
+        details: { name: describeProduct(product) },
+      },
+    );
     return ok(productView(product), 201);
   }
 
@@ -1269,7 +1323,13 @@ function handleProducts(
     if (product.referenced)
       return fail(409, 'This product is used by stock or order records. Deactivate it instead.');
     state.products.splice(index, 1);
-    record('deleted', 'product', describeProduct(product), 'Deleted from the catalogue');
+    record(
+      'product.deleted',
+      { type: 'product', id: product.id },
+      {
+        details: { name: describeProduct(product) },
+      },
+    );
     return done('product deleted');
   }
   if (method !== 'PATCH') return fail(405, 'Method not allowed');
@@ -1301,14 +1361,20 @@ function handleProducts(
   }
   if (product.active !== nextActive) {
     record(
-      'updated',
-      'product',
-      describeProduct(product),
-      nextActive ? 'Activated' : 'Deactivated',
-      [{ field: 'active', old: String(product.active), new: String(nextActive) }],
+      'product.updated',
+      { type: 'product', id: product.id },
+      {
+        changes: { active: { before: product.active, after: nextActive } },
+      },
     );
   } else if (changesFields) {
-    record('updated', 'product', describeProduct(product), 'Edited');
+    record(
+      'product.updated',
+      { type: 'product', id: product.id },
+      {
+        details: { name: describeProduct(product) },
+      },
+    );
   }
   product.active = nextActive;
   product.updated_at = new Date().toISOString();
@@ -1331,6 +1397,12 @@ function validateLookup(
 }
 
 const LOOKUP_ID_PREFIX = { types: 23, brands: 21, units: 22 } as const;
+/** The audit log's name for each lookup, as in the Go catalogue. */
+const LOOKUP_SUBJECT = {
+  types: 'product_type',
+  brands: 'brand',
+  units: 'unit_of_measure',
+} as const;
 
 const collapse = (value: unknown) => text(value).trim().split(/\s+/).filter(Boolean).join(' ');
 
@@ -1375,7 +1447,13 @@ function handleLookups(
     const row = lookup(uuid(LOOKUP_ID_PREFIX[kind], state.nextId), name, note, true, 0);
     row.created_at = row.updated_at = new Date().toISOString();
     list.push(row);
-    if (kind === 'units') record('created', 'unit', name, `Added unit of measure “${name}”`);
+    record(
+      `${LOOKUP_SUBJECT[kind]}.created`,
+      { type: LOOKUP_SUBJECT[kind], id: row.id },
+      {
+        changes: { name: { before: null, after: name } },
+      },
+    );
     return ok(lookupView(kind, row), 201);
   }
 
@@ -1385,7 +1463,13 @@ function handleLookups(
   if (method === 'DELETE') {
     if (lookupView(kind, row).in_use) return fail(409, rules.inUse);
     list.splice(index, 1);
-    if (kind === 'units') record('deleted', 'unit', row.name, 'Deleted unit of measure');
+    record(
+      `${LOOKUP_SUBJECT[kind]}.deleted`,
+      { type: LOOKUP_SUBJECT[kind], id: row.id },
+      {
+        changes: { name: { before: row.name, after: null } },
+      },
+    );
     return done(`${rules.noun} deleted`);
   }
   if (method !== 'PATCH') return fail(405, 'Method not allowed');
@@ -1399,8 +1483,18 @@ function handleLookups(
     const duplicate = duplicateName(kind, name, row.id);
     if (duplicate) return duplicate;
   }
-  if (kind === 'units' && (name !== row.name || body.active !== undefined)) {
-    record('updated', 'unit', name, 'Edited unit of measure');
+  if (
+    name !== row.name ||
+    note !== row.note ||
+    (typeof body.active === 'boolean' && body.active !== row.active)
+  ) {
+    record(
+      `${LOOKUP_SUBJECT[kind]}.updated`,
+      { type: LOOKUP_SUBJECT[kind], id: row.id },
+      {
+        changes: { name: { before: row.name, after: name } },
+      },
+    );
   }
   row.name = name;
   row.note = note;
@@ -1473,6 +1567,79 @@ export function handleAuth(
   return ok(null);
 }
 
+// ---------------------------------------------------------------- audit log (Go shapes)
+
+const DOMAINS = /^[a-z][a-z0-9_]*(,[a-z][a-z0-9_]*)*$/;
+
+/** Mirrors `GET /audit`: the same filters and validation, newest first, and the search is itself recorded. */
+function searchAudit(query: URLSearchParams): Reply {
+  const limit = Number(query.get('limit') ?? '50');
+  const offset = Number(query.get('offset') ?? '0');
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 100 ||
+    !Number.isInteger(offset) ||
+    offset < 0
+  )
+    return fail(400, 'limit must be between 1 and 100 and offset must be nonnegative');
+  const domainList = (name: string): string[] | null => {
+    const raw = query.get(name) ?? '';
+    if (raw === '') return [];
+    return DOMAINS.test(raw) ? raw.split(',') : null;
+  };
+  const domains = domainList('domain');
+  const excluded = domainList('exclude_domain');
+  if (!domains || !excluded) return fail(400, 'domain must be action domains separated by commas');
+  const outcome = query.get('outcome');
+  if (outcome && outcome !== 'success' && outcome !== 'failure')
+    return fail(400, 'outcome must be success or failure');
+  const subjectType = query.get('subject_type') ?? '';
+  const subjectId = query.get('subject_id') ?? '';
+  if ((subjectType === '') !== (subjectId === ''))
+    return fail(400, 'subject_type and subject_id go together');
+  const actor = query.get('actor_id');
+  const from = query.get('from');
+  const to = query.get('to');
+
+  record('audit.searched', null, {
+    details: { filters: Object.fromEntries(query), limit, offset },
+  });
+  const domainOf = (action: string) => action.split('.')[0] ?? '';
+  const matches = state.audit
+    .filter(
+      (entry) =>
+        (domains.length === 0 || domains.includes(domainOf(entry.action))) &&
+        !excluded.includes(domainOf(entry.action)) &&
+        (!outcome || entry.outcome === outcome) &&
+        (!actor || entry.actor?.id === actor) &&
+        (!subjectType ||
+          entry.subjects.some(
+            (subject) => subject.type === subjectType && subject.id === subjectId,
+          )) &&
+        (!from || entry.occurred_at >= new Date(from).toISOString()) &&
+        (!to || entry.occurred_at < new Date(to).toISOString()),
+    )
+    .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+  // Like the Go search, user records carry the account's current username.
+  const name = (subject: AuditSubject): AuditSubject & { name: string | null } => ({
+    ...subject,
+    name:
+      subject.type !== 'user'
+        ? null
+        : subject.id === ACTOR.id
+          ? ACTOR.username
+          : (state.users.find((user) => user.id === subject.id)?.username ?? null),
+  });
+  return ok(
+    matches.slice(offset, offset + limit).map((entry) => ({
+      ...entry,
+      target: entry.target && name(entry.target),
+      subjects: entry.subjects.map(name),
+    })),
+  );
+}
+
 // ---------------------------------------------------------------- entry point
 
 const RESOURCES = new Set([
@@ -1482,7 +1649,7 @@ const RESOURCES = new Set([
   'catalogue',
   'stores',
   'geography',
-  'audit-log',
+  'audit',
 ]);
 
 /**
@@ -1515,18 +1682,7 @@ export function handleAdmin(
         return ok({ synced_at: state.geography.synced_at, changes: 0 });
       }
       return method === 'GET' && !first ? ok(state.geography) : fail(405, 'Method not allowed');
-    default: {
-      if (method !== 'GET') return fail(405, 'Method not allowed');
-      const type = query.get('record_type');
-      const action = query.get('action');
-      return ok(
-        state.audit
-          .filter(
-            (entry) =>
-              (!type || entry.record_type === type) && (!action || entry.action === action),
-          )
-          .sort((a, b) => b.at.localeCompare(a.at)),
-      );
-    }
+    default:
+      return method === 'GET' && !first ? searchAudit(query) : fail(405, 'Method not allowed');
   }
 }

@@ -15,6 +15,7 @@ import { testRouter } from './navigation';
 
 /** Every permission the Go API defines: what an administrator holds. */
 export const ADMIN_PERMISSIONS = [
+  'audit:read',
   'catalogue:manage',
   'hotspots:activate',
   'hotspots:all_districts',

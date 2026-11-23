@@ -5136,6 +5136,24 @@
             "description": "For example auth.login_failed."
           },
           {
+            "name": "domain",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(,[a-z][a-z0-9_]*)*$"
+            },
+            "description": "Only actions in these domains (the part before the dot), separated by commas; for example user,role."
+          },
+          {
+            "name": "exclude_domain",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(,[a-z][a-z0-9_]*)*$"
+            },
+            "description": "Leave out actions in these domains, separated by commas; for example audit, to hide searches of the log."
+          },
+          {
             "name": "outcome",
             "in": "query",
             "schema": {
@@ -9891,6 +9909,12 @@
           },
           "id": {
             "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "The record's current name where the log can look it up: a user's username. Null for other records, or once the account is deleted.",
+            "example": "felix"
           }
         }
       },

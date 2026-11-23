@@ -126,7 +126,8 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 - **Documentation site at `/handbook/`.** `docs/` is published as a Docusaurus site, with search,
   served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
-  It updates with each stable release. Preview it with `make docs-serve`. See
+  It updates with each stable release. In development it is at `http://localhost:8080/handbook/`
+  with live reload, or run `make docs-serve`. See
   [ADR 0004](adr/0004-documentation-site.md).
 - **Warehouse stock on the Go API.** The stock page shows, per product, what is free to reserve,
   what is reserved, expired and expiring within 3 months, and the next expiry; every batch with its

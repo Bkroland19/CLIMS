@@ -10,7 +10,7 @@ Run all commands from the repository root. `ENVIRONMENT=dev` is the default. Sel
 
 `infra/compose/docker-compose.yml` contains shared configuration. Always combine it with exactly one of `docker-compose.dev.yml` or `docker-compose.prod.yml` in that directory. The Makefile does this automatically. The old MariaDB and PostgreSQL Compose entrypoints have been retired; PostgreSQL is the database for both environments.
 
-Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<service>/`, except the production-only documentation site:
+Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<service>/`:
 
 | Service   | Development                                                         | Production                                            |
 | --------- | ------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -20,7 +20,7 @@ Every service has `Dockerfile.dev` and `Dockerfile.prod` under `infra/docker/<se
 | postgres  | PostgreSQL 16, localhost database port                              | PostgreSQL 16, internal database port only            |
 | seaweedfs | SeaweedFS object storage, localhost S3 port 8333                    | SeaweedFS object storage, internal S3 port only       |
 | nginx     | Mounted development config, HTTP and Metro listeners                | Baked configuration, HTTP listener only               |
-| docs      | None: preview with `make docs-serve`                                | Static Docusaurus site under `/handbook/`             |
+| docs      | Docusaurus dev server under `/handbook/`, mounted docs and site     | Static Docusaurus site under `/handbook/`             |
 
 Both PostgreSQL Dockerfiles intentionally use the same upstream image. Runtime configuration belongs in Compose. Images are tagged `clims-<service>:dev` or `clims-<service>:prod`.
 
