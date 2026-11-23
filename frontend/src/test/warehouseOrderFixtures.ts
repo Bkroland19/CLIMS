@@ -1,5 +1,11 @@
 import type { Product } from '@/features/catalogue/api';
-import type { Movement, StockBalance, StockBatch } from '@/features/inventory/api';
+import type {
+  Movement,
+  ProductSummary,
+  StockBalance,
+  StockBatch,
+  StoreSummary,
+} from '@/features/inventory/api';
 import type { Order, OrderEvent } from '@/features/orders/api';
 
 import { anOrder, BOX, FEMALE, JMS, NMS } from './dcfpFixtures';
@@ -96,6 +102,52 @@ export interface WarehouseOrderData {
   batches?: StockBatch[];
   products?: Product[];
   movements?: Movement[];
+  summary?: StoreSummary;
+}
+
+/** A product's line in a store summary: 910 boxes of Engabu Free Female at NMS. */
+export function aProductSummary(overrides: Partial<ProductSummary> = {}): ProductSummary {
+  return {
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    on_hand: 910,
+    reserved: 300,
+    expired: 40,
+    expiring: 180,
+    no_expiry: 210,
+    usable: 570,
+    next_expiry: '2026-12-08',
+    received: 600,
+    dispatched: 80,
+    written_off: 0,
+    dispatched_90_days: 300,
+    ...overrides,
+  };
+}
+
+/** NMS at a glance: one product, and the district orders placed with it. */
+export function aStoreSummary(overrides: Partial<StoreSummary> = {}): StoreSummary {
+  return {
+    store_id: NMS.id,
+    store_name: NMS.name,
+    store_type: 'national',
+    products: [aProductSummary()],
+    orders: {
+      to_decide: 2,
+      waiting_for_stock: 1,
+      to_dispatch: 0,
+      in_transit: 1,
+      dispatched: 4,
+      rejected: 1,
+      dispatched_in_full: 3,
+      districts_supplied: 3,
+      received_short: 0,
+      median_days_to_dispatch: 2.4,
+    },
+    ...overrides,
+  };
 }
 
 /**
@@ -139,6 +191,9 @@ export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<strin
     if (path === '/inventory/batches') return { status: 200, body: envelope(data.batches ?? []) };
     if (path === '/inventory/movements') {
       return { status: 200, body: envelope(data.movements ?? []) };
+    }
+    if (path === '/inventory/store-summary') {
+      return { status: 200, body: envelope(data.summary ?? aStoreSummary({ products: [] })) };
     }
     if (path === '/catalogue/products') {
       return { status: 200, body: envelope(data.products ?? [FEMALE, FEMALE_FC2]) };

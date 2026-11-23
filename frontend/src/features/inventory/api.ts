@@ -176,3 +176,89 @@ export async function recordMovement(http: HttpClient, input: MovementInput): Pr
     'stock movement',
   );
 }
+
+/** One batch of a delivery, as printed on its cartons. */
+export interface ReceiptLineInput {
+  condom_id: string;
+  unit_of_measure_id: string;
+  batch_number: string;
+  /** YYYY-MM-DD, after today. */
+  expiry_date: string;
+  quantity: number;
+}
+
+export interface ReceiptInput {
+  store_id: string;
+  /** Where the delivery came from, e.g. the supplier and its delivery note. */
+  note?: string;
+  lines: ReceiptLineInput[];
+}
+
+/** Records a whole delivery, every batch or none; returns a ledger entry per line. */
+export async function recordReceipt(http: HttpClient, input: ReceiptInput): Promise<Movement[]> {
+  return parseList(movementSchema, await http.post('/inventory/receipts', input), 'delivery');
+}
+
+const productSummarySchema = z.object({
+  condom_id: z.string(),
+  product: z.string(),
+  unit_of_measure_id: z.string(),
+  unit: z.string(),
+  on_hand: count,
+  reserved: count,
+  /** In batches past their expiry date: cannot be reserved or dispatched. */
+  expired: count,
+  /** In batches with under three months left, not yet expired. */
+  expiring: count,
+  /** Held without an expiry date recorded. */
+  no_expiry: count,
+  /** On hand less reserved and expired: what can still be reserved for an order. */
+  usable: count,
+  /** Earliest expiry date of an unexpired batch, YYYY-MM-DD. */
+  next_expiry: text,
+  /** In the period asked for. */
+  received: count,
+  dispatched: count,
+  /** Taken away by adjustments: counted short, damaged, expired or lost. */
+  written_off: count,
+  /** In the 90 days to now, whatever the period, for stock cover. */
+  dispatched_90_days: count,
+});
+
+export type ProductSummary = z.infer<typeof productSummarySchema>;
+
+const storeSummarySchema = z.object({
+  store_id: z.string(),
+  store_name: z.string(),
+  store_type: z.enum(['national', 'district']),
+  products: z.array(productSummarySchema),
+  orders: z.object({
+    /** Open now. */
+    to_decide: count,
+    waiting_for_stock: count,
+    to_dispatch: count,
+    in_transit: count,
+    /** Steps taken in the period. */
+    dispatched: count,
+    rejected: count,
+    dispatched_in_full: count,
+    districts_supplied: count,
+    received_short: count,
+    median_days_to_dispatch: z.number().nullable(),
+  }),
+});
+
+export type StoreSummary = z.infer<typeof storeSummarySchema>;
+
+/** One store at a glance: stock per product now, and what moved and was ordered in the period. */
+export async function getStoreSummary(
+  http: HttpClient,
+  filter: { storeId: string; from?: string; to?: string },
+  signal?: AbortSignal,
+): Promise<StoreSummary> {
+  const body = await http.get(
+    `/inventory/store-summary${query({ store_id: filter.storeId, from: filter.from, to: filter.to })}`,
+    { signal },
+  );
+  return parseBody(storeSummarySchema, body, 'stock summary');
+}

@@ -4,6 +4,25 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- **The warehouse stock page at a glance.** `GET /api/v1/inventory/store-summary?store_id=&from=&to=`
+  reports one store: per product and unit, what is on hand, reserved, expired, expiring within three
+  months, usable and next to expire, what was received, dispatched and written off in the period, and
+  what went out in the last 90 days; and how many district orders wait at each step, with those
+  dispatched, rejected, dispatched in full and received short in the period, the districts supplied and
+  the median days to dispatch. Web: the warehouse stock page leads with on hand, dispatched, expired,
+  expiring, pending district orders and the success rate (dispatched of those dispatched or rejected),
+  for the last 30 or 90 days or 12 months, each linking to the list behind it; then products (with
+  stock cover in months), batches and movements as three views of one section.
+- **Stock is registered in one save.** `POST /api/v1/inventory/receipts` records every batch being
+  registered, each with a batch number and a future expiry date, in one transaction; a refusal names
+  the line. Web: **Register stock** opens a panel on the stock page where the batches are entered one
+  under the other (the product carries over to the next) and registered together.
+  `/warehouse/stock/receive` redirects to it.
+- Warehouse wording: a new district order's action reads **Manage order** (was "Decide on order"),
+  on the requests list, the order page and the dashboard's tasks.
+
 ### Changed
 
 - **The DCFP orders from the warehouse without choosing a unit.** `POST /api/v1/orders/warehouse-requests`

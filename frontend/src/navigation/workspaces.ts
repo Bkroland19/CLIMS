@@ -457,12 +457,10 @@ export const workspaces: readonly Workspace[] = [
                 path: '/warehouse/stock',
                 tab: 'Stock',
                 title: 'Warehouse stock',
-                description: 'Condom stock held at this warehouse, by batch, and every movement.',
+                description:
+                  'What the warehouse holds, what went out and what is waiting; register stock here.',
                 layout: 'table',
               },
-            ],
-            details: [
-              { path: '/warehouse/stock/receive', label: 'Record a delivery', layout: 'form' },
             ],
           },
           catalogue('/warehouse/catalogue'),

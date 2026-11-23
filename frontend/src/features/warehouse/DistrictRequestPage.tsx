@@ -298,7 +298,7 @@ function DecisionCard({
   return (
     <Card className="min-w-0">
       <CardHeader>
-        <CardTitle>{onCancel ? 'Change the approval' : 'Decide on this order'}</CardTitle>
+        <CardTitle>{onCancel ? 'Change the approval' : 'Manage this order'}</CardTitle>
         <CardDescription>
           {district} asked for {names.product(null, order.condom_category).toLowerCase()}. Choose
           which product to send; approving reserves the stock if this warehouse has it.

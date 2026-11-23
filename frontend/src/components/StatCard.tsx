@@ -47,6 +47,8 @@ interface StatCardProps {
   accent?: StatCardAccent;
   /** Adds the change since the previous point and a sparkline. */
   trend?: StatCardTrend;
+  /** One line under the figure saying what is behind it, e.g. "2 to decide · 1 to dispatch". */
+  detail?: string;
   /** Makes the whole card a link, e.g. to the list behind the figure. */
   href?: string;
   /** True while the figure is being fetched. */
@@ -72,6 +74,7 @@ export function StatCard({
   icon: Icon,
   accent = 'neutral',
   trend,
+  detail,
   href,
   isLoading = false,
   isSample = false,
@@ -115,6 +118,9 @@ export function StatCard({
                 </span>
                 {trend.caption}
               </p>
+            ) : null}
+            {detail ? (
+              <p className="text-muted-foreground text-xs leading-4 text-pretty">{detail}</p>
             ) : null}
           </div>
           {trend ? <Sparkline series={trend.series} className={ACCENT_CLASSES[accent]} /> : null}

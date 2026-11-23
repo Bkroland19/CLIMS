@@ -29,7 +29,7 @@ const sum = (batches: readonly StockBatch[]) =>
   batches.reduce((total, batch) => total + batch.on_hand, 0);
 
 /**
- * What needs the warehouse, in the order it needs doing: decide on new orders, reserve or recheck
+ * What needs the warehouse, in the order it needs doing: manage new orders, reserve or recheck
  * approved ones, dispatch reserved ones, write off expired batches, send short-dated batches
  * first, and recount stock held without an expiry date.
  */
@@ -51,9 +51,9 @@ export function warehouseTasks(
     tasks.push({
       id: `decide-${order.id}`,
       status: requestStatus(order),
-      title: `Decide on ${district(order)}'s order for ${amount(order, order.quantity_needed)}`,
+      title: `Manage ${district(order)}'s order for ${amount(order, order.quantity_needed)}`,
       detail: `${product(order)} · received ${formatTime(order.created_at)}`,
-      action: 'Decide',
+      action: 'Manage order',
       href: WAREHOUSE_PATHS.request(order.id),
     });
   }

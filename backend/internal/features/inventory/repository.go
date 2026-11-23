@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"context"
+	"fmt"
 
 	"clims-backend/internal/features/stock"
 	"errors"
@@ -273,53 +274,120 @@ type MovementInput struct {
 func (r *Repository) record(ctx context.Context, actorID string, in MovementInput) (Movement, error) {
 	var result Movement
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
-			VALUES ($1, $2, $3, 0) ON CONFLICT (store_id, condom_id, unit_of_measure_id) DO NOTHING`,
-			in.StoreID, in.CondomID, in.UnitOfMeasureID); err != nil {
-			return err
-		}
-		var onHand int64
-		err := tx.QueryRow(ctx, `UPDATE order_store_stock SET on_hand = on_hand + $4, updated_at = CURRENT_TIMESTAMP
-			WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND on_hand + $4 >= reserved
-			RETURNING on_hand`, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Quantity).Scan(&onHand)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errBelowReserved
-		}
-		if err != nil {
-			return err
-		}
-		// The batches add up to the store total: a receipt or a positive count fills the named batch, and
-		// a negative count must come out of it.
-		var batchID string
-		if in.Quantity > 0 {
-			batchID, err = stock.Add(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, in.Quantity)
-		} else {
-			batchID, err = stock.Remove(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, -in.Quantity)
-		}
-		if err != nil {
-			return err
-		}
-		var id string
-		if err = tx.QueryRow(ctx, `INSERT INTO inventory_movements
-				(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, actor_id, note, stock_batch_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-			in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Reason, in.Quantity, onHand, actorID, in.Note, batchID).Scan(&id); err != nil {
-			return err
-		}
-		rows, err := tx.Query(ctx, `SELECT `+movementColumns+movementJoins+` WHERE m.id = $1`, id)
-		if err != nil {
-			return err
-		}
-		if result, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[Movement]); err != nil {
-			return err
-		}
-		return r.audit.Record(ctx, tx, audit.Entry{Action: "inventory.movement_recorded",
-			Target:  &audit.Subject{Type: "inventory_movement", ID: result.ID},
-			Related: []audit.Subject{{Type: "store", ID: result.StoreID}, {Type: "product", ID: result.CondomID}},
-			Details: map[string]any{"reason": result.Reason, "quantity": result.Quantity,
-				"on_hand_after": result.OnHandAfter, "unit_of_measure_id": result.UnitOfMeasureID, "note": result.Note}})
+		var err error
+		result, err = r.recordIn(ctx, tx, actorID, in)
+		return err
 	})
 	return result, err
+}
+
+// recordIn writes one ledger entry and the balance and batch it changes, inside the caller's transaction.
+func (r *Repository) recordIn(ctx context.Context, tx pgx.Tx, actorID string, in MovementInput) (Movement, error) {
+	var result Movement
+	if _, err := tx.Exec(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
+		VALUES ($1, $2, $3, 0) ON CONFLICT (store_id, condom_id, unit_of_measure_id) DO NOTHING`,
+		in.StoreID, in.CondomID, in.UnitOfMeasureID); err != nil {
+		return result, err
+	}
+	var onHand int64
+	err := tx.QueryRow(ctx, `UPDATE order_store_stock SET on_hand = on_hand + $4, updated_at = CURRENT_TIMESTAMP
+		WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND on_hand + $4 >= reserved
+		RETURNING on_hand`, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Quantity).Scan(&onHand)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return result, errBelowReserved
+	}
+	if err != nil {
+		return result, err
+	}
+	// The batches add up to the store total: a receipt or a positive count fills the named batch, and
+	// a negative count must come out of it.
+	var batchID string
+	if in.Quantity > 0 {
+		batchID, err = stock.Add(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, in.Quantity)
+	} else {
+		batchID, err = stock.Remove(ctx, tx, in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry, -in.Quantity)
+	}
+	if err != nil {
+		return result, err
+	}
+	var id string
+	if err = tx.QueryRow(ctx, `INSERT INTO inventory_movements
+			(store_id, condom_id, unit_of_measure_id, reason, quantity, on_hand_after, actor_id, note, stock_batch_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		in.StoreID, in.CondomID, in.UnitOfMeasureID, in.Reason, in.Quantity, onHand, actorID, in.Note, batchID).Scan(&id); err != nil {
+		return result, err
+	}
+	rows, err := tx.Query(ctx, `SELECT `+movementColumns+movementJoins+` WHERE m.id = $1`, id)
+	if err != nil {
+		return result, err
+	}
+	if result, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[Movement]); err != nil {
+		return result, err
+	}
+	return result, r.audit.Record(ctx, tx, audit.Entry{Action: "inventory.movement_recorded",
+		Target:  &audit.Subject{Type: "inventory_movement", ID: result.ID},
+		Related: []audit.Subject{{Type: "store", ID: result.StoreID}, {Type: "product", ID: result.CondomID}},
+		Details: map[string]any{"reason": result.Reason, "quantity": result.Quantity,
+			"on_hand_after": result.OnHandAfter, "unit_of_measure_id": result.UnitOfMeasureID, "note": result.Note}})
+}
+
+// ReceiptInput is one delivery to a store: every batch it brought, saved together or not at all.
+type ReceiptInput struct {
+	StoreID string `json:"store_id"`
+	// Note says where the delivery came from, e.g. a supplier and its delivery note number.
+	Note  *string       `json:"note"`
+	Lines []ReceiptLine `json:"lines"`
+}
+
+// ReceiptLine is one batch of a delivery, as printed on its cartons.
+type ReceiptLine struct {
+	CondomID        string `json:"condom_id"`
+	UnitOfMeasureID string `json:"unit_of_measure_id"`
+	BatchNumber     string `json:"batch_number"`
+	// ExpiryDate is YYYY-MM-DD.
+	ExpiryDate string `json:"expiry_date"`
+	Quantity   int64  `json:"quantity"`
+}
+
+// errBatchExpiry stops a delivery from filing a batch number the store already holds under another expiry date.
+var errBatchExpiry = errors.New("this batch number is already held with another expiry date")
+
+// lineError names the delivery line a failure belongs to.
+type lineError struct {
+	line int
+	err  error
+}
+
+func (e *lineError) Error() string { return fmt.Sprintf("line %d: %v", e.line, e.err) }
+func (e *lineError) Unwrap() error { return e.err }
+
+// receive records every line of a delivery as a receipt into its batch, in one transaction.
+func (r *Repository) receive(ctx context.Context, actorID string, lines []MovementInput) ([]Movement, error) {
+	results := make([]Movement, 0, len(lines))
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		for i, in := range lines {
+			var other bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM stock_batches
+				WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND batch_number = $4
+					AND expiry_date IS DISTINCT FROM $5::date AND on_hand > 0)`,
+				in.StoreID, in.CondomID, in.UnitOfMeasureID, in.BatchNumber, in.expiry).Scan(&other); err != nil {
+				return err
+			}
+			if other {
+				return &lineError{line: i + 1, err: errBatchExpiry}
+			}
+			result, err := r.recordIn(ctx, tx, actorID, in)
+			if err != nil {
+				return &lineError{line: i + 1, err: err}
+			}
+			results = append(results, result)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 type ProductSummary struct {

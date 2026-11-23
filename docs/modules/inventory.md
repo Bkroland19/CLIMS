@@ -4,14 +4,16 @@
 
 The inventory API reports stock across the supply chain: the national warehouse, district stores and hotspots. It also records stock that arrives outside the order workflow.
 
-| Method | Route                         | Permission         |
-| ------ | ----------------------------- | ------------------ |
-| GET    | `/api/v1/inventory/stock`     | `inventory:read`   |
-| GET    | `/api/v1/inventory/batches`   | `inventory:read`   |
-| GET    | `/api/v1/inventory/hotspots`  | `inventory:read`   |
-| GET    | `/api/v1/inventory/movements` | `inventory:read`   |
-| POST   | `/api/v1/inventory/movements` | `inventory:manage` |
-| GET    | `/api/v1/inventory/summary`   | `inventory:read`   |
+| Method | Route                             | Permission         |
+| ------ | --------------------------------- | ------------------ |
+| GET    | `/api/v1/inventory/stock`         | `inventory:read`   |
+| GET    | `/api/v1/inventory/batches`       | `inventory:read`   |
+| GET    | `/api/v1/inventory/hotspots`      | `inventory:read`   |
+| GET    | `/api/v1/inventory/movements`     | `inventory:read`   |
+| POST   | `/api/v1/inventory/movements`     | `inventory:manage` |
+| POST   | `/api/v1/inventory/receipts`      | `inventory:manage` |
+| GET    | `/api/v1/inventory/summary`       | `inventory:read`   |
+| GET    | `/api/v1/inventory/store-summary` | `inventory:read`   |
 
 ## Reports
 
@@ -20,7 +22,9 @@ The inventory API reports stock across the supply chain: the national warehouse,
 - **Movements** is the ledger behind the balances: every change to a store's on-hand stock, newest first, with `on_hand_after`. Reasons are `opening`, `receipt`, `adjustment`, `dispatch` and `order_receipt`; the last two are written by the [order workflow](orders.md) and link the order. Filter by `store_id`, `condom_id` or `reason`, and page with `limit` and `offset`.
 - **Summary** totals each product nationally: warehouse and district stock on hand and available, stock in transit, and, from alert orders raised before migration 22, quantity delivered to hotspots in the period and open hotspot requests. Held counts include held warehouse orders.
 
-Hotspot, movement and summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
+- **Store summary** (`GET /api/v1/inventory/store-summary?store_id=`) is one store at a glance, for the warehouse stock screen. Per product and unit, as of now: `on_hand`, `reserved`, `expired` (in batches past their expiry date), `expiring` (under three months left), `no_expiry`, `usable` (on hand less reserved and expired, what check-stock can still reserve) and `next_expiry`; in the period, `received`, `dispatched` and `written_off` (stock taken away by adjustments); and `dispatched_90_days`, whatever the period, from which the screen works out stock cover. For the orders district stores placed with the store, open now: `to_decide` (queued), `waiting_for_stock` (reviewed or on hold), `to_dispatch` (confirmed) and `in_transit` (dispatched, not yet received); and, counting workflow steps taken in the period, `dispatched`, `rejected`, `dispatched_in_full` (at least the quantity ordered), `districts_supplied`, `received_short` (the district counted less than was sent) and `median_days_to_dispatch`. The screen's success rate is dispatched over dispatched plus rejected. Users see their assigned store; `orders:all_stores` any store (404 for one that does not exist).
+
+Hotspot, movement, summary and store summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
 
 ## Recording stock
 
@@ -30,6 +34,8 @@ Hotspot, movement and summary reports accept a period as `from` and `to` dates (
 - `adjustment` corrects stock after a count in either direction and requires a `note`.
 
 Stock cannot fall below what open orders have reserved; such an adjustment returns 409. Order dispatch and receipt continue to move stock themselves and record their own entries.
+
+`POST /api/v1/inventory/receipts` records a whole delivery: a `store_id`, an optional `note` (where it came from) and 1 to 50 `lines`, each a product, unit, `batch_number`, `expiry_date` and positive `quantity`. Every line becomes a `receipt` in one transaction, so the delivery is saved in full or not at all. A delivery is filed and dispatched by its batches, so each line needs a batch number and an expiry date after today (Uganda's date). The same batch may come on several lines with the same expiry date; a batch number given two expiry dates in one delivery, or already held at the store under another one, is refused. A refusal about one line starts with its number (`line 2: …`, 422, or 409 for a batch short of stock), so a client can show it on that line.
 
 ## Batches and expiry
 

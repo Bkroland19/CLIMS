@@ -7,6 +7,9 @@
  * - `GET /inventory/batches?store_id=&condom_id=`: batches with stock, first expiry first out.
  * - `GET /inventory/movements?store_id=` and `POST /inventory/movements`: the ledger, and a
  *   delivery (`receipt`) into a batch or an `adjustment` of one, with a note.
+ * - `POST /inventory/receipts`: a whole delivery, every batch or none.
+ * - `GET /inventory/store-summary?store_id=&from=&to=`: one store at a glance, its orders read
+ *   from the order mock (`dcfp.mts`) through the router.
  *
  * The order mock (`dcfp.mts`) reserves, dispatches and receives through the functions exported
  * here, so a dispatch takes stock from the warehouse's batches and the district's receipt adds
@@ -451,15 +454,208 @@ function record(body: Record<string, unknown>): Reply {
   return ok(presentMovement(entry), 201);
 }
 
+/** Like the Go API: every batch of a delivery, each with a batch number and a future expiry. */
+function receive(body: Record<string, unknown>): Reply {
+  const storeId = text(body.store_id);
+  const note = text(body.note) || null;
+  const lines = Array.isArray(body.lines) ? (body.lines as Record<string, unknown>[]) : [];
+  if (!storeId) return fail(422, 'store_id must be a nonzero UUID');
+  if (lines.length === 0 || lines.length > 50) {
+    return fail(422, 'a delivery needs between 1 and 50 lines');
+  }
+  const seen = new Map<string, { line: number; expiry: string }>();
+  const checked = [];
+  for (const [index, line] of lines.entries()) {
+    const prefix = `line ${String(index + 1)}: `;
+    const condomId = text(line.condom_id);
+    const unitId = text(line.unit_of_measure_id);
+    const number = text(line.batch_number);
+    const expiry = text(line.expiry_date);
+    const quantity = line.quantity;
+    if (!number || !expiry) return fail(422, `${prefix}batch_number and expiry_date are required`);
+    if (!PRODUCTS[condomId] || !UNIT_NAMES[unitId]) {
+      return fail(422, `${prefix}store_id, condom_id or unit_of_measure_id does not exist`);
+    }
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
+      return fail(422, `${prefix}a receipt needs a positive quantity`);
+    }
+    if (expiry <= day(0)) {
+      return fail(422, `${prefix}this batch has expired; expired stock cannot be received`);
+    }
+    const key = keyOf(condomId, unitId, number);
+    const first = seen.get(key);
+    if (first && first.expiry !== expiry) {
+      return fail(
+        422,
+        `${prefix}batch ${number} is on line ${String(first.line)} with another expiry date`,
+      );
+    }
+    if (!first) seen.set(key, { line: index + 1, expiry });
+    const clash = state.batches.some(
+      (b) =>
+        b.store_id === storeId &&
+        b.condom_id === condomId &&
+        b.unit_of_measure_id === unitId &&
+        b.batch_number === number &&
+        b.expiry_date !== expiry &&
+        b.on_hand > 0,
+    );
+    if (clash)
+      return fail(422, `${prefix}this batch number is already held with another expiry date`);
+    checked.push({ condomId, unitId, number, expiry, quantity });
+  }
+  const entries = checked.map((line) => {
+    const batch = addTo(
+      storeId,
+      line.condomId,
+      line.unitId,
+      line.number,
+      line.expiry,
+      line.quantity,
+    );
+    return presentMovement(
+      log(storeId, line.condomId, line.unitId, 'receipt', line.quantity, { note, batch }),
+    );
+  });
+  // The ledger lists newest first; the reply lists the lines in the order they were sent.
+  return ok(entries, 201);
+}
+
+/** An order as the summary reads it, with its history. */
+export interface SummaryOrder {
+  ordered_from_store_id: string;
+  ordered_for_store_id: string;
+  hot_spot_id: string | null;
+  order_status: string;
+  quantity_needed: number | null;
+  quantity_issued: number | null;
+  quantity_received: number | null;
+  created_at: string;
+  events: { action: string; created_at: string }[];
+}
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? (sorted[middle] ?? null)
+    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+}
+
+/** Like the Go API's GET /inventory/store-summary. */
+function storeSummary(query: URLSearchParams, orders: readonly SummaryOrder[]): Reply {
+  const storeId = query.get('store_id');
+  if (!storeId) return fail(400, 'store_id is required');
+  const store = storeOf(storeId);
+  if (!store) return fail(404, 'store not found');
+  const from = query.get('from');
+  const to = query.get('to');
+  const end = to ? dateOf(new Date(Date.parse(to) + DAY)) : null;
+  const inPeriod = (at: string) => (!from || at >= from) && (!end || at < end);
+  const since90 = new Date(Date.now() - 90 * DAY).toISOString();
+
+  const keys = new Map<string, Batch>();
+  for (const b of state.batches) {
+    if (b.store_id === storeId) keys.set(keyOf(b.store_id, b.condom_id, b.unit_of_measure_id), b);
+  }
+  const products = [...keys.entries()].map(([key, sample]) => {
+    const held = state.batches.filter(
+      (b) => keyOf(b.store_id, b.condom_id, b.unit_of_measure_id) === key && b.on_hand > 0,
+    );
+    const inBand = (...bands: string[]) =>
+      held
+        .filter((b) => bands.includes(bandOf(b.expiry_date)))
+        .reduce((sum, b) => sum + b.on_hand, 0);
+    const onHand = held.reduce((sum, b) => sum + b.on_hand, 0);
+    const reserved = state.reserved.get(key) ?? 0;
+    const expired = inBand('expired');
+    const moves = state.movements.filter(
+      (m) => keyOf(m.store_id, m.condom_id, m.unit_of_measure_id) === key,
+    );
+    const total = (keep: (m: Movement) => boolean) =>
+      moves.filter(keep).reduce((sum, m) => sum + m.quantity, 0);
+    const next = held
+      .filter((b) => b.expiry_date && bandOf(b.expiry_date) !== 'expired')
+      .map((b) => b.expiry_date ?? '')
+      .sort()[0];
+    return {
+      condom_id: sample.condom_id,
+      product: PRODUCTS[sample.condom_id]?.name ?? 'Condoms',
+      unit_of_measure_id: sample.unit_of_measure_id,
+      unit: UNIT_NAMES[sample.unit_of_measure_id] ?? 'Unit',
+      on_hand: onHand,
+      reserved,
+      expired,
+      expiring: inBand('under_1_month', 'under_3_months'),
+      no_expiry: inBand('unknown'),
+      usable: Math.max(onHand - reserved - expired, 0),
+      next_expiry: next ?? null,
+      received: total((m) => m.reason === 'receipt' && inPeriod(m.created_at)),
+      dispatched: -total((m) => m.reason === 'dispatch' && inPeriod(m.created_at)),
+      written_off: -total(
+        (m) => m.reason === 'adjustment' && m.quantity < 0 && inPeriod(m.created_at),
+      ),
+      dispatched_90_days: -total((m) => m.reason === 'dispatch' && m.created_at >= since90),
+    };
+  });
+  products.sort((a, b) => a.product.localeCompare(b.product) || a.unit.localeCompare(b.unit));
+
+  const placed = orders.filter(
+    (o) =>
+      o.ordered_from_store_id === storeId &&
+      o.hot_spot_id === null &&
+      o.order_status !== 'pending' &&
+      o.order_status !== 'fulfilled',
+  );
+  const steps = placed.flatMap((o) =>
+    o.events.filter((e) => inPeriod(e.created_at)).map((e) => ({ ...e, order: o })),
+  );
+  const dispatches = steps.filter((step) => step.action === 'dispatch');
+  const status = (...names: string[]) =>
+    placed.filter((o) => names.includes(o.order_status)).length;
+  return ok({
+    store_id: storeId,
+    store_name: store.name,
+    store_type: store.store_type,
+    products,
+    orders: {
+      to_decide: status('queued'),
+      waiting_for_stock: status('reviewed', 'on_hold'),
+      to_dispatch: status('confirmed'),
+      in_transit: status('dispatched'),
+      dispatched: dispatches.length,
+      rejected: steps.filter((step) => step.action === 'reject').length,
+      dispatched_in_full: dispatches.filter(
+        (step) => (step.order.quantity_issued ?? 0) >= (step.order.quantity_needed ?? 0),
+      ).length,
+      districts_supplied: new Set(dispatches.map((step) => step.order.ordered_for_store_id)).size,
+      received_short: steps.filter(
+        (step) =>
+          step.action === 'receive' &&
+          (step.order.quantity_received ?? 0) < (step.order.quantity_issued ?? 0),
+      ).length,
+      median_days_to_dispatch: median(
+        dispatches.map(
+          (step) => (Date.parse(step.created_at) - Date.parse(step.order.created_at)) / DAY,
+        ),
+      ),
+    },
+  });
+}
+
 /** Answers `/inventory/…`, or returns null for any other path. */
 export function handleInventory(
   method: string,
   parts: string[],
   query: URLSearchParams,
   body: Record<string, unknown> = {},
+  orders: () => readonly SummaryOrder[] = () => [],
 ): Reply | null {
   const [resource, target] = parts;
   if (resource !== 'inventory') return null;
+  if (method === 'POST' && target === 'receipts') return receive(body);
+  if (method === 'GET' && target === 'store-summary') return storeSummary(query, orders());
   if (target === 'movements') {
     if (method === 'POST') return record(body);
     if (method === 'GET') {

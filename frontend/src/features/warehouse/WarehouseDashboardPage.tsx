@@ -203,7 +203,9 @@ export default function WarehouseDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Recent stock movements</CardTitle>
-              <CardDescription>Deliveries, dispatches and corrections at {code}</CardDescription>
+              <CardDescription>
+                Stock registered, dispatches and corrections at {code}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {waiting || movements.isPending ? (

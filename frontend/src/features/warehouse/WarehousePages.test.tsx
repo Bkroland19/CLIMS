@@ -11,6 +11,7 @@ import {
   aBalance,
   aMovement,
   aStockBatch,
+  aStoreSummary,
   aWarehouseOrder,
   warehouseOrderApi,
 } from '@/test/warehouseOrderFixtures';
@@ -107,7 +108,9 @@ describe('District requests', () => {
       }),
     );
     expect(testRouter.location).toBe('/warehouse/stock');
-    expect(await screen.findByRole('heading', { name: 'Batches at JMS' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'JMS stock at a glance' }),
+    ).toBeInTheDocument();
   });
 
   it('filters by status from the address', async () => {
@@ -165,6 +168,7 @@ describe('Warehouse stock', () => {
         warehouseOrderApi({
           balances: [aBalance({ on_hand: 910, reserved: 300, available: 610 })],
           batches: BATCHES,
+          summary: aStoreSummary(),
           movements: [
             aMovement({
               id: 'm2',
@@ -183,20 +187,63 @@ describe('Warehouse stock', () => {
     });
   }
 
-  it('shows what can be reserved, every batch by shelf life, and the ledger in words', async () => {
+  const card = (label: string | RegExp) =>
+    screen.getByText(label, { selector: 'span' }).closest('a') as HTMLElement;
+
+  it('shows what is held, what went out and what is waiting, each figure linking to its list', async () => {
     renderStock('/warehouse/stock?store=NMS');
 
-    // 910 on hand, less 300 reserved and 40 expired.
-    expect(await screen.findByText('570')).toBeInTheDocument();
-    expect(screen.getByText('box free to reserve')).toBeInTheDocument();
+    await screen.findByText('910 box');
+    expect(card('On hand')).toHaveTextContent('570 box free to dispatch · 300 box reserved');
+    expect(card(/^Dispatched, last 30 days/)).toHaveTextContent(
+      '80 box4 orders to 3 districts · 1 still in transit',
+    );
+    expect(card('Expired')).toHaveTextContent('40 box1 batch to write off');
+    expect(card('Expired')).toHaveAttribute(
+      'href',
+      '/warehouse/stock?view=batches&band=expired&store=NMS',
+    );
+    expect(card('Expiring within 3 months')).toHaveTextContent('Next expiry 8 Dec 2026');
+    expect(card('Pending district orders')).toHaveTextContent('3');
+    expect(card('Pending district orders')).toHaveTextContent('2 new · 1 waiting for stock');
+    // Four dispatched and one rejected.
+    expect(card(/^Success rate/)).toHaveTextContent('80%4 of 5 orders dispatched');
+
+    const products = await screen.findByRole('table', { name: 'Stock by product at NMS' });
+    const row = within(products).getByText('Engabu Free Female').closest('tr') as HTMLElement;
+    // 570 free over 100 a month dispatched in the last 90 days.
+    expect(row).toHaveTextContent('570');
+    expect(row).toHaveTextContent('5.7 months');
+  });
+
+  it('asks the server for the period chosen', async () => {
+    const { requests } = renderStock('/warehouse/stock?store=NMS&period=90d');
+    expect(await screen.findByText(/^Dispatched, last 90 days/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        requests.find((request: RecordedRequest) =>
+          request.url.startsWith('/inventory/store-summary'),
+        )?.url,
+      ).toBe(`/inventory/store-summary?store_id=${NMS.id}&from=2026-08-23&to=2026-11-20`);
+    });
+  });
+
+  it('lists every batch by shelf life, and the ledger in words', async () => {
+    const user = userEvent.setup();
+    renderStock('/warehouse/stock?store=NMS');
+
+    await user.click(await screen.findByRole('link', { name: /^Batches/ }));
     const batches = await screen.findByRole('table', { name: 'Batches at NMS' });
     const row = (batch: string) => within(batches).getByText(batch).closest('tr');
     expect(row('FC2-2311-090')).toHaveTextContent('Expired');
     expect(row('FC2-2405-002')).toHaveTextContent('Under 1 month');
     expect(row('No batch number')).toHaveTextContent('Count it and record its batches');
 
+    await user.click(screen.getByRole('link', { name: 'Movements' }));
     const ledger = await screen.findByRole('table', { name: 'Stock movements at NMS' });
-    expect(within(ledger).getByText('UNFPA consignment, delivery note DN-118')).toBeInTheDocument();
+    expect(
+      await within(ledger).findByText('UNFPA consignment, delivery note DN-118'),
+    ).toBeInTheDocument();
     expect(within(ledger).getByRole('link', { name: 'Dispatched' })).toHaveAttribute(
       'href',
       '/warehouse/requests/o1?store=NMS',
@@ -205,15 +252,16 @@ describe('Warehouse stock', () => {
   });
 
   it('filters batches by shelf life from the address', async () => {
-    renderStock('/warehouse/stock?store=NMS&band=under_1_month');
+    renderStock('/warehouse/stock?store=NMS&band=expiring');
     const batches = await screen.findByRole('table', { name: 'Batches at NMS' });
     expect(await within(batches).findByText('FC2-2405-002')).toBeInTheDocument();
     expect(within(batches).queryByText('FC2-2502-118')).not.toBeInTheDocument();
+    expect(within(batches).queryByText('FC2-2311-090')).not.toBeInTheDocument();
   });
 
   it('records a stock count as the difference from what is held', async () => {
     const user = userEvent.setup();
-    const { requests } = renderStock('/warehouse/stock?store=NMS');
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=batches');
 
     await user.click(await screen.findByRole('button', { name: 'Actions for batch FC2-2502-118' }));
     await user.click(screen.getByRole('menuitem', { name: 'Adjust stock…' }));
@@ -247,7 +295,7 @@ describe('Warehouse stock', () => {
 
   it('writes off an expired batch in full by default', async () => {
     const user = userEvent.setup();
-    const { requests } = renderStock('/warehouse/stock?store=NMS');
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=batches');
 
     await user.click(await screen.findByRole('button', { name: 'Actions for batch FC2-2311-090' }));
     await user.click(screen.getByRole('menuitem', { name: 'Write off…' }));
@@ -268,75 +316,132 @@ describe('Warehouse stock', () => {
     });
   });
 
-  it('says when the store holds nothing', async () => {
-    renderStock('/warehouse/stock?store=NMS', { balances: [], batches: [], movements: [] });
-    expect(await screen.findByText('No stock recorded at NMS yet')).toBeInTheDocument();
-    expect(await screen.findByText('No batches held at NMS')).toBeInTheDocument();
+  it('says when the store holds nothing, and offers to register stock', async () => {
+    renderStock('/warehouse/stock?store=NMS', {
+      balances: [],
+      batches: [],
+      movements: [],
+      summary: aStoreSummary({ products: [] }),
+    });
+    expect(await screen.findByText('No stock registered at NMS yet')).toBeInTheDocument();
+    expect(card('On hand')).toHaveTextContent(/^On hand0/);
+    expect(card('Expired')).toHaveTextContent('NoneNothing past its expiry date');
+    expect(screen.getAllByRole('button', { name: 'Register stock' })).toHaveLength(2);
   });
 });
 
-describe('Recording a delivery', () => {
-  it('checks each batch, records it, and keeps the product for the next batch', async () => {
-    const user = userEvent.setup();
-    const { requests } = renderApp(<AppUnderTest />, {
-      route: '/warehouse/stock/receive?store=NMS',
+describe('Registering stock', () => {
+  function renderRegister(route: string, writes: Parameters<typeof warehouseOrderApi>[1]) {
+    return renderApp(<AppUnderTest />, {
+      route,
       signedIn: true,
-      replies: [
-        warehouseOrderApi(
-          {},
-          {
-            'POST /inventory/movements': {
-              status: 201,
-              body: { success: true, data: aMovement({ id: 'm9', batch_number: 'FC2-2611-001' }) },
-            },
-          },
-        ),
-      ],
+      replies: [warehouseOrderApi({ summary: aStoreSummary() }, writes)],
+    });
+  }
+
+  it('registers several batches in one save, keeping the product for the next', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderRegister('/warehouse/stock?store=NMS', {
+      'POST /inventory/receipts': {
+        status: 201,
+        body: { success: true, data: [aMovement({ id: 'm8' }), aMovement({ id: 'm9' })] },
+      },
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Record this batch' }));
-    expect(screen.getByText('Choose the product delivered.')).toBeInTheDocument();
-    expect(screen.getByText('Enter the batch number on the carton.')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Register stock' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Register stock at NMS' });
+    await within(sheet).findByRole('combobox', { name: 'Product' });
+    await user.click(within(sheet).getByRole('button', { name: 'Register stock' }));
+    expect(within(sheet).getByText('Choose the product.')).toBeInTheDocument();
+    expect(within(sheet).getByText('Enter the batch number on the carton.')).toBeInTheDocument();
     expect(requests.some((request) => request.method === 'POST')).toBe(false);
 
-    await user.click(screen.getByRole('combobox', { name: 'Product' }));
+    await user.click(within(sheet).getByRole('combobox', { name: 'Product' }));
     await user.click(await screen.findByRole('option', { name: /Engabu/ }));
     // The unit starts as the product's catalogue unit.
-    expect(screen.getByRole('combobox', { name: 'Unit' })).toHaveTextContent('box');
-    await user.type(screen.getByLabelText('Batch number'), ' FC2-2611-001 ');
-    await user.type(screen.getByLabelText('Expiry date'), '2026-11-19');
-    await user.type(screen.getByLabelText('Quantity received'), '500');
-    await user.type(screen.getByLabelText(/Where it came from/), 'UNFPA, DN-120');
-    await user.click(screen.getByRole('button', { name: 'Record this batch' }));
-    expect(screen.getByText(/This batch has expired/)).toBeInTheDocument();
-
-    const expiry = screen.getByLabelText('Expiry date');
+    expect(within(sheet).getByRole('combobox', { name: 'Unit' })).toHaveTextContent('box');
+    await user.type(within(sheet).getByLabelText('Batch number'), ' FC2-2611-001 ');
+    await user.type(within(sheet).getByLabelText('Expiry date'), '2026-11-19');
+    await user.type(within(sheet).getByLabelText('Quantity received'), '500');
+    await user.type(within(sheet).getByLabelText(/Source/), 'UNFPA, DN-120');
+    await user.click(within(sheet).getByRole('button', { name: 'Register stock' }));
+    expect(within(sheet).getByText(/This batch has expired/)).toBeInTheDocument();
+    const expiry = within(sheet).getByLabelText('Expiry date');
     await user.clear(expiry);
     await user.type(expiry, '2029-06-30');
-    await user.click(screen.getByRole('button', { name: 'Record this batch' }));
+
+    await user.click(within(sheet).getByRole('button', { name: 'Add another batch' }));
+    const second = within(sheet)
+      .getByRole('heading', { name: 'Batch 2' })
+      .closest('li') as HTMLElement;
+    // The product carries over, and the batch number is next.
+    expect(within(second).getByRole('combobox', { name: 'Product' })).toHaveTextContent(/Engabu/);
+    await waitFor(() => {
+      expect(within(second).getByLabelText('Batch number')).toHaveFocus();
+    });
+    await user.type(within(second).getByLabelText('Batch number'), 'FC2-2611-002');
+    await user.type(within(second).getByLabelText('Expiry date'), '2029-08-31');
+    await user.type(within(second).getByLabelText('Quantity received'), '250');
+    expect(within(sheet).getByText('750 box')).toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole('button', { name: 'Register stock' }));
     await waitFor(() => {
       expect(requests.find((request) => request.method === 'POST')).toMatchObject({
-        url: '/inventory/movements',
+        url: '/inventory/receipts',
         body: {
           store_id: NMS.id,
-          condom_id: FEMALE.id,
-          unit_of_measure_id: BOX.id,
-          reason: 'receipt',
-          quantity: 500,
-          batch_number: 'FC2-2611-001',
-          expiry_date: '2029-06-30',
           note: 'UNFPA, DN-120',
+          lines: [
+            {
+              condom_id: FEMALE.id,
+              unit_of_measure_id: BOX.id,
+              batch_number: 'FC2-2611-001',
+              expiry_date: '2029-06-30',
+              quantity: 500,
+            },
+            {
+              condom_id: FEMALE.id,
+              unit_of_measure_id: BOX.id,
+              batch_number: 'FC2-2611-002',
+              expiry_date: '2029-08-31',
+              quantity: 250,
+            },
+          ],
         },
       });
     });
-    const recorded = await screen.findByRole('list', { name: 'Batches recorded' });
-    expect(recorded).toHaveTextContent('FC2-2611-001 · 500 box of Engabu · Female · Free');
-    expect(screen.getByLabelText('Batch number')).toHaveValue('');
-    expect(screen.getByRole('combobox', { name: 'Product' })).toHaveTextContent(/Engabu/);
-    expect(screen.getByRole('link', { name: 'Done' })).toHaveAttribute(
-      'href',
-      '/warehouse/stock?store=NMS',
-    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Register stock at NMS' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('opens from a link, and shows a refused batch on its own line', async () => {
+    const user = userEvent.setup();
+    renderRegister('/warehouse/stock?store=NMS&register=1', {
+      'POST /inventory/receipts': {
+        status: 422,
+        body: {
+          success: false,
+          message: 'line 1: this batch number is already held with another expiry date',
+        },
+      },
+    });
+
+    const sheet = await screen.findByRole('dialog', { name: 'Register stock at NMS' });
+    await user.click(await within(sheet).findByRole('combobox', { name: 'Product' }));
+    await user.click(await screen.findByRole('option', { name: /Engabu/ }));
+    await user.type(within(sheet).getByLabelText('Batch number'), 'FC2-2502-118');
+    await user.type(within(sheet).getByLabelText('Expiry date'), '2029-06-30');
+    await user.type(within(sheet).getByLabelText('Quantity received'), '10');
+    await user.click(within(sheet).getByRole('button', { name: 'Register stock' }));
+
+    expect(await within(sheet).findByText('This batch was refused')).toBeInTheDocument();
+    expect(
+      within(sheet).getByText('This batch number is already held with another expiry date'),
+    ).toBeInTheDocument();
+    expect(within(sheet).getByText('Nothing was registered')).toBeInTheDocument();
   });
 });
 
@@ -369,15 +474,13 @@ describe('Warehouse dashboard', () => {
     });
     const items = within(tasks).getAllByRole('listitem');
     expect(items.map((item) => within(item).getByRole('link').textContent)).toEqual([
-      'Decide',
+      'Manage order',
       'Dispatch',
       'View expired',
       'View batches',
       'View stock',
     ]);
-    expect(
-      within(items[0] ?? tasks).getByText("Decide on Gulu's order for 500"),
-    ).toBeInTheDocument();
+    expect(within(items[0] ?? tasks).getByText("Manage Gulu's order for 500")).toBeInTheDocument();
     expect(within(items[0] ?? tasks).getByRole('link')).toHaveAttribute(
       'href',
       '/warehouse/requests/o-gulu?store=NMS',

@@ -26,7 +26,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { handleDcfp, seedDcfp } from './mock/dcfp.mts';
-import { handleInventory, seedInventory } from './mock/inventory.mts';
+import { handleInventory, seedInventory, type SummaryOrder } from './mock/inventory.mts';
 import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
 import { handleOnboarding, seedOnboarding } from './mock/onboarding.mts';
@@ -88,6 +88,19 @@ seedAll(DATASET);
 const lookups: Record<string, readonly unknown[]> = { organizationUnits };
 
 const reply = (status: number, body: unknown): Reply => ({ status, body });
+
+/** The order mock's orders with their history, for the stock summary. */
+function summaryOrders(): SummaryOrder[] {
+  const none = new URLSearchParams();
+  const data = (answer: Reply | null) =>
+    ((answer?.body as { data?: unknown } | undefined)?.data ?? []) as Record<string, unknown>[];
+  return data(handleDcfp('GET', ['orders'], {}, none)).map((order) => ({
+    ...(order as unknown as SummaryOrder),
+    events: data(
+      handleDcfp('GET', ['orders', String(order.id), 'events'], {}, none),
+    ) as unknown as SummaryOrder['events'],
+  }));
+}
 
 function send(response: ServerResponse, { status, body }: Reply): void {
   response.writeHead(status, { 'Content-Type': 'application/json' });
@@ -190,6 +203,7 @@ async function route(request: IncomingMessage): Promise<Reply> {
     parts,
     new URL(request.url ?? '/', 'http://mock').searchParams,
     body,
+    summaryOrders,
   );
   if (inventory) return inventory;
   const fulfilment = handleFulfilment(request.method ?? 'GET', parts, body);

@@ -12,12 +12,13 @@ import type { StatusTone } from '@/lib/status';
 export const BATCH_FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'expired', label: 'Expired' },
+  { value: 'expiring', label: 'Expiring within 3 months' },
   { value: 'under_1_month', label: 'Under 1 month' },
   { value: 'under_3_months', label: 'Under 3 months' },
   { value: 'under_6_months', label: 'Under 6 months' },
   { value: 'ok', label: '6 months or more' },
   { value: 'unknown', label: 'No expiry date' },
-] as const satisfies readonly { value: 'all' | Band; label: string }[];
+] as const satisfies readonly { value: 'all' | 'expiring' | Band; label: string }[];
 
 export type BatchFilter = (typeof BATCH_FILTERS)[number]['value'];
 
@@ -26,12 +27,14 @@ export function batchFilterFrom(param: string | null): BatchFilter {
 }
 
 export function keepsBatch(filter: BatchFilter, batch: StockBatch): boolean {
+  if (filter === 'expiring')
+    return batch.band === 'under_1_month' || batch.band === 'under_3_months';
   return filter === 'all' || batch.band === filter;
 }
 
 /** What each ledger reason reads as. */
 export const MOVEMENT_LABEL: Record<MovementReason, { label: string; tone: StatusTone }> = {
-  receipt: { label: 'Delivery', tone: 'positive' },
+  receipt: { label: 'Stock registered', tone: 'positive' },
   order_receipt: { label: 'Received from warehouse', tone: 'positive' },
   dispatch: { label: 'Dispatched', tone: 'info' },
   adjustment: { label: 'Adjustment', tone: 'neutral' },

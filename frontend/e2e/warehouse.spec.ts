@@ -117,27 +117,52 @@ test('lists what waits on the warehouse, and opens an order to dispatch', async 
   await expect(page.getByRole('heading', { name: 'Dispatch to Mukono' })).toBeVisible();
 });
 
-test('records a delivery batch by batch, and it shows in the stock', async ({ page }) => {
-  await open(page, '/warehouse/stock/receive?store=NMS', 'Record a delivery');
+test('registers two batches of stock in one save, and the figures follow', async ({ page }) => {
+  await open(page, '/warehouse/stock?store=NMS', 'Warehouse stock');
+  // NMS holds 820 FC2 boxes and 2,300 Engabu boxes.
+  const onHand = page.getByRole('link').filter({ hasText: /^On hand/ });
+  await expect(onHand).toContainText('3,120 Box');
+
+  await page.getByRole('button', { name: 'Register stock' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Register stock at NMS' });
   await choose(page, 'Product', FC2_BOXES);
-  await expect(page.getByRole('combobox', { name: 'Unit' })).toContainText('Box');
-  await page.getByRole('textbox', { name: 'Batch number' }).fill('FC2-2611-301');
-  await page.getByLabel('Expiry date').fill('2029-06-30');
-  await page.getByRole('textbox', { name: 'Quantity received' }).fill('250');
-  await page.getByRole('textbox', { name: /Where it came from/ }).fill('UNFPA, DN-301');
-  await page.getByRole('button', { name: 'Record this batch' }).click();
+  await expect(sheet.getByRole('combobox', { name: 'Unit' })).toContainText('Box');
+  await sheet.getByRole('textbox', { name: 'Batch number' }).fill('FC2-2611-301');
+  await sheet.getByLabel('Expiry date').fill('2029-06-30');
+  await sheet.getByRole('textbox', { name: 'Quantity received' }).fill('250');
+  await sheet.getByRole('textbox', { name: /Source/ }).fill('UNFPA, DN-301');
 
-  await expectToast(page, 'Delivery recorded in batch FC2-2611-301.');
-  await expect(page.getByRole('list', { name: 'Batches recorded' })).toContainText('FC2-2611-301');
-  await expect(page.getByRole('textbox', { name: 'Batch number' })).toHaveValue('');
-  await page.getByRole('link', { name: 'Done' }).click();
+  await sheet.getByRole('button', { name: 'Add another batch' }).click();
+  const second = sheet
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name: 'Batch 2' }) });
+  await expect(second.getByRole('textbox', { name: 'Batch number' })).toBeFocused();
+  await expect(second.getByRole('combobox', { name: 'Product' })).toContainText('FC2');
+  await second.getByRole('textbox', { name: 'Batch number' }).fill('FC2-2611-302');
+  await second.getByLabel('Expiry date').fill('2029-09-30');
+  await second.getByRole('textbox', { name: 'Quantity received' }).fill('150');
+  await expect(sheet).toContainText('2 batches · 400 Box');
+  await sheet.getByRole('button', { name: 'Register stock' }).click();
 
-  await expect(page).toHaveURL(/\/warehouse\/stock\?store=NMS$/);
+  await expectToast(page, 'Stock registered at NMS: 2 batches, 400 Box.');
+  await expect(sheet).toBeHidden();
+  await expect(onHand).toContainText('3,520 Box');
+
+  await page.getByRole('link', { name: /^Batches/ }).click();
   const batches = page.getByRole('table', { name: 'Batches at NMS' });
   await expect(batches.getByRole('row').filter({ hasText: 'FC2-2611-301' })).toContainText('250');
+  await expect(batches.getByRole('row').filter({ hasText: 'FC2-2611-302' })).toContainText('150');
+  await page.getByRole('link', { name: 'Movements' }).click();
   await expect(
     page.getByRole('table', { name: 'Stock movements at NMS' }).getByRole('row').nth(1),
   ).toContainText('UNFPA, DN-301');
+});
+
+test('opens the register-stock panel from the old receive address', async ({ page }) => {
+  await page.goto('/warehouse/stock/receive?store=NMS');
+  await expect(page.getByRole('dialog', { name: 'Register stock at NMS' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page).toHaveURL(/\/warehouse\/stock\?store=NMS$/);
 });
 
 test('writes off an expired batch', async ({ page }) => {

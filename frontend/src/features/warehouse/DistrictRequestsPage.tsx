@@ -85,7 +85,7 @@ function columnsFor(names: RequestNames, href: (path: string) => string): DataTa
 function actionLabel(order: Order): string {
   switch (order.order_status) {
     case 'queued':
-      return 'Decide on order';
+      return 'Manage order';
     case 'reviewed':
     case 'on_hold':
       return 'Check stock';

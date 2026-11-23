@@ -43,7 +43,7 @@ describe('warehouseTasks', () => {
       'recount',
     ]);
     expect(tasks[0]).toMatchObject({
-      title: "Decide on Gulu's order for 500 boxes",
+      title: "Manage Gulu's order for 500 boxes",
       detail: 'female condoms · received today',
       href: '/warehouse/requests/new',
     });
