@@ -129,3 +129,25 @@ logs a warning at startup whenever the probe is on.
 Keep the launcher in the registration workflow until pilot users have signed
 in from the portal and CLIMS authorization has been verified with users from
 different facilities.
+
+## Local browser checks
+
+`frontend/dev/sso-browser-checks/` holds two Playwright scripts for checking
+portal sign-in by hand against a local Keycloak. They are development aids, not
+part of the test suites or CI. Both read the test users' password from
+`SSO_CHECK_PASSWORD` and refuse to run without it; no password is stored in the
+repository. Run them from `frontend/` with a directory for screenshots:
+
+```sh
+SSO_CHECK_PASSWORD=... node dev/sso-browser-checks/portal-sign-in.mjs /tmp/shots
+SSO_CHECK_PASSWORD=... node dev/sso-browser-checks/portal-home.mjs /tmp/shots
+```
+
+- `portal-sign-in.mjs` starts CLIMS portal sign-in for each user in
+  `SSO_CHECK_USERS` (default
+  `clims-sso-linked,clims-sso-unlinked,clims-sso-norole`) at
+  `SSO_CHECK_CLIMS_ORIGIN` (default `http://localhost:3014`) and prints where
+  each one ended up.
+- `portal-home.mjs` signs `SSO_CHECK_PORTAL_USER` (default `clims-sso-linked`)
+  in to the portal at `SSO_CHECK_PORTAL_ORIGIN` (default
+  `http://localhost:3000`) and counts the CLIMS tiles.
