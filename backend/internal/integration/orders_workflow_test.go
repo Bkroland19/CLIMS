@@ -194,6 +194,25 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		!strings.Contains(requested["body"].(string), "ordered 50 ") || !strings.Contains(requested["body"].(string), category+" condoms") {
 		t.Fatalf("warehouse order notification: %v", requested)
 	}
+	// An order placed with JMS is JMS's alone: NMS's staff neither see it, nor hear of it, nor act on it.
+	var nmsStore string
+	scalar(&nmsStore, `SELECT id FROM stores WHERE code = 'nms'`)
+	if nmsStore == warehouse {
+		t.Fatal("the workflow's warehouse must be JMS for the NMS checks")
+	}
+	_, nmsToken := account("nms", "workflow-nms", &nmsStore, nil, "orders:process")
+	if !listed("/orders", warehouseToken, orderID) {
+		t.Fatal("JMS does not list the order placed with it")
+	}
+	if listed("/orders", nmsToken, orderID) {
+		t.Fatal("NMS lists an order placed with JMS")
+	}
+	request("GET", orderPath, nil, nmsToken, 404)
+	if inbox(nmsToken, "order", orderID, "order.replenishment_requested") != nil {
+		t.Fatal("NMS was notified of an order placed with JMS")
+	}
+	request("POST", orderPath+"/actions/review", map[string]any{"condom_id": product}, nmsToken, 404)
+	request("POST", orderPath+"/actions/reject", map[string]any{"reason": "Not ours"}, nmsToken, 404)
 
 	// 3. The warehouse reviews the order, checks stock (holding it until stock arrives) and dispatches.
 	act := func(name, token string, input any, code int, state string) map[string]any {
