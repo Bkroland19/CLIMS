@@ -2,7 +2,9 @@
  * The DCFP's flows for the mock API, in the Go API's shapes (docs/modules/orders.md):
  *
  * - `GET/POST /orders/stockouts`: hotspot stockout reports. A report notifies the district's
- *   DCFPs; it is not an order.
+ *   DCFPs; it is not an order. `GET /orders/stockouts/:id` adds its deliveries and history, and
+ *   `POST /orders/stockouts/:id/deliveries` records stock sent from the district store (no stock
+ *   is checked: the mock keeps no inventory). Acknowledgements happen in the field app.
  * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS;
  *   the warehouse chooses the product.
  * - `GET /orders`, `/orders/:id`, `/orders/:id/events`, and `POST /orders/:id/actions/receive`.
@@ -75,6 +77,36 @@ interface Report {
   reported_by: string;
   comment: string | null;
   created_at: string;
+  repeat_count: number;
+  last_reported_at: string;
+  status: 'awaiting_supply' | 'awaiting_acknowledgement' | 'partly_received' | 'fulfilled';
+  fulfilled_at: string | null;
+}
+
+interface Delivery {
+  id: string;
+  delivered_by_id: string;
+  note: string | null;
+  created_at: string;
+  lines: {
+    id: string;
+    category: 'male' | 'female';
+    condom_id: string;
+    product: string;
+    unit_of_measure_id: string;
+    quantity: number;
+    pieces: number;
+    acknowledged_pieces: number | null;
+    acknowledged_at: string | null;
+  }[];
+}
+
+interface ReportEvent {
+  id: string;
+  actor_id: string | null;
+  action: 'raised' | 'repeated' | 'selection_changed' | 'delivered' | 'acknowledged';
+  selection: Report['selection'];
+  created_at: string;
 }
 
 interface Notification {
@@ -123,6 +155,9 @@ const state = {
   orders: [] as Order[],
   events: [] as Event[],
   reports: [] as Report[],
+  /** Each report's deliveries and history, by report id. */
+  deliveries: {} as Record<string, Delivery[]>,
+  reportEvents: {} as Record<string, ReportEvent[]>,
   notifications: [] as Notification[],
   next: 1,
 };
@@ -207,8 +242,88 @@ function report(n: number, values: Partial<Report>, hours: number): Report {
     reported_by: 'Grace Nakato',
     comment: null,
     created_at: hoursAgo(hours),
+    repeat_count: 0,
+    last_reported_at: hoursAgo(hours),
+    status: 'awaiting_supply',
+    fulfilled_at: null,
     ...values,
   };
+}
+
+/** A report with its deliveries and history, as `GET /orders/stockouts/:id` returns it. */
+function stockoutDetail(r: Report) {
+  return {
+    ...r,
+    deliveries: state.deliveries[r.id] ?? [],
+    events: state.reportEvents[r.id] ?? [
+      {
+        id: `${r.id}-raised`,
+        actor_id: r.reported_by_id,
+        action: 'raised',
+        selection: r.selection,
+        created_at: r.created_at,
+      },
+    ],
+  };
+}
+
+/** Records stock sent to a hotspot. Lines must name seeded products of the report's categories. */
+function deliver(r: Report, body: Body): Reply {
+  if (r.fulfilled_at) return fail(409, 'this notification is already fulfilled');
+  const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
+  if (lines.length === 0 || lines.length > 20)
+    return fail(422, 'a delivery needs between 1 and 20 lines');
+  const now = new Date().toISOString();
+  const deliveryId = id(9, (state.next += 1));
+  const recorded: Delivery['lines'] = [];
+  for (const line of lines) {
+    const productId = text(line.condom_id);
+    const quantity = typeof line.quantity === 'number' ? line.quantity : 0;
+    const product = PRODUCTS[productId];
+    if (!product) return fail(422, 'unknown product');
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return fail(422, 'each line needs a quantity between 1 and 1000000');
+    }
+    const category = categoryOf(productId);
+    if (r.selection !== 'both' && r.selection !== category) {
+      return fail(422, "a delivery line's product type is not in the notification's selection");
+    }
+    recorded.push({
+      id: id(10, (state.next += 1)),
+      category,
+      condom_id: productId,
+      product: product.name,
+      unit_of_measure_id: product.unit ?? mockUnitId(1),
+      quantity,
+      // The mock does not know pack sizes; 100 a unit keeps the numbers readable.
+      pieces: quantity * 100,
+      acknowledged_pieces: null,
+      acknowledged_at: null,
+    });
+  }
+  const detail = stockoutDetail(r);
+  state.deliveries[r.id] = [
+    ...detail.deliveries,
+    {
+      id: deliveryId,
+      delivered_by_id: ME,
+      note: text(body.note) || null,
+      created_at: now,
+      lines: recorded,
+    },
+  ];
+  state.reportEvents[r.id] = [
+    ...detail.events,
+    {
+      id: `${deliveryId}-event`,
+      actor_id: ME,
+      action: 'delivered',
+      selection: r.selection,
+      created_at: now,
+    },
+  ];
+  r.status = 'awaiting_acknowledgement';
+  return ok(stockoutDetail(r), 201);
 }
 
 function stockoutNotification(r: Report): Notification {
@@ -247,7 +362,14 @@ function stockoutNotification(r: Report): Notification {
 export function seedDcfp(dataset: string): void {
   state.next = 100;
   if (dataset === 'empty') {
-    Object.assign(state, { orders: [], events: [], reports: [], notifications: [] });
+    Object.assign(state, {
+      orders: [],
+      events: [],
+      reports: [],
+      deliveries: {},
+      reportEvents: {},
+      notifications: [],
+    });
     return;
   }
   state.orders = [
@@ -276,6 +398,8 @@ export function seedDcfp(dataset: string): void {
       24 * 9,
     ),
   ];
+  state.deliveries = {};
+  state.reportEvents = {};
   state.reports = [
     report(1, { comment: 'Dispenser empty since Monday' }, 2),
     report(
@@ -469,6 +593,13 @@ export function handleDcfp(
   if (target === undefined)
     return method === 'GET' ? ok(state.orders) : fail(405, 'Method not allowed');
   if (target === 'stockouts') {
+    if (segment !== undefined) {
+      const r = state.reports.find((candidate) => candidate.id === segment);
+      if (!r) return fail(404, 'stockout notification not found');
+      if (method === 'GET' && action === undefined) return ok(stockoutDetail(r));
+      if (method === 'POST' && action === 'deliveries') return deliver(r, body);
+      return fail(404, 'Not found');
+    }
     if (method === 'GET') return ok(state.reports);
     if (method === 'POST') return reportStockout(body);
   }

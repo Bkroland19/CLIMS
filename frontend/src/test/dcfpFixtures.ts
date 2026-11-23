@@ -1,4 +1,10 @@
-import type { Order, StockoutReport, Warehouse } from '@/features/dcfp/api';
+import type {
+  Order,
+  StockBalance,
+  StockoutDetail,
+  StockoutReport,
+  Warehouse,
+} from '@/features/dcfp/api';
 import type { Lookup, Product } from '@/features/catalogue/api';
 
 import type { FakeReply } from './fakeAdapter';
@@ -76,6 +82,42 @@ export function aReport(overrides: Partial<StockoutReport> = {}): StockoutReport
     reported_by: 'Grace Nakato',
     comment: 'Dispenser empty since Monday',
     created_at: '2026-11-21T07:00:00Z',
+    repeat_count: 0,
+    last_reported_at: '2026-11-21T07:00:00Z',
+    status: 'awaiting_supply',
+    fulfilled_at: null,
+    ...overrides,
+  };
+}
+
+/** A report's page: the report with its deliveries and history. */
+export function aStockout(overrides: Partial<StockoutDetail> = {}): StockoutDetail {
+  return {
+    ...aReport(),
+    deliveries: [],
+    events: [
+      {
+        id: 'e1',
+        actor_id: 'u-vht',
+        action: 'raised',
+        selection: 'female',
+        created_at: '2026-11-21T07:00:00Z',
+      },
+    ],
+    ...overrides,
+  };
+}
+
+/** The district store's balance of a product, in its catalogue unit. */
+export function aBalance(overrides: Partial<StockBalance> = {}): StockBalance {
+  return {
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    on_hand: 12,
+    reserved: 2,
+    available: 10,
     ...overrides,
   };
 }
@@ -105,6 +147,10 @@ export function anOrder(overrides: Partial<Order> = {}): Order {
 
 interface DcfpData {
   reports?: StockoutReport[];
+  /** Report pages, by id. */
+  stockouts?: StockoutDetail[];
+  /** The district store's balances, or a status to refuse the read with. */
+  stock?: StockBalance[] | number;
   orders?: Order[];
   products?: Product[];
 }
@@ -123,7 +169,19 @@ export function dcfpApi(data: DcfpData = {}, writes: Record<string, Answer> = {}
     }
     const orders = data.orders ?? [];
     const order = /^\/orders\/([^/]+)/.exec(path);
+    const stockout = /^\/orders\/stockouts\/([^/]+)$/.exec(path);
     if (path === '/orders/stockouts') return { status: 200, body: envelope(data.reports ?? []) };
+    if (stockout) {
+      const found = data.stockouts?.find((candidate) => candidate.id === stockout[1]);
+      return found
+        ? { status: 200, body: envelope(found) }
+        : { status: 404, body: { success: false, message: 'stockout notification not found' } };
+    }
+    if (path === '/inventory/stock') {
+      return typeof data.stock === 'number'
+        ? { status: data.stock, body: { success: false, message: 'forbidden' } }
+        : { status: 200, body: envelope(data.stock ?? []) };
+    }
     if (path === '/orders') return { status: 200, body: envelope(orders) };
     if (order && path.endsWith('/events')) return { status: 200, body: envelope([]) };
     if (order) {

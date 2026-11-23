@@ -1,22 +1,26 @@
 'use client';
 
-import { PackagePlus } from 'lucide-react';
+import { PackagePlus, Truck } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { RowActions } from '@/components/data-table/RowActions';
+import { StatusBadge } from '@/components/StatusBadge';
 import { EMPTY_VALUE, formatTimestamp } from '@/lib/format';
 import { useReadOnly } from '@/navigation/useAccess';
 
 import type { StockoutReport } from './api';
 import { contactOf, DCFP_PATHS, placeOf } from './orders';
 import { useStockouts } from './queries';
+import { STOCKOUT_STATUS } from './stockouts';
 
 /**
- * Stockout notifications from the district's hotspots: which hotspot, where, who to call, and
- * the hotspot's message. A report is not an order; the DCFP decides whether to order stock
- * from NMS or JMS, and the row action starts that order with the product chosen.
+ * Stockout notifications from the district's hotspots: which hotspot, where, who to call, the
+ * hotspot's message and how far fulfilment has got. A report is not an order: the DCFP sends
+ * stock from the district store (the report's page), or orders from NMS or JMS when the store
+ * is short.
  */
 export default function StockoutsPage() {
   const reports = useStockouts();
@@ -31,7 +35,12 @@ export default function StockoutsPage() {
         value: (report) => `${report.hot_spot.name} ${placeOf(report)}`,
         cell: (report) => (
           <div className="min-w-0">
-            <div className="font-medium">{report.hot_spot.name}</div>
+            <Link
+              href={DCFP_PATHS.stockout(report.id)}
+              className="font-medium underline-offset-4 hover:underline"
+            >
+              {report.hot_spot.name}
+            </Link>
             <div className="text-muted-foreground truncate text-xs">
               {placeOf(report) || EMPTY_VALUE}
             </div>
@@ -39,6 +48,15 @@ export default function StockoutsPage() {
         ),
       },
       { id: 'product', header: 'Out of', value: (report) => report.product },
+      {
+        id: 'status',
+        header: 'Status',
+        value: (report) => STOCKOUT_STATUS[report.status].label,
+        cell: (report) => {
+          const status = STOCKOUT_STATUS[report.status];
+          return <StatusBadge status={status.label} tone={status.tone} />;
+        },
+      },
       {
         id: 'message',
         header: 'Message',
@@ -87,6 +105,17 @@ export default function StockoutsPage() {
               <RowActions
                 label={`Actions for ${report.hot_spot.name}`}
                 actions={[
+                  ...(report.status === 'fulfilled'
+                    ? []
+                    : [
+                        {
+                          label: 'Send stock to the hotspot',
+                          icon: Truck,
+                          onSelect: () => {
+                            router.push(DCFP_PATHS.stockout(report.id));
+                          },
+                        },
+                      ]),
                   {
                     label: 'Order stock from a warehouse',
                     icon: PackagePlus,

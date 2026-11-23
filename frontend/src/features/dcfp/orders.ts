@@ -8,6 +8,7 @@ import type { Order, OrderStatus, StockoutReport, Warehouse } from './api';
 export const DCFP_PATHS = {
   dashboard: '/dcfp',
   stockouts: '/dcfp/stockouts',
+  stockout: (id: string) => `/dcfp/stockouts/${encodeURIComponent(id)}`,
   orders: '/dcfp/restock',
   store: '/dcfp/restock/store',
   newOrder: '/dcfp/restock/new',

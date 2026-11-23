@@ -325,10 +325,11 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Stockouts',
                 title: 'Stockout notifications',
                 description:
-                  'Hotspots in your district that have run out, with their message and who to call. Order stock from NMS or JMS when it is needed.',
+                  'Hotspots in your district that have run out, with their message and who to call. Send them stock from the district store, or order from NMS or JMS when it is needed.',
                 layout: 'table',
               },
             ],
+            details: [{ path: '/dcfp/stockouts/[id]', label: 'Stockout', layout: 'detail' }],
           },
           {
             id: 'restock',

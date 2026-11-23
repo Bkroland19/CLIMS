@@ -31,6 +31,7 @@ export const ADMIN_PERMISSIONS = [
   'orders:receive',
   'orders:replenish',
   'orders:stockout',
+  'orders:supply_hotspots',
   'roles:assign',
   'roles:manage',
   'roles:read',
