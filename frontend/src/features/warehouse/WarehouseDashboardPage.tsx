@@ -1,13 +1,11 @@
 'use client';
 
-import { useDistrictContext } from '@/features/district/DistrictContext';
-import { Clock, Inbox, ListChecks, Truck } from 'lucide-react';
+import { ClockAlert, Inbox, PackageCheck, Truck } from 'lucide-react';
 import Link from 'next/link';
 
-import { ActivityTimeline } from '@/components/ActivityTimeline';
+import { ActivityTimeline, type ActivityEntry } from '@/components/ActivityTimeline';
 import { ColumnChart } from '@/components/charts/ColumnChart';
 import { ShareList } from '@/components/charts/ShareList';
-import { SampleDataNotice } from '@/components/SampleData';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { ErrorState } from '@/components/states/ErrorState';
 import { TaskList } from '@/components/TaskList';
@@ -21,18 +19,25 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { timelineEntries } from '@/features/fulfilment/activity';
-import type { WarehouseRequest } from '@/features/fulfilment/api';
-import { PRODUCTS } from '@/features/fulfilment/products';
-import { StockLevel } from '@/features/fulfilment/StockLevel';
+import { useDistrictContext } from '@/features/district/DistrictContext';
+import type { Order } from '@/features/orders/api';
 import { formatNumber, formatTimestamp } from '@/lib/format';
 
+import {
+  useCurrentWarehouse,
+  useRequestNames,
+  useStoreBatches,
+  useStoreOrders,
+  useStoreStock,
+} from './orderQueries';
 import { WAREHOUSE_PATHS, withStore } from './paths';
-import { useWarehouseActivity, useWarehouseRequests, useWarehouseStock } from './queries';
+import { reservable } from './picking';
+import { REQUEST_FILTERS } from './requests';
 import { SAMPLE_REQUESTS_BY_DISTRICT, SAMPLE_WEEKLY_DISPATCHES } from './sampleCharts';
+import { MOVEMENT_LABEL, movementBatch, signed } from './stock';
+import { useStoreMovements } from './stockQueries';
 import { StoreSwitch } from './StoreSwitch';
-import { REQUEST_FILTERS, warehouseTasks } from './tasks';
-import { useWarehouseStore } from './useWarehouseStore';
+import { warehouseTasks } from './tasks';
 
 const RECENT_EVENTS = 6;
 const SHARE_COLOURS = [
@@ -45,66 +50,75 @@ const SHARE_COLOURS = [
 
 type FilterValue = (typeof REQUEST_FILTERS)[number]['value'];
 
-function countOf(requests: readonly WarehouseRequest[] | undefined, value: FilterValue): string {
+function countOf(orders: readonly Order[] | undefined, value: FilterValue): string {
   const filter = REQUEST_FILTERS.find((candidate) => candidate.value === value);
-  if (!requests || !filter) return '—';
-  return formatNumber(requests.filter(filter.keeps).length);
+  if (!orders || !filter) return '—';
+  return formatNumber(orders.filter(filter.keeps).length);
 }
 
 export default function WarehouseDashboardPage() {
-  const { store, href } = useWarehouseStore();
+  const { code, href, warehouse, ...stores } = useCurrentWarehouse();
   const district = useDistrictContext()?.district;
-  const requests = useWarehouseRequests(store);
-  const visibleRequests = district
-    ? requests.data?.filter((request) => request.district === district)
-    : requests.data;
-  const stock = useWarehouseStock(store);
-  const activity = useWarehouseActivity(store);
-  const requestIds = new Set(visibleRequests?.map((request) => request.id));
-  const visibleActivity = district
-    ? activity.data?.filter((event) => event.reference !== null && requestIds.has(event.reference))
-    : activity.data;
+  const names = useRequestNames();
+  const orders = useStoreOrders(warehouse?.id);
+  const stock = useStoreStock(warehouse?.id ?? '', { enabled: warehouse !== undefined });
+  const batches = useStoreBatches(warehouse?.id ?? '', { enabled: warehouse !== undefined });
+  const movements = useStoreMovements(warehouse?.id);
+  const visibleOrders = district
+    ? orders.data?.filter((order) => names.district(order.ordered_for_store_id) === district)
+    : orders.data;
   const filtered = (value: FilterValue) => href(WAREHOUSE_PATHS.requestsWithStatus(value));
+  const waiting = stores.isPending || warehouse === undefined;
+  const expiring = batches.data?.filter(
+    (batch) => batch.band === 'under_1_month' || batch.band === 'under_3_months',
+  );
+  const recent: ActivityEntry[] = (movements.data ?? [])
+    .slice(0, RECENT_EVENTS)
+    .map((movement) => ({
+      id: movement.id,
+      text: `${MOVEMENT_LABEL[movement.reason].label}: ${signed(movement.quantity)} ${movement.unit}${
+        movementBatch(movement) ? ` · ${movementBatch(movement) ?? ''}` : ''
+      }`,
+      meta: `${movement.product} · ${formatTimestamp(movement.created_at)}`,
+      role: 'warehouse',
+    }));
 
   return (
     <div className="gap-section flex flex-col">
-      <div className="flex flex-col gap-4">
-        <StoreSwitch store={store} hrefFor={(code) => withStore(WAREHOUSE_PATHS.dashboard, code)} />
-        <SampleDataNotice subject="District requests, stock and activity" />
-      </div>
+      <StoreSwitch store={code} hrefFor={(other) => withStore(WAREHOUSE_PATHS.dashboard, other)} />
 
       <StatCardGrid>
         <StatCard
-          label="New requests"
-          value={countOf(visibleRequests, 'new')}
+          label="New orders"
+          value={countOf(visibleOrders, 'queued')}
           icon={Inbox}
           accent="info"
-          href={filtered('new')}
-          isLoading={requests.isPending}
-        />
-        <StatCard
-          label="Queued"
-          value={countOf(visibleRequests, 'queued')}
-          icon={ListChecks}
-          accent="positive"
           href={filtered('queued')}
-          isLoading={requests.isPending}
+          isLoading={waiting || orders.isPending}
         />
         <StatCard
-          label="On hold"
-          value={countOf(visibleRequests, 'on_hold')}
-          icon={Clock}
+          label="To dispatch"
+          value={countOf(visibleOrders, 'confirmed')}
+          icon={PackageCheck}
           accent="caution"
-          href={filtered('on_hold')}
-          isLoading={requests.isPending}
+          href={filtered('confirmed')}
+          isLoading={waiting || orders.isPending}
         />
         <StatCard
           label="In transit"
-          value={countOf(visibleRequests, 'dispatched')}
+          value={countOf(visibleOrders, 'dispatched')}
           icon={Truck}
           accent="violet"
           href={filtered('dispatched')}
-          isLoading={requests.isPending}
+          isLoading={waiting || orders.isPending}
+        />
+        <StatCard
+          label="Batches expiring within 3 months"
+          value={expiring ? formatNumber(expiring.length) : '—'}
+          icon={ClockAlert}
+          accent="caution"
+          href={href(WAREHOUSE_PATHS.stock)}
+          isLoading={waiting || batches.isPending}
         />
       </StatCardGrid>
 
@@ -112,31 +126,32 @@ export default function WarehouseDashboardPage() {
         <TaskList
           title="Needs your action"
           tasks={
-            visibleRequests && stock.data
-              ? warehouseTasks(visibleRequests, stock.data.batches, new Date(), (iso) =>
+            visibleOrders && batches.data
+              ? warehouseTasks(visibleOrders, batches.data, names, (iso) =>
                   formatTimestamp(iso),
                 ).map((task) => ({ ...task, href: href(task.href) }))
               : undefined
           }
-          isLoading={requests.isPending || stock.isPending}
-          error={requests.error ?? stock.error}
+          isLoading={waiting || orders.isPending || batches.isPending}
+          error={stores.error ?? orders.error ?? batches.error}
           errorTitle="Could not load your tasks"
           onRetry={() => {
-            void requests.refetch();
-            void stock.refetch();
+            void stores.refetch();
+            void orders.refetch();
+            void batches.refetch();
           }}
-          isRetrying={requests.isRefetching || stock.isRefetching}
+          isRetrying={orders.isRefetching || batches.isRefetching}
           loadingLabel="Loading tasks…"
           empty={{
             title: 'Nothing needs you right now',
-            description: 'New requests from district stores will appear here.',
+            description: 'New orders from district stores will appear here.',
           }}
         />
 
         <div className="gap-section flex min-w-0 flex-col">
           <Card>
             <CardHeader>
-              <CardTitle>Stock at {store}</CardTitle>
+              <CardTitle>Stock at {code}</CardTitle>
               <CardAction>
                 <Button asChild variant="outline" size="sm">
                   <Link href={href(WAREHOUSE_PATHS.stock)}>View stock</Link>
@@ -144,50 +159,68 @@ export default function WarehouseDashboardPage() {
               </CardAction>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              {stock.isPending ? (
+              {waiting || stock.isPending ? (
                 <Skeleton className="h-24 w-full" />
               ) : stock.isError ? (
                 <ErrorState
-                  title={`Could not load ${store} stock`}
+                  title={`Could not load ${code} stock`}
                   error={stock.error}
                   onRetry={() => void stock.refetch()}
                   isRetrying={stock.isRefetching}
                 />
+              ) : stock.data.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No stock recorded yet.</p>
               ) : (
-                PRODUCTS.map((product) => (
-                  <StockLevel
-                    key={product.key}
-                    product={product.key}
-                    inStock={stock.data.stock[product.key]}
-                    minimum={stock.data.min_levels[product.key]}
-                  />
-                ))
+                <ul className="flex flex-col divide-y">
+                  {stock.data.map((balance) => (
+                    <li
+                      key={`${balance.condom_id}:${balance.unit_of_measure_id}`}
+                      className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                    >
+                      <span className="min-w-0 truncate text-sm">{balance.product}</span>
+                      <span className="shrink-0 text-sm tabular-nums">
+                        <span className="font-medium">
+                          {formatNumber(
+                            reservable(
+                              balance,
+                              batches.data?.filter(
+                                (batch) =>
+                                  batch.condom_id === balance.condom_id &&
+                                  batch.unit_of_measure_id === balance.unit_of_measure_id,
+                              ),
+                            ),
+                          )}
+                        </span>{' '}
+                        <span className="text-muted-foreground">{balance.unit} free</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent activity</CardTitle>
-              <CardDescription>Latest updates on requests and stock at {store}</CardDescription>
+              <CardTitle>Recent stock movements</CardTitle>
+              <CardDescription>
+                Stock registered, dispatches and corrections at {code}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {activity.isPending ? (
+              {waiting || movements.isPending ? (
                 <Skeleton className="h-32 w-full" />
-              ) : activity.isError ? (
+              ) : movements.isError ? (
                 <ErrorState
-                  title="Could not load recent activity"
-                  error={activity.error}
-                  onRetry={() => void activity.refetch()}
-                  isRetrying={activity.isRefetching}
+                  title="Could not load the stock movements"
+                  error={movements.error}
+                  onRetry={() => void movements.refetch()}
+                  isRetrying={movements.isRefetching}
                 />
-              ) : !visibleActivity?.length ? (
+              ) : recent.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Nothing has happened yet.</p>
               ) : (
-                <ActivityTimeline
-                  variant="compact"
-                  entries={timelineEntries(visibleActivity.slice(0, RECENT_EVENTS), { feed: true })}
-                />
+                <ActivityTimeline variant="compact" entries={recent} />
               )}
             </CardContent>
           </Card>

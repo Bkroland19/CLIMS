@@ -143,7 +143,7 @@ Who gets notified does not change; targets become permission-based. For example:
 No new notifications are added in this work. Existing addressed events are not copied into the new
 inbox, which starts empty; `order_events` and `hot_spot_events` remain as history.
 `/orders/notifications` and `/hotspots/notifications` are marked deprecated and removed once the
-web and mobile clients use the central inbox.
+web and mobile clients use the central inbox. (`/orders/notifications` was removed in migration 32.)
 
 ## Out of scope for v1
 

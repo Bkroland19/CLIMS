@@ -179,7 +179,7 @@
         "tags": ["Orders"],
         "operationId": "createWarehouseRequest",
         "summary": "Order stock from NMS or JMS",
-        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the condom category (`condom_category`, male or female), the `quantity` and its `unit_of_measure_id`. The warehouse chooses the product (`condom_id`) when it reviews the request; until then the order's `condom_id` is null. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
+        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the condom category (`condom_category`, male or female) and the `quantity`, with no product and no unit (sending `unit_of_measure_id` or `condom_id` returns 400). The warehouse chooses the product (`condom_id`) when it reviews the request, and the order takes that product's catalogue unit; until then `condom_id` and `unit_of_measure_id` are null. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
         "responses": {
           "201": {
             "description": "Success",
@@ -217,60 +217,6 @@
             }
           }
         }
-      }
-    },
-    "/api/v1/orders/notifications": {
-      "get": {
-        "tags": ["Orders"],
-        "operationId": "listOrderNotifications",
-        "summary": "List order notifications",
-        "description": "Deprecated: use GET /api/v1/notifications, which carries every order notification with read state. This endpoint is removed once the web and mobile clients have switched. Requires orders:read. The inbox includes notifications addressed to the user or their assigned store. orders:all_stores can view all notifications. Returns up to 50 per page.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderEventListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "parameters": [
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0,
-              "default": 0
-            }
-          }
-        ],
-        "deprecated": true
       }
     },
     "/api/v1/orders/{id}/events": {
@@ -340,7 +286,7 @@
         "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance a warehouse order",
-        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body. review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
+        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest, and the transport: waybill_number, vehicle_registration, driver_name, driver_phone). Until dispatch (queued, reviewed, on_hold or confirmed) they may instead reject the order with a reason: it becomes rejected, keeps rejection_reason, releases any reservation, and takes no further step (409). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body; reject needs reason. review notifies the district of the approval (order.replenishment_approved), reject of the rejection (order.replenishment_rejected), and receive notifies the warehouse as well as the district. review names the product to send (condom_id, of the category requested), and the order takes that product's catalogue unit as its unit_of_measure_id (422 on error.condom_id when the product has none). review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
         "responses": {
           "200": {
             "description": "Success",
@@ -390,7 +336,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["review", "check-stock", "dispatch", "receive"]
+              "enum": ["review", "check-stock", "reject", "dispatch", "receive"]
             }
           }
         ],
@@ -440,7 +386,10 @@
           {
             "name": "status",
             "in": "query",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by order_status, e.g. on_hold or rejected."
           },
           {
             "name": "limit",
@@ -464,49 +413,6 @@
             }
           }
         ]
-      },
-      "post": {
-        "tags": ["Orders"],
-        "operationId": "createOrder",
-        "summary": "Request stock",
-        "description": "Requires orders:create. The requesting store must match the current user’s store unless they have orders:all_stores. The date defaults to the database current date. Inactive products are rejected with 422 and `error.condom_id`.",
-        "responses": {
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrderRequest"
-              }
-            }
-          }
-        }
       }
     },
     "/api/v1/orders/{id}": {
@@ -553,68 +459,6 @@
             }
           }
         ]
-      }
-    },
-    "/api/v1/orders/{id}/fulfill": {
-      "patch": {
-        "tags": ["Orders"],
-        "operationId": "fulfillOrder",
-        "summary": "Record quantities issued",
-        "description": "Requires orders:fulfill and the supplying store, or orders:all_stores in addition to orders:fulfill. Fulfillment records a single issuance up to the quantity requested.",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FulfillOrderRequest"
-              }
-            }
-          }
-        }
       }
     },
     "/api/v1/auth/register": {
@@ -1624,6 +1468,58 @@
         }
       }
     },
+    "/api/v1/inventory/batches": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listStockBatches",
+        "summary": "Batches at stores",
+        "description": "Requires inventory:read. The batches with stock at the stores the user may see (their assigned store; orders:all_stores sees every store), in the order dispatch takes them within each product and unit: earliest expiry first, unknown expiry last. band is the shelf life left in calendar months (expired, under_1_month, under_3_months, under_6_months, ok, or unknown without an expiry date), with days_remaining counted in Kampala time.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "One store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "condom_id",
+            "in": "query",
+            "description": "One product.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockBatchListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/inventory/hotspots": {
       "get": {
         "tags": ["Inventory"],
@@ -1842,6 +1738,51 @@
         }
       }
     },
+    "/api/v1/inventory/receipts": {
+      "post": {
+        "tags": ["Inventory"],
+        "operationId": "recordStockReceipt",
+        "summary": "Record a delivery",
+        "description": "Requires inventory:manage and the store as your assigned store, or orders:all_stores. Records every batch a delivery brought as a receipt into that batch, in one transaction: all lines are saved or none. Each line needs a batch_number and an expiry_date after today (Uganda's date). The same batch may appear on several lines with the same expiry date; a batch number given two expiry dates, or already held at the store under another expiry date, is refused (422). A message about one line starts with its number, e.g. \"line 2: \".",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockReceiptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/inventory/summary": {
       "get": {
         "tags": ["Inventory"],
@@ -1896,6 +1837,71 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/store-summary": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "getStoreStockSummary",
+        "summary": "One store's stock at a glance",
+        "description": "Requires inventory:read and the store as your assigned store, or orders:all_stores. Per product and unit: stock on hand, reserved, expired, expiring within three months, held without an expiry date, usable (on hand less reserved and expired) and the next expiry date, as of now; received, dispatched and written off in the period; and dispatched in the last 90 days, for stock cover. For orders district stores placed with the store: how many are open at each step now, and how many were dispatched, rejected, dispatched in full and received short in the period, the districts supplied and the median days from order to dispatch.",
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": true,
+            "description": "The store.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of the period, YYYY-MM-DD.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of the period, YYYY-MM-DD (included).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreStockSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -5110,6 +5116,35 @@
             "type": "string",
             "format": "uuid",
             "description": "review only: the product the warehouse sends, an active product of the requested condom_category. Required at the first review of a request without a product (422 with error.condom_id); a held request may switch product at a new review."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "description": "reject only (required): why the warehouse rejects the order. Trimmed; blank or missing returns 422 with error.reason. The district's DCFPs read it in their notification."
+          },
+          "waybill_number": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "description": "dispatch only, optional: the waybill or delivery note number. Trimmed; blank means not given. The district's dispatch notification includes it."
+          },
+          "vehicle_registration": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true,
+            "description": "dispatch only, optional: the vehicle's registration, e.g. UAX 123B. Trimmed; blank means not given. The district's dispatch notification includes it."
+          },
+          "driver_name": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true,
+            "description": "dispatch only, optional: the driver's name. Trimmed; blank means not given. The district's dispatch notification includes it."
+          },
+          "driver_phone": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true,
+            "description": "dispatch only, optional: the driver's phone number. Trimmed; blank means not given. The district's dispatch notification includes it."
           }
         },
         "additionalProperties": false
@@ -5167,60 +5202,6 @@
           }
         },
         "required": ["success", "data"]
-      },
-      "CreateOrderRequest": {
-        "type": "object",
-        "required": [
-          "condom_id",
-          "quantity_needed",
-          "ordered_for_store_id",
-          "ordered_from_store_id",
-          "unit_of_measure_id"
-        ],
-        "properties": {
-          "condom_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "quantity_needed": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          },
-          "order_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "ordered_for_store_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "ordered_from_store_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "unit_of_measure_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "FulfillOrderRequest": {
-        "type": "object",
-        "required": ["quantity_issued"],
-        "properties": {
-          "quantity_issued": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          }
-        },
-        "additionalProperties": false
       },
       "Order": {
         "type": "object",
@@ -5280,7 +5261,7 @@
             "type": "string",
             "format": "uuid",
             "nullable": true,
-            "description": "Null on an open stockout alert until the DCFP sends stock."
+            "description": "Null on a warehouse request until the warehouse chooses the product at review, which sets the product's catalogue unit; also null on an open alert order raised before stockouts became reports."
           },
           "comment": {
             "type": "string",
@@ -5310,6 +5291,7 @@
               "reviewed",
               "on_hold",
               "confirmed",
+              "rejected",
               "dispatched",
               "received",
               "delivered"
@@ -5365,6 +5347,31 @@
             "enum": ["male", "female"],
             "nullable": true,
             "description": "The condom category requested."
+          },
+          "rejection_reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the warehouse rejected the order; set only when order_status is rejected."
+          },
+          "waybill_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
+          },
+          "vehicle_registration": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
+          },
+          "driver_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
+          },
+          "driver_phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Transport recorded at dispatch, if given."
           }
         }
       },
@@ -6450,6 +6457,17 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "batch_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "The batch a receipt or adjustment changed; null for order steps, which can span batches, and for stock without batch details."
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "The batch's expiry date."
           }
         }
       },
@@ -7626,7 +7644,7 @@
       "WarehouseRequestRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["warehouse_store_id", "condom_category", "quantity", "unit_of_measure_id"],
+        "required": ["warehouse_store_id", "condom_category", "quantity"],
         "properties": {
           "warehouse_store_id": {
             "type": "string",
@@ -7641,11 +7659,8 @@
           "quantity": {
             "type": "integer",
             "format": "int32",
-            "minimum": 1
-          },
-          "unit_of_measure_id": {
-            "type": "string",
-            "format": "uuid"
+            "minimum": 1,
+            "description": "How many, counted in the catalogue unit of the product the warehouse chooses at review. The district names no unit."
           },
           "comment": {
             "type": "string",
@@ -7657,7 +7672,6 @@
           "warehouse_store_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "condom_category": "male",
           "quantity": 1,
-          "unit_of_measure_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "comment": "Two hotspots are out"
         }
       },
@@ -8383,7 +8397,12 @@
           "pending": {
             "type": "integer",
             "format": "int64",
-            "description": "Not yet received by the district."
+            "description": "Still open: neither received by the district nor rejected by the warehouse."
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Rejected by the warehouse before dispatch. Still counted as requested (and in the fulfilment rate), with no approved pieces."
           },
           "unconverted": {
             "type": "integer",
@@ -9678,6 +9697,365 @@
             "items": {
               "$ref": "#/components/schemas/AuditEntry"
             }
+          }
+        }
+      },
+      "StockBatch": {
+        "type": "object",
+        "required": [
+          "id",
+          "store_id",
+          "store_name",
+          "store_type",
+          "condom_id",
+          "product",
+          "unit_of_measure_id",
+          "unit",
+          "band",
+          "on_hand",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["male", "female"],
+            "nullable": true
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "batch_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for stock recorded without batch details."
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "days_remaining": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Days from today (Kampala) to the expiry date; negative once expired; null without an expiry date."
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "expired",
+              "under_1_month",
+              "under_3_months",
+              "under_6_months",
+              "ok",
+              "unknown"
+            ]
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StockBatchListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockBatch"
+            }
+          }
+        }
+      },
+      "StockReceiptRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["store_id", "lines"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "Where the delivery came from, e.g. the supplier and its delivery note number. Recorded on every line."
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "condom_id",
+                "unit_of_measure_id",
+                "batch_number",
+                "expiry_date",
+                "quantity"
+              ],
+              "properties": {
+                "condom_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "unit_of_measure_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "batch_number": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "expiry_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "After today."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                }
+              }
+            }
+          }
+        }
+      },
+      "StoreProductSummary": {
+        "type": "object",
+        "required": [
+          "condom_id",
+          "product",
+          "unit_of_measure_id",
+          "unit",
+          "on_hand",
+          "reserved",
+          "expired",
+          "expiring",
+          "no_expiry",
+          "usable",
+          "next_expiry",
+          "received",
+          "dispatched",
+          "written_off",
+          "dispatched_90_days"
+        ],
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "string"
+          },
+          "unit_of_measure_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reserved": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Held for orders approved with stock reserved."
+          },
+          "expired": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In batches past their expiry date; cannot be reserved or dispatched."
+          },
+          "expiring": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In batches with under three months left, not yet expired."
+          },
+          "no_expiry": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Held without an expiry date recorded."
+          },
+          "usable": {
+            "type": "integer",
+            "format": "int64",
+            "description": "On hand less reserved and expired: what can still be reserved."
+          },
+          "next_expiry": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Earliest expiry date of an unexpired batch."
+          },
+          "received": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Receipts in the period."
+          },
+          "dispatched": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dispatched to district stores in the period."
+          },
+          "written_off": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Taken away by adjustments in the period."
+          },
+          "dispatched_90_days": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dispatched in the 90 days to now, whatever the period."
+          }
+        }
+      },
+      "StoreStockSummary": {
+        "type": "object",
+        "required": ["store_id", "store_name", "store_type", "products", "orders"],
+        "properties": {
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "store_type": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreProductSummary"
+            }
+          },
+          "orders": {
+            "type": "object",
+            "required": [
+              "to_decide",
+              "waiting_for_stock",
+              "to_dispatch",
+              "in_transit",
+              "dispatched",
+              "rejected",
+              "dispatched_in_full",
+              "districts_supplied",
+              "received_short",
+              "median_days_to_dispatch"
+            ],
+            "properties": {
+              "to_decide": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Open now: queued."
+              },
+              "waiting_for_stock": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Open now: reviewed or on hold."
+              },
+              "to_dispatch": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Open now: confirmed, stock reserved."
+              },
+              "in_transit": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Open now: dispatched, not yet received."
+              },
+              "dispatched": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Dispatched in the period."
+              },
+              "rejected": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Rejected in the period."
+              },
+              "dispatched_in_full": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Dispatched in the period with at least the quantity ordered."
+              },
+              "districts_supplied": {
+                "type": "integer",
+                "format": "int64",
+                "description": "District stores dispatched to in the period."
+              },
+              "received_short": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Received in the period with less counted than dispatched."
+              },
+              "median_days_to_dispatch": {
+                "type": "number",
+                "nullable": true,
+                "description": "From order to dispatch, for orders dispatched in the period."
+              }
+            }
+          }
+        }
+      },
+      "StoreStockSummaryResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StoreStockSummary"
           }
         }
       }

@@ -28,11 +28,13 @@ var requestsCTE = `WITH q AS (
 	SELECT o.id, o.condom_id, coalesce(o.condom_category, c.category) AS category, o.unit_of_measure_id, o.order_status, o.created_at,
 		o.ordered_from_store_id AS warehouse_id, fs.name AS warehouse, o.ordered_for_store_id AS district_store_id,
 		ts.name AS district_store, ts.district_id, d.name AS district,
-		o.quantity_needed AS requested, coalesce(o.quantity_approved,
-			CASE WHEN o.order_status NOT IN ('queued') THEN o.quantity_needed END) AS approved,
+		o.quantity_needed AS requested,
+		-- A rejected request approved nothing, even when it was rejected after review.
+		CASE WHEN o.order_status <> 'rejected' THEN coalesce(o.quantity_approved,
+			CASE WHEN o.order_status NOT IN ('queued') THEN o.quantity_needed END) END AS approved,
 		o.quantity_issued AS issued, o.quantity_received AS received,
 		` + piecesOf("o.quantity_needed", "o.unit_of_measure_id") + ` AS requested_pieces,
-		` + piecesOf("coalesce(o.quantity_approved, CASE WHEN o.order_status NOT IN ('queued') THEN o.quantity_needed END)", "o.unit_of_measure_id") + ` AS approved_pieces,
+		` + piecesOf("CASE WHEN o.order_status <> 'rejected' THEN coalesce(o.quantity_approved, CASE WHEN o.order_status NOT IN ('queued') THEN o.quantity_needed END) END", "o.unit_of_measure_id") + ` AS approved_pieces,
 		` + piecesOf("o.quantity_issued", "o.unit_of_measure_id") + ` AS issued_pieces,
 		` + piecesOf("o.quantity_received", "o.unit_of_measure_id") + ` AS received_pieces,
 		(SELECT max(e.created_at) FROM order_events e WHERE e.order_id = o.id AND e.action = 'receive') AS received_at
@@ -62,8 +64,11 @@ type RequestTotals struct {
 	QuantityFulfilment *float64 `json:"quantity_fulfilment_rate"`
 	FullyReceived      int64    `json:"fully_received"`
 	PartlyReceived     int64    `json:"partly_received"`
-	Pending            int64    `json:"pending"`
-	Unconverted        int64    `json:"unconverted"`
+	// Pending requests are still open: neither received nor rejected.
+	Pending int64 `json:"pending"`
+	// Rejected requests were closed by the warehouse; they still count as requested.
+	Rejected    int64 `json:"rejected"`
+	Unconverted int64 `json:"unconverted"`
 }
 
 // totalsSQL aggregates q into RequestTotals' columns, in order.
@@ -71,12 +76,13 @@ const totalsSQL = `count(*), coalesce(sum(requested_pieces), 0), coalesce(sum(ap
 	coalesce(sum(issued_pieces), 0), coalesce(sum(received_pieces) FILTER (WHERE requested_pieces IS NOT NULL), 0),
 	count(*) FILTER (WHERE received IS NOT NULL AND received >= requested),
 	count(*) FILTER (WHERE received IS NOT NULL AND received < requested),
-	count(*) FILTER (WHERE received IS NULL),
+	count(*) FILTER (WHERE received IS NULL AND order_status <> 'rejected'),
+	count(*) FILTER (WHERE order_status = 'rejected'),
 	count(*) FILTER (WHERE requested_pieces IS NULL)`
 
 func scanTotals(row pgx.Row, t *RequestTotals, extra ...any) error {
 	dest := append(extra, &t.Requests, &t.RequestedPieces, &t.ApprovedPieces, &t.IssuedPieces, &t.AcknowledgedPieces,
-		&t.FullyReceived, &t.PartlyReceived, &t.Pending, &t.Unconverted)
+		&t.FullyReceived, &t.PartlyReceived, &t.Pending, &t.Rejected, &t.Unconverted)
 	if err := row.Scan(dest...); err != nil {
 		return err
 	}
@@ -112,7 +118,7 @@ func (r *Repository) supplyReport(ctx context.Context, s scope, f SupplyFilter, 
 		SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM received_at - created_at) / 3600)
 				FILTER (WHERE received_at IS NOT NULL),
 			count(*) FILTER (WHERE received_at IS NOT NULL),
-			extract(epoch FROM now() - min(created_at) FILTER (WHERE received_at IS NULL)) / 3600
+			extract(epoch FROM now() - min(created_at) FILTER (WHERE received_at IS NULL AND order_status <> 'rejected')) / 3600
 		FROM q`, args...).Scan(&out.Response.MedianHours, &out.Response.FulfilledIncluded,
 		&out.Response.OldestPendingHours); err != nil {
 		return SupplyReport{}, err

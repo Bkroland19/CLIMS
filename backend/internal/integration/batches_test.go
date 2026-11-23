@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,9 +25,13 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 	day := func(days int) string { return today.AddDate(0, 0, days).Format(time.DateOnly) }
 	receive := func(store, batch, expiry string, quantity int) {
 		t.Helper()
-		request("POST", "/inventory/movements", map[string]any{"store_id": store, "condom_id": product,
+		recorded := request("POST", "/inventory/movements", map[string]any{"store_id": store, "condom_id": product,
 			"unit_of_measure_id": unit, "reason": "receipt", "quantity": quantity, "note": "Batch received",
-			"batch_number": batch, "expiry_date": expiry}, admin, 201)
+			"batch_number": batch, "expiry_date": expiry}, admin, 201)["data"].(map[string]any)
+		// The ledger entry names the batch it filled.
+		if recorded["batch_number"] != batch || recorded["expiry_date"] != expiry {
+			t.Fatalf("receipt's batch: %v", recorded)
+		}
 	}
 	receive(warehouse, "EXP-1", day(-1), 5)
 	receive(warehouse, "NEAR-1", day(10), 10)
@@ -54,6 +59,28 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 		t.Fatalf("expired band filter: %v", expired)
 	}
 	request("GET", "/reports/batches?band=soon", nil, admin, 400)
+	// Stock managers see the same batches through inventory, in the order dispatch takes them.
+	var listed []string
+	for _, item := range request("GET", "/inventory/batches?store_id="+warehouse+"&condom_id="+product, nil, admin, 200)["data"].([]any) {
+		b := item.(map[string]any)
+		if b["unit_of_measure_id"] != unit {
+			continue
+		}
+		name := "unknown"
+		if b["batch_number"] != nil {
+			name = b["batch_number"].(string)
+		}
+		days := "-"
+		if b["days_remaining"] != nil {
+			days = fmt.Sprint(b["days_remaining"])
+		}
+		listed = append(listed, name+":"+b["band"].(string)+":"+days)
+	}
+	if strings.Join(listed, " ") != "EXP-1:expired:-1 NEAR-1:under_1_month:10 LATE-1:ok:365 unknown:unknown:-" {
+		t.Fatalf("inventory batches: %v", listed)
+	}
+	request("GET", "/inventory/batches", nil, districtToken, 403) // without inventory:read
+	request("GET", "/inventory/batches?store_id=nope", nil, admin, 400)
 	stockLine := func(store string) map[string]any {
 		t.Helper()
 		for _, line := range request("GET", "/reports/stock?store_id="+store, nil, admin, 200)["data"].(map[string]any)["lines"].([]any) {
@@ -78,7 +105,7 @@ func testBatchExpiry(t *testing.T, pool *pgxpool.Pool,
 
 	// Expired stock cannot be reserved: 45 unexpired units cannot cover 46.
 	created := request("POST", "/orders/warehouse-requests", map[string]any{"warehouse_store_id": warehouse,
-		"condom_category": categoryOf(t, pool, product), "unit_of_measure_id": unit, "quantity": 46}, districtToken, 201)["data"].(map[string]any)
+		"condom_category": categoryOf(t, pool, product), "quantity": 46}, districtToken, 201)["data"].(map[string]any)
 	orderID := created["id"].(string)
 	act := func(action string, body any, code int, status string) map[string]any {
 		t.Helper()

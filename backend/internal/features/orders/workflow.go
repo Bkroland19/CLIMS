@@ -22,7 +22,9 @@ var (
 	errUnknownProduct    = errors.New("condom_id does not name a product")
 	errChooseProduct     = errors.New("choose the product to send: give condom_id at review")
 	errWrongCategory     = errors.New("the product chosen is not of the condom category requested")
+	errProductUnit       = errors.New("the product chosen has no unit in the catalogue; give it one before sending it")
 	errExpiredStock      = errors.New("not enough unexpired stock: expired batches cannot be issued")
+	errRejectReason      = errors.New("say why the order is rejected")
 )
 
 // ActionInput carries the details a workflow step needs: an optional smaller quantity at dispatch,
@@ -37,16 +39,23 @@ type ActionInput struct {
 	QuantityReceived      *int32  `json:"quantity_received"`
 	QuantityIssued        *int32  `json:"quantity_issued"`
 	DiscrepancyNote       *string `json:"discrepancy_note"`
+	// Reason says why the warehouse rejects the order; the district's DCFPs read it.
+	Reason *string `json:"reason"`
+	// The transport recorded at dispatch, each optional.
+	WaybillNumber       *string `json:"waybill_number"`
+	VehicleRegistration *string `json:"vehicle_registration"`
+	DriverName          *string `json:"driver_name"`
+	DriverPhone         *string `json:"driver_phone"`
 }
 
 // WarehouseRequestInput is a DCFP's order to a national warehouse: which warehouse, which condom
-// category (male or female), and how much in which unit. The warehouse chooses the product.
+// category (male or female), and how much. The DCFP names no product and no unit: the warehouse
+// chooses the product at review, and the quantity is counted in that product's catalogue unit.
 type WarehouseRequestInput struct {
-	WarehouseID     string  `json:"warehouse_store_id"`
-	CondomCategory  string  `json:"condom_category"`
-	Quantity        int32   `json:"quantity"`
-	UnitOfMeasureID string  `json:"unit_of_measure_id"`
-	Comment         *string `json:"comment"`
+	WarehouseID    string  `json:"warehouse_store_id"`
+	CondomCategory string  `json:"condom_category"`
+	Quantity       int32   `json:"quantity"`
+	Comment        *string `json:"comment"`
 }
 
 // createWarehouseRequest places a DCFP's order with NMS or JMS for their district store. The order
@@ -76,15 +85,15 @@ func (r *Repository) createWarehouseRequest(ctx context.Context, access scope, i
 			return errNotWarehouse
 		}
 		var err error
-		order, err = scanOrder(tx.QueryRow(ctx, `INSERT INTO orders (condom_category, unit_of_measure_id, quantity_needed,
+		order, err = scanOrder(tx.QueryRow(ctx, `INSERT INTO orders (condom_category, quantity_needed,
 				ordered_by_id, ordered_for_store_id, ordered_from_store_id, order_status, comment)
-			VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7)
-			RETURNING `+columns, input.CondomCategory, input.UnitOfMeasureID, input.Quantity, access.userID, *access.storeID,
+			VALUES ($1, $2, $3, $4, $5, 'queued', $6)
+			RETURNING `+columns, input.CondomCategory, input.Quantity, access.userID, *access.storeID,
 			input.WarehouseID, input.Comment))
 		if err != nil {
 			return err
 		}
-		return r.record(ctx, tx, nil, order, access.userID, "replenishment_requested", &input.WarehouseID)
+		return r.record(ctx, tx, nil, order, access.userID, "replenishment_requested")
 	})
 	return order, err
 }
@@ -132,11 +141,11 @@ func (r *Repository) act(ctx context.Context, access scope, id, action string, i
 }
 
 // transition moves a warehouse request one step: the warehouse reviews, checks stock (reserving it,
-// or holding the request until stock arrives) and dispatches; the district receives.
+// or holding the request until stock arrives) and dispatches; the district receives. Before dispatch
+// the warehouse may reject the order with a reason instead, releasing anything reserved.
 func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, actorID, action string, input ActionInput) (Order, error) {
 	before := order
 	next := order.Status
-	var notifyStore *string
 	switch action {
 	case "review":
 		if order.Status != "queued" && order.Status != "on_hold" {
@@ -151,8 +160,9 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 			approved = *input.QuantityApproved
 		}
 		order.QuantityApproved = &approved
-		// The warehouse chooses the product to send from the category requested. Nothing is reserved
-		// before check-stock, so a held request may switch to another product at a new review.
+		// The warehouse chooses the product to send from the category requested, and the order is
+		// counted in that product's unit. Nothing is reserved before check-stock, so a held request
+		// may switch to another product (and its unit) at a new review.
 		if input.CondomID != nil {
 			if err := chooseProduct(ctx, tx, &order, *input.CondomID); err != nil {
 				return Order{}, err
@@ -175,6 +185,27 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		if reserved {
 			next = "confirmed"
 		}
+	case "reject":
+		// A rejection closes the order at any step before dispatch; the DCFP orders again if needed.
+		switch order.Status {
+		case "queued", "reviewed", "on_hold", "confirmed":
+		default:
+			return Order{}, errWorkflowConflict
+		}
+		if order.Status == "confirmed" {
+			// check-stock reserved the approved quantity; give it back.
+			tag, err := tx.Exec(ctx, `UPDATE order_store_stock SET reserved = reserved - $4, updated_at = CURRENT_TIMESTAMP
+				WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3 AND reserved >= $4`,
+				order.OrderedFromStoreID, *order.CondomID, order.UnitOfMeasureID, approvedQuantity(order))
+			if err != nil {
+				return Order{}, err
+			}
+			if tag.RowsAffected() != 1 {
+				return Order{}, fmt.Errorf("reject order %s: its reservation is missing", order.ID)
+			}
+		}
+		order.RejectionReason = input.Reason
+		next = "rejected"
 	case "dispatch":
 		// The warehouse ships what check-stock reserved, or less, releasing the rest.
 		if order.Status != "confirmed" {
@@ -216,7 +247,8 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		}
 		order.QuantityIssued = &quantity
 		order.HandledByID = &actorID
-		notifyStore = &order.OrderedForStoreID
+		order.WaybillNumber, order.VehicleRegistration = input.WaybillNumber, input.VehicleRegistration
+		order.DriverName, order.DriverPhone = input.DriverName, input.DriverPhone
 		next = "dispatched"
 	case "receive":
 		if order.Status != "dispatched" {
@@ -248,26 +280,29 @@ func (r *Repository) transition(ctx context.Context, tx pgx.Tx, order Order, act
 		}
 		order.QuantityReceived = input.QuantityReceived
 		order.DiscrepancyNote = input.DiscrepancyNote
-		notifyStore = &order.OrderedForStoreID
 		next = "received"
 	}
 	result, err := scanOrder(tx.QueryRow(ctx, `UPDATE orders SET order_status = $2, quantity_issued = $3,
 		handled_by_id = $4, quantity_received = $5, discrepancy_note = $6, quantity_approved = $7, condom_id = $8,
-		updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, order.ID, next, order.QuantityIssued,
-		order.HandledByID, order.QuantityReceived, order.DiscrepancyNote, order.QuantityApproved, order.CondomID))
+		rejection_reason = $9, waybill_number = $10, vehicle_registration = $11, driver_name = $12,
+		driver_phone = $13, unit_of_measure_id = $14, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING `+columns, order.ID, next,
+		order.QuantityIssued, order.HandledByID, order.QuantityReceived, order.DiscrepancyNote, order.QuantityApproved,
+		order.CondomID, order.RejectionReason, order.WaybillNumber, order.VehicleRegistration, order.DriverName,
+		order.DriverPhone, order.UnitOfMeasureID))
 	if err != nil {
 		return Order{}, err
 	}
-	return result, r.record(ctx, tx, &before, result, actorID, action, notifyStore)
+	return result, r.record(ctx, tx, &before, result, actorID, action)
 }
 
-// chooseProduct sets the product the warehouse sends: an active product of the category requested.
+// chooseProduct sets the product the warehouse sends, an active product of the category requested,
+// and counts the order in that product's catalogue unit.
 func chooseProduct(ctx context.Context, tx pgx.Tx, order *Order, condomID string) error {
 	if err := checkOrderable(ctx, tx, condomID); err != nil {
 		return err
 	}
-	var category *string
-	err := tx.QueryRow(ctx, `SELECT category FROM condoms WHERE id = $1`, condomID).Scan(&category)
+	var category, unitID *string
+	err := tx.QueryRow(ctx, `SELECT category, unit_id FROM condoms WHERE id = $1`, condomID).Scan(&category, &unitID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errUnknownProduct
 	}
@@ -277,7 +312,10 @@ func chooseProduct(ctx context.Context, tx pgx.Tx, order *Order, condomID string
 	if order.CondomCategory != nil && (category == nil || *category != *order.CondomCategory) {
 		return errWrongCategory
 	}
-	order.CondomID = &condomID
+	if unitID == nil {
+		return errProductUnit
+	}
+	order.CondomID, order.UnitOfMeasureID = &condomID, unitID
 	return nil
 }
 
@@ -319,18 +357,13 @@ type Event struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (r *Repository) listEvents(ctx context.Context, access scope, id *string, offset int32) ([]Event, error) {
-	if id != nil {
-		if _, err := r.get(ctx, access, *id); err != nil {
-			return nil, err
-		}
+// listEvents is an order's history, newest first, for a user who may see the order.
+func (r *Repository) listEvents(ctx context.Context, access scope, id string, offset int32) ([]Event, error) {
+	if _, err := r.get(ctx, access, id); err != nil {
+		return nil, err
 	}
 	rows, err := r.db.Query(ctx, `SELECT id, order_id, actor_id, action, status, created_at FROM order_events
-		WHERE ($1::uuid IS NOT NULL AND order_id = $1) OR
-			($1 IS NULL AND (notify_store_id = $2::uuid OR notify_user_id = $3::uuid
-				OR ($4::boolean AND (notify_store_id IS NOT NULL OR notify_user_id IS NOT NULL))))
-		ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $5`, id, access.storeID,
-		access.userID, access.allStores, offset)
+		WHERE order_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50 OFFSET $2`, id, offset)
 	if err != nil {
 		return nil, err
 	}

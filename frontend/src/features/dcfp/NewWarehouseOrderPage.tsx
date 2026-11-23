@@ -4,7 +4,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useId, useState, type SyntheticEvent } from 'react';
 
 import { DetailList } from '@/components/DetailList';
-import { SelectField } from '@/components/form/SelectField';
 import { TextField } from '@/components/form/TextField';
 import { RadioCardGroup } from '@/components/RadioCardGroup';
 import { ErrorState } from '@/components/states/ErrorState';
@@ -15,8 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { WriteAction } from '@/components/WriteAction';
-import type { Lookup } from '@/features/catalogue/api';
-import { useLookups } from '@/features/catalogue/queries';
 import { getErrorMessage, toApiError } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 
@@ -25,7 +22,7 @@ import { categoryLabel, DCFP_PATHS, parseCount, warehouseLabel } from './orders'
 import { usePlaceOrder, useWarehouses } from './queries';
 
 /** The API's fields, for showing its validation messages beside the right control. */
-type Field = 'warehouse_store_id' | 'condom_category' | 'quantity' | 'unit_of_measure_id';
+type Field = 'warehouse_store_id' | 'condom_category' | 'quantity';
 type Category = 'male' | 'female';
 
 const CATEGORIES: readonly { value: Category; label: string; description: string }[] = [
@@ -35,31 +32,27 @@ const CATEGORIES: readonly { value: Category; label: string; description: string
 
 export default function NewWarehouseOrderPage() {
   const warehouses = useWarehouses();
-  const units = useLookups('units');
   // A stockout report's "Order stock" action names its condom category.
   const preselected = useSearchParams().get('category');
 
-  const failed = warehouses.error ?? units.error;
-  if (failed) {
+  if (warehouses.error) {
     return (
       <div className="bg-card rounded-card border">
         <ErrorState
-          title="Could not load the warehouses and units"
-          error={failed}
+          title="Could not load the warehouses"
+          error={warehouses.error}
           onRetry={() => {
             void warehouses.refetch();
-            void units.refetch();
           }}
-          isRetrying={warehouses.isRefetching || units.isRefetching}
+          isRetrying={warehouses.isRefetching}
         />
       </div>
     );
   }
-  if (!warehouses.data || !units.data) return <PageSkeleton layout="form" />;
+  if (!warehouses.data) return <PageSkeleton layout="form" />;
   return (
     <OrderForm
       warehouses={warehouses.data}
-      units={units.data.filter((unit) => unit.active)}
       preselected={preselected === 'male' || preselected === 'female' ? preselected : null}
     />
   );
@@ -67,23 +60,20 @@ export default function NewWarehouseOrderPage() {
 
 interface OrderFormProps {
   warehouses: readonly Warehouse[];
-  units: readonly Lookup[];
   preselected: Category | null;
 }
 
-function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
+function OrderForm({ warehouses, preselected }: OrderFormProps) {
   const router = useRouter();
   const place = usePlaceOrder();
   const commentId = useId();
 
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [category, setCategory] = useState<Category | null>(preselected);
-  const [unitId, setUnitId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [comment, setComment] = useState('');
   const [attempted, setAttempted] = useState(false);
 
-  const unitName = units.find((unit) => unit.id === unitId)?.name ?? null;
   const count = parseCount(quantity);
 
   const serverErrors = place.error ? toApiError(place.error).fieldErrors : {};
@@ -95,7 +85,6 @@ function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
       count === null || count < 1
         ? 'Enter how many to order, as a whole number.'
         : serverError('quantity'),
-    unit_of_measure_id: unitId ? serverError('unit_of_measure_id') : 'Choose the unit.',
   };
   const shown = (field: Field) => (attempted || serverError(field) ? errors[field] : undefined);
   const hasErrors = Object.values(errors).some(Boolean);
@@ -105,15 +94,13 @@ function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
   function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setAttempted(true);
-    if (place.isPending || !warehouseId || !category || !unitId || count === null || count < 1)
-      return;
+    if (place.isPending || !warehouseId || !category || count === null || count < 1) return;
     place.reset();
     place.mutate(
       {
         warehouse_store_id: warehouseId,
         condom_category: category,
         quantity: count,
-        unit_of_measure_id: unitId,
         comment: comment.trim() || null,
       },
       {
@@ -172,8 +159,8 @@ function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
               <h3>What to order</h3>
             </CardTitle>
             <CardDescription>
-              Name the condom type. The warehouse chooses which product to send when it reviews the
-              order.
+              Name the condom type and how many. The warehouse chooses the product, and its unit,
+              when it reviews the order.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -186,16 +173,6 @@ function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
               error={shown('condom_category')}
               disabled={busy}
             />
-            <SelectField
-              label="Unit"
-              required
-              value={unitId}
-              onValueChange={setUnitId}
-              options={units.map((unit) => ({ value: unit.id, label: unit.name }))}
-              placeholder="Choose a unit"
-              error={shown('unit_of_measure_id')}
-              disabled={busy}
-            />
             <TextField
               label="Quantity"
               required
@@ -204,7 +181,6 @@ function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
               onChange={(event) => {
                 setQuantity(event.target.value);
               }}
-              description={unitName ? `In ${unitName}.` : undefined}
               error={shown('quantity')}
               disabled={busy}
               className="max-w-40 tabular-nums"
@@ -247,10 +223,7 @@ function OrderForm({ warehouses, units, preselected }: OrderFormProps) {
                 { label: 'Condom type', value: categoryLabel(category) ?? '—' },
                 {
                   label: 'Quantity',
-                  value:
-                    count !== null && count > 0
-                      ? `${formatNumber(count)}${unitName ? ` ${unitName}` : ''}`
-                      : '—',
+                  value: count !== null && count > 0 ? formatNumber(count) : '—',
                 },
               ]}
             />

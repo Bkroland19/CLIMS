@@ -48,11 +48,41 @@ func TestValidActionInput(t *testing.T) {
 		{"receive", ActionInput{QuantityReceived: count(9), DiscrepancyNote: note("   ")}, false},
 		{"dispatch", ActionInput{QuantityReceived: count(9)}, false},
 		{"dispatch", ActionInput{DiscrepancyNote: note("Short")}, false},
+		{"reject", ActionInput{Reason: note("Held for a campaign")}, true},
+		{"review", ActionInput{Reason: note("Held for a campaign")}, false},
+		{"dispatch", ActionInput{WaybillNumber: note(" WB-104 "), VehicleRegistration: note("UAX 123B"),
+			DriverName: note("John"), DriverPhone: note("0772 000000")}, true},
+		{"dispatch", ActionInput{VehicleRegistration: note(strings.Repeat("A", 31))}, false},
+		{"receive", ActionInput{QuantityReceived: count(1), WaybillNumber: note("WB")}, false},
 	}
 	for i, tc := range cases {
 		input := tc.input
 		if got := validActionInput(tc.action, &input); got != tc.valid {
 			t.Errorf("case %d (%s): got %v, want %v", i, tc.action, got, tc.valid)
 		}
+	}
+}
+
+func TestValidReason(t *testing.T) {
+	note := func(value string) *string { return &value }
+	for name, tc := range map[string]struct {
+		reason *string
+		valid  bool
+		want   string
+	}{
+		"trimmed":  {note("  Held for a campaign "), true, "Held for a campaign"},
+		"missing":  {nil, false, ""},
+		"blank":    {note("   "), false, ""},
+		"too long": {note(strings.Repeat("a", 4001)), false, ""},
+	} {
+		reason := tc.reason
+		if got := validReason(&reason); got != tc.valid || (got && *reason != tc.want) {
+			t.Errorf("%s: got %v %v", name, got, reason)
+		}
+	}
+	// Blank transport is dropped rather than refused.
+	input := ActionInput{WaybillNumber: note("  ")}
+	if !validActionInput("dispatch", &input) || input.WaybillNumber != nil {
+		t.Error("a blank waybill was kept or refused")
 	}
 }

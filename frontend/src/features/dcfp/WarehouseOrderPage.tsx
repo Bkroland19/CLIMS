@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useId, useState, type SyntheticEvent } from 'react';
 
@@ -21,7 +22,14 @@ import { getErrorMessage } from '@/lib/api';
 import { formatDate, formatTimestamp } from '@/lib/format';
 
 import type { Order, OrderEvent } from './api';
-import { eventLabel, ORDER_STATUS, orderSteps, parseCount, receiptErrors } from './orders';
+import {
+  DCFP_PATHS,
+  eventLabel,
+  ORDER_STATUS,
+  orderSteps,
+  parseCount,
+  receiptErrors,
+} from './orders';
 import { useOrder, useOrderEvents, useReceiveOrder } from './queries';
 import { useOrderNames, type OrderNames } from './useOrderNames';
 
@@ -52,7 +60,7 @@ export default function WarehouseOrderPage() {
 }
 
 /** Who acts at each step, for the history's role colour. */
-const WAREHOUSE_STEPS = new Set(['review', 'check-stock', 'dispatch']);
+const WAREHOUSE_STEPS = new Set(['review', 'check-stock', 'reject', 'dispatch']);
 
 function OrderDetail({
   order,
@@ -90,6 +98,7 @@ function OrderDetail({
               <ReceiveCard order={order} issued={order.quantity_issued} names={names} />
             </WriteAction>
           ) : null}
+          <DecisionNotice order={order} names={names} />
           {order.order_status === 'on_hold' ? (
             <Alert>
               <AlertTitle>Waiting for stock at the warehouse</AlertTitle>
@@ -135,14 +144,28 @@ function OrderDetail({
                   label: 'Quantity ordered',
                   value: names.quantity(order.quantity_needed, order.unit_of_measure_id),
                 },
-                {
-                  label: 'Quantity dispatched',
-                  value: names.quantity(order.quantity_issued, order.unit_of_measure_id),
-                },
-                {
-                  label: 'Quantity received',
-                  value: names.quantity(order.quantity_received, order.unit_of_measure_id),
-                },
+                ...(order.quantity_approved !== null
+                  ? [
+                      {
+                        label: 'Quantity approved',
+                        value: names.quantity(order.quantity_approved, order.unit_of_measure_id),
+                      },
+                    ]
+                  : []),
+                // A rejected order is never dispatched, so it has nothing to show there.
+                ...(order.order_status === 'rejected'
+                  ? []
+                  : [
+                      {
+                        label: 'Quantity dispatched',
+                        value: names.quantity(order.quantity_issued, order.unit_of_measure_id),
+                      },
+                      ...transportOf(order),
+                      {
+                        label: 'Quantity received',
+                        value: names.quantity(order.quantity_received, order.unit_of_measure_id),
+                      },
+                    ]),
                 ...(differs && order.discrepancy_note
                   ? [{ label: 'Why it differs', value: order.discrepancy_note }]
                   : []),
@@ -154,6 +177,67 @@ function OrderDetail({
       </div>
     </div>
   );
+}
+
+/** The approved statuses before dispatch, when a smaller approval is worth pointing out. */
+const APPROVED = new Set(['reviewed', 'on_hold', 'confirmed']);
+
+/**
+ * What the warehouse decided, when the DCFP needs more than the status: why it rejected the
+ * order, or that it approved less than was ordered.
+ */
+function DecisionNotice({ order, names }: { order: Order; names: OrderNames }) {
+  const warehouse = names.warehouseLabel(order.ordered_from_store_id);
+  if (order.order_status === 'rejected') {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>{warehouse} rejected this order</AlertTitle>
+        <AlertDescription>
+          <p className="break-words whitespace-pre-line">
+            {order.rejection_reason ?? 'No reason was given.'}
+          </p>
+          <p>
+            Nothing will be dispatched.{' '}
+            <Link
+              href={DCFP_PATHS.newOrderFor(order.condom_category)}
+              className="font-medium underline underline-offset-4"
+            >
+              Place a new order
+            </Link>{' '}
+            if you still need this stock.
+          </p>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  const partial =
+    APPROVED.has(order.order_status) &&
+    order.quantity_approved !== null &&
+    order.quantity_needed !== null &&
+    order.quantity_approved < order.quantity_needed;
+  if (!partial) return null;
+  return (
+    <Alert>
+      <AlertTitle>{warehouse} approved part of this order</AlertTitle>
+      <AlertDescription>
+        It approved {names.quantity(order.quantity_approved, order.unit_of_measure_id)} of the{' '}
+        {names.quantity(order.quantity_needed, order.unit_of_measure_id)} ordered and will dispatch
+        that. Order the rest from the other warehouse if you need it now.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/** The transport the warehouse recorded at dispatch, as detail rows; none when it recorded none. */
+function transportOf(order: Order): { label: string; value: string }[] {
+  const driver = [order.driver_name, order.driver_phone && `(${order.driver_phone})`]
+    .filter(Boolean)
+    .join(' ');
+  return [
+    { label: 'Waybill', value: order.waybill_number },
+    { label: 'Vehicle', value: order.vehicle_registration },
+    { label: 'Driver', value: driver || null },
+  ].filter((row): row is { label: string; value: string } => row.value !== null);
 }
 
 function ReceiveCard({

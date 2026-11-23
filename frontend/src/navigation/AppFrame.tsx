@@ -61,7 +61,8 @@ function SignedInShell({ children }: AppFrameProps) {
   const home = useHomeWorkspace();
 
   const canOpenDcfp = accessTo(access, 'dcfp') !== null;
-  const feed = useNotificationFeed(canOpenDcfp);
+  const canOpenWarehouse = accessTo(access, 'warehouse') !== null;
+  const feed = useNotificationFeed({ dcfp: canOpenDcfp, warehouse: canOpenWarehouse });
   const dcfpCounts = useDcfpCounts(inside(pathname, '/dcfp') && canOpenDcfp, feed.inbox);
   const warehouseCounts = useWarehouseCounts(
     inside(pathname, '/warehouse') && accessTo(access, 'warehouse') !== null,

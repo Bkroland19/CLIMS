@@ -1,15 +1,18 @@
 package integration
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // testCatalogue covers products, types, brands and units after the legacy import: the converted
 // rows, every write rule and each error response. reader is an active user without
-// catalogue:manage; the stores are used to place an order for a catalogue product.
-func testCatalogue(t *testing.T, request func(string, string, any, string, int) map[string]any,
+// catalogue:manage; the warehouse (sourceID) and district store (destinationID) are used to order a
+// catalogue product.
+func testCatalogue(t *testing.T, pool *pgxpool.Pool, request func(string, string, any, string, int) map[string]any,
 	admin, reader, sourceID, destinationID string,
 ) {
 	t.Helper()
@@ -228,16 +231,26 @@ func testCatalogue(t *testing.T, request func(string, string, any, string, int) 
 		t.Fatalf("legacy product not completed: %v", completed)
 	}
 
-	// Inactive products cannot be ordered; ordered products cannot be deleted.
-	order := map[string]any{
-		"condom_id": productID, "quantity_needed": 10, "unit_of_measure_id": unitID,
-		"ordered_from_store_id": sourceID, "ordered_for_store_id": destinationID,
+	// Inactive products cannot be ordered: the warehouse cannot choose one at review. Ordered products
+	// cannot be deleted. The administrator orders for the district store, as a DCFP would, and
+	// reviews the order as the warehouse.
+	assign := func(store any) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), `UPDATE users SET store_id = $1 WHERE email = 'admin@example.test'`,
+			store); err != nil {
+			t.Fatal(err)
+		}
 	}
+	assign(destinationID)
+	defer assign(nil)
+	placed := data(request("POST", "/orders/warehouse-requests", map[string]any{"warehouse_store_id": sourceID,
+		"condom_category": categoryOf(t, pool, productID), "quantity": 10}, admin, 201))
+	review := "/orders/" + placed["id"].(string) + "/actions/review"
 	request("PATCH", "/catalogue/products/"+productID, map[string]any{"active": false}, admin, 200)
-	expectFields("order inactive product", request("POST", "/orders", order, admin, 422),
+	expectFields("order inactive product", request("POST", review, map[string]any{"condom_id": productID}, admin, 422),
 		map[string]string{"condom_id": "This product is inactive and cannot be ordered."})
 	request("PATCH", "/catalogue/products/"+productID, map[string]any{"active": true}, admin, 200)
-	request("POST", "/orders", order, admin, 201)
+	request("POST", review, map[string]any{"condom_id": productID}, admin, 200)
 	if find("/catalogue/products", productID)["in_use"] != true {
 		t.Fatal("ordered product is not in use")
 	}

@@ -2,9 +2,10 @@ import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it } from 'vitest';
 
-import { aRequest, envelope } from '@/test/fulfilmentFixtures';
+import { anOrder, JMS } from '@/test/dcfpFixtures';
 import { testRouter } from '@/test/navigation';
 import { renderApp } from '@/test/renderApp';
+import { warehouseOrderApi } from '@/test/warehouseOrderFixtures';
 
 import { DistrictContextProvider, useDistrictContext } from './DistrictContext';
 
@@ -22,12 +23,17 @@ it('keeps the district across warehouse pages and clears it when the warehouse d
     {
       signedIn: true,
       route: '/warehouse?store=NMS',
+      // NMS serves Wakiso and JMS serves Gulu: the districts whose stores ordered from them.
       replies: [
-        (request) => ({
-          status: 200,
-          body: envelope([
-            aRequest({ district: request.url.includes('/NMS/') ? 'Wakiso' : 'Gulu' }),
-          ]),
+        warehouseOrderApi({
+          orders: [
+            anOrder({ id: 'o-nms', ordered_for_store_id: 'store-wakiso' }),
+            anOrder({
+              id: 'o-jms',
+              ordered_for_store_id: 'store-gulu',
+              ordered_from_store_id: JMS.id,
+            }),
+          ],
         }),
       ],
     },

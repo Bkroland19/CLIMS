@@ -60,6 +60,13 @@ describe('orderSteps', () => {
     ]);
     expect(steps[2]?.label).toBe('Waiting for stock');
   });
+
+  it('stops a rejected order at the warehouse’s decision', () => {
+    expect(orderSteps('rejected').map((s) => [s.label, s.state])).toEqual([
+      ['Sent to warehouse', 'done'],
+      ['Rejected', 'attention'],
+    ]);
+  });
 });
 
 describe('parseCount and receiptErrors', () => {

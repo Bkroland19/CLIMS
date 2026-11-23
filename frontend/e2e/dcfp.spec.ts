@@ -30,7 +30,9 @@ test('shows a stockout with the hotspot’s details and message, and orders stoc
   await page.getByRole('menuitem', { name: 'Order stock from a warehouse' }).click();
 
   await expect(page.getByRole('heading', { level: 1, name: 'New warehouse order' })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Product' })).toContainText('FC2');
+  // The stockout names the condom type; the warehouse chooses the product and its unit.
+  await expect(page.getByRole('radio', { name: /Female condoms/ })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Unit' })).toHaveCount(0);
   await page.getByRole('radio', { name: /^JMS/ }).check();
   await page.getByRole('textbox', { name: 'Quantity' }).fill('500');
   await page.getByRole('button', { name: 'Send order to JMS' }).click();
@@ -44,7 +46,7 @@ test('refuses an order without a quantity', async ({ page }) => {
   await open(page, '/dcfp/restock/new', 'New warehouse order');
   await page.getByRole('button', { name: 'Send order to JMS' }).click();
 
-  await expect(page.getByText('Choose the product to order.')).toBeVisible();
+  await expect(page.getByText('Choose male or female condoms.')).toBeVisible();
   await expect(page.getByText('Enter how many to order, as a whole number.')).toBeVisible();
   await expect(page).toHaveURL(/\/dcfp\/restock\/new$/);
 });
