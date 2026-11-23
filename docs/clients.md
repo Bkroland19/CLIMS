@@ -36,7 +36,7 @@ On this workstation, use `BUILDX_CONFIG=/tmp/clims-buildx make docker-up` if Doc
 | Expo Metro          | 8081           | Internal, through Nginx                   |
 | PostgreSQL          | 5432           | `localhost:5432` for local database tools |
 
-Nginx routes `/` and Next.js assets to the frontend; `/api`, `/docs`, and `/health` retain their full paths and go to Go. A separate Nginx listener proxies Metro's root paths and WebSocket upgrades. Docker DNS resolution lets the proxy refresh upstream addresses after container recreation.
+Nginx routes `/` and Next.js assets to the frontend; `/api`, `/docs`, and `/health` retain their full paths and go to Go. `/handbook/` goes to the documentation site, and in development `/ws` goes to its live-reload socket. A separate Nginx listener proxies Metro's root paths and WebSocket upgrades. Docker DNS resolution lets the proxy refresh upstream addresses after container recreation.
 
 The startup sequence waits for PostgreSQL, then the API, then Next.js; Nginx waits for the API, frontend, and Metro health checks. The PostgreSQL named volume is preserved. The API is no longer published directly on host port 8080: Nginx owns that port.
 
@@ -53,7 +53,7 @@ make run-frontend
 
 Open `http://localhost:3000`. Next.js rewrites `/api`, `/docs`, and `/health` to `BACKEND_URL`, defaulting to the Nginx gateway at `http://localhost:8080`. Copy `frontend/.env.example` to `frontend/.env.local` to change it, or point it at the mock API in `frontend/dev/` to work without a backend. Browser API calls use relative paths; no private database credentials are bundled into the client. `NEXT_PUBLIC_*` values are compiled into the public bundle, so they must never hold secrets. The screens call endpoints the Go API does not serve yet; the [web app guide](../frontend/README.md) lists them.
 
-The development Compose override uses `infra/docker/frontend/Dockerfile.dev`; production uses `Dockerfile.prod`. The web app bundles its font and does not download Google Fonts. `make check-frontend` runs formatting, lint, types, tests with coverage, and the build.
+The development Compose override uses `infra/docker/frontend/Dockerfile.dev`; production uses `Dockerfile.prod`. The web app bundles IBM Plex Sans for all workspaces, headings and forms; it does not download Google Fonts. `make check-frontend` runs formatting, lint, types, tests with coverage, and the build.
 
 ```sh
 make check-frontend

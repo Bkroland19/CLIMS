@@ -5,6 +5,10 @@ import (
 	"errors"
 	"slices"
 
+	"clims-backend/internal/features/audit"
+	"clims-backend/internal/features/notifications"
+	"clims-backend/internal/features/users"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,33 +38,58 @@ var transitions = map[string]transition{
 }
 
 // scope decides which hotspots a user sees: their own submissions (submit),
-// every hotspot in the district of their assigned store (activate), or every
-// hotspot (allDistricts).
+// every hotspot in the district of their assigned store (activate), the active
+// hotspots in the district they work in (readDistrict), or every hotspot
+// (allDistricts).
 type scope struct {
 	userID       string
 	storeID      *string
 	submit       bool
 	activate     bool
+	readDistrict bool
 	allDistricts bool
 }
 
-type Repository struct {
-	db *pgxpool.Pool
+// District visibility modes, passed as $3 so callers keep $5 onwards for their own parameters.
+const (
+	districtNone   = 0
+	districtAll    = 1 // every hotspot in the district of the assigned store (DCFPs)
+	districtActive = 2 // active hotspots in the district the user works in (VHTs requesting stock)
+)
+
+// districtMode picks the widest district visibility the scope allows.
+func (s scope) districtMode() int {
+	switch {
+	case s.activate:
+		return districtAll
+	case s.readDistrict:
+		return districtActive
+	default:
+		return districtNone
+	}
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+type Repository struct {
+	db       *pgxpool.Pool
+	notifier notifications.Notifier
+	audit    audit.Auditor
+}
+
+// NewRepository needs a notifier with NotificationTypes registered.
+func NewRepository(db *pgxpool.Pool, notifier notifications.Notifier, auditor audit.Auditor) *Repository {
+	return &Repository{db: db, notifier: notifier, audit: auditor}
 }
 
 // The district a DCFP is responsible for, from their assigned store ($1 is the user).
 const assignedDistrict = `(SELECT s.district_id FROM users u JOIN stores s ON s.id = u.store_id WHERE u.id = $1::uuid)`
 
-// Parameters $1 user ID, $2 submit, $3 activate and $4 all districts are reserved by this filter.
+// Parameters $1 user ID, $2 submit, $3 district mode and $4 all districts are reserved by this filter.
 const visibleHotSpots = `($4::boolean OR ($2::boolean AND h.submitted_by_id = $1::uuid)
-	OR ($3::boolean AND h.district_id = ` + assignedDistrict + `))`
+	OR ($3::int = 1 AND h.district_id = ` + assignedDistrict + `)
+	OR ($3::int = 2 AND h.status = 'active' AND h.district_id = ` + users.DistrictOfUser + `))`
 
 func visibleArgs(access scope, args ...any) []any {
-	return append([]any{access.userID, access.submit, access.activate, access.allDistricts}, args...)
+	return append([]any{access.userID, access.submit, access.districtMode(), access.allDistricts}, args...)
 }
 
 const hotSpotColumns = `h.id, h.name, h.type, h.village,
@@ -162,7 +191,7 @@ func (r *Repository) submit(ctx context.Context, actorID string, input SubmitReq
 				return err
 			}
 		}
-		return addEvent(ctx, tx, id, actorID, EventSubmitted, true, nil)
+		return r.record(ctx, tx, id, actorID, EventSubmitted, nil, true, nil, nil)
 	})
 	return id, err
 }
@@ -180,6 +209,10 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 		}
 		if status != StatusInactive {
 			return ErrNotEditable
+		}
+		before, err := snapshot(ctx, tx, id)
+		if err != nil {
+			return err
 		}
 		if review == ReviewDeactivated && (district == nil || *district != d.DistrictID) {
 			return ErrDistrictLocked
@@ -208,17 +241,24 @@ func (r *Repository) update(ctx context.Context, actorID, id string, d Details) 
 			id, d.ContactPersonName, d.ContactPersonPhone); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, id, actorID, event, true, nil)
+		return r.record(ctx, tx, id, actorID, event, before, true, nil, nil)
 	})
 }
 
 // comment adds to a visible hotspot's thread. A comment from the submitter
 // notifies the district; anyone else's comment notifies the submitter.
 func (r *Repository) comment(ctx context.Context, access scope, id, text string) error {
+	// Seeing a district's active hotspots is for requesting stock; it doesn't open their threads,
+	// which stay between the submitter and the DCFP (9).
+	access.readDistrict = false
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
 		var submittedBy *string
 		if err := tx.QueryRow(ctx, `SELECT h.submitted_by_id FROM hot_spots h WHERE `+visibleHotSpots+
 			` AND h.id = $5 FOR UPDATE OF h`, visibleArgs(access, id)...).Scan(&submittedBy); err != nil {
+			return err
+		}
+		before, err := snapshot(ctx, tx, id)
+		if err != nil {
 			return err
 		}
 		if err := addComment(ctx, tx, id, access.userID, ActionComment, text); err != nil {
@@ -233,7 +273,7 @@ func (r *Repository) comment(ctx context.Context, access scope, id, text string)
 		if !fromSubmitter {
 			notifyUser = submittedBy
 		}
-		return addEvent(ctx, tx, id, access.userID, EventCommented, fromSubmitter, notifyUser)
+		return r.record(ctx, tx, id, access.userID, EventCommented, before, fromSubmitter, notifyUser, &text)
 	})
 }
 
@@ -252,6 +292,10 @@ func (r *Repository) decide(ctx context.Context, access scope, id, action, text 
 		if !slices.Contains(step.from, review) {
 			return ErrInvalidTransition
 		}
+		before, err := snapshot(ctx, tx, id)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE hot_spots SET status = $2, review_status = $3,
 			updated_at = CURRENT_TIMESTAMP WHERE id = $1`, id, statusFor(step.review), step.review); err != nil {
 			return err
@@ -259,7 +303,7 @@ func (r *Repository) decide(ctx context.Context, access scope, id, action, text 
 		if err := addComment(ctx, tx, id, access.userID, step.commentAction, text); err != nil {
 			return err
 		}
-		return addEvent(ctx, tx, id, access.userID, step.event, false, submittedBy)
+		return r.record(ctx, tx, id, access.userID, step.event, before, false, submittedBy, &text)
 	})
 }
 
@@ -333,14 +377,5 @@ func checkDetails(ctx context.Context, tx pgx.Tx, d Details, excludeID *string) 
 func addComment(ctx context.Context, tx pgx.Tx, hotSpotID, userID, action, text string) error {
 	_, err := tx.Exec(ctx, `INSERT INTO hot_spot_comments (hot_spot_id, user_id, action, comment)
 		VALUES ($1, $2, $3, $4)`, hotSpotID, userID, action, text)
-	return err
-}
-
-// addEvent records a workflow step with the hotspot's resulting review status.
-// With notifyDistrict it goes to the hotspot's district, where DCFPs read it.
-func addEvent(ctx context.Context, tx pgx.Tx, hotSpotID, actorID, action string, notifyDistrict bool, notifyUser *string) error {
-	_, err := tx.Exec(ctx, `INSERT INTO hot_spot_events (hot_spot_id, actor_id, action, status, notify_district_id, notify_user_id)
-		SELECT h.id, $2, $3, h.review_status, CASE WHEN $4 THEN h.district_id END, $5
-		FROM hot_spots h WHERE h.id = $1`, hotSpotID, actorID, action, notifyDistrict, notifyUser)
 	return err
 }

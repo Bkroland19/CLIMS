@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 9.1.0"
+    "version": ">= 9.1.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -8,7 +9,14 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "developmentClient": false,
+      "env": {
+        "CLIMS_SLIM_ANDROID": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "android": {

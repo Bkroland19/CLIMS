@@ -1,12 +1,30 @@
 import type { HttpClient } from '@/lib/api';
-import { parseBody } from '@/lib/api';
+import { parseBody, parseList } from '@/lib/api';
 
+import { deviceSessionSchema, type DeviceSession } from './deviceSessions';
 import {
+  authUserSchema,
   refreshedTokensSchema,
   sessionSchema,
+  type AuthUser,
   type RefreshedTokens,
   type Session,
 } from './session';
+
+/*
+ * The Go API's `auth` feature (`backend/internal/features/auth/routes.go`):
+ *
+ *   POST   /auth/login          { login, password }  → { token, refresh_token, user }   anonymous
+ *   POST   /auth/refresh        { refresh_token }    → { token, refresh_token }         anonymous
+ *   GET    /auth/me             → the signed-in user, with every role and its permissions
+ *   POST   /auth/logout         ends the session that made the request
+ *   GET    /auth/sessions       → where the signed-in user is signed in
+ *   DELETE /auth/sessions/:id   signs one of those sessions out
+ *
+ * `POST /auth/register` is deliberately not used: it opens an account with no
+ * role. Accounts are created by an administrator, with their roles, through
+ * `POST /users` (see `features/users/api.ts`).
+ */
 
 /** Exchanges the single-use refresh token for new tokens. Rejects when the session has ended. */
 export async function refreshTokens(
@@ -45,4 +63,25 @@ export async function signIn(http: HttpClient, credentials: Credentials): Promis
 export async function completePortalSignIn(http: HttpClient): Promise<Session> {
   const body = await http.post('/auth/sso/exchange', undefined, { anonymous: true });
   return parseBody(sessionSchema, body, 'portal sign-in');
+}
+
+/**
+ * The signed-in user as the server has them now. A deactivated account
+ * rejects with a `forbidden` ApiError ("account is disabled").
+ */
+export async function getCurrentUser(http: HttpClient, signal?: AbortSignal): Promise<AuthUser> {
+  return parseBody(authUserSchema, await http.get('/auth/me', { signal }), 'current user');
+}
+
+/** Every unexpired session of the signed-in user, including ones already signed out. */
+export async function listMySessions(
+  http: HttpClient,
+  signal?: AbortSignal,
+): Promise<DeviceSession[]> {
+  return parseList(deviceSessionSchema, await http.get('/auth/sessions', { signal }), 'sessions');
+}
+
+/** Signs one of the user's own devices out. Rejects `not_found` when it was already signed out. */
+export async function revokeMySession(http: HttpClient, sessionId: string): Promise<void> {
+  await http.delete(`/auth/sessions/${encodeURIComponent(sessionId)}`);
 }

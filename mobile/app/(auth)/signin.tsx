@@ -1,32 +1,46 @@
-import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+  Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  View,
+  type TextInputInstance,
+} from "react-native";
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useT } from "@/lib/theme";
-import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
+import { useTheme } from "@/lib/theme";
+import { Banner, Btn, Btns, Input, List, Row, Sheet, Txt } from "@/components/m/kit";
 import { loginErrorMessage } from "@/lib/api";
 import { ROOT } from "@/lib/nav";
-import { DCFP } from "@/lib/seed";
 import { ROLE_LABEL, useSession } from "@/lib/session";
 import type { AppRole } from "@/lib/types";
-import { call } from "@/screens/common";
+import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
+import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
+import { TYPE } from "@/lib/fonts";
 
 export default function SignIn() {
-  const T = useT();
+  const { T } = useTheme();
   const insets = useSafeAreaInsets();
   const { signIn, signInDemo } = useSession();
-  const [email, setEmail] = useState("");
+  const col = useColumn(MAX_FORM_WIDTH);
+  const { isShort, isCompact } = useResponsive();
+  const seal = isShort ? 56 : isCompact ? 80 : 96;
+  const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [forgot, setForgot] = useState(false);
   const [demo, setDemo] = useState(false);
+  const setScroll = useKeyboardScroll();
+  const passwordInput = useRef<TextInputInstance>(null);
+  const canSignIn = !busy && !!id.trim() && !!pw;
 
   const enter = async () => {
+    if (!canSignIn) return;
     setErr("");
     setBusy(true);
     try {
-      await signIn(email, pw);
+      await signIn(id, pw);
       router.replace("/");
     } catch (e) {
       setErr(loginErrorMessage(e));
@@ -42,94 +56,115 @@ export default function SignIn() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: T.bg }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    // Padding on both platforms: Android draws edge to edge, so without it the keyboard covers the
+    // sign-in fields; the focused field is then scrolled into view above the keyboard.
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: T.bg }} behavior="padding">
       <ScrollView
+        ref={setScroll}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={[
+          col.style,
+          {
+            flexGrow: 1,
+            justifyContent: "center",
+            paddingTop: insets.top + (isShort ? 12 : 32),
+            paddingBottom: insets.bottom + 16,
+          },
+        ]}
       >
-        <View style={{ alignItems: "center", paddingHorizontal: 24, marginBottom: 28, gap: 10 }}>
-          <View
+        <View
+          style={{
+            alignItems: "center",
+            paddingHorizontal: isCompact ? 16 : 24,
+            marginBottom: isShort ? 12 : 24,
+            gap: isShort ? 4 : 6,
+          }}
+        >
+          {/* The seal carries its own white field and ring, so it needs no card in dark mode. */}
+          <Image
+            source={require("../../assets/images/moh-seal.png")}
             accessible
-            accessibilityLabel="Ministry of Health, Republic of Uganda"
-            style={{
-              width: 88,
-              height: 88,
-              borderRadius: T.ios ? 20 : 24,
-              backgroundColor: "#fff",
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: T.sep,
-            }}
-          >
-            <Image
-              source={require("../../assets/images/coat-of-arms.png")}
-              style={{ width: 64, height: 64 }}
-              resizeMode="contain"
-            />
-          </View>
+            accessibilityRole="image"
+            accessibilityLabel="The Republic of Uganda, Ministry of Health"
+            style={{ width: seal, height: seal, marginBottom: isShort ? 4 : 8 }}
+            resizeMode="contain"
+          />
           <Txt
-            accessibilityRole="header"
-            style={{ fontSize: 34, fontWeight: "700", letterSpacing: 0.5 }}
+            style={{
+              fontSize: isShort || isCompact ? 28 : 32,
+              fontWeight: "700",
+            }}
           >
             CLIMS
           </Txt>
-          <Txt style={{ color: T.fg2, fontSize: 15 }}>Ministry of Health · Uganda</Txt>
-          <Txt
-            style={{
-              color: T.fg2,
-              fontSize: 15,
-              textAlign: "center",
-              lineHeight: 21,
-              marginTop: 4,
-            }}
-          >
-            Sign in with the email and password your district focal person gave you.
+          <Txt style={{ color: T.fg2, fontSize: 15, fontWeight: "500" }}>
+            Ministry of Health, Uganda
           </Txt>
         </View>
 
+        <Txt
+          accessibilityRole="header"
+          style={{
+            ...TYPE.title,
+            fontWeight: "700",
+            paddingHorizontal: 16,
+            marginBottom: T.ios ? 4 : 8,
+          }}
+        >
+          Sign in
+        </Txt>
         {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
-
-        <Fields>
+        <View style={{ marginHorizontal: 16, marginBottom: 18, gap: 14 }}>
           <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            label="Email, username or phone"
+            outlined
+            leadingIcon="user"
+            value={id}
+            onChangeText={(value) => {
+              setId(value);
+              setErr("");
+            }}
             autoCapitalize="none"
-            autoComplete="email"
-            ph="name@example.org"
+            autoCorrect={false}
+            autoComplete="username"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordInput.current?.focus()}
           />
           <Input
             label="Password"
+            outlined
+            leadingIcon="shield"
             value={pw}
-            onChangeText={setPw}
+            onChangeText={(value) => {
+              setPw(value);
+              setErr("");
+            }}
             secure
             autoCapitalize="none"
+            autoCorrect={false}
             autoComplete="password"
+            inputRef={passwordInput}
+            returnKeyType="go"
+            onSubmitEditing={enter}
           />
-        </Fields>
+        </View>
         <Btns>
-          <Btn
-            label={busy ? "Signing in…" : "Sign in"}
-            onPress={enter}
-            dis={busy || !email.trim() || !pw}
-          />
+          <Btn label={busy ? "Signing in…" : "Sign in"} onPress={enter} dis={!canSignIn} />
           <Btn label="Forgot password?" kind="text" onPress={() => setForgot(true)} />
           {__DEV__ ? (
-            <Btn label="Try with sample data" kind="secondary" onPress={() => setDemo(true)} />
+            <Btn label="Try with sample data" kind="text" onPress={() => setDemo(true)} />
           ) : null}
         </Btns>
-        <Note
-          center
-          text="You stay signed in on this phone. CLIMS keeps working when there is no network."
-        />
       </ScrollView>
 
-      <Sheet visible={forgot} title="Forgot password" onClose={() => setForgot(false)}>
+      <Sheet
+        visible={forgot}
+        title="Forgot password"
+        icon="shield"
+        tone="info"
+        onClose={() => setForgot(false)}
+      >
         <Txt
           style={{
             marginHorizontal: 24,
@@ -139,25 +174,15 @@ export default function SignIn() {
             color: T.fg,
           }}
         >
-          {`Only your district focal person can reset your password. Call ${DCFP.name} to get a new one by SMS.`}
+          Contact your district focal person or CLIMS administrator to reset your password.
         </Txt>
         <Btns>
-          <Btn
-            label={`Call ${DCFP.name.split(" ")[0]}`}
-            icon="phone"
-            onPress={() => {
-              setForgot(false);
-              call(DCFP.phone);
-            }}
-          />
+          <Btn label="Done" onPress={() => setForgot(false)} />
         </Btns>
       </Sheet>
 
-      <Sheet visible={demo} title="Sample data" onClose={() => setDemo(false)}>
-        <List
-          h="Sign in as"
-          f="Development builds only. Sample Wakiso data is kept on this phone; the API has no hotspot or order endpoints yet."
-        >
+      <Sheet visible={demo} title="Sample data" icon="user" onClose={() => setDemo(false)}>
+        <List h="Sign in as" f="Development builds only. Sample Wakiso data is kept on this phone.">
           {(["vht", "hm", "rider"] as AppRole[]).map((r) => (
             <Row
               key={r}

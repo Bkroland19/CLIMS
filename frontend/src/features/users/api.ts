@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { deviceSessionSchema, type DeviceSession } from '@/features/auth/deviceSessions';
 import {
   ApiError,
+  optionalNumber,
   optionalText,
   parseBody,
   parseList,
@@ -14,16 +16,25 @@ import {
  * Users, roles and permissions: the Go API's `users` and `rbac` features
  * (`backend/internal/features/{users,rbac}`). Every path here exists there.
  *
- *   GET   /users?limit&offset      { users, limit, offset }   users:read
- *   POST  /users                   { user_id }                users:create + roles:assign
- *   PUT   /users/:id/roles         { role_ids }               roles:assign
- *   PATCH /users/:id/status        { status: active|disabled } users:update
- *   GET   /roles                   [{ id, name, permissions }] roles:read
- *   PUT   /roles/:id/permissions   { permissions }            roles:manage
- *   GET   /permissions             [code]                     roles:read
+ *   GET    /users?limit&offset      { users, limit, offset }    users:read
+ *   POST   /users                   { user_id }                 users:create + roles:assign
+ *          (body may carry `hot_spot_id`: a hotspot manager's hotspot,
+ *          and `store_id`: the store a DCFP, delivery agent or warehouse works at)
+ *   PUT    /users/:id/roles         { role_ids }                roles:assign
+ *   PATCH  /users/:id/status        { status: active|disabled } users:update
+ *   PATCH  /users/:id/store         { store_id: uuid | null }   users:update
+ *   GET    /users/:id/sessions      [session]                   users:read
+ *   DELETE /users/:id/sessions      { revoked }                 users:update
+ *   GET    /roles                   [{ id, name, permissions }] roles:read
+ *   PUT    /roles/:id/permissions   { permissions }             roles:manage
+ *   GET    /permissions             [code]                      roles:read
  *
  * The API has no endpoint to edit a user's name, email or phone, and none to
  * delete a user: an account is switched off by disabling it.
+ *
+ * Not used: `PATCH /users/:id/role` sets a single role and is superseded by
+ * `PUT /users/:id/roles`, which sets them all; `GET /users/:id` returns what
+ * the list already holds.
  */
 
 /** Ids are UUIDs in the Go API; anything else is kept as text rather than guessed at. */
@@ -54,6 +65,14 @@ const userSchema = z
     status: optionalText,
     role: z.unknown().optional(),
     roles: z.array(roleRefSchema).nullish(),
+    /** When they last signed in; null for an account never used. */
+    last_login_at: optionalText,
+    login_count: optionalNumber,
+    /** Devices signed in now. */
+    active_sessions: optionalNumber,
+    created_at: optionalText,
+    /** The store whose orders and stock they work with; null when none. */
+    store_id: optionalText,
   })
   .transform(({ role, roles, ...user }) => {
     const primary = roleRefSchema.safeParse(role);
@@ -72,7 +91,11 @@ export type User = z.output<typeof userSchema>;
 /** The statuses the API accepts for `PATCH /users/:id/status`. */
 export type UserStatus = 'active' | 'disabled';
 
-/** `POST /users`. `phone_number` is sent normalised (`+256…`) or blank. */
+/**
+ * `POST /users`. `phone_number` is sent normalised (`+256…`) or blank.
+ * `hot_spot_id` is the hotspot a hotspot manager runs, stored on the account.
+ * `store_id` is the store the account works at (see `stores.ts`).
+ */
 export interface NewUserInput {
   username: string;
   email: string;
@@ -81,6 +104,8 @@ export interface NewUserInput {
   lastname: string;
   phone_number: string;
   role_ids: string[];
+  hot_spot_id?: string;
+  store_id?: string;
 }
 
 /** The API's largest page; the list is read page by page up to this many pages. */
@@ -127,12 +152,38 @@ export async function setUserRoles(
   }
 }
 
+/** Sets the store a user works at, or clears it with `null`. */
+export async function setUserStore(
+  http: HttpClient,
+  id: string,
+  storeId: string | null,
+): Promise<void> {
+  await http.patch(`/users/${encodeURIComponent(id)}/store`, { store_id: storeId });
+}
+
 export async function setUserStatus(
   http: HttpClient,
   id: string,
   status: UserStatus,
 ): Promise<void> {
   await http.patch(`/users/${encodeURIComponent(id)}/status`, { status });
+}
+
+/** Every unexpired session of a user, including ones already signed out. */
+export async function listUserSessions(
+  http: HttpClient,
+  userId: string,
+  signal?: AbortSignal,
+): Promise<DeviceSession[]> {
+  const body = await http.get(`/users/${encodeURIComponent(userId)}/sessions`, { signal });
+  return parseList(deviceSessionSchema, body, 'user sessions');
+}
+
+/** Signs a user out on every device. Resolves to how many sessions that ended. */
+export async function revokeUserSessions(http: HttpClient, userId: string): Promise<number> {
+  const body = await http.delete(`/users/${encodeURIComponent(userId)}/sessions`);
+  return parseBody(z.object({ revoked: z.number().int().nonnegative() }), body, 'revoke sessions')
+    .revoked;
 }
 
 export async function listRoles(http: HttpClient, signal?: AbortSignal): Promise<Role[]> {
@@ -162,11 +213,14 @@ export function summariseUsers(users: readonly Pick<User, 'status'>[]): {
 }
 
 /*
- * The Go validator reports errors under the request struct's Go field names
- * with a rule tag, e.g. `{ "Username": "failed on validation rule: min" }`.
- * These turn them into the form's field names and a sentence a person can act on.
+ * The Go API reports validation errors under the request's JSON field names with
+ * a readable message, e.g. `{ "username": "Use at least 3 characters." }`. Older
+ * builds used the Go struct's field names and a rule tag
+ * (`{ "Username": "failed on validation rule: min" }`); both are turned into the
+ * form's field names and a sentence a person can act on.
  */
 const GO_FIELDS: Readonly<Record<string, string>> = {
+  role_id: 'role_ids',
   Username: 'username',
   Email: 'email',
   Password: 'password',
@@ -175,6 +229,7 @@ const GO_FIELDS: Readonly<Record<string, string>> = {
   Phone: 'phone_number',
   RoleID: 'role_ids',
   RoleIDs: 'role_ids',
+  HotSpotID: 'hot_spot_id',
 };
 
 const RULE_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -197,6 +252,7 @@ const RULE_MESSAGES: Readonly<Record<string, Readonly<Record<string, string>>>> 
   lastname: { max: 'Use at most 20 characters.' },
   phone_number: { max: 'Enter the number as +256 followed by 9 digits.' },
   role_ids: { default: 'Choose at least one role from the list.' },
+  hot_spot_id: { default: 'Choose the hotspot from the list.' },
 };
 
 /** Messages the API sends without a field, matched to the field they are about. */
@@ -214,9 +270,15 @@ const MESSAGE_FIELDS: readonly { pattern: RegExp; field: string; message: string
   },
 ];
 
+/** Fields picked from a list, where any failure means the same thing to the person. */
+const LIST_MESSAGES: Readonly<Record<string, string>> = {
+  role_ids: 'Choose at least one role from the list.',
+  hot_spot_id: 'Choose the hotspot from the list.',
+};
+
 function readableMessage(field: string, raw: string): string {
   const rule = /failed on validation rule: (\w+)/.exec(raw)?.[1];
-  if (!rule) return raw;
+  if (!rule) return LIST_MESSAGES[field] ?? raw;
   const messages = RULE_MESSAGES[field];
   return messages?.[rule] ?? messages?.default ?? 'Check this value.';
 }

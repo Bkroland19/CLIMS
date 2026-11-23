@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"clims-backend/internal/features/audit"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -74,9 +76,10 @@ func (r *Repository) LinkOIDCIdentity(ctx context.Context, id uuid.UUID, issuer,
 		if err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, `
+		inserted, err := tx.Exec(ctx, `
 			INSERT INTO user_oidc_identities (issuer, subject, user_id)
-			VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, issuer, subject, userID); err != nil {
+			VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, issuer, subject, userID)
+		if err != nil {
 			return err
 		}
 		var linked bool
@@ -88,7 +91,12 @@ func (r *Repository) LinkOIDCIdentity(ctx context.Context, id uuid.UUID, issuer,
 		if !linked {
 			return ErrIdentityLinkConflict
 		}
-		return nil
+		if inserted.RowsAffected() == 0 {
+			return nil // Already linked: a repeated sync changes nothing.
+		}
+		return r.audit.Record(ctx, tx, audit.Entry{Action: "user.identity_linked",
+			Target:  &audit.Subject{Type: "user", ID: userID.String()},
+			Details: map[string]any{"issuer": issuer, "subject": subject}})
 	})
 }
 
@@ -150,7 +158,7 @@ func (r *Repository) CreateOIDCSession(ctx context.Context, issuer, subject stri
 		case revoked:
 			return ErrSignInRevoked
 		}
-		return insertSession(ctx, tx, &issued, hash, userAgent, ip)
+		return r.insertSession(ctx, tx, &issued, hash, userAgent, ip)
 	})
 	if err != nil {
 		return IssuedSession{}, err

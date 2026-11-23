@@ -29,7 +29,7 @@ export function TrendChart({ series, rows, ...card }: TrendChartProps) {
 
   return (
     <ChartCard series={series} rows={rows} {...card}>
-      <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
+      <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
         <AreaChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />

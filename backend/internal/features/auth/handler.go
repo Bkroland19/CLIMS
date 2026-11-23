@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/request"
@@ -23,10 +24,22 @@ type Handler struct {
 	JWTSecret string
 	// Sessions serves sign-out and a user's own session list.
 	Sessions *users.Handler
+	Audit    audit.Auditor
 }
 
-func NewHandler(repo *users.Repository, service *users.Service, secret string) *Handler {
-	return &Handler{Repo: repo, Service: service, JWTSecret: secret, Sessions: users.NewHandler(repo, service)}
+func NewHandler(repo *users.Repository, service *users.Service, secret string, auditor audit.Auditor) *Handler {
+	return &Handler{Repo: repo, Service: service, JWTSecret: secret, Sessions: users.NewHandler(repo, service), Audit: auditor}
+}
+
+// loginFailed audits a refused login with the identifier that was typed and, when it
+// names one account, that account. The password is never recorded.
+func (h *Handler) loginFailed(c fiber.Ctx, identifier, reason, accountID string) error {
+	entry := audit.Entry{Action: "auth.login_failed", Outcome: audit.OutcomeFailure, Reason: reason,
+		Details: map[string]any{"identifier": identifier}}
+	if accountID != "" {
+		entry.Target = &audit.Subject{Type: "user", ID: accountID}
+	}
+	return h.Audit.RecordNow(c.Context(), entry)
 }
 
 func (h *Handler) Register(c fiber.Ctx) error {
@@ -74,16 +87,25 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	if len(req.Password) > 72 {
 		return response.Error(c, 422, "password must not exceed 72 bytes", nil)
 	}
-	user, err := h.authenticate(c, identifier, req.Password)
+	user, matched, err := h.authenticate(c, identifier, req.Password)
 	switch {
 	case errors.Is(err, errInvalidCredentials):
+		if err = h.loginFailed(c, identifier, "invalid_credentials", matched); err != nil {
+			return response.Error(c, 500, "failed to authenticate", nil)
+		}
 		return response.Error(c, 401, "invalid credentials", nil)
 	case errors.Is(err, errAmbiguousLogin):
-		return response.Error(c, 409, err.Error(), nil)
+		if err = h.loginFailed(c, identifier, "ambiguous_identifier", ""); err != nil {
+			return response.Error(c, 500, "failed to authenticate", nil)
+		}
+		return response.Error(c, 409, errAmbiguousLogin.Error(), nil)
 	case err != nil:
 		return response.Error(c, 500, "failed to authenticate", nil)
 	}
 	if user.Status != "active" {
+		if err = h.loginFailed(c, identifier, "account_disabled", user.ID); err != nil {
+			return response.Error(c, 500, "failed to authenticate", nil)
+		}
 		return response.Error(c, 403, "account is disabled", nil)
 	}
 	session, err := h.Repo.CreateSession(c.Context(), user.ID, c.Get(fiber.HeaderUserAgent), c.IP())
@@ -109,41 +131,53 @@ var (
 
 // authenticate finds the one account that identifier and password open. Email is unique, so an
 // email match is decisive. Usernames and phone numbers are not unique in legacy data: the password
-// must then match exactly one of the accounts that share them.
-func (h *Handler) authenticate(c fiber.Ctx, identifier, password string) (*users.User, error) {
+// must then match exactly one of the accounts that share them. On a wrong password it also returns
+// the ID of the account the identifier names, when it names exactly one, for the audit log.
+func (h *Handler) authenticate(c fiber.Ctx, identifier, password string) (*users.User, string, error) {
 	matches := func(u *users.User) bool {
 		return bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) == nil
 	}
 	byEmail, err := h.Repo.GetUserByEmail(c.Context(), identifier)
 	if err == nil && matches(byEmail) {
-		return byEmail, nil
+		return byEmail, "", nil
 	}
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
+		return nil, "", err
 	}
 	candidates, err := h.Repo.FindByUsernameOrPhone(c.Context(), identifier)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if len(candidates) > users.MaxLoginMatches {
-		return nil, errAmbiguousLogin
+		return nil, "", errAmbiguousLogin
+	}
+	named := map[string]bool{}
+	if byEmail != nil {
+		named[byEmail.ID] = true
 	}
 	var found *users.User
 	for _, candidate := range candidates {
+		named[candidate.ID] = true
 		if byEmail != nil && candidate.ID == byEmail.ID {
 			continue // its password was checked above
 		}
 		if matches(candidate) {
 			if found != nil {
-				return nil, errAmbiguousLogin
+				return nil, "", errAmbiguousLogin
 			}
 			found = candidate
 		}
 	}
 	if found == nil {
-		return nil, errInvalidCredentials
+		var account string
+		if len(named) == 1 {
+			for id := range named {
+				account = id
+			}
+		}
+		return nil, account, errInvalidCredentials
 	}
-	return found, nil
+	return found, "", nil
 }
 
 // Refresh exchanges a refresh token for a new access token and a new refresh token. Each refresh
@@ -155,7 +189,7 @@ func (h *Handler) Refresh(c fiber.Ctx) error {
 	if err := request.DecodeJSON(c, &req); err != nil || req.RefreshToken == "" || len(req.RefreshToken) > 128 {
 		return response.Error(c, 400, "provide refresh_token", nil)
 	}
-	session, err := h.Repo.RefreshSession(c.Context(), req.RefreshToken)
+	session, err := h.Repo.RefreshSession(c.Context(), req.RefreshToken, c.Get(fiber.HeaderUserAgent), c.IP())
 	if errors.Is(err, users.ErrRefreshInvalid) {
 		return response.Error(c, 401, err.Error(), nil)
 	}

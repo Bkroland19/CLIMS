@@ -3,7 +3,7 @@ import { useId, type ComponentProps } from 'react';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
-interface TextFieldProps extends Omit<ComponentProps<typeof Input>, 'id'> {
+interface TextFieldProps extends ComponentProps<typeof Input> {
   label: string;
   /** Validation message; its presence marks the field invalid. */
   error?: string;
@@ -12,8 +12,18 @@ interface TextFieldProps extends Omit<ComponentProps<typeof Input>, 'id'> {
 }
 
 /** A labelled input with its guidance and error wired up for assistive technology. */
-export function TextField({ label, error, description, required, ...inputProps }: TextFieldProps) {
-  const id = useId();
+export function TextField({
+  label,
+  error,
+  description,
+  required,
+  id: providedId,
+  'aria-describedby': describedBy,
+  'aria-invalid': invalid,
+  ...inputProps
+}: TextFieldProps) {
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
   const descriptionId = description ? `${id}-description` : undefined;
   const errorId = error ? `${id}-error` : undefined;
 
@@ -26,8 +36,10 @@ export function TextField({ label, error, description, required, ...inputProps }
       <Input
         id={id}
         required={required}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={[descriptionId, errorId].filter(Boolean).join(' ') || undefined}
+        aria-invalid={error ? true : invalid}
+        aria-describedby={
+          [descriptionId, errorId, describedBy].filter(Boolean).join(' ') || undefined
+        }
         {...inputProps}
       />
       {description ? <FieldDescription id={descriptionId}>{description}</FieldDescription> : null}

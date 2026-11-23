@@ -39,7 +39,7 @@ const (
 type ssoAccounts interface {
 	FindByOIDCIdentity(context.Context, string, string) (*users.User, error)
 	CreateOIDCSession(ctx context.Context, issuer, subject string, issuedAt *time.Time, userAgent, ip string) (users.IssuedSession, error)
-	RefreshSession(context.Context, string) (users.IssuedSession, error)
+	RefreshSession(ctx context.Context, refreshToken, userAgent, ip string) (users.IssuedSession, error)
 	GetUserByID(context.Context, string) (*users.User, error)
 }
 
@@ -195,7 +195,7 @@ func (s *SSO) exchange(c fiber.Ctx) error {
 	if refreshToken == "" || len(refreshToken) > 128 {
 		return response.Error(c, 401, "start sign-in again from the portal", nil)
 	}
-	session, err := s.accounts.RefreshSession(c.Context(), refreshToken)
+	session, err := s.accounts.RefreshSession(c.Context(), refreshToken, c.Get(fiber.HeaderUserAgent), c.IP())
 	switch {
 	case errors.Is(err, users.ErrRefreshInvalid):
 		return response.Error(c, 401, "start sign-in again from the portal", nil)

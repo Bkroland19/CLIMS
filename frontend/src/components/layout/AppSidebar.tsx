@@ -58,7 +58,7 @@ function NavEntry({ item, location, counts }: NavEntryProps) {
         isActive={isActive}
         tooltip={item.label}
         className={cn(
-          'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground h-9 gap-3 rounded-lg pr-2.5 pl-3 text-sm font-medium',
+          'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground h-8 gap-2.5 rounded-lg pr-2 pl-2.5 text-[0.8125rem] font-medium',
           'data-[active=true]:bg-primary/12 data-[active=true]:text-sidebar-foreground data-[active=true]:font-semibold',
           count > 0 && 'pr-10',
         )}
@@ -73,7 +73,7 @@ function NavEntry({ item, location, counts }: NavEntryProps) {
           }}
         >
           <Icon
-            className={cn('size-4.5!', isActive ? 'text-success' : 'text-muted-foreground')}
+            className={cn('size-4!', isActive ? 'text-success' : 'text-muted-foreground')}
             aria-hidden="true"
           />
           <span>{item.label}</span>
@@ -84,7 +84,7 @@ function NavEntry({ item, location, counts }: NavEntryProps) {
         <>
           <SidebarMenuBadge
             aria-hidden="true"
-            className="bg-foreground text-background peer-data-active/menu-button:text-background peer-hover/menu-button:text-background top-2! right-2.5 rounded-full px-1.5 text-[0.6875rem] font-semibold"
+            className="bg-foreground text-background peer-data-active/menu-button:text-background peer-hover/menu-button:text-background top-1.5! right-2 rounded-full px-1.5 text-[0.6875rem] font-semibold"
           >
             {count}
           </SidebarMenuBadge>
@@ -112,15 +112,15 @@ function NavSectionGroup({ section, isFirst, location, counts }: NavSectionGroup
     <SidebarGroup className="p-0" role="group" aria-labelledby={labelId}>
       {/* With the labels hidden in icon mode, a rule keeps the sections apart. */}
       {isFirst ? null : (
-        <SidebarSeparator className="mb-2.5 hidden group-data-[collapsible=icon]:block" />
+        <SidebarSeparator className="mb-2 hidden group-data-[collapsible=icon]:block" />
       )}
       <SidebarGroupLabel
         id={labelId}
-        className="text-muted-foreground h-auto px-3 pb-2 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase"
+        className="text-muted-foreground h-auto px-2.5 pb-1.5 text-[0.65625rem] font-semibold tracking-[0.08em] uppercase"
       >
         {section.label}
       </SidebarGroupLabel>
-      <SidebarMenu className="gap-0.5">
+      <SidebarMenu className="gap-px">
         {section.items.map((item) => (
           <NavEntry key={item.id} item={item} location={location} counts={counts} />
         ))}
@@ -147,16 +147,16 @@ function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProps) {
             <SidebarMenuButton
               size="lg"
               tooltip={`Workspace: ${current.label}`}
-              className="hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent h-auto gap-2.5 rounded-lg px-1 py-1.5"
+              className="hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent h-auto gap-2 rounded-lg px-1 py-1"
             >
               <span className="bg-primary/14 text-success flex size-8 shrink-0 items-center justify-center rounded-lg">
                 <Icon className="size-4" aria-hidden="true" />
               </span>
               <span className="flex min-w-0 flex-1 flex-col text-left leading-tight">
                 <span className="text-muted-foreground text-[0.6875rem] font-semibold tracking-[0.06em] uppercase">
-                  Workspace
+                  {current.readOnly ? 'Workspace · read-only' : 'Workspace'}
                 </span>
-                <span className="truncate text-[0.84375rem] font-semibold">{current.label}</span>
+                <span className="truncate text-[0.8125rem] font-semibold">{current.label}</span>
               </span>
               <ChevronsUpDown
                 className="text-muted-foreground size-4 shrink-0"
@@ -183,6 +183,9 @@ function WorkspaceSwitcher({ workspaces, current }: WorkspaceSwitcherProps) {
                   >
                     <WorkspaceIcon aria-hidden="true" />
                     <span className="flex-1 truncate">{workspace.label}</span>
+                    {workspace.readOnly ? (
+                      <span className="text-muted-foreground text-xs">Read-only</span>
+                    ) : null}
                     {isCurrent ? <Check className="text-success" aria-hidden="true" /> : null}
                   </Link>
                 </DropdownMenuItem>
@@ -220,7 +223,7 @@ export function AppSidebar({ workspaces, location, counts }: AppSidebarProps) {
       <SidebarContent>
         <nav
           aria-label="Main"
-          className="flex flex-col gap-4.5 px-3.5 pt-3.5 pb-4 group-data-[collapsible=icon]:px-3"
+          className="flex flex-col gap-3.5 px-2.5 pt-3 pb-3 group-data-[collapsible=icon]:px-2"
         >
           {workspace.sections.map((section, index) => (
             <NavSectionGroup
@@ -234,7 +237,7 @@ export function AppSidebar({ workspaces, location, counts }: AppSidebarProps) {
         </nav>
       </SidebarContent>
 
-      <SidebarFooter className="border-t px-3 py-2.5">
+      <SidebarFooter className="border-t px-2.5 py-2 group-data-[collapsible=icon]:px-2">
         <WorkspaceSwitcher workspaces={workspaces} current={workspace} />
       </SidebarFooter>
       <SidebarRail />

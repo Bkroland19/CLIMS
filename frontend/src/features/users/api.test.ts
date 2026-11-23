@@ -7,9 +7,12 @@ import {
   createUser,
   listPermissions,
   listRoles,
+  listUserSessions,
   listUsers,
+  revokeUserSessions,
   setRolePermissions,
   setUserRoles,
+  setUserStore,
   setUserStatus,
   summariseUsers,
   type NewUserInput,
@@ -66,6 +69,11 @@ describe('listUsers', () => {
           status: 'active',
           role: ADMIN_ROLE,
           roles: [ADMIN_ROLE, VHT_ROLE],
+          last_login_at: '2026-11-20T09:00:00Z',
+          login_count: 12,
+          active_sessions: 2,
+          created_at: '2026-01-05T08:00:00Z',
+          store_id: '00000000-0000-4000-8109-000000000001',
         },
       ]),
     );
@@ -83,6 +91,11 @@ describe('listUsers', () => {
         status: 'active',
         role: 'admin',
         roles: [ADMIN_ROLE, VHT_ROLE],
+        last_login_at: '2026-11-20T09:00:00Z',
+        login_count: 12,
+        active_sessions: 2,
+        created_at: '2026-01-05T08:00:00Z',
+        store_id: '00000000-0000-4000-8109-000000000001',
       },
     ]);
   });
@@ -146,6 +159,7 @@ describe('createUser', () => {
           Username: 'failed on validation rule: min',
           Phone: 'failed on validation rule: max',
           RoleIDs: 'failed on validation rule: uuid_rfc4122',
+          HotSpotID: 'failed on validation rule: uuid_rfc4122',
         },
       },
     });
@@ -155,6 +169,30 @@ describe('createUser', () => {
         username: ['Use at least 3 characters.'],
         phone_number: ['Enter the number as +256 followed by 9 digits.'],
         role_ids: ['Choose at least one role from the list.'],
+        hot_spot_id: ['Choose the hotspot from the list.'],
+      },
+    });
+  });
+
+  it('keeps the readable messages the Go API sends under JSON field names', async () => {
+    const { http } = setup({
+      status: 422,
+      body: {
+        success: false,
+        message: 'validation failed',
+        error: {
+          username: 'Use at least 3 characters.',
+          role_id: 'Choose a valid item from the list.',
+          hot_spot_id: 'Choose a valid item from the list.',
+        },
+      },
+    });
+    await expect(createUser(http, input)).rejects.toMatchObject({
+      kind: 'validation',
+      fieldErrors: {
+        username: ['Use at least 3 characters.'],
+        role_ids: ['Choose at least one role from the list.'],
+        hot_spot_id: ['Choose the hotspot from the list.'],
       },
     });
   });
@@ -168,6 +206,21 @@ describe('createUser', () => {
       kind: 'conflict',
       fieldErrors: { email: ['An account with this email address already exists.'] },
     });
+  });
+});
+
+describe('setUserStore', () => {
+  it('sets a store, and clears it with null', async () => {
+    const { http, requests } = setup(
+      { status: 200, body: { success: true } },
+      { status: 200, body: { success: true } },
+    );
+    await setUserStore(http, 'u-7', 's-1');
+    await setUserStore(http, 'u-7', null);
+    expect(requests.map(({ method, url, body }) => ({ method, url, body }))).toEqual([
+      { method: 'PATCH', url: '/users/u-7/store', body: { store_id: 's-1' } },
+      { method: 'PATCH', url: '/users/u-7/store', body: { store_id: null } },
+    ]);
   });
 });
 
@@ -242,5 +295,55 @@ describe('summariseUsers', () => {
 
   it('reports zeros for an empty list', () => {
     expect(summariseUsers([])).toEqual({ total: 0, active: 0, inactive: 0 });
+  });
+});
+
+describe('user sessions', () => {
+  const USER_ID = '00000000-0000-4000-8002-000000000007';
+  const session = {
+    id: '00000000-0000-4000-8003-000000000001',
+    user_agent: 'okhttp/4.12.0',
+    ip_address: null,
+    created_at: '2026-11-18T08:00:00Z',
+    last_seen_at: '2026-11-20T09:30:00Z',
+    expires_at: '2026-12-18T08:00:00Z',
+    revoked_at: null,
+    refreshed_at: null,
+    refresh_count: 0,
+    current: false,
+  };
+
+  it('lists where a user is signed in from GET /users/:id/sessions', async () => {
+    const { http, requests } = setup({ status: 200, body: { success: true, data: [session] } });
+    const sessions = await listUserSessions(http, USER_ID);
+    expect(requests[0]).toMatchObject({ method: 'GET', url: `/users/${USER_ID}/sessions` });
+    expect(sessions).toEqual([
+      {
+        id: session.id,
+        user_agent: 'okhttp/4.12.0',
+        ip_address: null,
+        created_at: session.created_at,
+        last_seen_at: session.last_seen_at,
+        expires_at: session.expires_at,
+        revoked_at: null,
+        current: false,
+      },
+    ]);
+  });
+
+  it('signs a user out everywhere with DELETE /users/:id/sessions and returns the count', async () => {
+    const { http, requests } = setup({
+      status: 200,
+      body: { success: true, message: 'sessions revoked', data: { revoked: 3 } },
+    });
+    await expect(revokeUserSessions(http, USER_ID)).resolves.toBe(3);
+    expect(requests[0]).toMatchObject({ method: 'DELETE', url: `/users/${USER_ID}/sessions` });
+  });
+
+  it('refuses a reply without a count', async () => {
+    const { http } = setup({ status: 200, body: { success: true, data: null } });
+    await expect(revokeUserSessions(http, USER_ID)).rejects.toMatchObject({
+      kind: 'unexpected_response',
+    });
   });
 });

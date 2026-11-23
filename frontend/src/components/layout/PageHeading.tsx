@@ -1,13 +1,6 @@
+import { ChevronLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { cn } from '@/lib/utils';
 import type { NavCounts, NavItem, NavLocation } from '@/navigation/navigation';
 
@@ -15,6 +8,8 @@ import type { NavCounts, NavItem, NavLocation } from '@/navigation/navigation';
 const NOT_FOUND_TITLE = 'Page not found';
 /** Read after a tab badge's number by screen readers. */
 const COUNT_SUFFIX = 'need attention';
+/** Put before the section's name on a record's way back to it. */
+const BACK_PREFIX = 'Back to';
 
 interface PageTabsProps {
   item: NavItem;
@@ -31,7 +26,7 @@ function PageTabs({ item, currentPath, counts }: PageTabsProps) {
   return (
     <nav
       aria-label={`${item.label} pages`}
-      className="-mb-px flex [scrollbar-width:none] gap-7 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+      className="-mb-px flex [scrollbar-width:none] gap-5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
     >
       {item.pages.map((page) => {
         const isCurrent = page.path === currentPath;
@@ -42,7 +37,7 @@ function PageTabs({ item, currentPath, counts }: PageTabsProps) {
             href={page.path}
             aria-current={isCurrent ? 'page' : undefined}
             className={cn(
-              'focus-visible:ring-ring flex h-9 shrink-0 items-center gap-2 rounded-t-md border-b-2 px-0.5 text-sm outline-none focus-visible:ring-2',
+              'focus-visible:ring-ring flex h-8 shrink-0 items-center gap-2 rounded-t-md border-b-2 px-0.5 text-sm outline-none focus-visible:ring-2',
               isCurrent
                 ? 'border-foreground text-foreground font-semibold'
                 : 'text-muted-foreground hover:text-foreground border-transparent font-medium',
@@ -72,58 +67,42 @@ interface PageHeadingProps {
   location: NavLocation;
   /** Tab badge counts by page path. */
   counts?: NavCounts;
+  /** The title when the address has no page or record, instead of "Page not found". */
+  fallbackTitle?: string;
 }
 
 /**
- * The band under the top bar: breadcrumb (workspace / section / record), the
- * page title, one line on what the page is for, and the section's tabs.
- * Everything comes from the navigation table.
+ * The band under the top bar: the page title, one line on what the page is
+ * for, and the section's tabs. A record (a detail page) instead gets a link
+ * back to its section above the title. Everything comes from the navigation
+ * table.
  */
-export function PageHeading({ location, counts }: PageHeadingProps) {
-  const { workspace, item, page, detail } = location;
-  const title = page?.title ?? detail?.label ?? NOT_FOUND_TITLE;
+export function PageHeading({ location, counts, fallbackTitle }: PageHeadingProps) {
+  const { item, page, detail } = location;
+  const title = page?.title ?? detail?.label ?? fallbackTitle ?? NOT_FOUND_TITLE;
   const tabbedItem = page && item && item.pages.length > 1 ? item : null;
-  const sectionHref = item?.pages[0].path;
-  const isOnSectionHome = page !== null && page.path === sectionHref;
+  const backItem = detail ? item : null;
 
   return (
     <div className="bg-card border-b">
-      <div className={cn('mx-auto max-w-360 px-4 pt-3 md:px-5', tabbedItem ? 'pb-0' : 'pb-3.5')}>
-        <Breadcrumb aria-label="Breadcrumb">
-          <BreadcrumbList className="flex-nowrap gap-1.5 overflow-hidden text-[0.8125rem] whitespace-nowrap">
-            <BreadcrumbItem className="shrink-0">{workspace.label}</BreadcrumbItem>
-            {item && sectionHref ? (
-              <>
-                <BreadcrumbSeparator className="text-border">/</BreadcrumbSeparator>
-                <BreadcrumbItem className="min-w-0">
-                  {isOnSectionHome ? (
-                    <BreadcrumbPage className="truncate font-semibold">{item.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild className="truncate font-semibold">
-                      <Link href={sectionHref}>{item.label}</Link>
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-              </>
-            ) : null}
-            {detail ? (
-              <>
-                <BreadcrumbSeparator className="text-border">/</BreadcrumbSeparator>
-                <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="truncate font-semibold">{detail.label}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </>
-            ) : null}
-          </BreadcrumbList>
-        </Breadcrumb>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-balance">{title}</h1>
+      <div className={cn('px-4 pt-2.5', tabbedItem ? 'pb-0' : 'pb-2.5')}>
+        {backItem ? (
+          <Link
+            href={backItem.pages[0].path}
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mb-0.5 -ml-0.5 inline-flex items-center gap-1 rounded-md text-[0.8125rem] font-medium outline-none focus-visible:ring-2"
+          >
+            <ChevronLeftIcon className="size-3.5" aria-hidden="true" />
+            {`${BACK_PREFIX} ${backItem.label}`}
+          </Link>
+        ) : null}
+        <h1 className="text-lg leading-snug font-semibold tracking-tight text-balance">{title}</h1>
         {page?.description ? (
-          <p className="text-muted-foreground mt-1 max-w-190 text-sm text-pretty">
+          <p className="text-muted-foreground max-w-190 text-[0.8125rem] text-pretty">
             {page.description}
           </p>
         ) : null}
         {tabbedItem ? (
-          <div className="mt-2">
+          <div className="mt-1.5">
             <PageTabs item={tabbedItem} currentPath={page?.path} counts={counts} />
           </div>
         ) : null}

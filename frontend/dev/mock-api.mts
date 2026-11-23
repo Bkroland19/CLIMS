@@ -4,6 +4,7 @@
  *   npm run mock-api                 # realistic demo data
  *   MOCK_DATA=worst npm run mock-api # the awkward data real systems contain
  *   MOCK_DATA=empty npm run mock-api # nothing recorded yet
+ *   MOCK_DATA=scale npm run mock-api # the demo plus a national store's volume of stock
  *
  * Then, in another terminal:
  *   BACKEND_URL=http://127.0.0.1:8787 npm run dev
@@ -25,11 +26,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { handleDcfp, seedDcfp } from './mock/dcfp.mts';
+import { handleInventory, seedInventory, type SummaryOrder } from './mock/inventory.mts';
 import { handleFulfilment, seedFulfilment } from './mock/fulfilment.mts';
-import { handleWarehouse, seedWarehouse } from './mock/warehouse.mts';
 import { handleMoh, seedMoh } from './mock/moh.mts';
 import { handleOnboarding, seedOnboarding } from './mock/onboarding.mts';
-import { handleAdmin, seedAdmin } from './mock/admin.mts';
+import { handleAdmin, handleAuth, seedAdmin, signedInUser } from './mock/admin.mts';
 import { handleReports, seedReports } from './mock/reports.mts';
 import { handleHotspots, seedHotspotsMock } from './mock/hotspots.mts';
 
@@ -55,9 +57,11 @@ const organizationUnits = [
 
 /**
  * `demo` is realistic data; `worst` puts the values that break layouts first
- * (missing fields, zero coordinates, long text); `empty` has nothing recorded.
+ * (missing fields, zero coordinates, long text); `empty` has nothing recorded;
+ * `scale` is the demo with a national store's volume of stock (hundreds of
+ * products, a thousand batches, a year of movements) at NMS.
  */
-const datasets = ['demo', 'worst', 'empty'] as const;
+const datasets = ['demo', 'worst', 'empty', 'scale'] as const;
 
 function isDatasetName(name: string): name is (typeof datasets)[number] {
   return (datasets as readonly string[]).includes(name);
@@ -75,7 +79,9 @@ if (!isDatasetName(DATASET)) {
 function seedAll(dataset: (typeof datasets)[number]): void {
   seedHotspotsMock(dataset);
   seedFulfilment(dataset);
-  seedWarehouse(dataset);
+  // Stock first: the order seed adds the reservations of its confirmed orders to it.
+  seedInventory(dataset);
+  seedDcfp(dataset);
   seedMoh(dataset);
   seedOnboarding();
   seedAdmin(dataset);
@@ -85,6 +91,19 @@ seedAll(DATASET);
 const lookups: Record<string, readonly unknown[]> = { organizationUnits };
 
 const reply = (status: number, body: unknown): Reply => ({ status, body });
+
+/** The order mock's orders with their history, for the stock summary. */
+function summaryOrders(): SummaryOrder[] {
+  const none = new URLSearchParams();
+  const data = (answer: Reply | null) =>
+    ((answer?.body as { data?: unknown } | undefined)?.data ?? []) as Record<string, unknown>[];
+  return data(handleDcfp('GET', ['orders'], {}, none)).map((order) => ({
+    ...(order as unknown as SummaryOrder),
+    events: data(
+      handleDcfp('GET', ['orders', String(order.id), 'events'], {}, none),
+    ) as unknown as SummaryOrder['events'],
+  }));
+}
 
 function send(response: ServerResponse, { status, body }: Reply): void {
   response.writeHead(status, { 'Content-Type': 'application/json' });
@@ -136,15 +155,9 @@ async function route(request: IncomingMessage): Promise<Reply> {
         refresh_token: REFRESH_TOKEN,
         token_type: 'Bearer',
         expires_in: 86400,
-        user: {
-          id: 1,
-          username: 'sarah.nakato',
-          firstname: 'Sarah',
-          lastname: 'Nakato',
-          email: typeof body.login === 'string' && body.login.includes('@') ? body.login : null,
-          status: 'active',
-          role: { id: 1, name: 'admin', permissions: [] },
-        },
+        user: signedInUser(
+          typeof body.login === 'string' && body.login.includes('@') ? body.login : null,
+        ),
       },
     });
   }
@@ -167,6 +180,9 @@ async function route(request: IncomingMessage): Promise<Reply> {
   if (resource === 'auth' && id === 'logout' && request.method === 'POST') {
     return reply(200, { success: true, message: 'logged out', data: null });
   }
+  // The signed-in user and their devices, in the Go API's shapes.
+  const auth = handleAuth(request.method ?? 'GET', parts, request.headers['user-agent'] ?? null);
+  if (auth) return auth;
   // Users, roles and permissions in the Go API's shapes; answered before the legacy lookups.
   const admin = handleAdmin(
     request.method ?? 'GET',
@@ -177,10 +193,24 @@ async function route(request: IncomingMessage): Promise<Reply> {
   if (admin) return admin;
   if (Object.hasOwn(lookups, resource)) return reply(200, lookups[resource]);
 
+  // The DCFP's stockout reports and warehouse orders, and the inbox, in the Go API's shapes.
+  const dcfp = handleDcfp(
+    request.method ?? 'GET',
+    parts,
+    body,
+    new URL(request.url ?? '/', 'http://mock').searchParams,
+  );
+  if (dcfp) return dcfp;
+  const inventory = handleInventory(
+    request.method ?? 'GET',
+    parts,
+    new URL(request.url ?? '/', 'http://mock').searchParams,
+    body,
+    summaryOrders,
+  );
+  if (inventory) return inventory;
   const fulfilment = handleFulfilment(request.method ?? 'GET', parts, body);
   if (fulfilment) return fulfilment;
-  const warehouse = handleWarehouse(request.method ?? 'GET', parts, body);
-  if (warehouse) return warehouse;
   const national = handleMoh(
     request.method ?? 'GET',
     parts,

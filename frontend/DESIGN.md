@@ -8,9 +8,11 @@ The look follows the [SalesOps Dashboard](https://v0.app/templates/salesops-dash
 reference: a 260px sidebar with a green active marker, uppercase table headers, tinted status
 chips, DM Sans. Components are shadcn/ui (`radix-nova` style, Radix primitives) on Tailwind CSS 4.
 
-The CLIMS prototype refines it, and wins where the two differ: a 56px top bar, flat 10px cards, a
-green-tinted table header, pill status chips and role colours. Its visual spec is
-`design/prototype/CLIMS Theme.dc.html` (see `design/IMPLEMENTATION_PLAN.md`).
+The CLIMS prototype refines it, and wins where the two differ: flat 10px cards, a green-tinted
+table header, pill status chips and role colours. Its visual spec is
+`design/prototype/CLIMS Theme.dc.html` (see `design/IMPLEMENTATION_PLAN.md`). The app is denser
+than the prototype: people work through long lists all day, so controls, rows and gaps are a step
+smaller than its 56px top bar and 36px controls (see Sizes).
 
 The reference ships in dark mode only. **Light is this product's theme**: its hues re-pitched for
 a white surface. Dark is available from the header toggle and uses the reference's own values. The
@@ -51,13 +53,21 @@ numbers that are compared use `tabular-nums`.
 
 ### Sizes
 
-| Thing        | Size                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------ |
-| Sidebar      | 248px; 56px collapsed to icons; a sheet below 768px                                  |
-| Top bar      | 56px (`h-header`), full width above the sidebar and the page                         |
-| Controls     | 36px standard (`default`); 32px compact (`sm`, `icon-sm`) in tables and toolbars     |
-| Table cells  | 9 × 12px (header 8 × 12px), 16px at the table's outer edges                          |
-| Status chips | 22px pill (`status-chip`), 10.5px bold capitals, a dot, a hairline of its own colour |
+| Thing        | Size                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------- |
+| Sidebar      | 224px, 32px items; 48px collapsed to icons; a sheet below 768px                       |
+| Top bar      | 48px (`h-header`), full width above the sidebar and the page                          |
+| Heading band | 18px title, 13px description, 32px tabs                                               |
+| Controls     | 32px standard (`default`, `icon`); 28px compact (`sm`, `icon-sm`) in tables, toolbars |
+| Table cells  | 6 × 12px (2px in the View menu's compact rows; header 6 × 12px), 16px at the edges    |
+| Status chips | 22px pill (`status-chip`), 10.5px bold capitals, a dot, a hairline of its own colour  |
+
+Spacing runs on a 4px scale with three steps that carry the rhythm: 16px between a page's
+sections and side-by-side columns (`gap-section`), 16px padding inside a card (`Card`,
+`StatCard`, `ChartCard`), and 12px between groups inside a card. Density comes from spacing and
+control height, not from shrinking what people read: body text, table cells and inputs stay
+14px. Only supporting text steps down (13px sidebar items and page descriptions, 11px table
+header capitals).
 
 ### Three rules that are easy to get wrong
 
@@ -106,41 +116,81 @@ solid ring: `focus-visible:ring-2 focus-visible:ring-ring`.
 
 ### The shell
 
-Top bar (menu toggle, product name, notifications bell, theme, account), then the sidebar and the
-page. The sidebar shows the current workspace's labelled sections; an item with things waiting
+Top bar (menu toggle, ministry seal and product name, notifications bell, theme, account), then
+the sidebar and the page. The sidebar shows the current workspace's labelled sections; an item with things waiting
 carries a count pill (a red dot when collapsed to icons), and the foot names the workspace. Under
-the top bar, the heading band holds the breadcrumb (workspace / section / record), the page title,
-one line on what the page is for and, when a section has several pages, its tabs. Tabs are links,
+the top bar, the heading band holds the page title, one line on what the page is for and, when a
+section has several pages, its tabs. There is no breadcrumb: the sidebar shows where you are. A
+record (a detail page) gets a "Back to <section>" link above its title instead. The band and the
+page fill the width beside the sidebar; there is no maximum width. Tabs are links,
 each to its own address. All of it comes from `navigation/workspaces.ts`; a page supplies only its
 content and, at the top of it, its `PageActions`.
 
 `accent` is deliberately neutral. The reference names its green "accent", but shadcn components
 use `accent` for hover backgrounds, which must stay quiet. Its green is this system's `primary`.
 
+### The seal
+
+The Ministry of Health seal (`src/assets/moh-seal.png`, cut from the ministry's artwork) is the
+only mark. It sits at 28px in the top bar and at 44px in `Brand`, on the sign-in, onboarding and
+access screens; the favicon and touch icon are made from the same artwork. Show it as supplied:
+never recolour, crop or outline it, and put it on no plate (its outer black ring is its edge in
+both themes). Beside the ministry's name it is decorative (`alt=""`); on its own its alt text is
+"Ministry of Health, Uganda".
+
 ## Building blocks
 
 Reach for these before writing markup.
 
-| Need                      | Use                                                                       |
-| ------------------------- | ------------------------------------------------------------------------- |
-| Page-level buttons        | `components/PageActions` (title and description come from the table)      |
-| A list of records         | `components/data-table/DataTable` (search, sort, paging, all states)      |
-| Per-row actions           | `components/data-table/RowActions` (`ROW_ACTION_SEPARATOR` groups items)  |
-| A headline figure         | `components/StatCard` in a `StatCardGrid` (`trend` adds change and line)  |
-| A record's ID and status  | `components/DetailHeader` (progress goes in its band)                     |
-| A record's progress       | `components/StepTracker` (state in words above each step)                 |
-| History or recent events  | `components/ActivityTimeline` (`connected` or `compact`; role dots)       |
-| Needed vs in stock        | `features/inventory/checkStock` and `StockCheckBadge`                     |
-| A create or edit form     | `components/form/FormDialog` with `TextField` and `SelectField`           |
-| Confirming a deletion     | `components/ConfirmDialog` (an alert dialog, never a plain dialog)        |
-| A page still loading      | `components/states/PageSkeleton` (`table`, `dashboard`, `detail`, `form`) |
-| Nothing to show           | `components/states/EmptyState`                                            |
-| Failed to load            | `components/states/ErrorState` (says what failed, offers retry)           |
-| A status word             | `components/StatusBadge` (`tone` overrides the word's lookup)             |
-| Change over time          | `components/charts/TrendChart`                                            |
-| A few categories compared | `components/charts/ColumnChart`                                           |
-| Parts of a whole          | `components/charts/ShareList` (labelled bars, not a donut)                |
-| A figure that is not live | `SampleBadge` on it, or `SampleDataNotice` for a whole page               |
+| Need                       | Use                                                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Page-level buttons         | `components/PageActions` (title and description come from the table)                                             |
+| Any table                  | `components/data-table/DataTable`: the only table. See "Tables" below                                            |
+| Per-row actions            | `components/data-table/RowActions` (`ROW_ACTION_SEPARATOR` groups items)                                         |
+| A headline figure          | `components/StatCard` in a `StatCardGrid` (`trend` adds change and line; `detail` one line of what is behind it) |
+| An amount in several units | `StatCard` `extra`: the unit holding most is the figure, the rest one quieter line under it; never add units     |
+| Things to do               | `components/TaskList` (status, title, detail, a button to where it is done; lays out by its own width)           |
+| A record's ID and status   | `components/DetailHeader` (progress goes in its band)                                                            |
+| A record's progress        | `components/StepTracker` (state in words above each step)                                                        |
+| History or recent events   | `components/ActivityTimeline` (`connected` or `compact`; role dots)                                              |
+| Needed vs in stock         | `features/inventory/checkStock` and `StockCheckBadge`                                                            |
+| A create or edit form      | `components/form/FormDialog` with `TextField` and `SelectField`                                                  |
+| A choice from hundreds     | `components/form/ComboboxField` (a select with a search box; label + hint)                                       |
+| Confirming a deletion      | `components/ConfirmDialog` (an alert dialog, never a plain dialog)                                               |
+| A page still loading       | `components/states/PageSkeleton` (`table`, `dashboard`, `detail`, `form`)                                        |
+| Nothing to show            | `components/states/EmptyState`                                                                                   |
+| Failed to load             | `components/states/ErrorState` (says what failed, offers retry)                                                  |
+| A status word              | `components/StatusBadge` (`tone` overrides the word's lookup)                                                    |
+| Change over time           | `components/charts/TrendChart`                                                                                   |
+| A few categories compared  | `components/charts/ColumnChart`                                                                                  |
+| Parts of a whole           | `components/charts/ShareList` (labelled bars, not a donut)                                                       |
+| A figure that is not live  | `SampleBadge` on it, or `SampleDataNotice` for a whole page                                                      |
+
+### Tables
+
+Every table is `DataTable`, so every table looks and behaves the same. Users & access
+(`features/users/UsersPage`) is the reference screen for a list.
+
+- **`variant="list"`** (the default) is a page's records in their own card: search, sorting,
+  paging, the View menu (columns, row height, rows per page) and every state. Give it a
+  `preferencesKey` so the viewer's View choices are remembered. Filters go in `toolbar`;
+  `FilterTabs` for a status sits above it. Mark secondary columns `hideable`, and those few people
+  need `defaultHidden`, so the table fits 1440px without scrolling sideways.
+- **`variant="embedded"`** is a short, fixed set of lines inside a card: an order's products, the
+  batches a dispatch takes, a report's figures, a chart's table view. It shows every row, has no
+  toolbar and no card of its own, and its cells may hold inputs. A column without `value` is a
+  column of inputs or buttons: never sorted, searched or exported.
+- **Scale.** Lists search, sort and page in the browser, over a search index built once per data
+  load, so tens of thousands of rows (every hotspot) stay instant. At 50 or 100 rows a page the
+  table scrolls inside its card and the header stays in view. An endpoint that pages (at most 100
+  a time) uses `more` with a "Load more" button, and the count says how many are loaded, never
+  pretending the first page is everything (the warehouse ledger, `useMovementLedger`). Ticking the
+  page offers "Select all N".
+- **Detail and totals.** `renderExpanded` opens a row onto its detail (an audit entry's changes, a
+  product's batches); the chevron is a real button with `aria-expanded`. A column's `total` sums
+  every matching row, not just the page, in the footer; amounts in different units are listed per
+  unit, never added. `rowTone` tints a row (`caution`, `negative`, `muted`) and the row still says
+  why in words.
 
 `components/ui/` is generated by the shadcn CLI (`npx shadcn@latest add <name>`). Edit a
 primitive only to align it with the tokens above, and keep the edit small so
@@ -169,6 +219,32 @@ primitive only to align it with the tokens above, and keep the edit small so
 
 The light and dark series colours were checked for colour-vision separation and 3:1 against their
 surface. If you change one, check the set again.
+
+## Maps
+
+The hotspot map (`features/hotspots/map`) is the one map. Extend it rather than adding another.
+
+- **The base map is context, not content.** OpenStreetMap tiles are desaturated in light and
+  inverted (with the hue turned back, so water stays blue) in dark, so the hotspots carry the
+  colour.
+- **Uganda is the subject.** The map is held to the country, everything outside the border is
+  dimmed with `background`, and the border is a `foreground` line.
+- **A hotspot is a pin.** A white-edged teardrop in its category colour, tip on the position, with
+  the venue's lucide glyph inside (`map/pins.ts`; a dot when the type is unknown). The glyph takes
+  white or near-black, whichever contrasts more with the fill. Pins are fills: active and a
+  working dispenser take `primary`; the other states take the status colours (`warning`,
+  `destructive`, `info`, neutral `role-system`). WebGL cannot read CSS, so `map/palette.ts` reads
+  the tokens and reads them again when the theme changes. Never write a hex value for a marker.
+  Across the whole country the points style uses small dots; pins take over at town level.
+- **Clusters are rings** split by the same categories, with the count inside. Each is a real
+  button whose name says what it holds in words.
+- **The key is a filter.** Its tabs choose what colour means; each entry switches its hotspots on
+  and off.
+- **The list beside the map is the accessible route.** Everything on the map is reachable from it
+  by keyboard. Colour never stands alone: rows carry a chip for every state except the usual one
+  (active), and the hover label and detail panel name the state.
+- Overlays on the map are `bg-card/95` panels with a 1px border and a small shadow, so they stay
+  legible over any tile.
 
 ## Accessibility
 

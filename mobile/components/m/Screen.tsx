@@ -1,19 +1,24 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   View,
   type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { useT } from "@/lib/theme";
 import { useNav } from "@/lib/nav";
 import { useStore, useUnread } from "@/lib/store";
+import { useColumn, useResponsive } from "@/hooks/useResponsive";
+import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import Icon, { type IconName } from "./Icon";
 import { Txt } from "./kit";
+import { usePressScale, useReducedMotion } from "./motion";
+import { TYPE } from "@/lib/fonts";
 
 export interface ScreenAction {
   label: string;
@@ -35,6 +40,7 @@ export default function Screen({
   children,
   scrollRef,
   noHeader,
+  onEndReached,
 }: {
   title: string;
   root?: boolean;
@@ -43,6 +49,8 @@ export default function Screen({
   children: React.ReactNode;
   scrollRef?: React.Ref<ScrollViewInstance>;
   noHeader?: boolean;
+  /** Called when the user scrolls near the end, to load the next page of a list. */
+  onEndReached?: () => void;
 }) {
   const T = useT();
   const insets = useSafeAreaInsets();
@@ -53,6 +61,32 @@ export default function Screen({
   const action = T.ios ? fab : undefined;
   const unread = useUnread();
   const showBell = !!root && !noHeader;
+  const setScroll = useKeyboardScroll(scrollRef);
+  // The main action slides away while the user scrolls down a list and returns on the way up,
+  // so it never sits over the last rows.
+  const reduce = useReducedMotion();
+  const [fabIn] = useState(() => new Animated.Value(1));
+  const fabShown = useRef(true);
+  const lastY = useRef(0);
+  const fabPress = usePressScale(0.95);
+  const showFab = (show: boolean) => {
+    if (fabShown.current === show) return;
+    fabShown.current = show;
+    if (reduce) return fabIn.setValue(1);
+    Animated.timing(fabIn, {
+      toValue: show ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+  // The header extends the page background behind the status bar.
+  const hdrBg = T.bg;
+  const hdrFg = T.fg;
+  const { isCompact, isShort, width } = useResponsive();
+  const col = useColumn();
+  // Short windows (split screen) get an inline title instead of the 52dp large title.
+  const largeTitle = T.ios && !hasBack && !isShort;
 
   const bell = showBell ? (
     <Pressable
@@ -71,7 +105,7 @@ export default function Screen({
         zIndex: 1,
       })}
     >
-      <Icon name="bell" size={T.ios ? 24 : 24} color={T.ios ? T.tint : T.fg} />
+      <Icon name="bell" size={24} color={T.ios ? T.tint : T.fg} />
       {unread > 0 ? (
         <View
           style={{
@@ -86,7 +120,7 @@ export default function Screen({
             alignItems: "center",
             justifyContent: "center",
             borderWidth: 2,
-            borderColor: T.hdrBg,
+            borderColor: hdrBg,
           }}
         >
           <Txt style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>
@@ -103,19 +137,20 @@ export default function Screen({
     <View
       style={{
         paddingTop: insets.top,
-        backgroundColor: T.hdrBg,
-        borderBottomWidth: hasBack ? StyleSheet.hairlineWidth : 0,
-        borderBottomColor: T.hdrBd,
+        backgroundColor: hdrBg,
       }}
     >
       <View
-        style={{
-          height: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 8,
-        }}
+        style={[
+          col.style,
+          {
+            height: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 8,
+          },
+        ]}
       >
         {hasBack ? (
           <Pressable
@@ -138,12 +173,16 @@ export default function Screen({
         ) : (
           <View />
         )}
-        {hasBack ? (
+        {!largeTitle ? (
           <View
             pointerEvents="none"
             style={{ position: "absolute", left: "28%", right: "28%", alignItems: "center" }}
           >
-            <Txt numberOfLines={1} style={{ fontSize: 17, fontWeight: "600" }}>
+            <Txt
+              accessibilityRole={hasBack ? undefined : "header"}
+              numberOfLines={1}
+              style={{ fontSize: 17, fontWeight: "600", color: hdrFg }}
+            >
               {title}
             </Txt>
           </View>
@@ -168,33 +207,46 @@ export default function Screen({
           ) : null}
         </View>
       </View>
-      {!hasBack ? (
-        <Txt
-          accessibilityRole="header"
-          style={{
-            paddingHorizontal: 16,
-            paddingBottom: 8,
-            fontSize: 34,
-            fontWeight: "700",
-            lineHeight: 40,
-          }}
-        >
-          {title}
-        </Txt>
+      {largeTitle ? (
+        <View style={col.style}>
+          <Txt
+            accessibilityRole="header"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={{
+              paddingHorizontal: 16,
+              paddingBottom: 8,
+              fontSize: isCompact ? 26 : 30,
+              fontWeight: "700",
+              lineHeight: isCompact ? 32 : 36,
+              color: hdrFg,
+            }}
+          >
+            {title}
+          </Txt>
+        </View>
       ) : null}
     </View>
   ) : (
-    <View style={{ paddingTop: insets.top, backgroundColor: T.hdrBg }}>
+    <View
+      style={{
+        paddingTop: insets.top,
+        backgroundColor: hdrBg,
+      }}
+    >
       <View
-        style={{
-          height: 64,
-          flexDirection: "row",
-          alignItems: "center",
-          paddingLeft: hasBack ? 4 : 16,
-          paddingRight: 4,
-          gap: 4,
-        }}
+        style={[
+          col.style,
+          {
+            height: isShort ? 56 : 64,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+          },
+        ]}
       >
+        <View style={{ width: hasBack ? 0 : 12 }} />
         {hasBack ? (
           <Pressable
             onPress={nav.back}
@@ -214,78 +266,133 @@ export default function Screen({
         <Txt
           accessibilityRole="header"
           numberOfLines={1}
-          style={{ flex: 1, fontSize: 22, lineHeight: 28 }}
+          style={{
+            flex: 1,
+            fontSize: isCompact ? 19 : 20,
+            lineHeight: 28,
+            color: hdrFg,
+            fontWeight: root ? "600" : "500",
+          }}
         >
           {title}
         </Txt>
         {bell}
+        <View style={{ width: 0 }} />
       </View>
     </View>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
+      <StatusBar style={T.dark ? "light" : "dark"} />
       {header}
       {offline ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            backgroundColor: T.offBg,
-          }}
-        >
-          <Icon name="wifiOff" size={16} color={T.warnFg} />
-          <Txt style={{ color: T.warnFg, fontSize: 13, fontWeight: "500" }}>
-            {nq
-              ? `Offline · ${nq} action${nq > 1 ? "s" : ""} saved on this phone`
-              : "Offline · your work is saved on this phone"}
-          </Txt>
+        <View style={{ backgroundColor: T.offBg }}>
+          <View
+            style={[
+              col.style,
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+              },
+            ]}
+          >
+            <Icon name="wifiOff" size={16} color={T.warnFg} />
+            <Txt style={{ flex: 1, color: T.warnFg, ...TYPE.footnote, fontWeight: "500" }}>
+              {nq
+                ? `Offline · ${nq} action${nq > 1 ? "s" : ""} saved on this phone`
+                : "Offline · your work is saved on this phone"}
+            </Txt>
+          </View>
         </View>
       ) : null}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/* Padding on both platforms: Android draws edge to edge, so the window no longer resizes
+          for the keyboard and the form would sit underneath it. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
-          ref={scrollRef}
+          ref={setScroll}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{
-            paddingTop: T.ios ? 6 : 4,
-            paddingBottom: fab && !T.ios ? 96 : 28,
-          }}
+          scrollEventThrottle={fab ? 64 : 250}
+          onScroll={
+            onEndReached || (fab && !T.ios)
+              ? (e) => {
+                  const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                  if (fab && !T.ios) {
+                    const y = contentOffset.y;
+                    const dy = y - lastY.current;
+                    if (y < 24 || dy < -6) showFab(true);
+                    else if (dy > 6) showFab(false);
+                    lastY.current = y;
+                  }
+                  // Start loading a screen's height before the end, so scrolling rarely waits.
+                  if (
+                    onEndReached &&
+                    layoutMeasurement.height + contentOffset.y >=
+                      contentSize.height - layoutMeasurement.height
+                  )
+                    onEndReached();
+                }
+              : undefined
+          }
+          contentContainerStyle={[
+            col.style,
+            {
+              paddingTop: T.ios ? 6 : 4,
+              paddingBottom: fab && !T.ios ? 96 : 28,
+            },
+          ]}
         >
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
       {fab && !T.ios ? (
-        <Pressable
-          onPress={fab.onPress}
-          accessibilityRole="button"
-          accessibilityLabel={fab.label}
-          style={({ pressed }) => ({
+        <Animated.View
+          pointerEvents="box-none"
+          style={{
             position: "absolute",
-            right: 16,
+            right: col.right + 16,
             bottom: 16,
-            height: 56,
-            borderRadius: 16,
-            paddingHorizontal: 18,
-            backgroundColor: pressed ? T.fabPress : T.fabBg,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            elevation: 3,
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 6,
-            shadowOffset: { width: 0, height: 3 },
-          })}
+            maxWidth: Math.max(0, width - col.right * 2 - 32),
+            opacity: fabIn,
+            transform: [
+              { translateY: fabIn.interpolate({ inputRange: [0, 1], outputRange: [96, 0] }) },
+              { scale: fabPress.scale },
+            ],
+          }}
         >
-          <Icon name={fab.icon ?? "plus"} size={22} color={T.fabFg} />
-          <Txt style={{ color: T.fabFg, fontSize: 15, fontWeight: "500" }}>{fab.label}</Txt>
-        </Pressable>
+          <Pressable
+            onPress={fab.onPress}
+            {...fabPress.handlers}
+            accessibilityRole="button"
+            accessibilityLabel={fab.label}
+            style={({ pressed }) => ({
+              minHeight: 56,
+              paddingVertical: 8,
+              borderRadius: 16,
+              paddingHorizontal: 18,
+              backgroundColor: pressed ? T.fabPress : T.fabBg,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              elevation: 3,
+              shadowColor: "#000",
+              shadowOpacity: 0.2,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 3 },
+            })}
+          >
+            <Icon name={fab.icon ?? "plus"} size={22} color={T.fabFg} />
+            <Txt
+              numberOfLines={1}
+              style={{ flexShrink: 1, color: T.fabFg, fontSize: 15, fontWeight: "500" }}
+            >
+              {fab.label}
+            </Txt>
+          </Pressable>
+        </Animated.View>
       ) : null}
     </View>
   );

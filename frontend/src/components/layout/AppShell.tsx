@@ -5,7 +5,7 @@ import { useRef, type CSSProperties, type ReactNode } from 'react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import type { AppNotification } from '@/components/layout/NotificationsBell';
+import type { AppNotification, NotificationActions } from '@/components/layout/NotificationsBell';
 import { PageHeading } from '@/components/layout/PageHeading';
 import { TopBar } from '@/components/layout/TopBar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -22,12 +22,24 @@ interface AppShellProps {
   counts?: NavCounts;
   /** The bell's list; leave out while there is no notification feed. */
   notifications?: readonly AppNotification[];
+  /** What the bell may do with the feed: open an item, mark all read. */
+  notificationActions?: NotificationActions;
+  /** The heading for an address that has no page in `workspaces`, e.g. one the person may not open. */
+  fallbackTitle?: string;
   /** The routed page. */
   children: ReactNode;
 }
 
 /** The signed-in frame: top bar, sidebar, heading band and the routed page. */
-export function AppShell({ workspaces, storage, counts, notifications, children }: AppShellProps) {
+export function AppShell({
+  workspaces,
+  storage,
+  counts,
+  notifications,
+  notificationActions,
+  fallbackTitle,
+  children,
+}: AppShellProps) {
   const pathname = usePathname();
   const location = locate(workspaces, pathname);
   const [isSidebarOpen, setIsSidebarOpen] = useStoredBoolean(storage, 'clims.sidebar-open', true);
@@ -42,7 +54,7 @@ export function AppShell({ workspaces, storage, counts, notifications, children 
       open={isSidebarOpen}
       onOpenChange={setIsSidebarOpen}
       className="flex-col"
-      style={{ '--sidebar-width': '15.5rem', '--sidebar-width-icon': '3.5rem' } as CSSProperties}
+      style={{ '--sidebar-width': '14rem', '--sidebar-width-icon': '3rem' } as CSSProperties}
     >
       <a
         href="#main"
@@ -50,7 +62,7 @@ export function AppShell({ workspaces, storage, counts, notifications, children 
       >
         Skip to content
       </a>
-      <TopBar notifications={notifications} />
+      <TopBar notifications={notifications} notificationActions={notificationActions} />
       <div className="flex flex-1">
         <AppSidebar workspaces={workspaces} location={location} counts={counts} />
         <SidebarInset
@@ -59,10 +71,10 @@ export function AppShell({ workspaces, storage, counts, notifications, children 
           tabIndex={-1}
           className="bg-canvas min-w-0 outline-none"
         >
-          <PageHeading location={location} counts={counts} />
-          <div className="mx-auto w-full max-w-360 flex-1 px-4 pt-4 pb-10 md:px-5">
+          <PageHeading location={location} counts={counts} fallbackTitle={fallbackTitle} />
+          <div className="w-full flex-1 px-4 pt-3 pb-8">
             <ErrorBoundary resetKey={pathname}>
-              <div className="flex w-full flex-col gap-6">{children}</div>
+              <div className="gap-section flex w-full flex-col">{children}</div>
             </ErrorBoundary>
           </div>
         </SidebarInset>

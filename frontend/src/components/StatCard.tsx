@@ -42,11 +42,19 @@ interface StatCardProps {
   label: string;
   /** Already formatted for display. */
   value: string;
+  /**
+   * The same figure in other units, on a quieter line under the value, e.g. "2,383,520 Box ·
+   * 114,840 Carton" under "31,635,000 Piece". Units are never added together, and three of them
+   * at full size would bury the figure.
+   */
+  extra?: string;
   icon: LucideIcon;
   /** Icon and sparkline colour. Defaults to neutral. */
   accent?: StatCardAccent;
   /** Adds the change since the previous point and a sparkline. */
   trend?: StatCardTrend;
+  /** One line under the figure saying what is behind it, e.g. "2 to decide · 1 to dispatch". */
+  detail?: string;
   /** Makes the whole card a link, e.g. to the list behind the figure. */
   href?: string;
   /** True while the figure is being fetched. */
@@ -69,9 +77,11 @@ interface StatCardProps {
 export function StatCard({
   label,
   value,
+  extra,
   icon: Icon,
   accent = 'neutral',
   trend,
+  detail,
   href,
   isLoading = false,
   isSample = false,
@@ -82,24 +92,29 @@ export function StatCard({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-muted-foreground text-sm font-medium">{label}</span>
+          <span className="text-muted-foreground text-[0.8125rem] font-medium">{label}</span>
           {isSample ? <SampleBadge /> : null}
         </div>
-        <div className="bg-secondary flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <Icon className={cn('size-4', ACCENT_CLASSES[accent])} aria-hidden="true" />
+        <div className="bg-secondary flex size-7 shrink-0 items-center justify-center rounded-md">
+          <Icon className={cn('size-3.5', ACCENT_CLASSES[accent])} aria-hidden="true" />
         </div>
       </div>
       {isLoading ? (
         <div role="status">
-          <Skeleton className="h-8 w-24 lg:h-9" />
+          <Skeleton className="h-8 w-24" />
           <span className="sr-only">Loading {label.toLowerCase()}…</span>
         </div>
       ) : (
         <div className="flex items-end justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-foreground text-2xl font-bold tracking-tight break-words tabular-nums lg:text-3xl">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-foreground text-2xl leading-8 font-bold tracking-tight break-words tabular-nums">
               {value}
             </p>
+            {extra ? (
+              <p className="text-foreground/80 -mt-1 text-sm font-semibold break-words tabular-nums">
+                {extra}
+              </p>
+            ) : null}
             {trend && change ? (
               <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
                 <span
@@ -116,6 +131,9 @@ export function StatCard({
                 {trend.caption}
               </p>
             ) : null}
+            {detail ? (
+              <p className="text-muted-foreground text-xs leading-4 text-pretty">{detail}</p>
+            ) : null}
           </div>
           {trend ? <Sparkline series={trend.series} className={ACCENT_CLASSES[accent]} /> : null}
         </div>
@@ -123,7 +141,7 @@ export function StatCard({
     </>
   );
 
-  const cardClasses = cn('bg-card rounded-card flex flex-col gap-3 border p-5', className);
+  const cardClasses = cn('bg-card rounded-card flex flex-col gap-1.5 border px-4 py-3', className);
   if (href) {
     return (
       <Link
@@ -151,7 +169,7 @@ function TrendIcon({ direction }: { direction: 'up' | 'down' | 'flat' }) {
  */
 export function StatCardGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-4">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-3">
       {children}
     </div>
   );

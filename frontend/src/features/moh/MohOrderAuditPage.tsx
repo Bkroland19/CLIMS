@@ -48,7 +48,7 @@ function OrderAudit({ detail }: { detail: OrderDetail }) {
     .join(' · ');
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <DetailHeader
         title={order.id}
         status={<StatusBadge status={status.label} tone={status.tone} />}
@@ -57,7 +57,7 @@ function OrderAudit({ detail }: { detail: OrderDetail }) {
         <DetailList variant="grid" items={orderMetrics(detail, now)} />
       </DetailHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Audit trail</CardTitle>
@@ -74,7 +74,7 @@ function OrderAudit({ detail }: { detail: OrderDetail }) {
           </CardContent>
         </Card>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <Card>
             <CardHeader>
               <CardTitle>Delivery</CardTitle>
@@ -115,7 +115,6 @@ function OrderAudit({ detail }: { detail: OrderDetail }) {
                         />
                       ),
                     },
-                    { label: 'Waybill', value: request.dispatch?.waybill ?? EMPTY_VALUE },
                     { label: 'Goods received note', value: request.receipt?.grn ?? EMPTY_VALUE },
                   ]}
                 />

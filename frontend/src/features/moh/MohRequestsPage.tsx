@@ -93,6 +93,7 @@ export default function MohRequestsPage() {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (request) => REQUEST_STATUS[request.status].label,
         cell: (request) => (
@@ -134,6 +135,7 @@ export default function MohRequestsPage() {
       </div>
       <DataTable
         label="Warehouse requests"
+        preferencesKey="moh-warehouse-requests"
         columns={columns}
         rows={rows}
         getRowId={(request) => request.id}

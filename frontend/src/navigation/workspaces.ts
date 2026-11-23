@@ -1,4 +1,5 @@
 import {
+  ChartColumn,
   ClipboardCheck,
   ClipboardList,
   HeartPulse,
@@ -10,6 +11,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Store,
+  Tags,
   Truck,
   Users,
   UsersRound,
@@ -21,7 +23,7 @@ import { HOME_PATH } from './paths';
 
 /*
  * Every signed-in screen, by workspace. This table drives the sidebar, the
- * heading band (breadcrumb, title, description, tabs), the loading skeleton
+ * heading band (title, description, tabs), the loading skeleton
  * and each page's browser title. The screens themselves are the `page.tsx`
  * files under `src/app/(app)`: a page missing from this table fails the
  * build, and a test fails if the table names a path that has no page.
@@ -48,6 +50,74 @@ function monthlyReports(path: string, description: string): NavItem {
     icon: ClipboardCheck,
     pages: [{ path, tab: 'Reports', title: 'Monthly reports', description, layout: 'table' }],
     details: [{ path: `${path}/[id]`, label: 'Monthly report', layout: 'form' }],
+  };
+}
+
+/**
+ * Programme reports from the Go API: notification fulfilment, warehouse
+ * requests, stock, expiry, HMIS 105 and approved versions, with downloads.
+ */
+function programmeReports(path: string, description: string): NavItem {
+  return {
+    id: 'programme-reports',
+    label: 'Programme reports',
+    icon: ChartColumn,
+    pages: [
+      {
+        path,
+        tab: 'Programme reports',
+        title: 'Programme reports',
+        description,
+        layout: 'table',
+        permission: 'reports:read',
+      },
+    ],
+  };
+}
+
+/**
+ * The condom catalogue (products and the types, brands and units they use). It
+ * is national master data, so MOH and the warehouse workspace show the same
+ * screens; who may change it follows `catalogue:manage`, set per role.
+ */
+function catalogue(path: string): NavItem {
+  return {
+    id: 'catalogue',
+    label: 'Product catalogue',
+    icon: Tags,
+    pages: [
+      {
+        path,
+        tab: 'Condoms',
+        title: 'Product catalogue',
+        description:
+          'Condom products, each a brand, category and type in one unit. Orders and stock pick from the active ones.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/types`,
+        tab: 'Types',
+        title: 'Product types',
+        description:
+          'How condom products reach people, such as free public-sector supply, social marketing or commercial sale.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/brands`,
+        tab: 'Brands',
+        title: 'Brands',
+        description: 'Brands condom products are distributed or sold under.',
+        layout: 'table',
+      },
+      {
+        path: `${path}/units`,
+        tab: 'Units of measure',
+        title: 'Units of measure',
+        description:
+          'Units condoms are packed and counted in. Each product says how many condoms its unit holds.',
+        layout: 'table',
+      },
+    ],
   };
 }
 
@@ -109,6 +179,10 @@ export const workspaces: readonly Workspace[] = [
             ],
             details: [{ path: '/moh/reports/[id]', label: 'Report', layout: 'detail' }],
           },
+          programmeReports(
+            '/moh/programme-reports',
+            'Notification fulfilment, warehouse requests, stock, expiry and HMIS 105 readiness from CLIMS records, with downloads and approved versions.',
+          ),
           // Distribution, procurement and the hotspot map predate the prototype, which has no
           // equivalent for them. They stay until it is decided whether MOH still needs them.
           {
@@ -169,6 +243,7 @@ export const workspaces: readonly Workspace[] = [
                 title: 'User management',
                 description: 'Everyone who can sign in to CLIMS, and the roles they hold.',
                 layout: 'table',
+                permission: 'users:read',
               },
               {
                 path: '/moh/users/roles',
@@ -176,31 +251,11 @@ export const workspaces: readonly Workspace[] = [
                 title: 'Roles & permissions',
                 description: 'What each role can see and do. A user can hold more than one role.',
                 layout: 'detail',
+                permission: 'roles:read',
               },
             ],
           },
-          {
-            id: 'catalogue',
-            label: 'Product catalogue',
-            icon: Package,
-            pages: [
-              {
-                path: '/moh/catalogue',
-                tab: 'Condoms',
-                title: 'Product catalogue',
-                description:
-                  'Condom products. Category, brand and type together identify a product.',
-                layout: 'table',
-              },
-              {
-                path: '/moh/catalogue/units',
-                tab: 'Units of measure',
-                title: 'Units of measure',
-                description: 'Units condoms are counted in, and how many pieces each holds.',
-                layout: 'table',
-              },
-            ],
-          },
+          catalogue('/moh/catalogue'),
           {
             id: 'locations',
             label: 'Stores & locations',
@@ -232,8 +287,9 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Audit log',
                 title: 'Audit log',
                 description:
-                  'Every create, update and delete in CLIMS, with who did it and what changed.',
+                  'Sign-ins, account changes and every change to records: who, what, when and from where.',
                 layout: 'table',
+                permission: 'audit:read',
               },
             ],
           },
@@ -261,28 +317,27 @@ export const workspaces: readonly Workspace[] = [
         label: 'Fulfilment',
         items: [
           {
-            id: 'orders',
-            label: 'Orders',
+            id: 'stockouts',
+            label: 'Stockouts',
             icon: Inbox,
             pages: [
               {
-                path: '/dcfp/orders',
-                tab: 'Queue',
-                title: 'Orders',
+                path: '/dcfp/stockouts',
+                tab: 'Stockouts',
+                title: 'Stockout notifications',
                 description:
-                  'Stockout notifications from hotspots. Review each one, check stock, then confirm or hold.',
+                  'Hotspots that have run out. Dispatch from your district store, or order more stock from NMS or JMS.',
                 layout: 'table',
               },
               {
-                path: '/dcfp/orders/held',
-                tab: 'Held for stock',
-                title: 'Orders',
+                path: '/dcfp/stockouts/dispatch',
+                tab: 'Dispatch',
+                title: 'Dispatch to hotspots',
                 description:
-                  'Orders waiting for stock, checked against what is in the district store now.',
+                  'Choose a hotspot request, send available district stock and follow receipt confirmations.',
                 layout: 'table',
               },
             ],
-            details: [{ path: '/dcfp/orders/[id]', label: 'Review order', layout: 'detail' }],
           },
           {
             id: 'restock',
@@ -291,10 +346,10 @@ export const workspaces: readonly Workspace[] = [
             pages: [
               {
                 path: '/dcfp/restock',
-                tab: 'Warehouse requests',
+                tab: 'Warehouse orders',
                 title: 'Restock',
                 description:
-                  'Stock ordered from NMS or JMS, and consignments waiting to be received.',
+                  'Condoms ordered from NMS or JMS, and consignments waiting to be received.',
                 layout: 'table',
               },
               {
@@ -308,25 +363,9 @@ export const workspaces: readonly Workspace[] = [
             ],
             // `new` is listed before `[id]`: a fixed segment wins, as it does in the router.
             details: [
-              { path: '/dcfp/restock/new', label: 'New warehouse request', layout: 'form' },
-              { path: '/dcfp/restock/[id]', label: 'Warehouse request', layout: 'detail' },
+              { path: '/dcfp/restock/new', label: 'New warehouse order', layout: 'form' },
+              { path: '/dcfp/restock/[id]', label: 'Warehouse order', layout: 'detail' },
             ],
-          },
-          {
-            id: 'dispatch',
-            label: 'Dispatch',
-            icon: Truck,
-            pages: [
-              {
-                path: '/dcfp/dispatch',
-                tab: 'Dispatch',
-                title: 'Dispatch',
-                description:
-                  'Confirmed orders ready to go out with a rider, and deliveries in progress.',
-                layout: 'table',
-              },
-            ],
-            details: [{ path: '/dcfp/dispatch/[id]', label: 'Dispatch order', layout: 'form' }],
           },
         ],
       },
@@ -343,8 +382,9 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'List',
                 title: 'Hotspots',
                 description:
-                  'Hotspots submitted by VHTs in your district. Verify the details, then activate the hotspot.',
+                  'Hotspots in your district. Review the ones VHTs submit, then activate or reject each with a comment.',
                 layout: 'table',
+                permission: 'hotspots:read',
               },
               {
                 path: '/dcfp/hotspot-map',
@@ -352,8 +392,10 @@ export const workspaces: readonly Workspace[] = [
                 title: 'Hotspot map',
                 description: DESCRIPTIONS.hotspotMap,
                 layout: 'dashboard',
+                permission: 'hotspots:read',
               },
             ],
+            details: [{ path: '/dcfp/hotspots/[id]', label: 'Hotspot', layout: 'detail' }],
           },
         ],
       },
@@ -363,6 +405,10 @@ export const workspaces: readonly Workspace[] = [
           monthlyReports(
             '/dcfp/reports',
             'Send the monthly district stock report to MOH. CLIMS checks the figures before they are sent.',
+          ),
+          programmeReports(
+            '/dcfp/programme-reports',
+            "Your district's notification fulfilment, warehouse requests, stock, expiry and HMIS 105 readiness, with downloads and approved versions.",
           ),
         ],
       },
@@ -381,7 +427,7 @@ export const workspaces: readonly Workspace[] = [
           dashboard(
             '/warehouse',
             'Warehouse dashboard',
-            'District requests waiting on this warehouse, and stock against its minimum levels.',
+            'District orders waiting on this warehouse, and batches to dispatch first or write off.',
           ),
         ],
       },
@@ -398,7 +444,7 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Requests',
                 title: 'District requests',
                 description:
-                  'Stock orders from district stores. Review, check stock, then dispatch or hold.',
+                  'Stock orders from district stores. Approve or reject each one, then dispatch it.',
                 layout: 'table',
               },
             ],
@@ -420,11 +466,13 @@ export const workspaces: readonly Workspace[] = [
                 path: '/warehouse/stock',
                 tab: 'Stock',
                 title: 'Warehouse stock',
-                description: 'Condom stock held at this warehouse, by batch, and every movement.',
+                description:
+                  'What the warehouse holds, what went out and what is waiting; register stock, or dispatch it to a district before it orders.',
                 layout: 'table',
               },
             ],
           },
+          catalogue('/warehouse/catalogue'),
         ],
       },
       {
@@ -433,6 +481,10 @@ export const workspaces: readonly Workspace[] = [
           monthlyReports(
             '/warehouse/reports',
             'Send the monthly warehouse stock report to MOH. CLIMS checks the figures before they are sent.',
+          ),
+          programmeReports(
+            '/warehouse/programme-reports',
+            'Warehouse requests, store stock and expiry from CLIMS records, with downloads and approved versions.',
           ),
         ],
       },

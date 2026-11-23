@@ -7,7 +7,7 @@ import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { DetailHeader } from '@/components/DetailHeader';
 import { DetailList } from '@/components/DetailList';
 import { InlineMessage } from '@/components/InlineMessage';
-import { ItemsTable, type ItemsTableColumn } from '@/components/ItemsTable';
+import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
 import { StepTracker, type Step } from '@/components/StepTracker';
 import { Badge } from '@/components/ui/badge';
@@ -98,7 +98,7 @@ interface FiguresCardProps {
 /** The stock movement table: one row per figure, one column per product. */
 export function FiguresCard({ report, draft, problems, disabled, onChange }: FiguresCardProps) {
   const form = REPORT_FORMS[report.level];
-  const columns: ItemsTableColumn<FigureRow>[] = [
+  const columns: DataTableColumn<FigureRow>[] = [
     {
       id: 'item',
       header: 'Item',
@@ -119,7 +119,7 @@ export function FiguresCard({ report, draft, problems, disabled, onChange }: Fig
         );
       },
     },
-    ...PRODUCTS.map((product): ItemsTableColumn<FigureRow> => ({
+    ...PRODUCTS.map((product): DataTableColumn<FigureRow> => ({
       id: product.key,
       header: `${product.short} · ${product.brand}`,
       numeric: true,
@@ -179,7 +179,8 @@ export function FiguresCard({ report, draft, problems, disabled, onChange }: Fig
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
-        <ItemsTable
+        <DataTable
+          variant="embedded"
           label="Stock movement"
           columns={columns}
           rows={form.rows}

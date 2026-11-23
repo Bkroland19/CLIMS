@@ -37,7 +37,8 @@ services:
       BACKEND_URL: http://backend:8080
       WATCHPACK_POLLING: "true"
       # Sent to the browser; never a secret.
-      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+      NEXT_PUBLIC_MAP_TILES: ${NEXT_PUBLIC_MAP_TILES:-}
+      NEXT_PUBLIC_MAP_ATTRIBUTION: ${NEXT_PUBLIC_MAP_ATTRIBUTION:-}
     volumes:
       - ../../frontend:/app
       - frontend_node_modules:/app/node_modules
@@ -72,6 +73,35 @@ services:
       retries: 15
       start_period: 60s
 
+  # Documentation site with live reload at /handbook/. Production serves the static build.
+  docs:
+    image: clims-docs:dev
+    build:
+      context: ../..
+      dockerfile: infra/docker/docs/Dockerfile.dev
+    environment:
+      DOCS_GENERATED_DIR: /tmp/docs-generated
+    expose: ["3000"]
+    volumes:
+      - ../../website:/app/website
+      - ../../docs:/app/docs:ro
+      - ../../VERSION:/app/VERSION:ro
+      - docs_node_modules:/app/website/node_modules
+      - docs_cache:/app/website/.docusaurus
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/handbook/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 120s
+
   nginx:
     image: clims-nginx:dev
     build:
@@ -92,3 +122,5 @@ volumes:
   frontend_node_modules:
   frontend_next:
   mobile_node_modules:
+  docs_node_modules:
+  docs_cache:

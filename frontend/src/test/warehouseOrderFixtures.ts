@@ -1,0 +1,244 @@
+import type { Product } from '@/features/catalogue/api';
+import type {
+  Movement,
+  ProductSummary,
+  StockBalance,
+  StockBatch,
+  StoreSummary,
+} from '@/features/inventory/api';
+import type { Order, OrderEvent } from '@/features/orders/api';
+
+import { anOrder, BOX, FEMALE, JMS, NMS } from './dcfpFixtures';
+import type { FakeReply } from './fakeAdapter';
+
+/*
+ * The warehouse screens on the Go API, for tests: district orders placed with NMS or JMS, the
+ * warehouse's stock and batches, and a fake of the endpoints those screens read.
+ */
+
+const envelope = (data: unknown) => ({ success: true, data });
+
+type Answer = Exclude<FakeReply, (...args: never[]) => unknown>;
+
+/** A second female product, so the warehouse has a choice to make at review. */
+export const FEMALE_FC2: Product = {
+  ...FEMALE,
+  id: 'p-fc2',
+  brand: { id: 'b-fc2', name: 'FC2' },
+};
+
+/** A district store as `GET /locations/stores` lists it; the store id is `store-<code>`. */
+export function aDistrictStore(name: string) {
+  const code = name.toLowerCase();
+  return {
+    id: `store-${code}`,
+    code,
+    name,
+    store_type: 'district' as const,
+    district_id: `d-${code}`,
+    district_name: name,
+  };
+}
+
+/**
+ * An order from Wakiso to NMS for female condoms, waiting for the warehouse. The DCFP names no
+ * unit: the order takes the product's unit when the warehouse chooses one at review.
+ */
+export function aWarehouseOrder(overrides: Partial<Order> = {}): Order {
+  return anOrder({
+    id: 'o1',
+    condom_id: null,
+    condom_category: 'female',
+    unit_of_measure_id: overrides.condom_id ? BOX.id : null,
+    ordered_for_store_id: 'store-wakiso',
+    ordered_from_store_id: NMS.id,
+    ...overrides,
+  });
+}
+
+export function aBalance(overrides: Partial<StockBalance> = {}): StockBalance {
+  return {
+    store_id: NMS.id,
+    store_name: NMS.name,
+    store_type: 'national',
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    on_hand: 800,
+    reserved: 0,
+    available: 800,
+    incoming: 0,
+    updated_at: '2026-11-20T08:00:00Z',
+    ...overrides,
+  };
+}
+
+export function aStockBatch(overrides: Partial<StockBatch> = {}): StockBatch {
+  return {
+    id: 'b-late',
+    store_id: NMS.id,
+    store_name: NMS.name,
+    store_type: 'national',
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    category: 'female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    batch_number: 'FC2-2502-118',
+    expiry_date: '2028-06-30',
+    days_remaining: 588,
+    band: 'ok',
+    on_hand: 500,
+    created_at: '2026-10-01T08:00:00Z',
+    untouched: true,
+    ...overrides,
+  };
+}
+
+export interface WarehouseOrderData {
+  orders?: Order[];
+  events?: OrderEvent[];
+  balances?: StockBalance[];
+  batches?: StockBatch[];
+  products?: Product[];
+  movements?: Movement[];
+  summary?: StoreSummary;
+  /** What `GET /locations/districts` lists; by default the three district stores and Kotido. */
+  districts?: { id: string; name: string }[];
+}
+
+/** A product's line in a store summary: 910 boxes of Engabu Free Female at NMS. */
+export function aProductSummary(overrides: Partial<ProductSummary> = {}): ProductSummary {
+  return {
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    on_hand: 910,
+    reserved: 300,
+    expired: 40,
+    expiring: 180,
+    no_expiry: 210,
+    usable: 570,
+    next_expiry: '2026-12-08',
+    received: 600,
+    dispatched: 80,
+    written_off: 0,
+    dispatched_90_days: 300,
+    ...overrides,
+  };
+}
+
+/** NMS at a glance: one product, and the district orders placed with it. */
+export function aStoreSummary(overrides: Partial<StoreSummary> = {}): StoreSummary {
+  return {
+    store_id: NMS.id,
+    store_name: NMS.name,
+    store_type: 'national',
+    products: [aProductSummary()],
+    orders: {
+      to_decide: 2,
+      waiting_for_stock: 1,
+      to_dispatch: 0,
+      in_transit: 1,
+      dispatched: 4,
+      rejected: 1,
+      dispatched_in_full: 3,
+      districts_supplied: 3,
+      received_short: 0,
+      median_days_to_dispatch: 2.4,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * Answers the warehouse screens' requests by path. Writes answer from `writes` by
+ * "METHOD /path", else with the order as it was.
+ */
+export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<string, Answer> = {}) {
+  const orders = data.orders ?? [];
+  return (request: { method: string; url: string }): Answer => {
+    const [path = ''] = request.url.split('?');
+    const order = /^\/orders\/([^/]+)/.exec(path);
+    if (request.method !== 'GET') {
+      return (
+        writes[`${request.method} ${path}`] ?? {
+          status: 200,
+          body: envelope(orders.find((candidate) => candidate.id === order?.[1]) ?? anOrder()),
+        }
+      );
+    }
+    if (path === '/orders') return { status: 200, body: envelope(orders) };
+    if (order && path.endsWith('/events'))
+      return { status: 200, body: envelope(data.events ?? []) };
+    if (order) {
+      const found = orders.find((candidate) => candidate.id === order[1]);
+      return found
+        ? { status: 200, body: envelope(found) }
+        : { status: 404, body: { success: false, message: 'order not found' } };
+    }
+    if (path === '/locations/districts') {
+      const districts =
+        data.districts ??
+        ['Gulu', 'Kotido', 'Mukono', 'Wakiso'].map((name) => ({
+          id: `d-${name.toLowerCase()}`,
+          name,
+        }));
+      return { status: 200, body: envelope(districts) };
+    }
+    if (path === '/locations/stores') {
+      const national = [NMS, JMS].map((store) => ({
+        ...store,
+        district_id: null,
+        district_name: null,
+      }));
+      const stores = request.url.includes('store_type=national')
+        ? national
+        : [...national, aDistrictStore('Gulu'), aDistrictStore('Mukono'), aDistrictStore('Wakiso')];
+      return { status: 200, body: envelope(stores) };
+    }
+    if (path === '/inventory/stock') return { status: 200, body: envelope(data.balances ?? []) };
+    if (path === '/inventory/batches') return { status: 200, body: envelope(data.batches ?? []) };
+    if (path === '/inventory/movements') {
+      // Paged and filtered as the API does it: newest first, at most `limit` from `offset`.
+      const params = new URLSearchParams(request.url.split('?')[1] ?? '');
+      const reason = params.get('reason');
+      const limit = Number(params.get('limit') ?? 50);
+      const offset = Number(params.get('offset') ?? 0);
+      const kept = (data.movements ?? []).filter((m) => !reason || m.reason === reason);
+      return { status: 200, body: envelope(kept.slice(offset, offset + limit)) };
+    }
+    if (path === '/inventory/store-summary') {
+      return { status: 200, body: envelope(data.summary ?? aStoreSummary({ products: [] })) };
+    }
+    if (path === '/catalogue/products') {
+      return { status: 200, body: envelope(data.products ?? [FEMALE, FEMALE_FC2]) };
+    }
+    if (path === '/catalogue/units') return { status: 200, body: envelope([BOX]) };
+    return { status: 200, body: envelope([]) };
+  };
+}
+
+export function aMovement(overrides: Partial<Movement> = {}): Movement {
+  return {
+    id: 'm1',
+    store_id: NMS.id,
+    store_name: NMS.name,
+    condom_id: FEMALE.id,
+    product: 'Engabu Free Female',
+    unit_of_measure_id: BOX.id,
+    unit: 'box',
+    reason: 'receipt',
+    quantity: 600,
+    on_hand_after: 910,
+    order_id: null,
+    actor_id: 'u1',
+    note: 'UNFPA consignment, delivery note DN-118',
+    created_at: '2026-11-19T09:00:00Z',
+    batch_number: 'FC2-2502-118',
+    expiry_date: '2028-06-30',
+    ...overrides,
+  };
+}

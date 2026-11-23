@@ -23,7 +23,7 @@ interface RedirectProps {
 }
 
 /** Replaces the current address with `to`, showing a loader for the moment that takes. */
-function Redirect({ to }: RedirectProps) {
+export function Redirect({ to }: RedirectProps) {
   const router = useRouter();
   useEffect(() => {
     router.replace(to);

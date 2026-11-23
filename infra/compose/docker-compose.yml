@@ -55,6 +55,8 @@ services:
       OIDC_PUBLIC_ORIGIN: ${OIDC_PUBLIC_ORIGIN:-}
       IDENTITY_SYNC_CLIENT_ID: ${IDENTITY_SYNC_CLIENT_ID:-}
       APP_ENV: ${APP_ENV:-production}
+      # Addresses allowed to report the client IP; empty trusts the private container network.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       PORT: 8080
     expose: ["8080"]
     depends_on:

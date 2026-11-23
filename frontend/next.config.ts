@@ -12,10 +12,11 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   // Send only the origin, not the full path, to other sites.
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // The app uses none of these device features, so no script may ask for them.
+  // The app uses none of these device features, so no script may ask for them,
+  // except location: the hotspot map can centre on where a field user stands.
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    value: 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()',
   },
 ];
 
@@ -35,7 +36,15 @@ const nextConfig: NextConfig = {
   redirects() {
     // The bare address has no screen of its own; it leads to the default
     // workspace (HOME_PATH in src/navigation/paths.ts; a test keeps them equal).
-    return [{ source: '/', destination: '/moh', permanent: false }];
+    return [
+      { source: '/', destination: '/moh', permanent: false },
+      // Registering stock moved into a panel on the stock page; the query (`?store=`) is kept.
+      {
+        source: '/warehouse/stock/receive',
+        destination: '/warehouse/stock?register=1',
+        permanent: false,
+      },
+    ];
   },
   rewrites() {
     const backend = process.env.BACKEND_URL || 'http://localhost:8080';

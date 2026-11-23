@@ -259,7 +259,7 @@ func (f *fakeAccounts) CreateOIDCSession(_ context.Context, _, subject string, i
 	return users.IssuedSession{ID: id, UserID: userID, RefreshToken: refresh, ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
-func (f *fakeAccounts) RefreshSession(_ context.Context, token string) (users.IssuedSession, error) {
+func (f *fakeAccounts) RefreshSession(_ context.Context, token, _, _ string) (users.IssuedSession, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for id, s := range f.sessions {
@@ -646,7 +646,7 @@ func TestRevokeEndsPortalSession(t *testing.T) {
 
 	h.do("POST", "/sessions/revoke", h.token, h.identity("portal-user"), 204)
 	h.do("GET", "/test/sessions/check", h.token, "", 401, testSessionHeader, access)
-	if _, err := h.repo.RefreshSession(context.Background(), refresh); !errors.Is(err, users.ErrRefreshInvalid) {
+	if _, err := h.repo.RefreshSession(context.Background(), refresh, "", ""); !errors.Is(err, users.ErrRefreshInvalid) {
 		t.Fatalf("refresh after revoke: %v", err)
 	}
 	if status, _ := exchange(pending); status != 401 {

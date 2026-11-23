@@ -19,6 +19,9 @@ const session: Session = {
     firstname: null,
     lastname: null,
     email: null,
+    permissions: null,
+    roleNames: ['dfcp'],
+    store_id: null,
   },
 };
 

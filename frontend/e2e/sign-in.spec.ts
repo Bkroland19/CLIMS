@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { ADMIN, AUTH_FILE } from './support/env';
 import { resetMock } from './support/mock';
-import { open } from './support/ui';
+import { expectToast, open } from './support/ui';
 
 // Signed out: these tests start from a browser with no session.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -58,5 +58,25 @@ test.describe('signed in', () => {
     // The session is gone, not just hidden: opening a signed-in page goes back to sign-in.
     await page.goto('/moh');
     await expect(page).toHaveURL(/\/sign-in/);
+  });
+
+  test('signs another device out from the account menu', async ({ page }) => {
+    await open(page, '/moh', 'MOH dashboard');
+    await page.getByRole('button', { name: /account menu/i }).click();
+    await page.getByRole('menuitem', { name: 'Signed-in devices' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Signed-in devices' });
+    const devices = dialog.getByRole('list', { name: 'Your signed-in devices' });
+    // The mock's third session was signed out already, so it is not listed.
+    await expect(devices.getByRole('listitem')).toHaveCount(2);
+    await expect(devices.getByRole('listitem').first()).toContainText('This device');
+    // Chromium spaces the hidden ", Android app" off as its own box: "Sign out , Android app".
+    await dialog.getByRole('button', { name: /^Sign out\s*, Android app$/ }).click();
+
+    await expectToast(page, 'Signed out of Android app');
+    await expect(devices.getByRole('listitem')).toHaveCount(1);
+    await expect(
+      dialog.getByText('This is the only device signed in to your account.'),
+    ).toBeVisible();
   });
 });

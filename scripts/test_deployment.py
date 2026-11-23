@@ -76,7 +76,7 @@ class DeploymentTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         commands = self.log.read_text().splitlines()
         self.assertTrue(commands[-2].endswith("build postgres nginx seaweedfs"))
-        self.assertTrue(commands[-1].endswith("postgres backend frontend nginx seaweedfs"))
+        self.assertTrue(commands[-1].endswith("postgres backend frontend docs nginx seaweedfs"))
 
     def test_missing_server_secrets_fails_before_docker(self):
         (self.root / "shared/prod.env").unlink()

@@ -9,6 +9,7 @@ import (
 
 	"clims-backend/internal/config"
 	"clims-backend/internal/database"
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/pkg/validator"
@@ -44,7 +45,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pool.Close()
-	repo := users.NewRepository(pool)
+	repo := users.NewRepository(pool, audit.NewService(pool))
+	// Recorded in the audit log as this command, since no person is signed in.
+	ctx = audit.WithSystemActor(ctx, "create-admin")
 	var roleID string
 	if err := pool.QueryRow(ctx, `SELECT id FROM roles WHERE name = $1`, rbac.AdminRoleName).Scan(&roleID); err != nil {
 		log.Fatal("failed to resolve admin role")

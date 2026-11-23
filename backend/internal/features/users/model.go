@@ -29,6 +29,49 @@ type User struct {
 	Role           *rbac.Role  `json:"role"`
 	Roles          []rbac.Role `json:"roles"`
 	PasswordHash   string      `json:"-"`
+
+	OrganisationUnit *AssignedOrganisationUnit `json:"organisation_unit"`
+	HotSpot          *AssignedHotSpot          `json:"hot_spot"`
+	Subcounty        *AssignedSubcounty        `json:"subcounty"`
+	Store            *AssignedStore            `json:"store"`
+}
+
+type AssignedOrganisationUnit struct {
+	ID        string `json:"id"`
+	UID       string `json:"uid"`
+	Name      string `json:"name"`
+	ShortName string `json:"short_name"`
+	Subcounty string `json:"subcounty"`
+	District  string `json:"district"`
+	Region    string `json:"region"`
+}
+
+type AssignedHotSpot struct {
+	ID        string   `json:"id"`
+	Name      *string  `json:"name"`
+	Type      *string  `json:"type"`
+	Status    string   `json:"status"`
+	Village   *string  `json:"village"`
+	Subcounty *string  `json:"subcounty"`
+	District  *string  `json:"district"`
+	Latitude  *float64 `json:"latitude"`
+	Longitude *float64 `json:"longitude"`
+}
+
+type AssignedSubcounty struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	DistrictID   string `json:"district_id"`
+	DistrictName string `json:"district_name"`
+}
+
+type AssignedStore struct {
+	ID           string  `json:"id"`
+	Code         string  `json:"code"`
+	Name         string  `json:"name"`
+	StoreType    string  `json:"store_type"`
+	DistrictID   *string `json:"district_id"`
+	DistrictName *string `json:"district_name"`
 }
 
 func (u *User) HasPermission(code string) bool {

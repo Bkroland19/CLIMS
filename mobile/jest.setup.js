@@ -1,7 +1,11 @@
 /* global jest */
-// Reanimated needs a native runtime. Tests only need the pieces the app uses.
-jest.mock("react-native-reanimated", () => {
-  const { View } = require("react-native");
-  const anim = { delay: () => anim, duration: () => anim };
-  return { __esModule: true, default: { View }, FadeInDown: anim, FadeIn: anim };
+// Shared test setup. The field app animates with React Native's own Animated API, so no native
+// animation library needs mocking here.
+jest.useRealTimers();
+
+// Tests see the end state of every animation: the motion helpers (components/m/motion.tsx) treat
+// the phone as asking for reduced motion, so entrances, count-ups and springs settle immediately.
+jest.mock("./components/m/motion", () => {
+  const actual = jest.requireActual("./components/m/motion");
+  return { ...actual, useReducedMotion: () => true };
 });

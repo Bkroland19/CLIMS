@@ -41,7 +41,15 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete_on_close=False)
         model = json.loads(result.stdout)
         models[mode] = model
         services = model["services"]
-        assert set(services) == {"backend", "frontend", "mobile", "postgres", "seaweedfs", "nginx"}
+        assert set(services) == {
+            "backend",
+            "frontend",
+            "mobile",
+            "docs",
+            "postgres",
+            "seaweedfs",
+            "nginx",
+        }, mode
         for name, service in services.items():
             build = service["build"]
             assert build["dockerfile"].endswith(f"Dockerfile.{mode}"), (mode, name)
@@ -52,21 +60,22 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete_on_close=False)
             assert len(services["nginx"]["ports"]) == 2
             assert services["postgres"].get("ports")
             assert services["seaweedfs"].get("ports")
-            for name in ("backend", "frontend", "mobile"):
+            for name in ("backend", "frontend", "mobile", "docs"):
                 assert any(m["type"] == "bind" for m in services[name]["volumes"])
             assert "mobile" in services["nginx"]["depends_on"]
         else:
             assert model["name"] == "clims-prod"
             assert len(services["nginx"]["ports"]) == 1
-            for name in ("backend", "frontend", "postgres", "seaweedfs"):
+            for name in ("backend", "frontend", "docs", "postgres", "seaweedfs"):
                 assert not services[name].get("ports"), name
-            for name in ("backend", "frontend", "postgres", "seaweedfs", "nginx"):
+            for name in ("backend", "frontend", "docs", "postgres", "seaweedfs", "nginx"):
                 assert not any(m["type"] == "bind" for m in services[name].get("volumes", [])), name
             assert services["mobile"]["profiles"] == ["artifacts"]
             assert "mobile" not in services["nginx"]["depends_on"]
+            assert "docs" in services["nginx"]["depends_on"]
     pinned = {
         f"{service.upper()}_IMAGE": f"ghcr.io/example/clims/{service}@sha256:" + "a" * 64
-        for service in ("backend", "frontend", "mobile")
+        for service in ("backend", "frontend", "mobile", "docs")
     }
     result = subprocess.run(
         [

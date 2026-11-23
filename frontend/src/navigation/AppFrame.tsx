@@ -1,15 +1,29 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import { AppShell } from '@/components/layout/AppShell';
+import { useCurrentUser } from '@/features/auth/hooks';
+import { useCan, useCurrentUserSync } from '@/features/auth/queries';
 import { DistrictContextProvider } from '@/features/district/DistrictContext';
-import { useDcfpCounts } from '@/features/fulfilment/useDcfpCounts';
+import { useDcfpCounts } from '@/features/dcfp/useDcfpCounts';
+import { useNotificationFeed } from '@/features/notifications/useNotificationFeed';
 import { useWarehouseCounts } from '@/features/warehouse/useWarehouseCounts';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
 
-import { RequireAuth } from './guards';
+import { accessTo, navigationFor } from './access';
+import {
+  NoPermission,
+  NoPermissionsNotice,
+  NotYourWorkspace,
+  NoWebAccessPage,
+  ReadOnlyNotice,
+} from './AccessScreens';
+import { Redirect, RequireAuth } from './guards';
+import { locate } from './navigation';
+import { HOME_PATH } from './paths';
+import { ReadOnlyProvider, useHomeWorkspace, useWebAccess } from './useAccess';
 import { workspaces } from './workspaces';
 
 interface AppFrameProps {
@@ -25,21 +39,84 @@ export function AppFrame({ children }: AppFrameProps) {
   );
 }
 
+const inside = (pathname: string, base: string) =>
+  pathname === base || pathname.startsWith(`${base}/`);
+
 /**
- * The shell with its badge counts. It sits inside the guard so the counts
- * are only fetched for a signed-in user. Each workspace's counts are read
- * only while that workspace is open. No notifications yet: they have no source.
+ * The shell, cut to what the signed-in person may open. Their roles choose the
+ * workspaces (`access.ts`); their permissions choose the pages within them. A
+ * page outside that is replaced by a short explanation rather than left to
+ * fail on the API's 403s, and a workspace opened read-only says so on top.
+ *
+ * It also keeps the user's roles and permissions current (`GET /auth/me`) and
+ * fetches each workspace's badge counts only while that workspace is open.
  */
 function SignedInShell({ children }: AppFrameProps) {
+  useCurrentUserSync();
   const storage = useAppStorage();
   const pathname = usePathname();
-  const dcfpCounts = useDcfpCounts(pathname === '/dcfp' || pathname.startsWith('/dcfp/'));
+  const user = useCurrentUser();
+  const access = useWebAccess();
+  const can = useCan();
+  const home = useHomeWorkspace();
+
+  const canOpenDcfp = accessTo(access, 'dcfp') !== null;
+  const canOpenWarehouse = accessTo(access, 'warehouse') !== null;
+  const feed = useNotificationFeed({ dcfp: canOpenDcfp, warehouse: canOpenWarehouse });
+  const dcfpCounts = useDcfpCounts(inside(pathname, '/dcfp') && canOpenDcfp, feed.inbox);
   const warehouseCounts = useWarehouseCounts(
-    pathname === '/warehouse' || pathname.startsWith('/warehouse/'),
+    inside(pathname, '/warehouse') && accessTo(access, 'warehouse') !== null,
   );
+  const navigation = useMemo(
+    () => navigationFor(workspaces, access, (code) => can(code)),
+    [access, can],
+  );
+
+  if (access.noWorkspace) return <NoWebAccessPage reason={access.noWorkspace} />;
+
+  const target = locate(workspaces, pathname);
+  const level = accessTo(access, target.workspace.id);
+  // `/` and the sign-in page send everyone to MOH; anyone else starts in their own workspace.
+  if (level === null && pathname === HOME_PATH && home) return <Redirect to={home.basePath} />;
+
+  const visible = locate(navigation, pathname);
+  const isScreen = target.page !== null || target.detail !== null;
+  const blocked = !isScreen
+    ? null
+    : level === null
+      ? 'workspace'
+      : visible.page === null && visible.detail === null
+        ? 'permission'
+        : null;
+
+  let content = children;
+  let fallbackTitle: string | undefined;
+  if (blocked === 'workspace') {
+    content = <NotYourWorkspace workspace={target.workspace} home={home} />;
+    fallbackTitle = 'Not part of your work';
+  } else if (blocked === 'permission' && target.page) {
+    content = <NoPermission page={target.page} home={home} />;
+    fallbackTitle = target.page.title;
+  }
+
+  const readOnly = level === 'read' && blocked === null;
+  const hasNoPermissions = user?.permissions?.length === 0;
+
   return (
-    <AppShell workspaces={workspaces} storage={storage} counts={dcfpCounts ?? warehouseCounts}>
-      <DistrictContextProvider>{children}</DistrictContextProvider>
-    </AppShell>
+    <ReadOnlyProvider value={readOnly}>
+      <AppShell
+        workspaces={navigation}
+        storage={storage}
+        counts={dcfpCounts ?? warehouseCounts}
+        notifications={feed.notifications}
+        notificationActions={feed.actions}
+        fallbackTitle={fallbackTitle}
+      >
+        {readOnly ? <ReadOnlyNotice workspace={target.workspace} /> : null}
+        {hasNoPermissions && blocked === null ? <NoPermissionsNotice /> : null}
+        {/* A blocked screen gets no district picker: its lookups would only 403. */}
+        {blocked === null ? <DistrictContextProvider>{content}</DistrictContextProvider> : content}
+      </AppShell>
+    </ReadOnlyProvider>
   );
 }

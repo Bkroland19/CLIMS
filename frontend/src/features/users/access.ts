@@ -71,18 +71,49 @@ export function userRoleLabels(user: Pick<User, 'roles' | 'role'>): string[] {
   return user.role ? [roleLabel({ id: '', name: user.role })] : [];
 }
 
+/*
+ * Every permission the Go API defines (its migrations 2, 6, 8, 13, 18 and 29), worded
+ * from the server's own descriptions. "Assigned" store, hotspot or district
+ * means the one on the user's account; the `all_*` codes lift that limit.
+ */
 const PERMISSION_LABELS: Readonly<Record<string, string>> = {
+  'catalogue:manage':
+    'Create, edit and retire condom products, product types, brands and units of measure',
   'users:read': 'List users and view user accounts',
   'users:create': 'Create user accounts',
   'users:update': 'Activate or disable user accounts',
   'roles:read': 'List roles and their permissions',
   'roles:assign': 'Assign roles to users',
   'roles:manage': 'Change the permissions of roles',
+  'orders:read': 'View orders involving their store',
+  'orders:stockout': 'Report stockouts at their hotspot',
+  'orders:process': 'Approve, reject, check and dispatch orders placed with their warehouse',
+  'orders:replenish': 'Order stock from NMS or JMS for their district store',
+  'orders:receive': 'Check and record stock their store received',
+  'orders:all_stores': 'Use their order permissions for every store',
+  'inventory:read': 'View stock balances, movements and hotspot deliveries',
+  'inventory:manage': 'Record stock received and stock adjustments at their store',
+  'hotspots:read': 'View hotspots they submitted or in their district',
+  'hotspots:submit': 'Submit newly identified hotspots for activation',
+  'hotspots:activate': 'Verify and activate hotspots in their district',
+  'hotspots:all_districts': 'Use their hotspot permissions in every district',
+  'orders:supply_hotspots': 'Deliver stock to hotspots in their district',
+  'orders:deliver': 'Carry hotspot deliveries named for them, and see those deliveries',
+  'reports:read': 'View programme reports and download them',
+  'reports:configure': "Set their store's review cycle, receipt deadline and on-time target",
+  'reports:approve': 'Approve report versions and record corrections',
+  'audit:read': 'Search the audit log of sign-ins and changes',
 };
 
 const GROUP_LABELS: Readonly<Record<string, string>> = {
+  catalogue: 'Catalogue',
   users: 'Users',
   roles: 'Roles',
+  orders: 'Orders',
+  inventory: 'Inventory',
+  hotspots: 'Hotspots',
+  reports: 'Reports',
+  audit: 'Audit log',
 };
 
 export function permissionLabel(code: string): string {

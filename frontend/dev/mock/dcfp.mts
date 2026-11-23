@@ -1,0 +1,1004 @@
+/**
+ * The DCFP's flows for the mock API, in the Go API's shapes (docs/modules/orders.md):
+ *
+ * - `GET/POST /orders/stockouts`: hotspot stockout reports. A report notifies the district's
+ *   DCFPs; it is not an order. `GET /orders/stockouts/:id` adds deliveries and history, and
+ *   `POST /orders/stockouts/:id/deliveries` records a delivery without changing mock inventory.
+ * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS,
+ *   with no unit; the warehouse chooses the product and the order takes that product's unit.
+ * - `POST /orders/district-dispatches`: NMS or JMS sends free stock to a district store before it
+ *   orders, one dispatched order per product, all lines or none.
+ * - `GET /orders`, `/orders/:id`, `/orders/:id/events`, and `POST /orders/:id/actions/{review,
+ *   check-stock,reject,dispatch,receive}`: the warehouse approves, reserves and dispatches from
+ *   the batches in `inventory.mts`, first expiry first out; the district's receipt adds to the
+ *   batches at its store.
+ * - `/notifications`: the signed-in user's central inbox.
+ *
+ * The mock user sees every store, as an administrator does: Wakiso's orders for the DCFP screens,
+ * and a few other districts' orders for the warehouse screens. Seeded orders start at each
+ * status.
+ */
+import { mockProductId, mockUnitId } from './admin.mts';
+import { MOCK_STORES, mockDistrictStoreId } from './hotspots.mts';
+import { addTo, log, planTake, reservableFor, reserve, take, type Take } from './inventory.mts';
+
+interface Reply {
+  status: number;
+  body: unknown;
+}
+
+type Body = Record<string, unknown>;
+
+type Status =
+  'queued' | 'reviewed' | 'on_hold' | 'confirmed' | 'rejected' | 'dispatched' | 'received';
+
+interface Order {
+  id: string;
+  condom_id: string | null;
+  condom_category: 'male' | 'female';
+  quantity_needed: number;
+  quantity_issued: number | null;
+  quantity_received: number | null;
+  order_status: Status;
+  order_date: string;
+  ordered_by_id: string;
+  handled_by_id: string | null;
+  ordered_for_store_id: string;
+  ordered_from_store_id: string;
+  /** Null until the warehouse chooses the product; then the product's catalogue unit. */
+  unit_of_measure_id: string | null;
+  comment: string | null;
+  discrepancy_note: string | null;
+  quantity_approved: number | null;
+  rejection_reason: string | null;
+  waybill_number: string | null;
+  vehicle_registration: string | null;
+  driver_name: string | null;
+  driver_phone: string | null;
+  /** Stock the warehouse sent without an order. */
+  unrequested: boolean;
+  hot_spot_id: null;
+  parent_order_id: null;
+  rider_id: null;
+  delivery_note: null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Event {
+  id: string;
+  order_id: string;
+  actor_id: string;
+  action: string;
+  status: Status;
+  created_at: string;
+}
+
+interface Report {
+  id: string;
+  hot_spot_id: string;
+  hot_spot: {
+    name: string;
+    village: string | null;
+    subcounty: string | null;
+    district: string | null;
+    contact_name: string | null;
+    contact_phone: string | null;
+  };
+  condom_id: string | null;
+  selection: 'male' | 'female' | 'both';
+  product: string;
+  district_store_id: string;
+  reported_by_id: string;
+  reported_by: string;
+  comment: string | null;
+  created_at: string;
+  repeat_count: number;
+  last_reported_at: string;
+  status: 'awaiting_supply' | 'awaiting_acknowledgement' | 'partly_received' | 'fulfilled';
+  fulfilled_at: string | null;
+}
+
+interface Rider {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+
+/** Delivery agents working in the mock DCFP's district (GET /orders/stockouts/:id/riders). */
+const riders = (): Rider[] => [
+  { id: id(11, 1), name: 'Moses Kato', phone: '0772 000111' },
+  { id: id(11, 2), name: 'Sarah Achieng', phone: null },
+];
+
+interface Delivery {
+  id: string;
+  delivered_by_id: string;
+  note: string | null;
+  created_at: string;
+  rider: Rider | null;
+  lines: {
+    id: string;
+    category: 'male' | 'female';
+    condom_id: string;
+    product: string;
+    unit_of_measure_id: string;
+    quantity: number;
+    pieces: number;
+    acknowledged_pieces: number | null;
+    acknowledged_at: string | null;
+  }[];
+}
+
+interface ReportEvent {
+  id: string;
+  actor_id: string | null;
+  action: 'raised' | 'repeated' | 'selection_changed' | 'delivered' | 'acknowledged';
+  selection: Report['selection'];
+  created_at: string;
+}
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  actor_id: string | null;
+  data: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+}
+
+const id = (prefix: number, n: number) =>
+  `00000000-0000-4000-${String(8300 + prefix)}-${String(n).padStart(12, '0')}`;
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60_000).toISOString();
+
+const DISTRICT = mockDistrictStoreId('Wakiso') ?? '';
+const NMS = MOCK_STORES.find((store) => store.code === 'nms')?.id ?? '';
+const JMS = MOCK_STORES.find((store) => store.code === 'jms')?.id ?? '';
+const NATIONAL = new Set([NMS, JMS]);
+const ME = '00000000-0000-4000-8002-000000000001';
+const WAREHOUSE_STAFF = '00000000-0000-4000-8002-000000000009';
+
+/** Products the seed refers to, by the admin mock's numbering, and what the API calls them. */
+const PRODUCTS: Record<string, { name: string; unit: string | null }> = {
+  [mockProductId(1)]: { name: 'Engabu Free Male', unit: mockUnitId(1) },
+  [mockProductId(2)]: { name: 'Engabu Free Male', unit: mockUnitId(2) },
+  [mockProductId(3)]: { name: 'Engabu Free Male', unit: mockUnitId(3) },
+  [mockProductId(4)]: { name: 'FC2 Free Female', unit: mockUnitId(1) },
+  [mockProductId(5)]: { name: 'FC2 Free Female', unit: mockUnitId(2) },
+  [mockProductId(7)]: { name: 'Trust Commercial Male', unit: null },
+  [mockProductId(99)]: {
+    name: 'A brand name long enough Socially marketed Female',
+    unit: mockUnitId(3),
+  },
+};
+
+/** The condom category of a seeded product, read from its name. */
+const categoryOf = (product: string | null): 'male' | 'female' =>
+  product && PRODUCTS[product]?.name.endsWith('Female') ? 'female' : 'male';
+
+const state = {
+  orders: [] as Order[],
+  events: [] as Event[],
+  reports: [] as Report[],
+  /** Each report's deliveries and history, by report id. */
+  deliveries: {} as Record<string, Delivery[]>,
+  reportEvents: {} as Record<string, ReportEvent[]>,
+  notifications: [] as Notification[],
+  /** The batches each dispatched order took, for the district's receipt. */
+  shipments: new Map<string, Take[]>(),
+  next: 1,
+};
+
+const ok = (data: unknown, status = 200): Reply => ({ status, body: { success: true, data } });
+const fail = (status: number, message: string, error?: Record<string, string>): Reply => ({
+  status,
+  body: error ? { success: false, message, error } : { success: false, message },
+});
+
+function order(
+  n: number,
+  values: Partial<Order> & Pick<Order, 'order_status'>,
+  hours: number,
+): Order {
+  const quantity = values.quantity_needed ?? 500;
+  const product = values.condom_id === undefined ? mockProductId(5) : values.condom_id;
+  return {
+    id: id(1, n),
+    condom_id: product,
+    condom_category: categoryOf(product),
+    quantity_needed: quantity,
+    quantity_issued: null,
+    quantity_received: null,
+    order_date: hoursAgo(hours).slice(0, 10),
+    ordered_by_id: ME,
+    handled_by_id: null,
+    ordered_for_store_id: DISTRICT,
+    ordered_from_store_id: NMS,
+    unit_of_measure_id: product === null ? null : mockUnitId(2),
+    comment: null,
+    discrepancy_note: null,
+    quantity_approved: null,
+    rejection_reason: null,
+    waybill_number: null,
+    vehicle_registration: null,
+    driver_name: null,
+    driver_phone: null,
+    unrequested: false,
+    hot_spot_id: null,
+    parent_order_id: null,
+    rider_id: null,
+    delivery_note: null,
+    created_at: hoursAgo(hours),
+    updated_at: hoursAgo(Math.max(hours - 6, 0)),
+    ...values,
+  };
+}
+
+/** The steps that brought a seeded order to its status. */
+function historyOf(o: Order): Event[] {
+  const steps: [string, Status, string][] = [['replenishment_requested', 'queued', ME]];
+  const reached = ['queued', 'reviewed', 'on_hold', 'confirmed', 'dispatched', 'received'].indexOf(
+    o.order_status,
+  );
+  if (reached >= 1) steps.push(['review', 'reviewed', WAREHOUSE_STAFF]);
+  if (o.order_status === 'on_hold') steps.push(['check-stock', 'on_hold', WAREHOUSE_STAFF]);
+  if (reached >= 3) steps.push(['check-stock', 'confirmed', WAREHOUSE_STAFF]);
+  if (reached >= 4) steps.push(['dispatch', 'dispatched', WAREHOUSE_STAFF]);
+  if (reached >= 5) steps.push(['receive', 'received', ME]);
+  if (o.order_status === 'rejected') steps.push(['reject', 'rejected', WAREHOUSE_STAFF]);
+  const start = Date.parse(o.created_at);
+  return steps.map(([action, status, actor], index) => ({
+    id: `${o.id}-e${index}`,
+    order_id: o.id,
+    actor_id: actor,
+    action,
+    status,
+    created_at: new Date(start + index * 3 * 60 * 60_000).toISOString(),
+  }));
+}
+
+function report(n: number, values: Partial<Report>, hours: number): Report {
+  return {
+    id: id(2, n),
+    hot_spot_id: id(3, n),
+    hot_spot: {
+      name: 'Kisenyi Landing Site',
+      village: 'Kisenyi',
+      subcounty: 'Katabi Town Council',
+      district: 'Wakiso',
+      contact_name: 'Peter Okello',
+      contact_phone: '0772 123456',
+    },
+    condom_id: null,
+    selection: 'female',
+    product: 'female condoms',
+    district_store_id: DISTRICT,
+    reported_by_id: id(4, n),
+    reported_by: 'Grace Nakato',
+    comment: null,
+    created_at: hoursAgo(hours),
+    repeat_count: 0,
+    last_reported_at: hoursAgo(hours),
+    status: 'awaiting_supply',
+    fulfilled_at: null,
+    ...values,
+  };
+}
+
+/** A report with its deliveries and history, as `GET /orders/stockouts/:id` returns it. */
+function stockoutDetail(r: Report) {
+  return {
+    ...r,
+    deliveries: state.deliveries[r.id] ?? [],
+    events: state.reportEvents[r.id] ?? [
+      {
+        id: `${r.id}-raised`,
+        actor_id: r.reported_by_id,
+        action: 'raised',
+        selection: r.selection,
+        created_at: r.created_at,
+      },
+    ],
+  };
+}
+
+/** Records stock sent to a hotspot. Lines must name seeded products of the report's categories. */
+function deliver(r: Report, body: Body): Reply {
+  if (r.fulfilled_at) return fail(409, 'this notification is already fulfilled');
+  const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
+  if (lines.length === 0 || lines.length > 20)
+    return fail(422, 'a delivery needs between 1 and 20 lines');
+  const now = new Date().toISOString();
+  const deliveryId = id(9, (state.next += 1));
+  const recorded: Delivery['lines'] = [];
+  for (const line of lines) {
+    const productId = text(line.condom_id);
+    const quantity = typeof line.quantity === 'number' ? line.quantity : 0;
+    const product = PRODUCTS[productId];
+    if (!product) return fail(422, 'unknown product');
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return fail(422, 'each line needs a quantity between 1 and 1000000');
+    }
+    const category = categoryOf(productId);
+    if (r.selection !== 'both' && r.selection !== category) {
+      return fail(422, "a delivery line's product type is not in the notification's selection");
+    }
+    recorded.push({
+      id: id(10, (state.next += 1)),
+      category,
+      condom_id: productId,
+      product: product.name,
+      unit_of_measure_id: product.unit ?? mockUnitId(1),
+      quantity,
+      // The mock does not know pack sizes; 100 a unit keeps the numbers readable.
+      pieces: quantity * 100,
+      acknowledged_pieces: null,
+      acknowledged_at: null,
+    });
+  }
+  const riderId = text(body.rider_id);
+  const rider = riderId ? riders().find((candidate) => candidate.id === riderId) : null;
+  if (riderId && !rider) {
+    const message =
+      "the delivery agent must be an active delivery agent working in the hotspot's district";
+    return fail(422, message, { rider_id: message });
+  }
+  const detail = stockoutDetail(r);
+  state.deliveries[r.id] = [
+    ...detail.deliveries,
+    {
+      id: deliveryId,
+      delivered_by_id: ME,
+      note: text(body.note) || null,
+      created_at: now,
+      rider: rider ?? null,
+      lines: recorded,
+    },
+  ];
+  state.reportEvents[r.id] = [
+    ...detail.events,
+    {
+      id: `${deliveryId}-event`,
+      actor_id: ME,
+      action: 'delivered',
+      selection: r.selection,
+      created_at: now,
+    },
+  ];
+  r.status = 'awaiting_acknowledgement';
+  return ok(stockoutDetail(r), 201);
+}
+
+function stockoutNotification(r: Report): Notification {
+  const place = [r.hot_spot.village, r.hot_spot.subcounty, r.hot_spot.district]
+    .filter(Boolean)
+    .join(', ');
+  const contact = [
+    r.hot_spot.contact_name,
+    r.hot_spot.contact_phone && `(${r.hot_spot.contact_phone})`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return {
+    id: `${r.id}-n`,
+    type: 'order.stockout_reported',
+    title: `Stockout at ${r.hot_spot.name}`,
+    body:
+      `${r.hot_spot.name}${place ? `, ${place},` : ''} is out of ${r.product}.` +
+      (r.comment ? ` Message: "${r.comment}"` : '') +
+      ` Reported by ${r.reported_by}.` +
+      (contact ? ` Contact: ${contact}.` : ''),
+    resource_type: 'hotspot',
+    resource_id: r.hot_spot_id,
+    actor_id: r.reported_by_id,
+    data: {
+      report_id: r.id,
+      hotspot: r.hot_spot.name,
+      product: r.product,
+      message: r.comment ?? '',
+    },
+    read_at: null,
+    created_at: r.created_at,
+  };
+}
+
+export function seedDcfp(dataset: string): void {
+  state.next = 100;
+  if (dataset === 'empty') {
+    Object.assign(state, {
+      orders: [],
+      events: [],
+      reports: [],
+      deliveries: {},
+      reportEvents: {},
+      notifications: [],
+    });
+    return;
+  }
+  state.orders = [
+    order(
+      1,
+      {
+        order_status: 'queued',
+        condom_id: null,
+        condom_category: 'female',
+        comment: 'Two hotspots in Katabi are out',
+      },
+      3,
+    ),
+    order(
+      2,
+      { order_status: 'on_hold', ordered_from_store_id: JMS, condom_id: mockProductId(2) },
+      30,
+    ),
+    order(
+      3,
+      { order_status: 'dispatched', quantity_issued: 480, handled_by_id: WAREHOUSE_STAFF },
+      52,
+    ),
+    order(
+      4,
+      {
+        order_status: 'received',
+        condom_id: mockProductId(2),
+        quantity_needed: 1000,
+        quantity_issued: 1000,
+        quantity_received: 990,
+        discrepancy_note: 'One box damaged in transit',
+        handled_by_id: WAREHOUSE_STAFF,
+      },
+      24 * 9,
+    ),
+    order(
+      5,
+      {
+        order_status: 'rejected',
+        ordered_from_store_id: JMS,
+        condom_id: null,
+        condom_category: 'female',
+        quantity_needed: 800,
+        rejection_reason:
+          'Female condoms are reserved for the national campaign until 15 December. Please order from NMS.',
+      },
+      24 * 4,
+    ),
+    // Other districts' orders, for the warehouse screens.
+    order(
+      6,
+      {
+        order_status: 'queued',
+        ordered_for_store_id: mockDistrictStoreId('Kampala') ?? '',
+        condom_id: null,
+        condom_category: 'male',
+        quantity_needed: 800,
+        comment: 'Stock for the Independence Day outreach',
+      },
+      5,
+    ),
+    order(
+      7,
+      {
+        order_status: 'queued',
+        ordered_for_store_id: mockDistrictStoreId('Gulu') ?? '',
+        condom_id: null,
+        quantity_needed: 900,
+      },
+      26,
+    ),
+    order(
+      8,
+      {
+        order_status: 'confirmed',
+        ordered_for_store_id: mockDistrictStoreId('Mukono') ?? '',
+        quantity_needed: 400,
+        quantity_approved: 400,
+      },
+      40,
+    ),
+  ];
+  state.deliveries = {};
+  state.reportEvents = {};
+  state.reports = [
+    report(1, { comment: 'Dispenser empty since Monday' }, 2),
+    report(
+      2,
+      {
+        hot_spot: {
+          name: 'Nansana Bus Park',
+          village: 'Nansana',
+          subcounty: 'Nansana Division',
+          district: 'Wakiso',
+          contact_name: null,
+          contact_phone: '0701 555123',
+        },
+        condom_id: mockProductId(2),
+        product: 'Engabu Free Male',
+        reported_by: 'Moses Kato',
+        comment: 'Running low. Weekend market',
+      },
+      20,
+    ),
+    report(
+      3,
+      {
+        hot_spot: {
+          name: 'Kasangati Bar 7',
+          village: null,
+          subcounty: null,
+          district: 'Wakiso',
+          contact_name: null,
+          contact_phone: null,
+        },
+        reported_by: 'Agnes Atim',
+      },
+      24 * 12,
+    ),
+  ];
+  if (dataset === 'worst') {
+    state.reports.unshift(
+      report(
+        99,
+        {
+          hot_spot: {
+            name: 'A hotspot with a name long enough to wrap twice in the table cell',
+            village: 'V'.repeat(60),
+            subcounty: null,
+            district: 'Wakiso',
+            contact_name: 'Someone With A Very Long Name Indeed',
+            contact_phone: '+256 772 000000 ext. 12345',
+          },
+          condom_id: mockProductId(99),
+          product: PRODUCTS[mockProductId(99)]?.name ?? 'Condoms',
+          comment: 'x'.repeat(600),
+        },
+        1,
+      ),
+    );
+  }
+  state.events = state.orders.flatMap(historyOf);
+  state.shipments = new Map();
+  // Confirmed orders hold their reservations at the warehouse.
+  for (const o of state.orders) {
+    if (o.order_status === 'confirmed' && o.condom_id && o.unit_of_measure_id) {
+      reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, approvedOf(o));
+    }
+  }
+  state.notifications = state.reports.map(stockoutNotification);
+  // Older ones have been read.
+  for (const n of state.notifications.slice(2)) n.read_at = hoursAgo(1);
+}
+
+const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+function placeWarehouseOrder(body: Body): Reply {
+  // Like the Go API, which refuses unknown fields: the DCFP names no product and no unit.
+  if ('unit_of_measure_id' in body || 'condom_id' in body) return fail(400, 'invalid request body');
+  const warehouse = text(body.warehouse_store_id);
+  const category = text(body.condom_category);
+  const quantity = body.quantity;
+  if (!warehouse) {
+    const message = 'provide the warehouse_store_id UUID';
+    return fail(422, message, { warehouse_store_id: message });
+  }
+  if (category !== 'male' && category !== 'female') {
+    const message = 'condom_category must be male or female';
+    return fail(422, message, { condom_category: message });
+  }
+  if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) {
+    const message = 'quantity must be a positive whole number';
+    return fail(422, message, { quantity: message });
+  }
+  if (!NATIONAL.has(warehouse)) {
+    const message = 'warehouse_store_id must name a national warehouse (NMS or JMS)';
+    return fail(422, message, { warehouse_store_id: message });
+  }
+  const created = order(
+    (state.next += 1),
+    {
+      order_status: 'queued',
+      condom_id: null,
+      condom_category: category,
+      quantity_needed: quantity,
+      ordered_from_store_id: warehouse,
+      comment: text(body.comment) || null,
+    },
+    0,
+  );
+  created.updated_at = created.created_at;
+  state.orders.unshift(created);
+  state.events.push(...historyOf(created));
+  return ok(created, 201);
+}
+
+const conflict = () => fail(409, 'action is unavailable in the current order state');
+const approvedOf = (o: Order) => o.quantity_approved ?? o.quantity_needed;
+
+function step(o: Order, action: string, status: Status, actor = WAREHOUSE_STAFF): void {
+  o.order_status = status;
+  o.updated_at = new Date().toISOString();
+  state.events.push({
+    id: `${o.id}-e${String(state.events.length)}`,
+    order_id: o.id,
+    actor_id: actor,
+    action,
+    status,
+    created_at: o.updated_at,
+  });
+}
+
+/** Like the Go API: approve a queued or held order for a product of its category, all or part. */
+function review(o: Order, body: Body): Reply {
+  if (o.order_status !== 'queued' && o.order_status !== 'on_hold') return conflict();
+  const asked = body.quantity_approved;
+  const quantity = asked === undefined ? o.quantity_needed : asked;
+  if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) {
+    return fail(422, 'action requires valid shipment or receipt details');
+  }
+  if (quantity > o.quantity_needed)
+    return fail(422, 'action requires valid shipment or receipt details');
+  const chosen = text(body.condom_id) || o.condom_id;
+  if (!chosen) {
+    const message = 'choose the product to send: give condom_id at review';
+    return fail(422, message, { condom_id: message });
+  }
+  if (!PRODUCTS[chosen] || categoryOf(chosen) !== o.condom_category) {
+    const message = 'the product chosen is not of the condom category requested';
+    return fail(422, message, { condom_id: message });
+  }
+  // The order is counted in the chosen product's catalogue unit.
+  const unit = PRODUCTS[chosen].unit;
+  if (!unit) {
+    const message =
+      'the product chosen has no unit in the catalogue; give it one before sending it';
+    return fail(422, message, { condom_id: message });
+  }
+  o.condom_id = chosen;
+  o.unit_of_measure_id = unit;
+  o.quantity_approved = quantity;
+  step(o, 'review', 'reviewed');
+  return ok(o);
+}
+
+/** Reserves the approved quantity when enough unexpired stock is free, else holds the order. */
+function checkStock(o: Order): Reply {
+  if (
+    (o.order_status !== 'reviewed' && o.order_status !== 'on_hold') ||
+    !o.condom_id ||
+    !o.unit_of_measure_id
+  ) {
+    return conflict();
+  }
+  const approved = approvedOf(o);
+  if (reservableFor(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id) >= approved) {
+    reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, approved);
+    step(o, 'check-stock', 'confirmed');
+  } else {
+    step(o, 'check-stock', 'on_hold');
+  }
+  return ok(o);
+}
+
+function reject(o: Order, body: Body): Reply {
+  if (!['queued', 'reviewed', 'on_hold', 'confirmed'].includes(o.order_status)) return conflict();
+  const reason = text(body.reason);
+  if (!reason) {
+    return fail(422, 'say why the order is rejected', { reason: 'say why the order is rejected' });
+  }
+  if (o.order_status === 'confirmed' && o.condom_id && o.unit_of_measure_id) {
+    reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, -approvedOf(o));
+  }
+  o.rejection_reason = reason;
+  step(o, 'reject', 'rejected');
+  return ok(o);
+}
+
+/** Like the Go API: dispatch what is reserved, or less, first expiry first out. */
+function dispatch(o: Order, body: Body): Reply {
+  if (o.order_status !== 'confirmed' || !o.condom_id || !o.unit_of_measure_id) return conflict();
+  const approved = approvedOf(o);
+  const asked = body.quantity_issued;
+  const quantity = asked === undefined ? approved : asked;
+  if (
+    typeof quantity !== 'number' ||
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > approved
+  ) {
+    return fail(422, 'action requires valid shipment or receipt details');
+  }
+  const plan = planTake(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, quantity);
+  if (!plan) return fail(409, 'not enough unexpired stock: expired batches cannot be issued');
+  const reason = text(body.expiry_exception_reason);
+  if (plan.nearExpiry && !reason) {
+    const message = 'stock expiring within one month needs expiry_exception_reason';
+    return fail(422, message, { expiry_exception_reason: message });
+  }
+  reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, -approved);
+  state.shipments.set(o.id, take(plan.takes));
+  log(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, 'dispatch', -quantity, {
+    orderId: o.id,
+  });
+  Object.assign(o, {
+    quantity_issued: quantity,
+    handled_by_id: WAREHOUSE_STAFF,
+    waybill_number: text(body.waybill_number) || null,
+    vehicle_registration: text(body.vehicle_registration) || null,
+    driver_name: text(body.driver_name) || null,
+    driver_phone: text(body.driver_phone) || null,
+  });
+  step(o, 'dispatch', 'dispatched');
+  return ok(o);
+}
+
+const DISPATCH_FIELDS = new Set([
+  'warehouse_store_id',
+  'district_store_id',
+  'lines',
+  'note',
+  'expiry_exception_reason',
+  'waybill_number',
+  'vehicle_registration',
+  'driver_name',
+  'driver_phone',
+]);
+
+/**
+ * Like the Go API: free stock (unexpired, unreserved) goes to a district store before it orders,
+ * first expiry first out, as one dispatched order per line. Every line is checked before any
+ * stock moves, so the lines go together or not at all.
+ */
+function districtDispatch(body: Body): Reply {
+  if (Object.keys(body).some((key) => !DISPATCH_FIELDS.has(key))) {
+    return fail(400, 'invalid request body');
+  }
+  const warehouse = text(body.warehouse_store_id);
+  const district = text(body.district_store_id);
+  if (!NATIONAL.has(warehouse)) {
+    const message = 'warehouse_store_id must name a national warehouse (NMS or JMS)';
+    return fail(422, message, { warehouse_store_id: message });
+  }
+  if (!MOCK_STORES.some((store) => store.id === district && store.store_type === 'district')) {
+    const message = 'district_store_id must name a district store';
+    return fail(422, message, { district_store_id: message });
+  }
+  const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
+  if (lines.length < 1 || lines.length > 20) {
+    const message = 'a dispatch needs between 1 and 20 lines';
+    return fail(422, message, { lines: message });
+  }
+  const reason = text(body.expiry_exception_reason);
+  const planned = [];
+  for (const [index, line] of lines.entries()) {
+    const at = `line ${String(index + 1)}: `;
+    const product = text(line.condom_id);
+    const quantity = line.quantity;
+    const first = lines.findIndex((other) => text(other.condom_id) === product);
+    if (first < index) {
+      return fail(
+        422,
+        `${at}the product is already on line ${String(first + 1)}; put its whole quantity on one line`,
+      );
+    }
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) {
+      return fail(422, `${at}quantity must be a whole number from 1 to 10000000`);
+    }
+    const unit = PRODUCTS[product]?.unit;
+    if (!PRODUCTS[product]) return fail(422, `${at}condom_id does not name a product`);
+    if (!unit) {
+      return fail(
+        422,
+        `${at}the product chosen has no unit in the catalogue; give it one before sending it`,
+      );
+    }
+    if (reservableFor(warehouse, product, unit) < quantity) {
+      return fail(
+        409,
+        `${at}not enough free stock: on hand less reserved and expired stock does not cover it`,
+      );
+    }
+    const plan = planTake(warehouse, product, unit, quantity);
+    if (!plan)
+      return fail(409, `${at}not enough unexpired stock: expired batches cannot be issued`);
+    if (plan.nearExpiry && !reason) {
+      const message = `${at}stock expiring within one month needs expiry_exception_reason`;
+      return fail(422, message, { expiry_exception_reason: message });
+    }
+    planned.push({ product, unit, quantity, plan });
+  }
+  const created = planned.map(({ product, unit, quantity, plan }) => {
+    const sent = order(
+      (state.next += 1),
+      {
+        order_status: 'dispatched',
+        condom_id: product,
+        condom_category: categoryOf(product),
+        unit_of_measure_id: unit,
+        quantity_needed: quantity,
+        quantity_approved: quantity,
+        quantity_issued: quantity,
+        ordered_by_id: WAREHOUSE_STAFF,
+        handled_by_id: WAREHOUSE_STAFF,
+        ordered_for_store_id: district,
+        ordered_from_store_id: warehouse,
+        comment: text(body.note) || null,
+        waybill_number: text(body.waybill_number) || null,
+        vehicle_registration: text(body.vehicle_registration) || null,
+        driver_name: text(body.driver_name) || null,
+        driver_phone: text(body.driver_phone) || null,
+        unrequested: true,
+      },
+      0,
+    );
+    sent.updated_at = sent.created_at;
+    state.shipments.set(sent.id, take(plan.takes));
+    log(warehouse, product, unit, 'dispatch', -quantity, { orderId: sent.id });
+    state.orders.unshift(sent);
+    state.events.push({
+      id: `${sent.id}-e${String(state.events.length)}`,
+      order_id: sent.id,
+      actor_id: WAREHOUSE_STAFF,
+      action: 'dispatch',
+      status: 'dispatched',
+      created_at: sent.created_at,
+    });
+    return sent;
+  });
+  return ok(created, 201);
+}
+
+/** The district's batches are the ones shipped: a shortfall comes off the last of them. */
+function receiveIntoBatches(o: Order, counted: number): void {
+  if (!o.condom_id || !o.unit_of_measure_id || counted <= 0) return;
+  let left = counted;
+  for (const shipped of state.shipments.get(o.id) ?? []) {
+    const quantity = Math.min(left, shipped.quantity);
+    if (quantity > 0) {
+      addTo(
+        o.ordered_for_store_id,
+        o.condom_id,
+        o.unit_of_measure_id,
+        shipped.batch_number,
+        shipped.expiry_date,
+        quantity,
+      );
+    }
+    left -= quantity;
+  }
+  // A surplus, or an order seeded as dispatched, goes to a batch of unknown expiry.
+  if (left > 0) addTo(o.ordered_for_store_id, o.condom_id, o.unit_of_measure_id, null, null, left);
+  log(o.ordered_for_store_id, o.condom_id, o.unit_of_measure_id, 'order_receipt', counted, {
+    orderId: o.id,
+  });
+}
+
+function receive(o: Order, body: Body): Reply {
+  if (o.order_status !== 'dispatched') {
+    return fail(409, 'action is unavailable in the current order state');
+  }
+  const counted = body.quantity_received;
+  const note = text(body.discrepancy_note);
+  if (typeof counted !== 'number' || !Number.isInteger(counted) || counted < 0) {
+    return fail(422, 'action requires valid shipment or receipt details');
+  }
+  if (counted !== o.quantity_issued && !note) {
+    return fail(422, 'action requires valid shipment or receipt details');
+  }
+  receiveIntoBatches(o, counted);
+  Object.assign(o, {
+    order_status: 'received',
+    quantity_received: counted,
+    discrepancy_note: note || null,
+    updated_at: new Date().toISOString(),
+  });
+  state.events.push({
+    id: `${o.id}-e${state.events.length}`,
+    order_id: o.id,
+    actor_id: ME,
+    action: 'receive',
+    status: 'received',
+    created_at: o.updated_at,
+  });
+  return ok(o);
+}
+
+function reportStockout(body: Body): Reply {
+  const hotSpot = text(body.hot_spot_id);
+  const selection = text(body.condom_category);
+  if (!hotSpot) return fail(422, "provide the hotspot's UUID");
+  if (selection !== 'male' && selection !== 'female' && selection !== 'both') {
+    return fail(422, 'condom_category must be male, female or both');
+  }
+  const created = report(
+    (state.next += 1),
+    {
+      hot_spot_id: hotSpot,
+      selection,
+      product: selection === 'both' ? 'male and female condoms' : `${selection} condoms`,
+      reported_by: 'Sarah Nakato',
+      reported_by_id: ME,
+      comment: text(body.message) || null,
+    },
+    0,
+  );
+  state.reports.unshift(created);
+  state.notifications.unshift(stockoutNotification(created));
+  return ok(created, 201);
+}
+
+function inbox(method: string, parts: string[], query: URLSearchParams): Reply {
+  const [, target, action] = parts;
+  if (method === 'GET' && target === undefined) {
+    const unread = query.get('unread') === 'true';
+    const limit = Math.min(Number(query.get('limit') ?? 50) || 50, 100);
+    return ok(state.notifications.filter((n) => !unread || n.read_at === null).slice(0, limit));
+  }
+  if (method === 'GET' && target === 'unread-count') {
+    return ok({ unread: state.notifications.filter((n) => n.read_at === null).length });
+  }
+  if (method === 'POST' && target === 'read-all') {
+    const unread = state.notifications.filter((n) => n.read_at === null);
+    for (const n of unread) n.read_at = new Date().toISOString();
+    return ok({ marked: unread.length });
+  }
+  if (method === 'POST' && target && action === 'read') {
+    const found = state.notifications.find((n) => n.id === target);
+    if (!found) return fail(404, 'notification not found');
+    found.read_at ??= new Date().toISOString();
+    return ok(null);
+  }
+  return fail(404, 'Not found');
+}
+
+/** Answers `/orders…` and `/notifications…`, or returns null for any other path. */
+export function handleDcfp(
+  method: string,
+  parts: string[],
+  body: Body,
+  query: URLSearchParams,
+): Reply | null {
+  const [resource, target, segment, action] = parts;
+  if (resource === 'notifications') return inbox(method, parts, query);
+  if (resource !== 'orders') return null;
+  if (target === undefined)
+    return method === 'GET' ? ok(state.orders) : fail(405, 'Method not allowed');
+  if (target === 'stockouts') {
+    if (segment !== undefined) {
+      const r = state.reports.find((candidate) => candidate.id === segment);
+      if (!r) return fail(404, 'stockout notification not found');
+      if (method === 'GET' && action === undefined) return ok(stockoutDetail(r));
+      if (method === 'POST' && action === 'deliveries') return deliver(r, body);
+      if (method === 'GET' && action === 'riders') return ok(riders());
+      return fail(404, 'Not found');
+    }
+    if (method === 'GET') return ok(state.reports);
+    if (method === 'POST') return reportStockout(body);
+  }
+  if (target === 'warehouse-requests' && method === 'POST') return placeWarehouseOrder(body);
+  if (target === 'district-dispatches' && method === 'POST') return districtDispatch(body);
+  const found = state.orders.find((candidate) => candidate.id === target);
+  if (!found) return fail(404, 'order not found');
+  if (method === 'GET' && segment === undefined) return ok(found);
+  if (method === 'GET' && segment === 'events') {
+    return ok(state.events.filter((event) => event.order_id === found.id).reverse());
+  }
+  if (method === 'POST' && segment === 'actions') {
+    switch (action) {
+      case 'review':
+        return review(found, body);
+      case 'check-stock':
+        return checkStock(found);
+      case 'reject':
+        return reject(found, body);
+      case 'dispatch':
+        return dispatch(found, body);
+      case 'receive':
+        return receive(found, body);
+    }
+    return fail(404, 'unknown order action');
+  }
+  return fail(404, 'Not found');
+}

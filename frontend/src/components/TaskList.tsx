@@ -68,7 +68,7 @@ export function TaskList({
   const hasFailed = error !== undefined && error !== null;
   return (
     <Card className={cn('min-w-0 gap-0 py-0', className)}>
-      <CardHeader className="border-b py-4">
+      <CardHeader className="border-b py-3">
         <CardTitle className="flex items-center gap-2">
           {title}
           {tasks && !isLoading && !hasFailed ? (
@@ -81,33 +81,42 @@ export function TaskList({
       {hasFailed ? (
         <ErrorState title={errorTitle} error={error} onRetry={onRetry} isRetrying={isRetrying} />
       ) : isLoading || !tasks ? (
-        <div className="flex flex-col gap-3 p-4" role="status">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+        <div className="flex flex-col gap-2 p-4" role="status">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
           <span className="sr-only">{loadingLabel}</span>
         </div>
       ) : tasks.length === 0 ? (
         <EmptyState icon={CircleCheck} title={empty.title} description={empty.description} />
       ) : (
-        <ol className="divide-y" aria-label={title}>
+        // Laid out by the list's own width, not the window's: in a narrow column the status sits
+        // above the task, and on a phone the button drops under it.
+        <ol className="@container divide-y" aria-label={title}>
           {tasks.map((task) => (
             <li
               key={task.id}
-              className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4"
+              className="flex flex-col gap-2 px-4 py-2.5 @2xl:flex-row @2xl:items-center @2xl:gap-3"
             >
               <StatusBadge
                 status={task.status.label}
                 tone={task.status.tone}
-                className="self-start sm:self-center"
+                className="self-start @2xl:self-center"
               />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium break-words">{task.title}</p>
-                <p className="text-muted-foreground text-xs break-words">{task.detail}</p>
+              <div className="flex min-w-0 flex-1 flex-col gap-2 @sm:flex-row @sm:items-center @sm:gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium break-words">{task.title}</p>
+                  <p className="text-muted-foreground text-xs break-words">{task.detail}</p>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 self-start @sm:self-center"
+                >
+                  <Link href={task.href}>{task.action}</Link>
+                </Button>
               </div>
-              <Button asChild variant="outline" size="sm" className="self-start sm:self-center">
-                <Link href={task.href}>{task.action}</Link>
-              </Button>
             </li>
           ))}
         </ol>

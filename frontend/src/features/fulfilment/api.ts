@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { parseBody, parseList, type HttpClient } from '@/lib/api';
 
 /*
- * District fulfilment: hotspot orders, warehouse requests, the district store,
- * riders and the activity feed.
+ * Legacy fulfilment data for the remaining sample screens: hotspot orders, warehouse
+ * requests, riders and the activity feed. The DCFP's stockouts, warehouse orders and
+ * district inventory use the Go API through `@/features/dcfp` and `@/features/inventory`.
  *
  * NOT YET IN THE GO API. These paths and shapes are the contract the web
  * client is written against and the mock API (`dev/mock/fulfilment.mts`)
@@ -105,9 +106,6 @@ export const REQUEST_STATUSES = [
 export const WAREHOUSES = ['NMS', 'JMS'] as const;
 export type WarehouseCode = (typeof WAREHOUSES)[number];
 
-export const RECEIPT_CONDITIONS = ['Intact', 'Damaged', 'Batch or expiry differs'] as const;
-export type ReceiptCondition = (typeof RECEIPT_CONDITIONS)[number];
-
 const receiptLineSchema = batchLineSchema.extend({
   on_waybill: count,
   counted: count,
@@ -173,11 +171,10 @@ export const storeSchema = z.object({
 export type DistrictStore = z.infer<typeof storeSchema>;
 export type StockMovement = DistrictStore['movements'][number];
 
-const riderSchema = riderSummarySchema.extend({
-  status: z.enum(['available', 'on_delivery', 'off_duty']),
-});
-
-export type Rider = z.infer<typeof riderSchema>;
+/** A district rider, as the MOH audit and the rider statuses describe one. */
+export type Rider = z.infer<typeof riderSummarySchema> & {
+  status: 'available' | 'on_delivery' | 'off_duty';
+};
 
 export const activitySchema = z.object({
   id: z.string(),
@@ -216,15 +213,6 @@ export async function listRequests(
   return parseList(requestSchema, body, 'warehouse requests');
 }
 
-export async function getRequest(
-  http: HttpClient,
-  id: string,
-  signal?: AbortSignal,
-): Promise<WarehouseRequest> {
-  const body = await http.get(`/warehouse-requests/${encodeURIComponent(id)}`, { signal });
-  return parseBody(requestSchema, body, 'warehouse request');
-}
-
 export async function getDistrictStore(
   http: HttpClient,
   signal?: AbortSignal,
@@ -232,103 +220,9 @@ export async function getDistrictStore(
   return parseBody(storeSchema, await http.get('/district-store', { signal }), 'district store');
 }
 
-export async function listRiders(http: HttpClient, signal?: AbortSignal): Promise<Rider[]> {
-  return parseList(riderSchema, await http.get('/riders', { signal }), 'riders');
-}
-
-export async function listActivity(http: HttpClient, signal?: AbortSignal): Promise<Activity[]> {
-  return parseList(activitySchema, await http.get('/activity', { signal }), 'activity');
-}
-
-/* Writes. Each returns nothing: callers refetch, since one action moves stock, orders and requests. */
-
-export interface Quantity {
-  male: number;
-  female: number;
-}
-
-/** Batches to issue. Leave out to let the server pick first-expiry-first-out. */
+/** Batches to issue, as the warehouse's dispatch picks them. */
 export interface PickInput {
   product: 'male' | 'female';
   batch: string;
   quantity: number;
-}
-
-export interface ConfirmOrderInput {
-  approved: Quantity;
-  lines?: PickInput[];
-}
-
-const orderPath = (id: string, action: string) =>
-  `/hotspot-orders/${encodeURIComponent(id)}/${action}`;
-
-export async function confirmOrder(
-  http: HttpClient,
-  id: string,
-  input: ConfirmOrderInput,
-): Promise<void> {
-  await http.post(orderPath(id, 'confirm'), input);
-}
-
-export interface HoldOrderInput {
-  reason: string;
-  /** The quantities reviewed so far, kept for when the order is released. */
-  approved?: Quantity;
-}
-
-export async function holdOrder(
-  http: HttpClient,
-  id: string,
-  input: HoldOrderInput,
-): Promise<void> {
-  await http.post(orderPath(id, 'hold'), input);
-}
-
-export async function releaseOrder(
-  http: HttpClient,
-  id: string,
-  input: { lines?: PickInput[] },
-): Promise<void> {
-  await http.post(orderPath(id, 'release'), input);
-}
-
-export async function dispatchOrder(http: HttpClient, id: string, riderId: string): Promise<void> {
-  await http.post(orderPath(id, 'dispatch'), { rider_id: riderId });
-}
-
-export interface NewRequestInput {
-  warehouse: WarehouseCode;
-  items: Quantity;
-  /** Held orders to release when this stock arrives. */
-  linked_orders: string[];
-  note: string;
-}
-
-/** Sends a request to a warehouse and returns its ID. */
-export async function createRequest(http: HttpClient, input: NewRequestInput): Promise<string> {
-  const body = await http.post('/warehouse-requests', input);
-  return parseBody(requestSchema, body, 'warehouse request').id;
-}
-
-export interface ReceiptLineInput {
-  product: 'male' | 'female';
-  batch: string;
-  counted: number;
-  damaged: number;
-  condition: ReceiptCondition;
-}
-
-export interface ReceiveInput {
-  /** One per waybill line, in waybill order. */
-  lines: ReceiptLineInput[];
-  /** Required when anything differs from the waybill. */
-  discrepancy: { type: string; note: string } | null;
-}
-
-export async function receiveRequest(
-  http: HttpClient,
-  id: string,
-  input: ReceiveInput,
-): Promise<void> {
-  await http.post(`/warehouse-requests/${encodeURIComponent(id)}/receive`, input);
 }

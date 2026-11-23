@@ -81,3 +81,26 @@ func TestLoadConfigReadsAppEnv(t *testing.T) {
 		t.Fatalf("APP_ENV %q, probe %q", cfg.AppEnv, cfg.IdentitySyncTestProbe)
 	}
 }
+
+func TestTrustedProxies(t *testing.T) {
+	t.Setenv("DB_USER", "test")
+	t.Setenv("DB_PASSWORD", "test")
+	t.Setenv("DB_NAME", "test")
+	t.Setenv("JWT_SECRET", "test")
+	t.Setenv("TRUSTED_PROXIES", " 172.21.0.6, 10.0.0.0/8 ,,2001:db8::/32 ")
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.TrustedProxies) != 3 || cfg.TrustedProxies[0] != "172.21.0.6" || cfg.TrustedProxies[2] != "2001:db8::/32" {
+		t.Fatalf("parsed %v", cfg.TrustedProxies)
+	}
+	t.Setenv("TRUSTED_PROXIES", "")
+	if cfg, err = LoadConfig(); err != nil || cfg.TrustedProxies != nil {
+		t.Fatalf("unset should mean no explicit list: %v %v", cfg.TrustedProxies, err)
+	}
+	t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8,nginx")
+	if _, err = LoadConfig(); err == nil {
+		t.Fatal("a value that is not an IP or CIDR should fail at startup")
+	}
+}

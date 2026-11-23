@@ -1,16 +1,9 @@
 import { ChartNoAxesColumn, Table2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import { DataTable } from '@/components/data-table/DataTable';
 import { SampleBadge } from '@/components/SampleData';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -58,8 +51,8 @@ export function ChartCard({
   const [isTable, setIsTable] = useState(false);
 
   return (
-    <section className={cn('bg-card rounded-card flex min-w-0 flex-col border p-5', className)}>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+    <section className={cn('bg-card rounded-card flex min-w-0 flex-col border p-4', className)}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold">{title}</h2>
@@ -99,30 +92,22 @@ export function ChartCard({
 
       {isTable ? (
         <div className="max-h-72 overflow-auto">
-          <Table aria-label={title}>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{categoryLabel}</TableHead>
-                {series.map((item) => (
-                  <TableHead key={item.key} className="text-right">
-                    {item.label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.label}>
-                  <TableCell>{row.label}</TableCell>
-                  {series.map((item) => (
-                    <TableCell key={item.key} className="text-right tabular-nums">
-                      {formatNumber(row.values[item.key])}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            variant="embedded"
+            label={title}
+            rows={rows}
+            getRowId={(row) => row.label}
+            columns={[
+              { id: 'category', header: categoryLabel, value: (row) => row.label },
+              ...series.map((item) => ({
+                id: item.key,
+                header: item.label,
+                numeric: true,
+                value: (row: ChartRow) => row.values[item.key],
+                cell: (row: ChartRow) => formatNumber(row.values[item.key]),
+              })),
+            ]}
+          />
         </div>
       ) : (
         children

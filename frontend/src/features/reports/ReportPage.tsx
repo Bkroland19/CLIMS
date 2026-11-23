@@ -16,6 +16,7 @@ import { RecordView } from '@/components/RecordView';
 import type { ProductKey } from '@/features/fulfilment/products';
 import { toApiError } from '@/lib/api';
 import { formatDate, formatTimestamp } from '@/lib/format';
+import { WriteAction } from '@/components/WriteAction';
 
 import type { FigureKey, MonthlyReport } from './api';
 import {
@@ -190,11 +191,11 @@ function ReportEditor({ report }: { report: MonthlyReport }) {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <ReportHeader report={report} viewer="reporter" steps={steps} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="gap-section flex min-w-0 flex-col">
           <div ref={bannerRef} tabIndex={-1} className="rounded-lg outline-none">
             {submit.isPending ? (
               <Alert variant="info">
@@ -214,15 +215,17 @@ function ReportEditor({ report }: { report: MonthlyReport }) {
                   <ul className="mt-2 flex flex-col gap-1">
                     {problems.map((problem) => (
                       <li key={`${problem.field}-${problem.check}`}>
-                        <button
+                        <Button
+                          variant="link"
+                          size="sm"
                           type="button"
                           onClick={() => {
                             focusField(problem.field);
                           }}
-                          className="focus-visible:ring-ring rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+                          className="block h-auto rounded-sm p-0 text-left whitespace-normal text-current"
                         >
                           <span className="font-semibold">{problem.where}:</span> {problem.message}
-                        </button>
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -328,7 +331,7 @@ function ReportEditor({ report }: { report: MonthlyReport }) {
           <HistoryCard report={report} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="gap-section flex min-w-0 flex-col">
           <FactsCard
             title="Send to MOH"
             items={[
@@ -354,20 +357,24 @@ function ReportEditor({ report }: { report: MonthlyReport }) {
                 <AlertDescription>{failure}</AlertDescription>
               </Alert>
             ) : null}
-            <div className="flex flex-col gap-2">
-              <Button onClick={send} disabled={isBusy}>
-                {submit.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
-                {submit.isPending
-                  ? 'Sending…'
-                  : report.status === 'errors' || problems.length > 0
-                    ? 'Re-check and send'
-                    : 'Validate and send'}
-              </Button>
-              <Button variant="outline" onClick={saveDraft} disabled={!isDirty || isBusy}>
-                {save.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
-                Save draft
-              </Button>
-            </div>
+            <WriteAction>
+              <div className="flex flex-col gap-2">
+                <Button onClick={send} disabled={isBusy}>
+                  {submit.isPending ? (
+                    <Spinner data-icon="inline-start" aria-hidden="true" />
+                  ) : null}
+                  {submit.isPending
+                    ? 'Sending…'
+                    : report.status === 'errors' || problems.length > 0
+                      ? 'Re-check and send'
+                      : 'Validate and send'}
+                </Button>
+                <Button variant="outline" onClick={saveDraft} disabled={!isDirty || isBusy}>
+                  {save.isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
+                  Save draft
+                </Button>
+              </div>
+            </WriteAction>
             <p className="text-muted-foreground text-xs">
               CLIMS checks the report before it leaves. If something is wrong it comes back to you
               to fix: nothing reaches MOH until it passes.

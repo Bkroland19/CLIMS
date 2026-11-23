@@ -21,6 +21,11 @@ export interface NavPage {
   /** One line on what the page is for, under the title. */
   description?: string;
   layout: PageLayout;
+  /**
+   * The permission code the page's data needs, e.g. `users:read`. Without it the
+   * page is left out of the navigation. Pages on sample data need none.
+   */
+  permission?: string;
 }
 
 /**
@@ -30,7 +35,7 @@ export interface NavPage {
  */
 export interface NavDetail {
   path: string;
-  /** The last breadcrumb, and the page title. */
+  /** The page title. */
   label: string;
   layout: PageLayout;
 }
@@ -58,6 +63,8 @@ export interface Workspace {
   /** Every path in the workspace starts with this one. Its first page lives here. */
   basePath: string;
   sections: readonly NavSection[];
+  /** Set on a workspace the signed-in person may look at but not act in. */
+  readOnly?: boolean;
 }
 
 /** Where an address sits in the navigation. `page` and `detail` are both null for an unknown address. */

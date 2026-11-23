@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/rbac"
 
 	"github.com/jackc/pgx/v5"
@@ -16,9 +17,29 @@ var ErrUnknownRole = errors.New("unknown role")
 
 var ErrLastAdmin = errors.New("cannot disable or demote the last active admin")
 
-type Repository struct{ DB *pgxpool.Pool }
+// ErrUnknownStore means a store_id names no store.
+var ErrUnknownStore = errors.New("unknown store")
 
-func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{DB: db} }
+type Repository struct {
+	DB    *pgxpool.Pool
+	audit audit.Auditor
+}
+
+func NewRepository(db *pgxpool.Pool, auditor audit.Auditor) *Repository {
+	return &Repository{DB: db, audit: auditor}
+}
+
+// createdAccount is what a new account's audit entry records; never the password.
+type createdAccount struct {
+	Username  string   `json:"username"`
+	Email     string   `json:"email"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Phone     string   `json:"phone_number"`
+	StoreID   *string  `json:"store_id"`
+	RoleIDs   []string `json:"role_ids"`
+}
+
 func (r *Repository) CreateUser(ctx context.Context, req AccountInput, passwordHash string, roleID string) (string, error) {
 	var roleIDs []string
 	if roleID != "" {
@@ -33,12 +54,15 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 		return "", err
 	}
 	defer tx.Rollback(ctx)
+	if err = checkStore(ctx, tx, req.StoreID); err != nil {
+		return "", err
+	}
 	var id string
 	err = tx.QueryRow(ctx, `INSERT INTO users
-		(username,email,password,firstname,lastname,phone_number,location,organisation_unit_id,hot_spot_id,status,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
+		(username,email,password,firstname,lastname,phone_number,location,organisation_unit_id,hot_spot_id,store_id,status,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`,
 		req.Username, req.Email, passwordHash, req.FirstName, req.LastName, req.Phone,
-		req.Location, req.Assignment.OrganisationUnitID, req.Assignment.HotSpotID).Scan(&id)
+		req.Location, req.Assignment.OrganisationUnitID, req.Assignment.HotSpotID, req.StoreID).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -46,6 +70,19 @@ func (r *Repository) CreateUserWithRoles(ctx context.Context, req AccountInput, 
 		if err = replaceRoles(ctx, tx, id, roleIDs); err != nil {
 			return "", err
 		}
+	}
+	// Nobody is signed in for a public sign-up, so the new account is its own actor.
+	entry := audit.Entry{Action: "user.created", Target: &audit.Subject{Type: "user", ID: id},
+		Changes: audit.Diff(nil, createdAccount{Username: req.Username, Email: req.Email, FirstName: req.FirstName,
+			LastName: req.LastName, Phone: req.Phone, StoreID: req.StoreID, RoleIDs: roleIDs})}
+	if audit.Anonymous(ctx) {
+		entry.Action, entry.ActorID = "auth.registered", id
+	}
+	if req.StoreID != nil {
+		entry.Related = []audit.Subject{{Type: "store", ID: *req.StoreID}}
+	}
+	if err = r.audit.Record(ctx, tx, entry); err != nil {
+		return "", err
 	}
 	return id, tx.Commit(ctx)
 }
@@ -61,13 +98,34 @@ const userSelect = `SELECT u.id,u.username,COALESCE(u.email,''),u.password,u.fir
 			WHERE rp.role_id = r.id ORDER BY p.name
 		)) ORDER BY r.id)
 		FROM role_user ru JOIN roles r ON r.id = ru.role_id WHERE ru.user_id = u.id
-	), '[]'::jsonb) FROM users u `
+	), '[]'::jsonb),
+	CASE WHEN ou.id IS NOT NULL THEN jsonb_build_object(
+		'id', ou.id, 'uid', ou.uid, 'name', ou.name, 'short_name', ou.shortname,
+		'subcounty', ou.subcounty, 'district', ou.district, 'region', ou.region) END,
+	CASE WHEN h.id IS NOT NULL THEN jsonb_build_object(
+		'id', h.id, 'name', h.name, 'type', h.type, 'status', h.status, 'village', h.village,
+		'subcounty', hs.name, 'district', hd.name, 'latitude', h.latitude, 'longitude', h.longitude) END,
+	CASE WHEN sc.id IS NOT NULL THEN jsonb_build_object(
+		'id', sc.id, 'name', sc.name, 'district_id', sc.district_id, 'district_name', sd.name) END,
+	CASE WHEN st.id IS NOT NULL THEN jsonb_build_object(
+		'id', st.id, 'code', st.code, 'name', st.name, 'store_type', st.store_type,
+		'district_id', st.district_id, 'district_name', td.name) END
+	FROM users u
+	LEFT JOIN organization_units ou ON ou.id = u.organisation_unit_id
+	LEFT JOIN hot_spots h ON h.id = u.hot_spot_id
+	LEFT JOIN subcounties hs ON hs.id = h.subcounty_id
+	LEFT JOIN districts hd ON hd.id = h.district_id
+	LEFT JOIN subcounties sc ON sc.id = u.subcounty_id
+	LEFT JOIN districts sd ON sd.id = sc.district_id
+	LEFT JOIN stores st ON st.id = u.store_id
+	LEFT JOIN districts td ON td.id = st.district_id `
 
 func scanUser(row pgx.Row) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Phone, &u.Status,
 		&u.Location, &u.OrganisationUnitID, &u.HotSpotID, &u.SubcountyID, &u.StoreID,
-		&u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt, &u.LoginCount, &u.ActiveSessions, &u.Roles)
+		&u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt, &u.LoginCount, &u.ActiveSessions, &u.Roles,
+		&u.OrganisationUnit, &u.HotSpot, &u.Subcounty, &u.Store)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +266,10 @@ func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []
 	if status != nil {
 		newStatus = *status
 	}
+	var rolesBefore []string
+	if err = tx.QueryRow(ctx, userRoleNames, id).Scan(&rolesBefore); err != nil {
+		return err
+	}
 	if roleIDs != nil {
 		if err = replaceRoles(ctx, tx, id, roleIDs); err != nil {
 			return err
@@ -217,10 +279,13 @@ func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []
 		return err
 	}
 	// A disabled account is signed out everywhere, so re-enabling it does not revive old tokens.
+	var revokedSessions int64
 	if newStatus != "active" {
-		if _, err = tx.Exec(ctx, revokeAll, id); err != nil {
+		tag, err := tx.Exec(ctx, revokeAll, id)
+		if err != nil {
 			return err
 		}
+		revokedSessions = tag.RowsAffected()
 	}
 	if currentAdmin && currentStatus == "active" && (newStatus != "active" || roleIDs != nil) {
 		var adminRemaining bool
@@ -234,7 +299,42 @@ func (r *Repository) updateUserAccess(ctx context.Context, id string, roleIDs []
 			return ErrLastAdmin
 		}
 	}
+	if err = r.recordAccessChange(ctx, tx, id, rolesBefore, currentStatus, newStatus, revokedSessions); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
+}
+
+// userRoleNames lists a user's role names in order, for audit entries.
+const userRoleNames = `SELECT coalesce(array_agg(r.name ORDER BY r.name), '{}')
+	FROM role_user ru JOIN roles r ON r.id = ru.role_id WHERE ru.user_id = $1`
+
+// recordAccessChange audits a change of roles or status; unchanged values record nothing.
+func (r *Repository) recordAccessChange(ctx context.Context, tx pgx.Tx, id string, rolesBefore []string,
+	statusBefore, statusAfter string, revokedSessions int64) error {
+	target := &audit.Subject{Type: "user", ID: id}
+	var rolesAfter []string
+	if err := tx.QueryRow(ctx, userRoleNames, id).Scan(&rolesAfter); err != nil {
+		return err
+	}
+	if changes := audit.Diff(map[string]any{"roles": rolesBefore}, map[string]any{"roles": rolesAfter}); len(changes) > 0 {
+		if err := r.audit.Record(ctx, tx, audit.Entry{Action: "user.roles_changed", Target: target, Changes: changes}); err != nil {
+			return err
+		}
+	}
+	if statusBefore == statusAfter {
+		return nil
+	}
+	action := "user.disabled"
+	if statusAfter == "active" {
+		action = "user.enabled"
+	}
+	entry := audit.Entry{Action: action, Target: target,
+		Changes: audit.Diff(map[string]any{"status": statusBefore}, map[string]any{"status": statusAfter})}
+	if action == "user.disabled" {
+		entry.Details = map[string]any{"sessions_revoked": revokedSessions}
+	}
+	return r.audit.Record(ctx, tx, entry)
 }
 
 func replaceRoles(ctx context.Context, tx pgx.Tx, userID string, roleIDs []string) error {
@@ -258,4 +358,51 @@ func replaceRoles(ctx context.Context, tx pgx.Tx, userID string, roleIDs []strin
 		WHERE u.id = $1 AND r.id = ANY($2::text[]::uuid[]) ON CONFLICT DO NOTHING`,
 		userID, roleIDs)
 	return err
+}
+
+// checkStore returns ErrUnknownStore when storeID names no store. users.store_id has no
+// foreign key (the column predates the stores table), so the API checks instead.
+func checkStore(ctx context.Context, tx pgx.Tx, storeID *string) error {
+	if storeID == nil {
+		return nil
+	}
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM stores WHERE id = $1)`, *storeID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return ErrUnknownStore
+	}
+	return nil
+}
+
+// SetUserStore assigns the store a user works with, or clears it when storeID is nil.
+func (r *Repository) SetUserStore(ctx context.Context, id string, storeID *string) error {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err = checkStore(ctx, tx, storeID); err != nil {
+		return err
+	}
+	var before *string
+	if err = tx.QueryRow(ctx, `SELECT store_id FROM users WHERE id = $1 FOR UPDATE`, id).Scan(&before); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE users SET store_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, id, storeID); err != nil {
+		return err
+	}
+	if changes := audit.Diff(map[string]any{"store_id": before}, map[string]any{"store_id": storeID}); len(changes) > 0 {
+		entry := audit.Entry{Action: "user.store_assigned", Target: &audit.Subject{Type: "user", ID: id}, Changes: changes}
+		for _, store := range []*string{before, storeID} {
+			if store != nil {
+				entry.Related = append(entry.Related, audit.Subject{Type: "store", ID: *store})
+			}
+		}
+		if err = r.audit.Record(ctx, tx, entry); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }

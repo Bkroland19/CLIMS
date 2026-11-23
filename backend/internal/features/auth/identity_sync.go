@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/users"
 )
 
@@ -138,7 +139,8 @@ func (s *identitySync) authorize(verifier *oidc.IDTokenVerifier) fiber.Handler {
 			!slices.Contains(claims.Roles[s.cfg.Audience].Roles, identitySyncRole) {
 			return syncError(c, fiber.StatusForbidden, "")
 		}
-		c.SetContext(ctx)
+		// Audit entries name the service client, since no person signed in.
+		c.SetContext(audit.AsSystemActor(ctx, "identity-sync:"+s.cfg.ServiceClient))
 		return c.Next()
 	}
 }

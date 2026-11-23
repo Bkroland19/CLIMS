@@ -1,4 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { isAxiosError } from "axios";
 import type { ScrollViewInstance } from "react-native";
 import * as Location from "expo-location";
 import { useT } from "@/lib/theme";
@@ -16,27 +18,51 @@ import {
   Note,
   Pick,
   Progress,
-  ReadOnly,
   Row,
   Search,
   Seg,
   Select,
   Sheet,
+  SkeletonList,
   Stepper,
-  Toggle,
+  Txt,
 } from "@/components/m/kit";
-import { MapCard, PhotoField } from "@/components/m/media";
+import { MapCard } from "@/components/m/media";
+import {
+  DEMO_PLACES,
+  DISPENSER_CONDITIONS,
+  draftHotspot,
+  HOTSPOT_TYPES,
+  isNetworkError,
+  LIMITS,
+  listDistricts,
+  listRegions,
+  listSubcounties,
+  OTHER_TYPE,
+  submitErrorMessage,
+  submitHotspot,
+  toLocalHotspot,
+  toSubmission,
+  validateMapForm,
+  type MapField,
+  type MapForm,
+  type Place,
+} from "@/lib/hotspots";
 import { ago, chip, items, orderChip, PRODUCTS, toInt } from "@/lib/format";
 import { useNav } from "@/lib/nav";
 import { useMe } from "@/lib/session";
-import { useStore } from "@/lib/store";
-import type { Hotspot, Order, Qty } from "@/lib/types";
-import { call, firstName, matches, stockStats } from "./common";
+import { useStore, type RefreshResult } from "@/lib/store";
+import type { Order, Qty } from "@/lib/types";
+import { call, firstName, hotspotChip, inactiveNote, matches, shortId, stockStats } from "./common";
+import { TYPE } from "@/lib/fonts";
 
 export function useMine() {
   const { s } = useStore();
   const me = useMe();
-  const mine = s.hotspots.filter((h) => h.vhts.includes(me.name) || h.contact === me.name);
+  // Signed-in VHTs see the hotspots they submitted (from the API); demo sign-ins see samples.
+  const mine = me.demo
+    ? s.hotspots.filter((h) => h.vhts.includes(me.name) || h.contact === me.name)
+    : s.hotspots.filter((h) => h.source === "api");
   const openOf = (hid: string): Order | undefined =>
     s.orders.find((o) => o.hotspotId === hid && o.status !== "received");
   return { mine, openOf };
@@ -47,32 +73,107 @@ export function useMine() {
 export function VhtHotspots() {
   const T = useT();
   const nav = useNav();
+  const me = useMe();
+  const { refreshHotspots, loadMoreHotspots } = useStore();
   const { mine, openOf } = useMine();
   const [q, setQ] = useState("");
+  const [sync, setSync] = useState<RefreshResult | "loading">("loading");
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Reload page one whenever the tab is shown, so DCFP decisions appear.
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      refreshHotspots().then((r) => {
+        if (!live) return;
+        setSync(r.status);
+        setHasMore(r.hasMore);
+      });
+      return () => {
+        live = false;
+      };
+    }, [refreshHotspots]),
+  );
+
+  // Fetch the next page near the end of the list; one request at a time.
+  const loadMore = useCallback(() => {
+    if (!hasMore || loadingMore || me.demo) return;
+    setLoadingMore(true);
+    loadMoreHotspots(mine.length)
+      .then((r) => {
+        setHasMore(r.status === "ok" && r.hasMore);
+        if (r.status !== "ok") setSync(r.status);
+      })
+      .finally(() => setLoadingMore(false));
+  }, [hasMore, loadingMore, me.demo, loadMoreHotspots, mine.length]);
+
   const list = mine.filter((h) => matches(q, h.name, h.id, h.village, h.subcounty, h.contact));
-  const areas = [...new Set(mine.map((h) => h.subcounty.replace(/ TC$/, "")))].join(" and ");
+  const areas = [...new Set(mine.map((h) => h.subcounty.replace(/ TC$/, "")).filter(Boolean))];
+  const count = `${mine.length} hotspot${mine.length === 1 ? "" : "s"}`;
+  const foot = me.demo
+    ? `${count} in ${areas.join(" and ")}`
+    : hasMore
+      ? `Showing your ${count} most recently updated. Scroll for more.`
+      : `${count} you submitted${areas.length ? ` in ${areas.slice(0, 3).join(", ")}${areas.length > 3 ? "…" : ""}` : ""}`;
+  const firstLoad = sync === "loading" && !mine.length;
   return (
     <Screen
       title="Hotspots"
       root
       fab={{ label: "Map hotspot", icon: "plus", onPress: () => nav.go("map") }}
+      onEndReached={loadMore}
     >
-      <Search value={q} onChangeText={setQ} ph="Search hotspots" />
-      <List empty={`No hotspots match “${q}”.`} f={q ? "" : `${mine.length} hotspots in ${areas}`}>
+      {sync === "forbidden" ? (
+        <Banner
+          tone="warning"
+          title="Can't load your hotspots"
+          body="Your account can't view hotspots yet. Ask your district focal person to give VHTs hotspot access."
+        />
+      ) : sync === "offline" && mine.length ? (
+        <Banner tone="neutral" title="Offline" body="Showing your hotspots as last loaded." />
+      ) : sync === "error" ? (
+        <Banner tone="warning" title="Couldn't refresh your hotspots" body="Try again shortly." />
+      ) : null}
+      {mine.length ? <Search value={q} onChangeText={setQ} ph="Search hotspots" /> : null}
+      {firstLoad ? <SkeletonList rows={6} /> : null}
+      <List
+        empty={
+          firstLoad
+            ? undefined
+            : q
+              ? hasMore
+                ? `No loaded hotspots match “${q}”. Scroll to the end to load more, then search again.`
+                : `No hotspots match “${q}”.`
+              : sync === "offline"
+                ? "Connect to the internet to load your hotspots."
+                : "You haven't mapped any hotspots yet. Tap Map hotspot to add one."
+        }
+        f={q || !mine.length ? "" : foot}
+      >
         {list.map((h) => {
           const o = openOf(h.id);
           const out = h.stock.male === 0 || h.stock.female === 0;
           const left = items(h.stock);
+          const api = h.source === "api";
           return (
             <Row
               key={h.id}
               t={h.name}
-              s={`${h.village} · ${left === "—" ? "out of stock" : `${left} left`}`}
+              s={
+                api
+                  ? [h.village, h.subcounty].filter(Boolean).join(", ") || h.type
+                  : `${h.village} · ${left === "—" ? "out of stock" : `${left} left`}`
+              }
               ic="pin"
-              icBg={h.status !== "Active" ? T.inactiveIcBg : out ? T.dangerIcBg : undefined}
-              icFg={out && h.status === "Active" ? T.dangerIcFg : undefined}
+              icBg={h.status !== "Active" ? T.inactiveIcBg : out && !api ? T.dangerIcBg : undefined}
+              icFg={out && !api && h.status === "Active" ? T.dangerIcFg : undefined}
               chip={
-                h.status !== "Active" ? chip("Inactive", "neutral") : o ? orderChip(o.status) : null
+                o && h.status === "Active"
+                  ? orderChip(o.status)
+                  : api || h.status !== "Active"
+                    ? hotspotChip(h)
+                    : null
               }
               chev
               onPress={() => nav.go(`hotspot/${h.id}`)}
@@ -80,6 +181,13 @@ export function VhtHotspots() {
           );
         })}
       </List>
+      {loadingMore ? (
+        <SkeletonList rows={2} />
+      ) : hasMore && !q ? (
+        <Btns>
+          <Btn label="Load more hotspots" kind="secondary" onPress={loadMore} />
+        </Btns>
+      ) : null}
     </Screen>
   );
 }
@@ -115,9 +223,10 @@ export function VhtHotspot({ id }: { id: string }) {
       ) : null}
       <Hero
         title={h.name}
-        sub={`${h.id} · ${h.kind} · ${h.subcounty}`}
-        chip={chip(h.status, active ? "success" : "neutral")}
-        stats={stockStats(T, h)}
+        sub={[shortId(h.id), h.type, h.subcounty].filter(Boolean).join(" · ")}
+        chip={hotspotChip(h)}
+        // The API has no stock figures yet; sample hotspots show the phone's copy.
+        stats={h.source === "api" ? undefined : stockStats(T, h)}
         msg={`Last delivery ${h.lastDelivery != null ? ago(h.lastDelivery) : "none yet"}`}
       >
         {active ? (
@@ -135,18 +244,12 @@ export function VhtHotspot({ id }: { id: string }) {
       {o ? (
         <Banner
           tone="info"
-          title={`Open order ${o.id}`}
+          title="Open order"
           body={`${orderChip(o.status).label} · ${items(o.approved)} · raised ${ago(o.createdAt)}`}
           act={{ label: "View order", onPress: () => nav.go(`order/${o.id}`) }}
         />
       ) : null}
-      {!active ? (
-        <Banner
-          tone="neutral"
-          title="Inactive"
-          body="Can't request stock until the district reactivates this hotspot."
-        />
-      ) : null}
+      {!active ? <Banner tone="neutral" {...inactiveNote(h)} /> : null}
       <List h="Contact person">
         <Row
           t={h.contact}
@@ -157,7 +260,7 @@ export function VhtHotspot({ id }: { id: string }) {
         />
       </List>
       <List h="Details" f={h.comment}>
-        <Row t="Type" v={h.kind} />
+        <Row t="Type" v={h.type || "—"} />
         <Row t="Dispenser" v={h.dispenser ? h.dispCond || "Yes" : "None"} />
         <Row t="VHTs" v={h.vhts.map((n) => (n === me.name ? "You" : n)).join(", ") || "—"} />
         <Row t="Mapped" v={h.mappedAt != null ? ago(h.mappedAt) : "—"} />
@@ -166,8 +269,8 @@ export function VhtHotspot({ id }: { id: string }) {
         {ords.map((x) => (
           <Row
             key={x.id}
-            t={x.id}
-            s={`${ago(x.createdAt)} · ${items(x.items)}`}
+            t={items(x.items)}
+            s={`Sent ${ago(x.createdAt)}`}
             chip={orderChip(x.status)}
             chev
             onPress={() => nav.go(`order/${x.id}`)}
@@ -182,13 +285,17 @@ export function VhtHotspot({ id }: { id: string }) {
 
 export function VhtRequests() {
   const nav = useNav();
+  const me = useMe();
   const { s } = useStore();
   const { mine } = useMine();
   const ids = mine.map((h) => h.id);
+  // Signed-in VHTs see the stockout alerts they sent to the API; demo sign-ins see sample orders.
   const rows = s.orders
-    .filter((o) => ids.includes(o.hotspotId))
+    .filter((o) => (me.demo ? ids.includes(o.hotspotId) : o.source === "api"))
     .sort((a, b) => b.createdAt - a.createdAt);
-  const q0 = s.outbox.filter((it) => it.type === "notify" && ids.includes(it.payload.hotspotId));
+  const q0 = s.outbox.filter((it) =>
+    me.demo ? it.type === "notify" && ids.includes(it.payload.hotspotId) : it.type === "stockout",
+  );
   return (
     <Screen
       title="Requests"
@@ -201,9 +308,12 @@ export function VhtRequests() {
             <Row
               key={it.id}
               t={
-                s.hotspots.find((h) => h.id === it.payload.hotspotId)?.name ?? it.payload.hotspotId
+                it.type === "stockout"
+                  ? it.payload.hotspot
+                  : (s.hotspots.find((h) => h.id === it.payload.hotspotId)?.name ??
+                    it.payload.hotspotId)
               }
-              s={`${items(it.payload.items)} · saved ${ago(it.at)}`}
+              s={`${it.type === "stockout" ? it.payload.product : items(it.payload.items)} · saved ${ago(it.at)}`}
               chip={chip("Offline", "warning")}
               ic="upload"
             />
@@ -215,10 +325,15 @@ export function VhtRequests() {
           <Row
             key={o.id}
             t={o.hotspot}
-            s={`${o.id} · ${items(o.items)} · ${ago(o.createdAt)}`}
+            s={
+              o.source === "api"
+                ? `${o.product ?? "Condoms"} · sent ${ago(o.createdAt)}`
+                : `${items(o.items)} · ${ago(o.createdAt)}`
+            }
             chip={orderChip(o.status)}
             chev
-            onPress={() => nav.go(`order/${o.id}`)}
+            // A request sent to the API opens its notification: what was sent and what arrived.
+            onPress={() => nav.go(o.source === "api" ? `stockout/${o.id}` : `order/${o.id}`)}
           />
         ))}
       </List>
@@ -328,7 +443,7 @@ export function RequestForm({ hotspotId, fixed }: { hotspotId?: string; fixed?: 
         <Banner
           tone="info"
           title={isHm ? "You already have an open order" : `${sel?.name} already has an open order`}
-          body={`${open.id} is ${orderChip(open.status).label.toLowerCase()}.${isHm ? "" : " Only send another if more stock is needed."}`}
+          body={`It is ${orderChip(open.status).label.toLowerCase()}.${isHm ? "" : " Only send another if more stock is needed."}`}
           act={
             isHm ? { label: "View order", onPress: () => nav.go(`order/${open.id}`) } : undefined
           }
@@ -416,35 +531,50 @@ export function RequestForm({ hotspotId, fixed }: { hotspotId?: string; fixed?: 
 
 /* ───────── Map a hotspot (4 steps) ───────── */
 
-const SUBCOUNTIES = [
-  "Katabi TC",
-  "Kajjansi TC",
-  "Nansana Municipality",
-  "Kira Municipality",
-  "Ssisa",
-  "Busukuma",
-];
 const STEPS = ["Location", "Details", "Contact person", "Review"];
+
+/** Which form fields each step owns, so Continue checks only that step. */
+const STEP_FIELDS: MapField[][] = [
+  ["gps", "regionId", "districtId", "subcountyId", "village"],
+  ["name", "type", "otherType", "dispenser", "condition", "comment"],
+  ["contactName", "contactPhone"],
+  [],
+];
 
 export function VhtMapDone({ id }: { id: string }) {
   const nav = useNav();
   const me = useMe();
   const { s } = useStore();
+  if (id === "queued")
+    return (
+      <Screen title="Hotspot saved" backLabel="Hotspots">
+        <Done
+          tone="info"
+          icon="wifiOff"
+          title="Saved on this phone"
+          body="It goes to the district for review as soon as you are back online. You don't need to map it again."
+        />
+        <Btns>
+          <Btn label="Map another hotspot" kind="secondary" onPress={() => nav.replace("map")} />
+          <Btn label="Back to hotspots" kind="text" onPress={nav.back} />
+        </Btns>
+      </Screen>
+    );
   const h = s.hotspots.find((x) => x.id === id);
   if (!h)
     return (
-      <Screen title="Hotspot mapped" backLabel="Hotspots">
+      <Screen title="Hotspot submitted" backLabel="Hotspots">
         <Banner tone="neutral" title="That hotspot isn't available" />
       </Screen>
     );
   return (
-    <Screen title="Hotspot mapped" backLabel="Hotspots">
+    <Screen title="Hotspot submitted" backLabel="Hotspots">
       <Done
-        title={`${h.name} is active`}
-        body={`${h.id} is on the Wakiso hotspot register. ${h.contact === me.name ? "You are its contact person." : `${h.contact} gets an SMS with their CLIMS username.`}`}
+        title={`${h.name} sent for review`}
+        body={`The ${h.district || "district"} focal person checks new hotspots before they can get stock. ${h.contact === me.name ? "You are its contact person." : `${h.contact} is its contact person.`}`}
       />
       <Btns>
-        <Btn label="Request first stock" onPress={() => nav.replace(`request/${h.id}`)} />
+        <Btn label="View hotspot" onPress={() => nav.replace(`hotspot/${h.id}`)} />
         <Btn label="Map another hotspot" kind="secondary" onPress={() => nav.replace("map")} />
         <Btn label="Back to hotspots" kind="text" onPress={nav.back} />
       </Btns>
@@ -452,33 +582,103 @@ export function VhtMapDone({ id }: { id: string }) {
   );
 }
 
+/** The only choice in a list, if there is exactly one: most VHTs work in one region and district. */
+const onlyId = (list: Place[] | null) => (list?.length === 1 ? list[0].id : "");
+
+/**
+ * Region, district and sub-county lists for the form, from the API (or demo samples). Region and
+ * district fall back to the only choice when the VHT hasn't picked one; they can still change it.
+ */
+function usePlaces(demo: boolean, pickedRegion: string, pickedDistrict: string) {
+  // Loaded lists keyed by what they belong to, so changing a parent needs no reset.
+  const [lists, setLists] = useState<Record<string, Place[]>>({});
+  const [err, setErr] = useState("");
+  const get = (key: string): Place[] | null =>
+    demo
+      ? key === "regions"
+        ? DEMO_PLACES.regions
+        : key.startsWith("d:")
+          ? (DEMO_PLACES.districts[key.slice(2)] ?? [])
+          : (DEMO_PLACES.subcounties[key.slice(2)] ?? [])
+      : (lists[key] ?? null);
+
+  const regions = get("regions");
+  const regionId = pickedRegion || onlyId(regions);
+  const districts = regionId ? get(`d:${regionId}`) : null;
+  const districtId = pickedDistrict || onlyId(districts);
+  const subcounties = districtId ? get(`s:${districtId}`) : null;
+
+  useEffect(() => {
+    if (demo) return;
+    const wanted: [string, () => Promise<Place[]>][] = [["regions", listRegions]];
+    if (regionId) wanted.push([`d:${regionId}`, () => listDistricts(regionId)]);
+    if (districtId) wanted.push([`s:${districtId}`, () => listSubcounties(districtId)]);
+    let live = true;
+    for (const [key, load] of wanted)
+      load()
+        .then((list) => live && setLists((x) => (x[key] ? x : { ...x, [key]: list })))
+        .catch(
+          (e: unknown) =>
+            live &&
+            setErr(
+              isAxiosError(e) && e.response?.status === 403
+                ? "Your account can't map hotspots yet. Ask your district focal person to give VHTs hotspot access."
+                : "Couldn't load the place lists. Connect to the internet once, then try again.",
+            ),
+        );
+    return () => {
+      live = false;
+    };
+  }, [demo, regionId, districtId]);
+
+  return { regions, districts, subcounties, regionId, districtId, err: demo ? "" : err };
+}
+
+const opts = (list: Place[] | null) => (list ?? []).map((p) => ({ v: p.id, l: p.name }));
+const nameIn = (list: Place[] | null, id: string) => list?.find((p) => p.id === id)?.name ?? "";
+
 export function VhtMap() {
+  const T = useT();
   const nav = useNav();
   const me = useMe();
-  const { send } = useStore();
+  const { send, queue, offline } = useStore();
   const scroll = useRef<ScrollViewInstance>(null);
   const [step, setStep] = useState(0);
-  const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null);
+  const [gpsAcc, setGpsAcc] = useState<number | null>(null);
   const [gpsWait, setGpsWait] = useState(false);
   const [gpsErr, setGpsErr] = useState("");
-  const [f, setF] = useState({
+  const [f, setF] = useState<MapForm>({
+    regionId: "",
+    districtId: "",
+    subcountyId: "",
     village: "",
-    subcounty: "Katabi TC",
+    lat: null,
+    lng: null,
     name: "",
-    kind: "Permanent" as Hotspot["kind"],
-    disp: "Working",
+    type: "",
+    otherType: "",
+    dispenser: "",
+    condition: "",
     comment: "",
-    who: "other" as "other" | "me",
-    cname: "",
-    cphone: "",
-    invite: true,
-    visited: false,
+    contactName: "",
+    contactPhone: "",
   });
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [who, setWho] = useState<"other" | "me">("other");
+  const [visited, setVisited] = useState(false);
+  const [shown, setShown] = useState<boolean[]>([false, false, false, false]);
+  const [busy, setBusy] = useState(false);
+  const [sendErr, setSendErr] = useState("");
   const up =
-    <K extends keyof typeof f>(k: K) =>
-    (v: (typeof f)[K]) =>
+    <K extends keyof MapForm>(k: K) =>
+    (v: MapForm[K]) =>
       setF((x) => ({ ...x, [k]: v }));
+
+  const places = usePlaces(!!me.demo, f.regionId, f.districtId);
+  const form: MapForm = { ...f, regionId: places.regionId, districtId: places.districtId };
+
+  const errs = validateMapForm(form);
+  const errOf = (k: MapField) => (shown[step] ? errs[k] : undefined) ?? "";
+  const stepOk = (n: number) => (n === 3 ? visited : STEP_FIELDS[n].every((k) => !errs[k]));
 
   const capture = async () => {
     setGpsErr("");
@@ -490,11 +690,8 @@ export function VhtMap() {
         return;
       }
       const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      setGps({
-        lat: p.coords.latitude,
-        lng: p.coords.longitude,
-        acc: Math.round(p.coords.accuracy ?? 0),
-      });
+      setF((x) => ({ ...x, lat: p.coords.latitude, lng: p.coords.longitude }));
+      setGpsAcc(Math.round(p.coords.accuracy ?? 0));
     } catch {
       setGpsErr("Couldn't get a GPS fix. Move into the open and try again.");
     } finally {
@@ -502,68 +699,95 @@ export function VhtMap() {
     }
   };
 
-  const phoneOk = /^\+?[0-9 ()-]{7,20}$/.test(f.cphone.trim());
-  const valid = [
-    gps != null && f.village.trim().length > 1,
-    f.name.trim().length > 2,
-    f.who === "me" || (f.cname.trim().length > 2 && phoneOk),
-    f.visited,
-  ];
-  const contact = f.who === "me" ? me.name : f.cname.trim();
+  const chooseWho = (w: "other" | "me") => {
+    setWho(w);
+    setF((x) =>
+      w === "me"
+        ? { ...x, contactName: me.name, contactPhone: me.phone }
+        : { ...x, contactName: "", contactPhone: "" },
+    );
+  };
 
-  const next = () => {
-    if (step < 3) {
-      setStep(step + 1);
-      scroll.current?.scrollTo({ y: 0, animated: false });
+  const goTo = (n: number) => {
+    setStep(n);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  };
+
+  const submit = async () => {
+    const body = toSubmission(form);
+    const label = `Map hotspot · ${body.name}`;
+    setSendErr("");
+    if (me.demo) {
+      const names = {
+        region: nameIn(places.regions, form.regionId),
+        district: nameIn(places.districts, form.districtId),
+        subcounty: nameIn(places.subcounties, form.subcountyId),
+      };
+      const r = send("mapHotspot", { hotspot: draftHotspot(body, names, me.name) }, label);
+      nav.replace(r.queued || !r.id ? "map/queued" : `map/${r.id}`);
       return;
     }
-    const r = send(
-      "mapHotspot",
-      {
-        hotspot: {
-          name: f.name.trim(),
-          kind: f.kind,
-          village: f.village.trim(),
-          subcounty: f.subcounty,
-          contact,
-          phone: f.who === "me" ? me.phone : f.cphone.trim(),
-          vhts: [me.name],
-          dispenser: f.disp !== "None",
-          dispCond: f.disp === "None" ? "" : f.disp,
-          lat: gps?.lat,
-          lng: gps?.lng,
-          comment: f.comment.trim(),
-          dispPhoto: photo ?? undefined,
-        },
-      },
-      `Map hotspot · ${f.name.trim()}`,
-    );
-    if (!r.queued && r.id) nav.replace(`map/${r.id}`);
-    else nav.back();
+    if (offline) {
+      queue("mapHotspot", { request: body }, label);
+      nav.replace("map/queued");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await submitHotspot(body);
+      const r = send("mapHotspot", { hotspot: toLocalHotspot(res, me.name, body.comment) }, label);
+      nav.replace(`map/${r.id ?? res.id}`);
+    } catch (e) {
+      if (isNetworkError(e)) {
+        queue("mapHotspot", { request: body }, label);
+        nav.replace("map/queued");
+        return;
+      }
+      setSendErr(submitErrorMessage(e));
+      const st = isAxiosError(e) ? e.response?.status : undefined;
+      if (st === 409) goTo(1);
+      else if (st === 422) goTo(0);
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const next = () => {
+    if (!stepOk(step)) {
+      setShown((x) => x.map((v, i) => (i === step ? true : v)));
+      return;
+    }
+    if (step < 3) goTo(step + 1);
+    else submit();
+  };
+
+  const typeLabel = f.type === OTHER_TYPE ? f.otherType.trim() : f.type;
+  const dispLabel =
+    f.dispenser === "yes" ? `Yes, ${f.condition.toLowerCase()}` : f.dispenser === "no" ? "No" : "";
 
   return (
     <Screen title="Map a hotspot" backLabel="Hotspots" scrollRef={scroll}>
       <Progress count={4} step={step} label={`Step ${step + 1} of 4 · ${STEPS[step]}`} />
+      {sendErr ? <Banner tone="danger" title="Couldn't submit the hotspot" body={sendErr} /> : null}
       {step === 0 ? (
         <>
           {gpsWait ? (
             <MapCard h="Where is the hotspot?" cap="Capturing GPS…" wait />
-          ) : gps ? (
+          ) : f.lat != null && f.lng != null ? (
             <MapCard
               h="Where is the hotspot?"
-              lat={gps.lat}
-              lng={gps.lng}
+              lat={f.lat}
+              lng={f.lng}
               cap="Location captured"
-              cap2={`${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)} · accuracy ±${gps.acc} m`}
+              cap2={`${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}${gpsAcc != null ? ` · accuracy ±${gpsAcc} m` : ""}`}
               act={{ label: "Capture again", onPress: capture }}
             />
           ) : (
             <>
               <Banner
                 h="Where is the hotspot?"
-                tone={gpsErr ? "warning" : "info"}
-                title={gpsErr ? "No location yet" : "Stand at the hotspot entrance"}
+                tone={gpsErr || errOf("gps") ? "warning" : "info"}
+                title={gpsErr || errOf("gps") ? "No location yet" : "Stand at the hotspot entrance"}
                 body={gpsErr || "Then capture the GPS location. It works without network."}
               />
               <Btns>
@@ -571,78 +795,121 @@ export function VhtMap() {
               </Btns>
             </>
           )}
+          {places.err ? <Banner tone="warning" title="No place lists" body={places.err} /> : null}
           <Fields h="Address">
+            <Select
+              label="Region"
+              value={form.regionId}
+              options={opts(places.regions)}
+              loading={places.regions === null && !places.err}
+              onChange={(v) =>
+                setF((x) => ({ ...x, regionId: v, districtId: "", subcountyId: "" }))
+              }
+              err={errOf("regionId")}
+            />
+            <Select
+              label="District"
+              value={form.districtId}
+              options={opts(places.districts)}
+              loading={!!form.regionId && places.districts === null && !places.err}
+              onChange={(v) =>
+                setF((x) => ({ ...x, regionId: form.regionId, districtId: v, subcountyId: "" }))
+              }
+              err={errOf("districtId")}
+            />
+            <Select
+              label="Sub-county"
+              value={f.subcountyId}
+              options={opts(places.subcounties)}
+              loading={!!form.districtId && places.subcounties === null && !places.err}
+              onChange={up("subcountyId")}
+              err={errOf("subcountyId")}
+            />
             <Input
-              label="Village"
+              label="Village (optional)"
+              max={LIMITS.village}
               value={f.village}
               onChangeText={up("village")}
               ph="e.g. Kigungu"
               autoCapitalize="words"
+              err={errOf("village")}
             />
-            <Select
-              label="Sub-county"
-              value={f.subcounty}
-              options={SUBCOUNTIES.map((x) => ({ v: x, l: x }))}
-              onChange={up("subcounty")}
-            />
-            <ReadOnly label="District" value="Wakiso" />
           </Fields>
         </>
       ) : null}
       {step === 1 ? (
         <>
-          <Fields
-            h="About the hotspot"
-            f={
-              f.kind === "Permanent"
-                ? "Bars, lodges, landing sites, taxi parks."
-                : "Markets, events and seasonal sites."
-            }
-          >
+          <Fields h="About the hotspot">
             <Input
               label="Hotspot name"
+              max={LIMITS.name}
               value={f.name}
               onChangeText={up("name")}
               ph="Name people in the area use"
               autoCapitalize="words"
-            />
-            <Seg
-              label="Type"
-              options={[
-                ["Permanent", "Permanent"],
-                ["Temporary", "Temporary"],
-              ]}
-              value={f.kind}
-              onChange={up("kind")}
+              err={errOf("name")}
             />
             <Select
-              label="Condom dispenser"
-              value={f.disp}
-              onChange={up("disp")}
-              options={[
-                ["Working", "Yes — working"],
-                ["Needs repair", "Yes — needs repair"],
-                ["Broken", "Yes — broken"],
-                ["None", "No dispenser"],
-              ].map(([v, l]) => ({ v, l }))}
+              label="Type"
+              value={f.type}
+              options={[...HOTSPOT_TYPES, OTHER_TYPE].map((t) => ({ v: t, l: t }))}
+              onChange={up("type")}
+              err={errOf("type")}
             />
+            {f.type === OTHER_TYPE ? (
+              <Input
+                label="What kind of place?"
+                max={LIMITS.type}
+                value={f.otherType}
+                onChangeText={up("otherType")}
+                ph="e.g. Hair salon"
+                autoCapitalize="sentences"
+                err={errOf("otherType")}
+              />
+            ) : null}
           </Fields>
-          {f.disp !== "None" ? (
-            <PhotoField
-              h="Dispenser photo"
-              value={photo}
-              onChange={setPhoto}
-              hint="Photograph the dispenser so the district can see its condition."
-              when="Taken just now"
+          <Fields h="Condom dispenser">
+            <Seg
+              label="Is there a condom dispenser?"
+              options={[
+                ["yes", "Yes"],
+                ["no", "No"],
+              ]}
+              value={f.dispenser}
+              onChange={(v) => setF((x) => ({ ...x, dispenser: v, condition: "" }))}
             />
+            {f.dispenser === "yes" ? (
+              <Seg
+                label="Condition"
+                options={DISPENSER_CONDITIONS.map((c) => [c, c] as [string, string])}
+                value={f.condition}
+                onChange={up("condition")}
+              />
+            ) : null}
+          </Fields>
+          {errOf("dispenser") || errOf("condition") ? (
+            <Txt
+              accessibilityRole="alert"
+              style={{
+                marginHorizontal: 32,
+                marginTop: -12,
+                marginBottom: 16,
+                ...TYPE.footnote,
+                color: T.danger,
+              }}
+            >
+              {errOf("dispenser") || errOf("condition")}
+            </Txt>
           ) : null}
-          <Fields>
+          <Fields f="Sent to the district focal person with the hotspot.">
             <Input
               label="Comment (optional)"
+              max={LIMITS.comment}
               value={f.comment}
               onChangeText={up("comment")}
               ph="e.g. Busy on weekends"
               multiline
+              err={errOf("comment")}
             />
           </Fields>
         </>
@@ -650,79 +917,88 @@ export function VhtMap() {
       {step === 2 ? (
         <Fields
           h="Contact person"
-          f={
-            f.who === "me"
-              ? "You receive deliveries and report stockouts for this hotspot."
-              : "The contact person receives deliveries and reports stockouts."
-          }
+          f="The hotspot manager on site. They receive deliveries and report stockouts."
         >
           <Seg
-            label="Who receives deliveries?"
+            label="Who manages the hotspot?"
             options={[
               ["other", "Someone there"],
               ["me", "Me"],
             ]}
-            value={f.who}
-            onChange={up("who")}
+            value={who}
+            onChange={chooseWho}
           />
-          {f.who === "other" ? (
-            <Input
-              label="Full name"
-              value={f.cname}
-              onChangeText={up("cname")}
-              ph="e.g. Sarah Nakirya"
-              autoCapitalize="words"
-            />
-          ) : null}
-          {f.who === "other" ? (
-            <Input
-              label="Phone number"
-              value={f.cphone}
-              onChangeText={up("cphone")}
-              keyboardType="phone-pad"
-              ph="+256 7XX XXX XXX"
-              err={f.cphone.trim() && !phoneOk ? "Enter a phone number, e.g. +256 700 000000." : ""}
-            />
-          ) : null}
-          {f.who === "other" ? (
-            <Toggle
-              label="Invite as hotspot manager"
-              sub="They get an SMS with their username and password"
-              value={f.invite}
-              onChange={up("invite")}
-            />
-          ) : null}
+          <Input
+            label="Full name"
+            max={LIMITS.contact}
+            value={f.contactName}
+            onChangeText={up("contactName")}
+            ph="e.g. Sarah Nakirya"
+            autoCapitalize="words"
+            err={errOf("contactName")}
+          />
+          <Input
+            label="Phone number"
+            value={f.contactPhone}
+            onChangeText={up("contactPhone")}
+            keyboardType="phone-pad"
+            ph="+256 7XX XXX XXX"
+            err={
+              errOf("contactPhone") ||
+              (f.contactPhone.trim() && errs.contactPhone ? errs.contactPhone : "")
+            }
+          />
         </Fields>
       ) : null}
       {step === 3 ? (
         <>
           <List h="Review">
-            <Row t="Name" v={f.name} />
-            <Row t="Type" v={f.kind} />
-            <Row t="Location" v={`${f.village}, ${f.subcounty}`} />
-            <Row t="GPS" v={gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "—"} />
+            <Row t="Name" v={f.name.trim()} />
+            <Row t="Type" v={typeLabel} />
             <Row
-              t="Dispenser"
-              v={f.disp === "None" ? "None" : `${f.disp}${photo ? " · photo" : ""}`}
+              t="Location"
+              v={[
+                f.village.trim(),
+                nameIn(places.subcounties, f.subcountyId),
+                nameIn(places.districts, form.districtId),
+              ]
+                .filter(Boolean)
+                .join(", ")}
             />
-            <Row t="Contact" v={f.who === "me" ? "You" : `${contact} · ${f.cphone}`} />
+            <Row
+              t="GPS"
+              v={f.lat != null && f.lng != null ? `${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}` : "—"}
+            />
+            <Row t="Dispenser" v={dispLabel} />
+            <Row
+              t="Contact"
+              v={`${who === "me" ? "You" : f.contactName.trim()} · ${f.contactPhone.trim()}`}
+            />
           </List>
-          <Fields>
+          <Fields
+            f={
+              offline
+                ? "You're offline. It's saved on this phone and sent when you're back online."
+                : "The district focal person reviews it before it can get stock."
+            }
+          >
             <Check
               label="I visited this hotspot and the details are correct"
-              value={f.visited}
-              onChange={up("visited")}
+              value={visited}
+              onChange={setVisited}
             />
           </Fields>
         </>
       ) : null}
       <Btns>
         <Btn
-          label={step === 3 ? "Activate hotspot" : "Continue"}
+          label={step === 3 ? (busy ? "Submitting…" : "Submit for review") : "Continue"}
           onPress={next}
-          dis={!valid[step]}
+          dis={busy || (step === 3 && !visited)}
         />
-        {step > 0 ? <Btn label="Back" kind="text" onPress={() => setStep(step - 1)} /> : null}
+        {step > 0 ? (
+          <Btn label="Back" kind="text" onPress={() => goTo(step - 1)} dis={busy} />
+        ) : null}
       </Btns>
     </Screen>
   );

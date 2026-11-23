@@ -1,47 +1,61 @@
-import { Stack, router } from "expo-router";
+import React from "react";
 import { View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/context/theme/ThemeProvider";
-import { AppText, Button } from "@/components/ui";
+import { Stack, router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useT } from "@/lib/theme";
+import { Btn, Btns, Txt } from "@/components/m/kit";
+import Icon from "@/components/m/Icon";
+import { MAX_FORM_WIDTH, useColumn } from "@/hooks/useResponsive";
+import { TYPE } from "@/lib/fonts";
 
+/**
+ * Shown for links that match no screen. Built from the field app's kit, which needs only the theme the
+ * root layout provides, so it renders whether or not anyone is signed in.
+ */
 export default function NotFoundScreen() {
-  const { colors } = useTheme();
+  const T = useT();
+  const insets = useSafeAreaInsets();
+  const col = useColumn(MAX_FORM_WIDTH);
   return (
     <>
       <Stack.Screen options={{ title: "Page not found" }} />
       <View
         style={{
           flex: 1,
-          alignItems: "center",
           justifyContent: "center",
-          padding: 32,
-          backgroundColor: colors.bg,
+          backgroundColor: T.bg,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
         }}
       >
-        <View
-          style={{
-            width: 88,
-            height: 88,
-            borderRadius: 44,
-            backgroundColor: colors.brandSoft,
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 16,
-          }}
-        >
-          <Ionicons name="compass-outline" size={40} color={colors.brandText} />
+        <View style={[col.style, { alignItems: "center", paddingHorizontal: 24, gap: 12 }]}>
+          <View
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: 44,
+              backgroundColor: T.icBg,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="help" size={40} color={T.icFg} />
+          </View>
+          <Txt
+            accessibilityRole="header"
+            style={{ ...TYPE.title, fontWeight: "700", textAlign: "center" }}
+          >
+            We couldn&apos;t find that page
+          </Txt>
+          <Txt style={{ color: T.fg2, ...TYPE.subhead, textAlign: "center" }}>
+            It may have moved or no longer exists.
+          </Txt>
         </View>
-        <AppText variant="title" style={{ textAlign: "center" }}>
-          We couldn&apos;t find that page
-        </AppText>
-        <AppText variant="body" color="textMuted" style={{ textAlign: "center", marginTop: 6 }}>
-          It may have moved or no longer exists.
-        </AppText>
-        <Button
-          title="Back to start"
-          onPress={() => router.replace("/")}
-          style={{ marginTop: 24, alignSelf: "stretch" }}
-        />
+        <View style={[col.style, { marginTop: 24 }]}>
+          <Btns>
+            <Btn label="Back to start" onPress={() => router.replace("/")} />
+          </Btns>
+        </View>
       </View>
     </>
   );

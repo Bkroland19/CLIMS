@@ -1,224 +1,581 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  CalendarX2,
+  ClockAlert,
+  Package,
+  PackageCheck,
+  PackagePlus,
+  Pencil,
+  Scale,
+  Store,
+  Truck,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { ItemsTable } from '@/components/ItemsTable';
-import { SampleDataNotice } from '@/components/SampleData';
+import { RowActions } from '@/components/data-table/RowActions';
+import { FilterSelect } from '@/components/FilterSelect';
+import { FilterTabs } from '@/components/FilterTabs';
+import { StatCard } from '@/components/StatCard';
+import { StatusBadge } from '@/components/StatusBadge';
+import { TaskList } from '@/components/TaskList';
+import { EmptyState } from '@/components/states/EmptyState';
+import { ErrorState } from '@/components/states/ErrorState';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCurrentUser } from '@/features/auth/hooks';
+import { useCan } from '@/features/auth/queries';
+import { DCFP_PATHS } from '@/features/dcfp/orders';
+import { DeliverStockDialog } from '@/features/dcfp/DeliverStockDialog';
+import { useStores } from '@/features/geography/queries';
+import {
+  MOVEMENT_REASONS,
+  type Movement,
+  type MovementReason,
+  type ProductSummary,
+  type StockBatch,
+} from '@/features/inventory/api';
+import { BAND_STATUS, batchLabel } from '@/features/inventory/bands';
+import { AdjustBatchDialog } from '@/features/warehouse/AdjustBatchDialog';
+import { EditBatchDialog } from '@/features/warehouse/EditBatchDialog';
+import { RegisterStockSheet } from '@/features/warehouse/RegisterStockSheet';
+import { ShelfLifeOverview } from '@/features/warehouse/ShelfLifeOverview';
+import { useStoreBatches } from '@/features/warehouse/orderQueries';
+import { ugandaToday } from '@/features/warehouse/receiving';
+import { shelfLifeByUnit, stockAttention } from '@/features/warehouse/shelfLife';
+import {
+  BATCH_FILTERS,
+  batchFilterFrom,
+  keepsBatch,
+  MOVEMENT_LABEL,
+  signed,
+} from '@/features/warehouse/stock';
+import { useMovementLedger, useStoreSummary } from '@/features/warehouse/stockQueries';
+import {
+  formatAmounts,
+  formatMonths,
+  PERIODS,
+  periodFrom,
+  periodPhrase,
+  periodRange,
+  stockCover,
+  totalsByUnit,
+} from '@/features/warehouse/summary';
 import { formatDate, formatNumber, formatTimestamp } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { useReadOnly } from '@/navigation/useAccess';
 
-import type { BatchLine, DistrictStore, StockMovement, WarehouseRequest } from './api';
-import { NEAR_EXPIRY_MONTHS } from './batches';
-import { BatchStatusBadge, ExpiryCell, ProductCell } from './BatchCells';
-import { PRODUCTS, sumQuantities, type ProductKey } from './products';
-import { useDistrictStore, useOrders, useRequests } from './queries';
-import { RecordView } from '@/components/RecordView';
-import { StockLevel } from './StockLevel';
-import { DCFP_PATHS } from './tasks';
+const VIEWS = [
+  { value: 'products', label: 'Products' },
+  { value: 'batches', label: 'Batches' },
+  { value: 'movements', label: 'Movements' },
+] as const;
+const productColumns: DataTableColumn<ProductSummary>[] = [
+  { id: 'product', header: 'Product', value: (row) => row.product },
+  { id: 'unit', filter: 'select', header: 'Unit', value: (row) => row.unit },
+  ...(
+    [
+      ['on_hand', 'On hand'],
+      ['usable', 'Available'],
+      ['received', 'Received'],
+      ['dispatched', 'Dispatched'],
+      ['expired', 'Expired'],
+      ['written_off', 'Written off'],
+    ] as const
+  ).map(([id, header]): DataTableColumn<ProductSummary> => ({
+    id,
+    header,
+    numeric: true,
+    value: (row) => row[id],
+    cell: (row) => formatNumber(row[id]),
+  })),
+  {
+    id: 'cover',
+    header: 'Stock cover',
+    value: (row) => stockCover(row),
+    cell: (row) => {
+      const months = stockCover(row);
+      return months === null ? 'No dispatch history' : formatMonths(months);
+    },
+  },
+  {
+    id: 'next_expiry',
+    filter: 'date',
+    header: 'Next expiry',
+    value: (row) => row.next_expiry,
+    cell: (row) => (row.next_expiry ? formatDate(row.next_expiry) : 'Not recorded'),
+  },
+];
+const batchColumns: DataTableColumn<StockBatch>[] = [
+  { id: 'product', header: 'Product', value: (row) => row.product },
+  { id: 'batch', header: 'Batch', value: batchLabel },
+  { id: 'unit', filter: 'select', header: 'Unit', value: (row) => row.unit },
+  {
+    id: 'on_hand',
+    header: 'On hand',
+    numeric: true,
+    value: (row) => row.on_hand,
+    cell: (row) => formatNumber(row.on_hand),
+  },
+  {
+    id: 'expiry',
+    filter: 'date',
+    header: 'Expiry date',
+    value: (row) => row.expiry_date,
+    cell: (row) => (row.expiry_date ? formatDate(row.expiry_date) : 'Not recorded'),
+  },
+  {
+    id: 'band',
+    filter: 'select',
+    header: 'Shelf life',
+    value: (row) => BAND_STATUS[row.band].label,
+    cell: (row) => (
+      <StatusBadge status={BAND_STATUS[row.band].label} tone={BAND_STATUS[row.band].tone} />
+    ),
+  },
+];
+const movementColumns: DataTableColumn<Movement>[] = [
+  {
+    id: 'date',
+    filter: 'date',
+    header: 'Date',
+    value: (row) => row.created_at,
+    cell: (row) => formatTimestamp(row.created_at),
+  },
+  { id: 'product', header: 'Product', value: (row) => row.product },
+  { id: 'unit', filter: 'select', header: 'Unit', value: (row) => row.unit },
+  {
+    id: 'reason',
+    filter: 'select',
+    header: 'Movement',
+    value: (row) => MOVEMENT_LABEL[row.reason].label,
+  },
+  {
+    id: 'quantity',
+    header: 'Change',
+    numeric: true,
+    value: (row) => row.quantity,
+    cell: (row) => signed(row.quantity),
+  },
+  {
+    id: 'balance',
+    header: 'Balance after',
+    numeric: true,
+    value: (row) => row.on_hand_after,
+    cell: (row) => formatNumber(row.on_hand_after),
+  },
+  { id: 'note', header: 'Note', value: (row) => row.note ?? '' },
+  {
+    id: 'order',
+    header: 'Order',
+    value: (row) => row.order_id,
+    cell: (row) =>
+      row.order_id ? (
+        <Link className="text-primary underline" href={`${DCFP_PATHS.orders}/${row.order_id}`}>
+          View order
+        </Link>
+      ) : (
+        '—'
+      ),
+  },
+];
 
+/** The assigned district's real balances, batches and ledger, using the same inventory API as warehouses. */
 export default function DistrictStorePage() {
-  const store = useDistrictStore();
+  const user = useCurrentUser();
+  const can = useCan();
+  const readOnly = useReadOnly();
+  const storeId = user?.store_id ?? undefined;
+  const stores = useStores(Boolean(storeId));
+  const store = stores.data?.find(
+    (candidate) => candidate.id === storeId && candidate.store_type === 'district',
+  );
+  const params = useSearchParams();
+  const router = useRouter();
+  const view =
+    VIEWS.find((item) => item.value === params.get('view'))?.value ??
+    (params.has('band') ? 'batches' : 'products');
+  const band = batchFilterFrom(params.get('band'));
+  const period = periodFrom(params.get('period'));
+  const reason = MOVEMENT_REASONS.find((item) => item === params.get('reason'));
+  const today = useMemo(() => ugandaToday(new Date()), []);
+  const range = useMemo(() => periodRange(period, today), [period, today]);
+  const summary = useStoreSummary(store?.id, range);
+  const batches = useStoreBatches(store?.id ?? '', { enabled: Boolean(store) });
+  const ledger = useMovementLedger(store?.id, reason ?? null, {
+    enabled: Boolean(store) && view === 'movements',
+  });
+  const [registering, setRegistering] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
+  const [adjusting, setAdjusting] = useState<StockBatch | null>(null);
+  const [editing, setEditing] = useState<StockBatch | null>(null);
+  const shelfLife = useMemo(
+    () => (batches.data ? shelfLifeByUnit(batches.data) : undefined),
+    [batches.data],
+  );
+  const products = summary.data?.products;
+  const attention = useMemo(
+    () =>
+      batches.data && products
+        ? stockAttention(batches.data, products, (path) => path, DCFP_PATHS.store)
+        : undefined,
+    [batches.data, products],
+  );
+  const manage = !readOnly && can('inventory:manage');
+  const pathFor = (changes: Record<string, string>) => {
+    const next = new URLSearchParams(params.toString());
+    for (const [key, value] of Object.entries(changes)) next.set(key, value);
+    return `${DCFP_PATHS.store}?${next.toString()}`;
+  };
+  const amount = (pick: (row: ProductSummary) => number) =>
+    products ? formatAmounts(totalsByUnit(products, pick)) : '—';
+
+  if (!storeId)
+    return (
+      <EmptyState
+        icon={Store}
+        title="No district store assigned"
+        description="Ask an administrator to assign your account to its district store. Stock will appear here once it is assigned."
+      />
+    );
+  if (stores.error)
+    return (
+      <ErrorState
+        title="Could not load your district store"
+        error={stores.error}
+        onRetry={() => void stores.refetch()}
+      />
+    );
+  if (stores.isSuccess && !store)
+    return (
+      <EmptyState
+        icon={Store}
+        title="No district store assigned"
+        description="Your account's store is not a district store. Ask an administrator to check the assignment."
+      />
+    );
+
   return (
-    <div className="flex flex-col gap-6">
-      <SampleDataNotice subject="The stock figures" />
-      <RecordView
-        query={store}
-        layout="table"
-        noun="district store"
-        back={{ href: DCFP_PATHS.dashboard, label: 'Back to the dashboard' }}
-      >
-        {(data) => <StoreView store={data} />}
-      </RecordView>
+    <div className="gap-section flex flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">{store?.name ?? 'District store'}</h2>
+          <p className="text-muted-foreground text-sm">
+            Current stock and activity in the {periodPhrase(period)}. Quantities stay in their
+            recorded units.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterSelect
+            label="Period"
+            value={period}
+            options={PERIODS.map((item) => ({ value: item.value, label: item.label }))}
+            onValueChange={(value) => {
+              router.replace(pathFor({ period: value }), { scroll: false });
+            }}
+          />
+          {!readOnly && can('orders:receive') ? (
+            <Button asChild variant="outline">
+              <Link href={`${DCFP_PATHS.orders}?status=dispatched`}>
+                <ArrowDownToLine data-icon="inline-start" />
+                Receive warehouse delivery
+              </Link>
+            </Button>
+          ) : null}
+          {!readOnly && can('orders:replenish') ? (
+            <Button asChild variant="outline">
+              <Link href={DCFP_PATHS.newOrder}>Request stock</Link>
+            </Button>
+          ) : null}
+          {!readOnly && can('orders:supply_hotspots') ? (
+            <Button
+              disabled={!store || !summary.isSuccess}
+              onClick={() => {
+                setDispatching(true);
+              }}
+            >
+              <Truck data-icon="inline-start" />
+              Dispatch to hotspot
+            </Button>
+          ) : null}
+          {manage ? (
+            <Button
+              variant="outline"
+              disabled={!store}
+              onClick={() => {
+                setRegistering(true);
+              }}
+            >
+              <PackagePlus data-icon="inline-start" />
+              Register stock
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {summary.error ? (
+        <ErrorState
+          title="Could not load district stock"
+          error={summary.error}
+          onRetry={() => void summary.refetch()}
+        />
+      ) : summary.isSuccess && products?.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="No stock in the district store"
+          description="Receive a warehouse delivery or register stock from another source to get started."
+        />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="On hand"
+            value={amount((row) => row.on_hand)}
+            detail="Physical stock, including reserved and expired"
+            icon={Package}
+            isLoading={summary.isPending}
+          />
+          <StatCard
+            label="Available to dispatch"
+            value={amount((row) => row.usable)}
+            detail={`${amount((row) => row.reserved)} reserved · excludes expired stock`}
+            icon={PackageCheck}
+            isLoading={summary.isPending}
+          />
+          <StatCard
+            label="Received"
+            value={amount((row) => row.received)}
+            detail={`Warehouse receipts and registrations, ${periodPhrase(period)}`}
+            icon={ArrowDownToLine}
+            isLoading={summary.isPending}
+          />
+          <StatCard
+            label="Dispatched"
+            value={amount((row) => row.dispatched)}
+            detail={`Stock sent out, including hotspot deliveries, ${periodPhrase(period)}`}
+            icon={Truck}
+            isLoading={summary.isPending}
+          />
+          <StatCard
+            label="Expired"
+            value={amount((row) => row.expired)}
+            detail="Cannot be dispatched; write off after disposal"
+            icon={CalendarX2}
+            accent="caution"
+            isLoading={summary.isPending}
+            href={pathFor({ view: 'batches', band: 'expired' })}
+          />
+          <StatCard
+            label="Expiring within 3 months"
+            value={amount((row) => row.expiring)}
+            detail="Prioritise these batches for dispatch"
+            icon={ClockAlert}
+            accent="caution"
+            isLoading={summary.isPending}
+            href={pathFor({ view: 'batches', band: 'expiring' })}
+          />
+          <StatCard
+            label="Written off"
+            value={amount((row) => row.written_off)}
+            detail={`Negative adjustments, ${periodPhrase(period)}`}
+            icon={Scale}
+            isLoading={summary.isPending}
+          />
+          <StatCard
+            label="Expiry not recorded"
+            value={amount((row) => row.no_expiry)}
+            detail="Check the cartons and update their expiry dates"
+            icon={CalendarX2}
+            accent="caution"
+            isLoading={summary.isPending}
+            href={pathFor({ view: 'batches', band: 'unknown' })}
+          />
+        </div>
+      )}
+      <div className="gap-section grid xl:grid-cols-2">
+        <ShelfLifeOverview
+          code={store?.name ?? 'the district store'}
+          units={shelfLife}
+          isLoading={batches.isPending}
+          error={batches.error}
+          onRetry={() => void batches.refetch()}
+          isRetrying={batches.isRefetching}
+          hrefForBand={(value) => pathFor({ view: 'batches', band: value })}
+        />
+        <TaskList
+          title="Stock needing attention"
+          tasks={attention}
+          isLoading={summary.isPending || batches.isPending}
+          error={summary.error ?? batches.error}
+          errorTitle="Could not check district stock"
+          onRetry={() => {
+            void summary.refetch();
+            void batches.refetch();
+          }}
+          loadingLabel="Checking district stock…"
+          empty={{
+            title: products?.length === 0 ? 'Nothing to check yet' : 'Nothing needs attention',
+            description:
+              'Expiry risks, missing batch dates and products with less than a month of stock appear here.',
+          }}
+        />
+      </div>
+      <div className="flex flex-col gap-3">
+        <FilterTabs
+          label="Show district stock by"
+          tabs={VIEWS}
+          value={view}
+          hrefFor={(value) => pathFor({ view: value, band: 'all' })}
+        />
+        {view === 'products' ? (
+          <>
+            <p className="text-muted-foreground text-sm">
+              Received, dispatched and written off cover the selected period. Stock cover uses the
+              last 90 days of dispatches; it is an estimate, not measured consumption.
+            </p>
+            <DataTable
+              label="District stock by product"
+              columns={productColumns}
+              rows={products}
+              getRowId={(row) => `${row.condom_id}:${row.unit_of_measure_id}`}
+              isLoading={summary.isPending}
+              error={summary.error}
+              onRetry={() => void summary.refetch()}
+              emptyTitle="No products in stock yet"
+              emptyDescription="Products appear here once stock has been received."
+              preferencesKey="district-stock-products"
+            />
+          </>
+        ) : view === 'batches' ? (
+          <DataTable
+            label="District stock batches"
+            columns={batchColumns}
+            rows={batches.data?.filter((row) => keepsBatch(band, row))}
+            getRowId={(row) => row.id}
+            isLoading={batches.isPending}
+            error={batches.error}
+            onRetry={() => void batches.refetch()}
+            emptyTitle="No batches to show"
+            emptyDescription="Receive stock or choose another shelf-life filter."
+            preferencesKey="district-stock-batches"
+            toolbar={
+              <FilterSelect
+                label="Shelf life"
+                value={band}
+                options={BATCH_FILTERS}
+                onValueChange={(value) => {
+                  router.replace(pathFor({ band: value }), { scroll: false });
+                }}
+              />
+            }
+            rowActions={
+              manage
+                ? (batch) => (
+                    <RowActions
+                      label={`Actions for batch ${batchLabel(batch)}`}
+                      actions={[
+                        {
+                          label: 'Edit batch',
+                          icon: Pencil,
+                          onSelect: () => {
+                            setEditing(batch);
+                          },
+                        },
+                        {
+                          label:
+                            batch.band === 'expired'
+                              ? 'Write off expired stock'
+                              : 'Adjust or write off',
+                          icon: Scale,
+                          onSelect: () => {
+                            setAdjusting(batch);
+                          },
+                        },
+                      ]}
+                    />
+                  )
+                : undefined
+            }
+          />
+        ) : (
+          <>
+            <p className="text-muted-foreground text-sm">
+              Every movement, newest first. The ledger includes all dates; the period selector
+              applies to the summary figures.
+            </p>
+            <DataTable
+              label="District stock movements"
+              columns={movementColumns}
+              rows={ledger.rows}
+              getRowId={(row) => row.id}
+              isLoading={ledger.isPending}
+              error={ledger.error}
+              onRetry={() => void ledger.refetch()}
+              emptyTitle="No stock movements yet"
+              emptyDescription="Receipts, dispatches and adjustments appear here."
+              preferencesKey="district-stock-movements"
+              more={{
+                hasMore: ledger.hasMore,
+                isLoading: ledger.isLoadingMore,
+                onLoadMore: ledger.loadMore,
+                noun: 'movements',
+              }}
+              toolbar={
+                <FilterSelect
+                  label="Movement"
+                  value={reason ?? 'all'}
+                  options={[
+                    { value: 'all', label: 'Every movement' },
+                    ...MOVEMENT_REASONS.map((value) => ({
+                      value,
+                      label: MOVEMENT_LABEL[value].label,
+                    })),
+                  ]}
+                  onValueChange={(value: MovementReason | 'all') => {
+                    router.replace(pathFor({ reason: value }), { scroll: false });
+                  }}
+                />
+              }
+            />
+          </>
+        )}
+      </div>
+      {registering && manage ? (
+        <RegisterStockSheet
+          open
+          onOpenChange={setRegistering}
+          code={store?.name ?? 'the district store'}
+          warehouse={store}
+        />
+      ) : null}
+      {adjusting && manage ? (
+        <AdjustBatchDialog
+          batch={adjusting}
+          open
+          onOpenChange={(open) => {
+            if (!open) setAdjusting(null);
+          }}
+        />
+      ) : null}
+      {editing && manage ? (
+        <EditBatchDialog
+          batch={editing}
+          held={batches.data ?? []}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+        />
+      ) : null}
+      {dispatching && store && !readOnly && can('orders:supply_hotspots') ? (
+        <DeliverStockDialog
+          storeId={store.id}
+          stock={products ?? []}
+          onClose={() => {
+            setDispatching(false);
+          }}
+        />
+      ) : null}
     </div>
   );
-}
-
-/** "+1,000", "−400" or "—": a movement's change, signed in words as well as colour. */
-function signed(change: number): string {
-  if (change === 0) return '—';
-  return `${change > 0 ? '+' : '−'}${formatNumber(Math.abs(change))}`;
-}
-
-function ChangeCell({ change }: { change: number }) {
-  return (
-    <span
-      className={cn(
-        'tabular-nums',
-        change > 0 ? 'text-success font-medium' : change === 0 && 'text-muted-foreground',
-      )}
-    >
-      {signed(change)}
-    </span>
-  );
-}
-
-/** "Last delivery … from NMS · GRN-…", from the most recently received request. */
-function lastDelivery(requests: readonly WarehouseRequest[] | undefined): string | null {
-  const received = (requests ?? [])
-    .flatMap((request) => (request.receipt ? [{ request, receipt: request.receipt }] : []))
-    .sort((a, b) => b.receipt.received_at.localeCompare(a.receipt.received_at));
-  const [latest] = received;
-  if (!latest) return null;
-  return `Last delivery ${formatTimestamp(latest.receipt.received_at)} from ${latest.request.warehouse} · ${latest.receipt.grn}.`;
-}
-
-function StoreView({ store }: { store: DistrictStore }) {
-  const now = new Date();
-  const orders = useOrders();
-  const requests = useRequests();
-
-  const heldNeed = orders.data
-    ? sumQuantities(
-        orders.data.filter((order) => order.status === 'on_hold').map((order) => order.approved),
-      )
-    : null;
-  const batches = [...store.batches].sort((a, b) => a.expires_on.localeCompare(b.expires_on));
-  const lastIn = lastDelivery(requests.data);
-
-  const movementColumns = useMemo<DataTableColumn<StockMovement>[]>(
-    () => [
-      {
-        id: 'at',
-        header: 'Date',
-        value: (movement) => movement.at,
-        cell: (movement) => formatTimestamp(movement.at),
-      },
-      { id: 'reference', header: 'Reference', value: (movement) => movement.reference },
-      { id: 'movement', header: 'Movement', value: (movement) => movement.description },
-      {
-        id: 'male',
-        header: 'Male',
-        numeric: true,
-        value: (movement) => movement.change.male,
-        cell: (movement) => <ChangeCell change={movement.change.male} />,
-      },
-      {
-        id: 'female',
-        header: 'Female',
-        numeric: true,
-        value: (movement) => movement.change.female,
-        cell: (movement) => <ChangeCell change={movement.change.female} />,
-      },
-      {
-        id: 'balance',
-        header: 'Balance (M / F)',
-        numeric: true,
-        sortable: false,
-        value: (movement) =>
-          `${formatNumber(movement.balance.male)} / ${formatNumber(movement.balance.female)}`,
-      },
-    ],
-    [],
-  );
-
-  return (
-    <>
-      <div className="grid gap-4 md:grid-cols-2">
-        {PRODUCTS.map((product) => (
-          <Card key={product.key}>
-            <CardContent className="flex flex-col gap-2">
-              <StockLevel
-                size="large"
-                product={product.key}
-                inStock={store.stock[product.key]}
-                minimum={store.min_levels[product.key]}
-                note={`Minimum level ${formatNumber(store.min_levels[product.key])} · ${
-                  heldNeed ? formatNumber(heldNeed[product.key]) : '—'
-                } needed by held orders`}
-              />
-              <p className="text-muted-foreground text-xs">{batchSummary(batches, product.key)}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>Batches in store</CardTitle>
-          <CardDescription>
-            {lastIn ? `${lastIn} ` : null}Issued first-expiry-first-out; near expiry is under{' '}
-            {NEAR_EXPIRY_MONTHS} months.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          <ItemsTable<BatchLine>
-            label="Batches in store"
-            rows={batches}
-            getRowId={(batch) => `${batch.product}:${batch.batch}`}
-            emptyText="No stock in the district store."
-            columns={[
-              {
-                id: 'product',
-                header: 'Product',
-                cell: (batch) => <ProductCell product={batch.product} />,
-              },
-              { id: 'batch', header: 'Batch', cell: (batch) => batch.batch },
-              {
-                id: 'manufactured',
-                header: 'Manufactured',
-                cell: (batch) => formatDate(batch.manufactured_on),
-              },
-              {
-                id: 'expires',
-                header: 'Expires',
-                cell: (batch) => <ExpiryCell expiresOn={batch.expires_on} now={now} />,
-              },
-              {
-                id: 'pieces',
-                header: 'Pieces',
-                numeric: true,
-                cell: (batch) => formatNumber(batch.quantity),
-              },
-              {
-                id: 'status',
-                header: 'Status',
-                cell: (batch) => <BatchStatusBadge expiresOn={batch.expires_on} now={now} />,
-              },
-            ]}
-          />
-        </CardContent>
-      </Card>
-
-      <section aria-labelledby="movements-heading" className="flex min-w-0 flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 id="movements-heading" className="text-base font-semibold">
-              Stock movements
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Additions from warehouses and allocations to hotspots.
-            </p>
-          </div>
-          <Button asChild className="self-start sm:self-auto">
-            <Link href={DCFP_PATHS.newRequest}>
-              <Plus data-icon="inline-start" />
-              Request stock
-            </Link>
-          </Button>
-        </div>
-        <DataTable
-          label="Stock movements"
-          columns={movementColumns}
-          rows={store.movements}
-          getRowId={(movement) => `${movement.at}:${movement.reference}:${movement.description}`}
-          searchPlaceholder="Search movements…"
-          emptyTitle="No stock movements yet"
-          emptyDescription="Deliveries from warehouses and allocations to hotspots appear here."
-        />
-      </section>
-    </>
-  );
-}
-
-/** "2 batches · next expiry 31 Jan 2027", or that there are none. */
-function batchSummary(batches: readonly BatchLine[], product: ProductKey): string {
-  const own = batches.filter((batch) => batch.product === product);
-  const [first] = own;
-  if (!first) return 'No batches in store';
-  return `${String(own.length)} batch${own.length > 1 ? 'es' : ''} · next expiry ${formatDate(first.expires_on)}`;
 }

@@ -2,6 +2,17 @@
 
 Notable bugs and mistakes, with their root cause and what now prevents a repeat.
 
+## 2026-11-23: Shared table behaviour and frontend dependencies
+
+- A missing font package in the Docker dependency volume left Turbopack serving a cached CSS
+  compilation error even after the package was installed. Refresh container dependencies and clear
+  the generated development cache when module resolution remains stale; verify a served page and
+  its font asset, not only the host installation.
+- Keeping old table rows after a failed refresh hid the outage. Shared tables now keep those rows
+  with an explicit stale-data warning and retry, so an error cannot be mistaken for current data.
+- Receipt dates were checked for shape only, allowing impossible dates to reach the API. Shared
+  calendar validation now rejects rollover dates and tests leap-year boundaries.
+
 ## 2026-11-12: Importing the web app
 
 ### A credential was committed to source
@@ -76,3 +87,17 @@ re-export into a file importing itself.
 - **Now:** nothing to enforce beyond the habit: check what an unfamiliar package is before removing
   it. The slip was caught within minutes because the type-check and tests were run immediately
   after.
+
+## 2026-11-21: Two migrations numbered 20
+
+### The API stopped starting after two pull requests merged
+
+`store_assignment` and `vht_district_stockouts` were written on separate branches and both took
+version 20. Each branch passed CI alone; once both were merged, golang-migrate refused to open the
+migration set and the API exited at start-up.
+
+- **Root cause:** a migration's number is chosen when it is generated, from the branch's own files,
+  and nothing checked for a clash after merging.
+- **Now:** `vht_district_stockouts` is migration 21 and inserts its permissions with `ON CONFLICT DO
+NOTHING`, so it reruns safely on a database that applied it as 20. Before merging a branch with a
+  migration, rebase and rerun the integration tests, which apply every migration to a fresh database.

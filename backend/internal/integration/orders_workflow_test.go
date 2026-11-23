@@ -2,11 +2,15 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// testOrderWorkflow covers the two flows: a hotspot's stockout report notifies its district's DCFPs,
+// and a DCFP orders stock from a national warehouse, which reviews, checks and dispatches it for the
+// district to receive.
 func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	request func(string, string, any, string, int) map[string]any,
 	login func(string, string, int) string,
@@ -20,17 +24,23 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 			t.Fatal(err)
 		}
 	}
-	var hotSpot string
-	if err := pool.QueryRow(ctx, `SELECT id FROM hot_spots ORDER BY id LIMIT 1`).Scan(&hotSpot); err != nil {
-		t.Fatal(err)
+	scalar := func(dest any, sql string, args ...any) {
+		t.Helper()
+		if err := pool.QueryRow(ctx, sql, args...).Scan(dest); err != nil {
+			t.Fatal(err)
+		}
 	}
-	exec(`INSERT INTO order_hot_spot_routes (hot_spot_id, store_id) VALUES ($1, $2)`, hotSpot, district)
+	var hotSpot string
+	scalar(&hotSpot, `SELECT id FROM hot_spots ORDER BY id LIMIT 1`)
+	// Reports go to the store of the hotspot's district. The hotspot is picked by random UUID, so clear
+	// its subcounty: one from its old district would break the subcounty/district foreign key.
+	exec(`UPDATE hot_spots SET district_id = (SELECT district_id FROM stores WHERE id = $2), subcounty_id = NULL,
+		village = 'Kisenyi' WHERE id = $1`, hotSpot, district)
+	exec(`INSERT INTO contact_persons (name, phone_number, hot_spot_id) VALUES ('Peter Okello', '0700123456', $1)`, hotSpot)
 	account := func(role, name string, store, hotspot *string, permissions ...string) (string, string) {
 		t.Helper()
 		var roleID string
-		if err := pool.QueryRow(ctx, `SELECT id FROM roles WHERE name = $1`, role).Scan(&roleID); err != nil {
-			t.Fatal(err)
-		}
+		scalar(&roleID, `SELECT id FROM roles WHERE name = $1`, role)
 		request("PUT", "/roles/"+roleID+"/permissions",
 			map[string]any{"permissions": append([]string{"orders:read"}, permissions...)}, admin, 200)
 		email := name + "@example.test"
@@ -42,26 +52,153 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		return id, login(email, "test-password-123", 200)
 	}
 	_, hotspotToken := account("hotspot manager", "workflow-hotspot", nil, &hotSpot, "orders:stockout")
-	_, districtToken := account("dfcp", "workflow-district", &district, nil, "orders:process", "orders:replenish", "orders:receive")
+	_, districtToken := account("dfcp", "workflow-district", &district, nil, "orders:replenish", "orders:receive")
 	_, warehouseToken := account("jms", "workflow-warehouse", &warehouse, nil, "orders:process")
-	riderID, riderToken := account("delivery agent", "workflow-rider", &district, nil, "orders:deliver")
+	var otherStore string
+	scalar(&otherStore, `SELECT s.id FROM stores s WHERE s.store_type = 'district' AND s.id <> $1 LIMIT 1`, district)
+	_, otherToken := account("dfcp", "workflow-other-district", &otherStore, nil, "orders:replenish", "orders:receive")
+	// Delivery agents work at a district store: one in the hotspot's district, one elsewhere.
+	rider, riderToken := account("delivery agent", "workflow-rider", &district, nil, "orders:deliver")
+	awayRider, awayRiderToken := account("delivery agent", "workflow-rider-away", &otherStore, nil, "orders:deliver")
+	riders := deliveryAgents{id: rider, token: riderToken, awayID: awayRider, awayToken: awayRiderToken}
 
-	stockout := map[string]any{"hot_spot_id": hotSpot, "condom_id": product, "unit_of_measure_id": unit, "quantity_needed": 50}
-	parent := request("POST", "/orders/stockouts", stockout, hotspotToken, 201)["data"].(map[string]any)
-	parentPath := "/orders/" + parent["id"].(string)
-	notifications := func(token, wantAction string) {
+	// inbox returns the central-inbox notification of this type about the resource, if any.
+	inbox := func(token, resourceType, resourceID, typeName string) map[string]any {
 		t.Helper()
-		events := request("GET", "/orders/notifications", nil, token, 200)["data"].([]any)
-		for _, event := range events {
-			if event.(map[string]any)["action"] == wantAction {
-				return
+		for _, item := range request("GET", "/notifications?limit=100", nil, token, 200)["data"].([]any) {
+			n := item.(map[string]any)
+			if n["resource_type"] == resourceType && n["resource_id"] == resourceID && n["type"] == typeName {
+				return n
 			}
 		}
-		t.Fatalf("notification %s missing: %v", wantAction, events)
+		return nil
 	}
-	act := func(order, name, token string, input any, code int, state string) map[string]any {
+	listed := func(path, token, id string) bool {
 		t.Helper()
-		result := request("POST", order+"/actions/"+name, input, token, code)
+		for _, item := range request("GET", path, nil, token, 200)["data"].([]any) {
+			if item.(map[string]any)["id"] == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	// 1. A stockout is a report with a message. It carries no quantity and creates no order.
+	var ordersBefore int
+	scalar(&ordersBefore, `SELECT count(*) FROM orders`)
+	// Requests name a condom category; the product's category is the one these checks use.
+	var category string
+	scalar(&category, `SELECT category FROM condoms WHERE id = $1`, product)
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_category": category, "quantity_needed": 50}, hotspotToken, 400)
+	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": hotSpot, "condom_id": product}, hotspotToken, 400)
+	report := request("POST", "/orders/stockouts", map[string]any{
+		"hot_spot_id": hotSpot, "condom_category": category, "message": "Dispenser empty since Monday",
+	}, hotspotToken, 201)["data"].(map[string]any)
+	reportID := report["id"].(string)
+	if report["district_store_id"] != district || report["hot_spot_id"] != hotSpot || report["order_status"] != nil ||
+		report["comment"] != "Dispenser empty since Monday" || report["hot_spot"].(map[string]any)["village"] != "Kisenyi" {
+		t.Fatalf("unexpected stockout report: %v", report)
+	}
+	var ordersAfter int
+	scalar(&ordersAfter, `SELECT count(*) FROM orders`)
+	if ordersAfter != ordersBefore {
+		t.Fatal("a stockout report created an order")
+	}
+
+	// The district's DCFPs get the hotspot's details and the message; nobody else does.
+	stockout := inbox(districtToken, "hotspot", hotSpot, "order.stockout_reported")
+	if stockout == nil {
+		t.Fatal("the district's DCFP was not notified of the stockout")
+	}
+	body := stockout["body"].(string)
+	for _, part := range []string{"Kisenyi", `Message: "Dispenser empty since Monday"`, "Reported by workflow-hotspot",
+		"Contact: Peter Okello (0700123456)"} {
+		if !strings.Contains(body, part) {
+			t.Fatalf("stockout notification lacks %q: %s", part, body)
+		}
+	}
+	if data := stockout["data"].(map[string]any); data["report_id"] != reportID || data["contact_phone"] != "0700123456" {
+		t.Fatalf("stockout notification data: %v", data)
+	}
+	for name, token := range map[string]string{"another district's DCFP": otherToken, "the warehouse": warehouseToken,
+		"the reporter": hotspotToken} {
+		if inbox(token, "hotspot", hotSpot, "order.stockout_reported") != nil {
+			t.Fatalf("%s was notified of the stockout", name)
+		}
+	}
+	// The DCFP and the reporter's hotspot see the report; other districts do not.
+	if !listed("/orders/stockouts", districtToken, reportID) || !listed("/orders/stockouts?hot_spot_id="+hotSpot, hotspotToken, reportID) {
+		t.Fatal("the stockout report is missing from the DCFP's or the hotspot's list")
+	}
+	if listed("/orders/stockouts", otherToken, reportID) {
+		t.Fatal("another district listed the stockout report")
+	}
+	request("GET", "/orders/stockouts?hot_spot_id=nope", nil, districtToken, 400)
+	// A hotspot without a district cannot route a report.
+	var noDistrictHotSpot string
+	scalar(&noDistrictHotSpot, `SELECT id FROM hot_spots WHERE district_id IS NULL LIMIT 1`)
+	if message := request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": noDistrictHotSpot, "condom_category": category},
+		admin, 422)["message"]; message != "hotspot has no district with a store; set the hotspot's district" {
+		t.Fatalf("hotspot without a district: %v", message)
+	}
+
+	// 2. The DCFP orders a condom category and quantity from NMS or JMS for the district store.
+	order := func(token string, body map[string]any, code int) map[string]any {
+		t.Helper()
+		result := request("POST", "/orders/warehouse-requests", body, token, code)
+		if code >= 400 {
+			return result
+		}
+		return result["data"].(map[string]any)
+	}
+	// The order is counted in the chosen product's catalogue unit, and later checks read that unit,
+	// so set it for the test and put it back as found.
+	var catalogueUnit *string
+	scalar(&catalogueUnit, `SELECT unit_id FROM condoms WHERE id = $1`, product)
+	defer exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, catalogueUnit)
+	exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, unit)
+	valid := map[string]any{"warehouse_store_id": warehouse, "condom_category": category, "quantity": 50,
+		"comment": "Two hotspots are out"}
+	with := func(changes map[string]any) map[string]any {
+		body := map[string]any{}
+		for k, v := range valid {
+			body[k] = v
+		}
+		for k, v := range changes {
+			body[k] = v
+		}
+		return body
+	}
+	order(hotspotToken, valid, 403) // only DCFPs order from the warehouse
+	order(admin, valid, 403)        // for an assigned district store, even with orders:all_stores
+	if res := order(districtToken, with(map[string]any{"warehouse_store_id": otherStore}), 422); res["error"].(map[string]any)["warehouse_store_id"] == nil {
+		t.Fatalf("a district store was accepted as the warehouse: %v", res)
+	}
+	order(districtToken, with(map[string]any{"quantity": 0}), 422)
+	if res := order(districtToken, with(map[string]any{"condom_category": "both"}), 422); res["error"].(map[string]any)["condom_category"] == nil {
+		t.Fatalf("a warehouse request must name male or female: %v", res)
+	}
+	order(districtToken, with(map[string]any{"unit_of_measure_id": unit}), 400) // the order takes the product's unit
+	order(districtToken, with(map[string]any{"condom_id": product}), 400)       // the warehouse chooses the product
+	order(districtToken, with(map[string]any{"hot_spot_id": hotSpot}), 400)
+	created := order(districtToken, valid, 201)
+	if created["order_status"] != "queued" || created["ordered_for_store_id"] != district || created["ordered_from_store_id"] != warehouse ||
+		created["quantity_needed"] != float64(50) || created["unit_of_measure_id"] != nil || created["hot_spot_id"] != nil ||
+		created["parent_order_id"] != nil || created["comment"] != "Two hotspots are out" ||
+		created["condom_id"] != nil || created["condom_category"] != category {
+		t.Fatalf("unexpected warehouse order: %v", created)
+	}
+	orderID := created["id"].(string)
+	orderPath := "/orders/" + orderID
+	if requested := inbox(warehouseToken, "order", orderID, "order.replenishment_requested"); requested == nil ||
+		!strings.Contains(requested["body"].(string), "ordered 50 ") || !strings.Contains(requested["body"].(string), category+" condoms") {
+		t.Fatalf("warehouse order notification: %v", requested)
+	}
+
+	// 3. The warehouse reviews the order, checks stock (holding it until stock arrives) and dispatches.
+	act := func(name, token string, input any, code int, state string) map[string]any {
+		t.Helper()
+		result := request("POST", orderPath+"/actions/"+name, input, token, code)
 		if code >= 400 {
 			return nil
 		}
@@ -71,51 +208,138 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		}
 		return data
 	}
-	notifications(districtToken, "stockout_reported")
-	act(parentPath, "review", warehouseToken, nil, 404, "")
-	act(parentPath, "review", hotspotToken, nil, 403, "")
-	act(parentPath, "dispatch", districtToken, map[string]any{"rider_id": riderID}, 409, "")
-	// The district review is automatic: the DCFP checks stock on the queued order directly.
-	act(parentPath, "check-stock", districtToken, nil, 200, "on_hold")
-	replenish := map[string]any{"warehouse_store_id": warehouse}
-	child := act(parentPath, "request-replenishment", districtToken, replenish, 201, "queued")
-	if child["parent_order_id"] != parent["id"] {
-		t.Fatalf("unlinked replenishment: %v", child)
+	act("review", otherToken, nil, 403, "") // no orders:process
+	act("receive", otherToken, map[string]any{"quantity_received": 1}, 404, "")
+	act("review", hotspotToken, nil, 403, "")
+	// The alert-only steps went with the alert orders.
+	for _, gone := range []string{"request-replenishment", "deliver"} {
+		request("POST", orderPath+"/actions/"+gone, nil, districtToken, 404)
 	}
-	childPath := "/orders/" + child["id"].(string)
-	act(parentPath, "request-replenishment", districtToken, replenish, 409, "")
-	notifications(warehouseToken, "replenishment_requested")
-	// The warehouse reviews a request before checking stock, and rechecks a held request directly.
-	act(childPath, "check-stock", warehouseToken, nil, 409, "")
-	act(childPath, "review", warehouseToken, nil, 200, "reviewed")
-	act(childPath, "check-stock", warehouseToken, nil, 200, "on_hold")
+	act("check-stock", warehouseToken, nil, 409, "")
+	// The warehouse chooses the product, of the category requested.
+	act("review", warehouseToken, nil, 422, "")
+	act("review", warehouseToken, map[string]any{"condom_id": "not-a-uuid"}, 422, "")
+	var otherCategory *string
+	scalar(&otherCategory, `SELECT (SELECT id::text FROM condoms WHERE category IN ('male', 'female') AND category <> $1 LIMIT 1)`, category)
+	if otherCategory != nil {
+		act("review", warehouseToken, map[string]any{"condom_id": *otherCategory}, 422, "")
+	}
+	// The order is counted in the chosen product's catalogue unit from review onwards.
+	if reviewed := act("review", warehouseToken, map[string]any{"condom_id": product}, 200, "reviewed"); reviewed["condom_id"] != product ||
+		reviewed["unit_of_measure_id"] != unit {
+		t.Fatalf("the warehouse's product choice and its unit were not kept: %v", reviewed)
+	}
+	// The district hears what was approved, and which product is coming.
+	if approved := inbox(districtToken, "order", orderID, "order.replenishment_approved"); approved == nil ||
+		!strings.Contains(approved["body"].(string), "approved the order for 50 ") {
+		t.Fatalf("approval notification: %v", approved)
+	}
+	act("review", warehouseToken, map[string]any{"reason": "No"}, 422, "") // a reason is for rejecting
+	act("check-stock", warehouseToken, nil, 200, "on_hold")
 	// Warehouse stock arrives through the inventory API, so the ledger accounts for every unit.
 	request("POST", "/inventory/movements", map[string]any{"store_id": warehouse, "condom_id": product,
 		"unit_of_measure_id": unit, "reason": "receipt", "quantity": 100, "note": "Delivery from supplier"}, admin, 201)
-	act(childPath, "check-stock", warehouseToken, nil, 200, "confirmed")
-	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 51}, 422, "")
-	act(childPath, "dispatch", warehouseToken, map[string]any{"quantity_issued": 0}, 422, "")
-	act(childPath, "dispatch", warehouseToken, nil, 200, "dispatched")
-	act(childPath, "receive", districtToken, map[string]any{"quantity_received": 55}, 422, "")
-	act(childPath, "receive", districtToken, map[string]any{"quantity_received": 55, "quantity_issued": 5}, 422, "")
+	act("check-stock", warehouseToken, nil, 200, "confirmed")
+	act("dispatch", warehouseToken, map[string]any{"quantity_issued": 51}, 422, "")
+	act("dispatch", warehouseToken, map[string]any{"quantity_issued": 0}, 422, "")
+	request("POST", orderPath+"/actions/dispatch", map[string]any{"rider_id": warehouse}, warehouseToken, 400)
+	act("dispatch", warehouseToken, map[string]any{"vehicle_registration": strings.Repeat("A", 31)}, 422, "")
+	// The transport is optional; a blank field is dropped.
+	dispatched := act("dispatch", warehouseToken, map[string]any{"waybill_number": " WB-104 ",
+		"vehicle_registration": "UAX 123B", "driver_name": "  "}, 200, "dispatched")
+	if dispatched["waybill_number"] != "WB-104" || dispatched["vehicle_registration"] != "UAX 123B" || dispatched["driver_name"] != nil {
+		t.Fatalf("dispatch transport: %v", dispatched)
+	}
+	if note := inbox(districtToken, "order", orderID, "order.shipment_dispatched"); note == nil ||
+		!strings.Contains(note["body"].(string), "Waybill WB-104, vehicle UAX 123B.") {
+		t.Fatalf("the district was not told the stock is on the way: %v", note)
+	}
+
+	// 4. The district records what arrived; a difference needs a note.
+	_, colleagueToken := account("dfcp", "workflow-district-colleague", &district, nil, "orders:replenish", "orders:receive")
+	act("receive", districtToken, map[string]any{"quantity_received": 55}, 422, "")
+	act("receive", districtToken, map[string]any{"quantity_received": 55, "quantity_issued": 5}, 422, "")
 	receipt := map[string]any{"quantity_received": 55, "discrepancy_note": "Five additional units counted"}
-	act(childPath, "receive", districtToken, receipt, 200, "received")
-	act(childPath, "receive", districtToken, receipt, 409, "")
-	// Receipt reserves the stock for the held order at once and confirms it to the hotspot manager.
-	if held := request("GET", parentPath, nil, districtToken, 200)["data"].(map[string]any); held["order_status"] != "confirmed" {
-		t.Fatalf("held order not confirmed by receipt: %v", held)
+	act("receive", districtToken, receipt, 200, "received")
+	act("receive", districtToken, receipt, 409, "")
+	// The receipt notifies the district's other DCFPs, not the one who records it.
+	if inbox(colleagueToken, "order", orderID, "order.shipment_received") == nil {
+		t.Fatal("the district's other DCFP was not told the stock arrived")
 	}
-	notifications(hotspotToken, "check-stock")
-	act(parentPath, "review", districtToken, nil, 409, "")
-	partial := map[string]any{"rider_id": riderID, "quantity_issued": 45}
-	dispatched := act(parentPath, "dispatch", districtToken, partial, 200, "dispatched")
-	if dispatched["quantity_issued"] != float64(45) {
-		t.Fatalf("partial dispatch not recorded: %v", dispatched)
+	if inbox(districtToken, "order", orderID, "order.shipment_received") != nil {
+		t.Fatal("the DCFP who recorded the receipt was notified of it")
 	}
-	notifications(riderToken, "dispatch")
-	act(parentPath, "deliver", riderToken, map[string]any{"delivery_note": "Received by hotspot manager"}, 200, "delivered")
-	notifications(hotspotToken, "deliver")
-	request("GET", parentPath+"/events", nil, hotspotToken, 200)
+	// The warehouse learns what arrived, with the discrepancy.
+	if note := inbox(warehouseToken, "order", orderID, "order.shipment_received"); note == nil ||
+		!strings.Contains(note["body"].(string), `50 were dispatched. Note: "Five additional units counted"`) {
+		t.Fatalf("the warehouse was not told what arrived: %v", note)
+	}
+	request("GET", orderPath+"/events", nil, districtToken, 200)
+
+	// 5. Before dispatch the warehouse may reject an order instead, with the reason the district reads.
+	// It runs after the supply report checks, which count every request.
+	testRejection := func() {
+		pendingBefore := request("GET", "/reports/warehouse-requests", nil, admin, 200)["data"].(map[string]any)["total"].(map[string]any)["pending"]
+		reject := func(path string, body any, code int) map[string]any {
+			t.Helper()
+			return request("POST", path+"/actions/reject", body, warehouseToken, code)
+		}
+		if res := reject(orderPath, map[string]any{"reason": "Too late"}, 409); res["message"] == nil {
+			t.Fatalf("a received order was rejected: %v", res)
+		}
+		queued := order(districtToken, with(map[string]any{"quantity": 20}), 201)
+		queuedPath := "/orders/" + queued["id"].(string)
+		request("POST", queuedPath+"/actions/reject", map[string]any{"reason": "No"}, districtToken, 403) // orders:process
+		for _, blank := range []any{nil, map[string]any{"reason": "   "}} {
+			if res := reject(queuedPath, blank, 422); res["error"].(map[string]any)["reason"] == nil {
+				t.Fatalf("a rejection without a reason should fail on error.reason: %v", res)
+			}
+		}
+		rejected := reject(queuedPath, map[string]any{"reason": " Stock is held for a campaign "}, 200)["data"].(map[string]any)
+		if rejected["order_status"] != "rejected" || rejected["rejection_reason"] != "Stock is held for a campaign" {
+			t.Fatalf("rejected order: %v", rejected)
+		}
+		if note := inbox(colleagueToken, "order", queued["id"].(string), "order.replenishment_rejected"); note == nil ||
+			!strings.Contains(note["body"].(string), `Reason: "Stock is held for a campaign"`) {
+			t.Fatalf("rejection notification: %v", note)
+		}
+		reject(queuedPath, map[string]any{"reason": "Again"}, 409)
+		request("POST", queuedPath+"/actions/review", map[string]any{"condom_id": product}, warehouseToken, 409)
+		// A rejection after the stock check releases what it reserved.
+		confirmed := order(districtToken, with(map[string]any{"quantity": 20}), 201)
+		confirmedPath := "/orders/" + confirmed["id"].(string)
+		request("POST", confirmedPath+"/actions/review", map[string]any{"condom_id": product}, warehouseToken, 200)
+		if checked := request("POST", confirmedPath+"/actions/check-stock", nil, warehouseToken, 200)["data"].(map[string]any); checked["order_status"] != "confirmed" {
+			t.Fatalf("stock check before rejecting: %v", checked)
+		}
+		reject(confirmedPath, map[string]any{"reason": "The cartons failed inspection"}, 200)
+		var reservedAfter int
+		scalar(&reservedAfter, `SELECT reserved FROM order_store_stock WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3`,
+			warehouse, product, unit)
+		if reservedAfter != 0 {
+			t.Fatalf("a rejection left %d reserved", reservedAfter)
+		}
+		found := false
+		for _, item := range request("GET", "/orders?status=rejected", nil, warehouseToken, 200)["data"].([]any) {
+			found = found || item.(map[string]any)["id"] == confirmed["id"]
+		}
+		if !found {
+			t.Fatal("rejected orders are missing from the status filter")
+		}
+		// The report counts the requests as rejected: still requested, but neither approved nor pending.
+		total := request("GET", "/reports/warehouse-requests", nil, admin, 200)["data"].(map[string]any)["total"].(map[string]any)
+		if total["rejected"] != float64(2) || total["pending"] != pendingBefore {
+			t.Fatalf("supply report after two rejections: %v (pending before %v)", total, pendingBefore)
+		}
+	}
+
+	// Alert orders raised before stockouts became reports are history: no workflow step applies.
+	var legacy string
+	scalar(&legacy, `INSERT INTO orders (hot_spot_id, condom_id, ordered_by_id, ordered_for_store_id, ordered_from_store_id, order_status)
+		SELECT $1, $2, id, $3, $3, 'queued' FROM users ORDER BY id LIMIT 1 RETURNING id`, hotSpot, product, district)
+	request("POST", "/orders/"+legacy+"/actions/review", nil, admin, 409)
+	exec(`DELETE FROM orders WHERE id = $1`, legacy)
+
 	balance := func(store string, wantOnHand int) {
 		t.Helper()
 		var onHand, reserved int
@@ -127,7 +351,40 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 			t.Fatalf("store %s balance on hand=%d reserved=%d, want %d and 0", store, onHand, reserved, wantOnHand)
 		}
 	}
-	balance(district, 10) // 55 received, 45 issued
+	balance(district, 55)
 	balance(warehouse, 50)
 	testInventoryReports(t, pool, request, admin, districtToken, warehouse, district, hotSpot)
+	testNotificationFulfilment(t, pool, request, admin, hotspotToken, districtToken, otherToken, district, hotSpot, unit,
+		reportID, riders)
+	testSupplyReports(t, pool, request, admin, districtToken, warehouseToken, otherToken, warehouse, district, product, unit)
+	testRejection()
+	testBatchExpiry(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)
+	testExpiryAlerts(t, pool, request, districtToken, warehouseToken, warehouse, district)
+	testSettingsAndHMIS(t, pool, request, admin, districtToken, otherToken, warehouse, district)
+	testExportsAndVersions(t, pool, request, admin, districtToken, district)
+	testStoreSummary(t, pool, request, admin, districtToken, warehouse, district, product, unit)
+	testBatchEdit(t, pool, request, admin, districtToken, warehouse, product, unit)
+	testDistrictDispatch(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)
+}
+
+// assertWarehouseGrants checks the default grants migration 31 gives the warehouse and DCFP roles,
+// before any test changes a role's permissions.
+func assertWarehouseGrants(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	want := map[string][]string{
+		"nms":  {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
+		"jms":  {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
+		"dfcp": {"inventory:manage", "inventory:read", "orders:read", "orders:receive", "orders:replenish"},
+	}
+	for role, permissions := range want {
+		var granted []string
+		if err := pool.QueryRow(context.Background(), `SELECT coalesce(array_agg(p.name ORDER BY p.name), '{}')
+			FROM role_permission rp JOIN roles r ON r.id = rp.role_id JOIN permissions p ON p.id = rp.permission_id
+			WHERE r.name = $1 AND (p.name LIKE 'orders:%' OR p.name LIKE 'inventory:%')`, role).Scan(&granted); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(granted, ",") != strings.Join(permissions, ",") {
+			t.Errorf("role %s has %v, want %v", role, granted, permissions)
+		}
+	}
 }

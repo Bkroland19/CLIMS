@@ -33,7 +33,7 @@ Web roles in the prototype:
 | Onboarding (signed out) | Invitation → phone → SMS code → password → check details | — |
 | DCFP (district focal person) | Dashboard · Orders (Queue, Held for stock) · Restock (Warehouse requests, District store) · Dispatch · Hotspots · Monthly reports | Review order · New warehouse request · Warehouse request · Dispatch order · Report |
 | Warehouse (NMS / JMS, switchable) | District requests · Stock · Monthly reports | District request · Report |
-| MOH | Dashboard · Orders (Hotspot orders, Warehouse orders) · Reports (Submissions) · Users & access (Users, Roles & permissions) · Product catalogue (Condoms, Units of measure) · Stores & locations (Stores, Geography) · Audit log | Order audit trail · Report |
+| MOH | Dashboard · Orders (Hotspot orders, Warehouse orders) · Reports (Submissions) · Users & access (Users, Roles & permissions) · Product catalogue (Condoms, Brands, Units of measure) · Stores & locations (Stores, Geography) · Audit log | Order audit trail · Report |
 
 Source files: `Onboarding`, `DcfpWorkspace`, `WarehouseWorkspace`,
 `MohWorkspace`, `AdminWorkspace` (MOH administration), `ReportsWorkspace`
@@ -79,7 +79,8 @@ match `DESIGN.md`. Differences:
 
 The Go API has **auth, users and roles (RBAC) only**. It has nothing for
 hotspots, orders, warehouse requests, dispatch, deliveries, stock, reports,
-catalogue, stores, geography, audit, invitations or SMS codes. Today the
+stores, geography, audit, invitations or SMS codes. (Update: the product catalogue,
+with brands and units, is now in the Go API at `/catalogue`; see `docs/modules/catalogue.md`.) Today the
 frontend serves condoms, hotspots and inventory from `dev/mock-api.mjs` and
 sample data (`components/SampleData.tsx`).
 
@@ -118,7 +119,8 @@ unless asked.
 6. **MOH workspace:** dashboard, hotspot and warehouse orders, order audit
    trail.
 7. **MOH administration:** users and roles (wired to the real
-   `/users` and `/roles` API), product catalogue and units, stores and geography,
+   `/users` and `/roles` API), product catalogue, brands and units (wired to the real
+   `/catalogue` API), stores and geography,
    audit log.
 8. **Monthly reports:** DCFP and warehouse submission flow (figures checked
    before sending), MOH submissions list and report detail.
@@ -130,6 +132,14 @@ unless asked.
     retired routes.
 
 ### Phase 4 notes (DCFP workspace)
+
+> **Superseded for the DCFP's own screens (2026-11-21).** Hotspot stockouts are now reports that
+> notify the DCFP, and the DCFP orders stock from NMS or JMS directly (`docs/modules/orders.md`).
+> The DCFP screens use the Go API through `src/features/dcfp/` (`/orders/stockouts`,
+> `/orders/warehouse-requests`, `/orders`, `/orders/{id}/actions/receive`), and the mock serves the
+> same paths from `dev/mock/dcfp.mts`. The order queue, held orders and dispatch screens are gone.
+> The contract below still describes what the MOH and warehouse screens and the district store
+> page read from the mock.
 
 **Fulfilment API contract.** Not yet in the Go API. The client (`src/features/fulfilment/api.ts`)
 and the mock (`dev/mock/fulfilment.mts`) use these paths and shapes. Every reply uses the Go
@@ -187,6 +197,24 @@ a movement. Receiving adds the accepted pieces by batch and records a movement a
   sends no district.
 - Monthly reports for the DCFP come in Phase 8.
 
+### Phase 5 notes (warehouse workspace)
+
+**District filter.** NMS and JMS users, and MOH and administrators looking in, can narrow the
+dashboard and the district requests list to one district from the District menu. The menu lists
+every district from `GET /locations/districts`, as MOH's does, because NMS and JMS serve the
+whole country rather than a fixed set of districts. Until the warehouse endpoints exist, the
+client filters the store's requests by district name in the browser. When
+`GET /warehouses/{code}/requests` is built, it should:
+
+- accept an optional `?district_id=` (an id from `/locations/districts`) and return only that
+  district's requests;
+- return `district_id` on each request beside `district`, and spell `district` as
+  `/locations/districts` does (for example "Wakiso District"), so the client can match by id.
+
+Stock, monthly reports and request detail are not filtered: the stock belongs to the warehouse,
+and the reports are per store. The sidebar badges count the work waiting at the whole store,
+whichever district is picked.
+
 ### Phase 10 notes (hardening)
 
 **Retired routes.** `/hotspot-manager`, `/delivery`, `/suppliers`, `/nms`, `/jms` and `/store` are
@@ -229,5 +257,5 @@ its visible text (WCAG 2.5.3).
 ## Still open
 
 1. Backend: which of orders, warehouse requests, dispatch, stock, reports,
-   catalogue, stores, geography, audit and invitations are planned for the Go
+   stores, geography, audit and invitations are planned for the Go
    API, and in what order? This sets which phases can go live first.

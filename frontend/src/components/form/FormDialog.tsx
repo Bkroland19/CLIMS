@@ -31,6 +31,10 @@ interface FormDialogProps {
    */
   error?: string | null;
   onSubmit: ComponentProps<'form'>['onSubmit'];
+  /** Where focus goes on close, when the element that opened the dialog has gone. */
+  onCloseAutoFocus?: (event: Event) => void;
+  /** The submit removes something, e.g. writing off a whole batch. */
+  destructive?: boolean;
   children: ReactNode;
 }
 
@@ -46,6 +50,8 @@ export function FormDialog({
   isDirty = false,
   error,
   onSubmit,
+  onCloseAutoFocus,
+  destructive = false,
   children,
 }: FormDialogProps) {
   return (
@@ -58,13 +64,29 @@ export function FormDialog({
     >
       <DialogContent
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-2xl"
+        onCloseAutoFocus={onCloseAutoFocus}
         onInteractOutside={(event) => {
           // A stray click on the backdrop must not throw away typed input.
           // Cancel, the close button and Escape still dismiss.
           if (isDirty) event.preventDefault();
         }}
       >
-        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-6">
+        <form
+          noValidate
+          onSubmit={(event) => {
+            const form = event.currentTarget;
+            onSubmit?.(event);
+            // Let validation render first; the same focus behaviour covers every dialog.
+            requestAnimationFrame(() => {
+              form
+                .querySelector<HTMLElement>(
+                  'input[aria-invalid="true"], textarea[aria-invalid="true"], button[aria-invalid="true"]',
+                )
+                ?.focus();
+            });
+          }}
+          className="flex flex-col gap-4"
+        >
           <DialogHeader>
             <DialogTitle className="wrap-anywhere">{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
@@ -76,7 +98,7 @@ export function FormDialog({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+          <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
           <DialogFooter>
             <Button
               type="button"
@@ -88,7 +110,11 @@ export function FormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button
+              type="submit"
+              variant={destructive ? 'destructive' : 'default'}
+              disabled={isPending}
+            >
               {isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
               {isPending ? pendingLabel : submitLabel}
             </Button>

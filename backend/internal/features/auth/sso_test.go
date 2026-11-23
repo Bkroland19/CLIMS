@@ -46,7 +46,7 @@ func (f *ssoFixture) CreateOIDCSession(_ context.Context, _, subject string, _ *
 	return users.IssuedSession{ID: "session-1", UserID: userID, RefreshToken: token, ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
-func (f *ssoFixture) RefreshSession(_ context.Context, token string) (users.IssuedSession, error) {
+func (f *ssoFixture) RefreshSession(_ context.Context, token, _, _ string) (users.IssuedSession, error) {
 	userID, ok := f.sessions[token]
 	if !ok {
 		return users.IssuedSession{}, users.ErrRefreshInvalid

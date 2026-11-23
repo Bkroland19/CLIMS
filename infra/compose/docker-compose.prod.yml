@@ -32,13 +32,34 @@ services:
       args:
         VERSION: ${VERSION:-}
         # Compiled into the public bundle at build time; never a secret.
-        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+        NEXT_PUBLIC_MAP_TILES: ${NEXT_PUBLIC_MAP_TILES:-}
+        NEXT_PUBLIC_MAP_ATTRIBUTION: ${NEXT_PUBLIC_MAP_ATTRIBUTION:-}
+
+  # The static site build; development runs the Docusaurus dev server instead.
+  docs:
+    image: ${DOCS_IMAGE:-clims-docs:prod}
+    build:
+      context: ../..
+      dockerfile: infra/docker/docs/Dockerfile.prod
+      args:
+        VERSION: ${VERSION:-}
+        EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-}
+    expose: ["80"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/_nginx/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   nginx:
     image: clims-nginx:prod
     build:
       context: ../..
       dockerfile: infra/docker/nginx/Dockerfile.prod
+    depends_on:
+      docs:
+        condition: service_healthy
 
   mobile:
     profiles: ["artifacts"]

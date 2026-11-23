@@ -13,7 +13,7 @@ import (
 
 func TestLoginAttemptLimit(t *testing.T) {
 	app := fiber.New()
-	RegisterRoutes(app.Group("/api/v1"), NewHandler(nil, nil, "test-secret"), middleware.NewJWTMiddleware("test-secret"), users.ActiveUser(nil))
+	RegisterRoutes(app.Group("/api/v1"), NewHandler(nil, nil, "test-secret", nil), middleware.NewJWTMiddleware("test-secret"), users.ActiveUser(nil))
 	for attempt := 1; attempt <= 11; attempt++ {
 		req := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")

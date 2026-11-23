@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -29,6 +30,11 @@ type Config struct {
 	// "1" adds the identity-sync session probe for the conformance suite. It needs APP_ENV development
 	// or test; see IdentitySyncProbe.
 	IdentitySyncTestProbe string `mapstructure:"IDENTITY_SYNC_TEST_PROBE"`
+	// TrustedProxiesSetting is TRUSTED_PROXIES: comma-separated IPs or CIDR ranges allowed to
+	// report the client address. Empty trusts private networks, where nginx reaches the API.
+	TrustedProxiesSetting string `mapstructure:"TRUSTED_PROXIES"`
+	// TrustedProxies is TrustedProxiesSetting parsed and validated.
+	TrustedProxies []string `mapstructure:"-"`
 }
 
 func LoadConfig() (cfg Config, err error) {
@@ -39,7 +45,7 @@ func LoadConfig() (cfg Config, err error) {
 	v.SetDefault("DB_SSLMODE", "disable")
 	// Binding includes environment-only keys in Unmarshal.
 	for _, key := range []string{"APP_ENV", "PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "JWT_SECRET",
-		"OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_PUBLIC_ORIGIN", "IDENTITY_SYNC_CLIENT_ID", "IDENTITY_SYNC_TEST_PROBE"} {
+		"TRUSTED_PROXIES", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_PUBLIC_ORIGIN", "IDENTITY_SYNC_CLIENT_ID", "IDENTITY_SYNC_TEST_PROBE"} {
 		if err := v.BindEnv(key); err != nil {
 			return cfg, err
 		}
@@ -54,7 +60,29 @@ func LoadConfig() (cfg Config, err error) {
 			return cfg, fmt.Errorf("%s is required", setting.name)
 		}
 	}
+	if cfg.TrustedProxies, err = parseTrustedProxies(cfg.TrustedProxiesSetting); err != nil {
+		return cfg, err
+	}
 	return cfg, nil
+}
+
+// parseTrustedProxies splits TRUSTED_PROXIES and rejects anything that is not an IP or CIDR,
+// so a typo fails at startup instead of trusting the wrong addresses.
+func parseTrustedProxies(setting string) ([]string, error) {
+	var proxies []string
+	for _, entry := range strings.Split(setting, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if net.ParseIP(entry) == nil {
+			if _, _, err := net.ParseCIDR(entry); err != nil {
+				return nil, fmt.Errorf("TRUSTED_PROXIES: %q is not an IP address or CIDR range", entry)
+			}
+		}
+		proxies = append(proxies, entry)
+	}
+	return proxies, nil
 }
 
 func (cfg *Config) DSN() string {

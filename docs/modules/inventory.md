@@ -4,22 +4,29 @@
 
 The inventory API reports stock across the supply chain: the national warehouse, district stores and hotspots. It also records stock that arrives outside the order workflow.
 
-| Method | Route                         | Permission         |
-| ------ | ----------------------------- | ------------------ |
-| GET    | `/api/v1/inventory/stock`     | `inventory:read`   |
-| GET    | `/api/v1/inventory/hotspots`  | `inventory:read`   |
-| GET    | `/api/v1/inventory/movements` | `inventory:read`   |
-| POST   | `/api/v1/inventory/movements` | `inventory:manage` |
-| GET    | `/api/v1/inventory/summary`   | `inventory:read`   |
+| Method | Route                             | Permission         |
+| ------ | --------------------------------- | ------------------ |
+| GET    | `/api/v1/inventory/stock`         | `inventory:read`   |
+| GET    | `/api/v1/inventory/batches`       | `inventory:read`   |
+| PATCH  | `/api/v1/inventory/batches/{id}`  | `inventory:manage` |
+| DELETE | `/api/v1/inventory/batches/{id}`  | `inventory:manage` |
+| GET    | `/api/v1/inventory/hotspots`      | `inventory:read`   |
+| GET    | `/api/v1/inventory/movements`     | `inventory:read`   |
+| POST   | `/api/v1/inventory/movements`     | `inventory:manage` |
+| POST   | `/api/v1/inventory/receipts`      | `inventory:manage` |
+| GET    | `/api/v1/inventory/summary`       | `inventory:read`   |
+| GET    | `/api/v1/inventory/store-summary` | `inventory:read`   |
 
 ## Reports
 
 - **Stock** lists each store's balance per product and unit: `on_hand`, `reserved` for confirmed orders, `available` (on hand less reserved) and `incoming` (dispatched to the store by the warehouse and not yet received). Filter by `store_id`, `store_type` (`national` or `district`) or `condom_id`.
-- **Hotspots** reports what each hotspot has been supplied per product: quantity `delivered` and number of `deliveries` in the period, `last_delivered_at`, quantity `in_transit` with a rider, quantity still `requested`, `on_hold_requests` and `last_stockout_at`. CLIMS does not record consumption at hotspots, so this is supply, not a count of stock on site. Filter by `hot_spot_id` or `condom_id`.
-- **Movements** is the ledger behind the balances: every change to a store's on-hand stock, newest first, with `on_hand_after`. Reasons are `opening`, `receipt`, `adjustment`, `dispatch` and `order_receipt`; the last two are written by the [order workflow](orders.md) and link the order. Filter by `store_id`, `condom_id` or `reason`, and page with `limit` and `offset`.
-- **Summary** totals each product nationally: warehouse and district stock on hand and available, stock in transit, quantity delivered to hotspots in the period, and open and held hotspot requests.
+- **Hotspots** reports what each hotspot was supplied through the alert orders raised before migration 22 (see [orders](orders.md#alert-orders-raised-before-migration-22)); stockout reports are not orders and do not appear. Per product: quantity `delivered` and number of `deliveries` in the period, `last_delivered_at`, quantity `in_transit` with a rider, `open_alerts` not yet sent, `on_hold_requests` waiting for the warehouse and `last_stockout_at`. An open alert has no unit until the DCFP acts, so it is reported on a row without one, as it is in the summary. CLIMS does not record consumption at hotspots, so this is supply, not a count of stock on site. Filter by `hot_spot_id` or `condom_id`.
+- **Movements** is the ledger behind the balances: every change to a store's on-hand stock, newest first, with `on_hand_after`. Reasons are `opening`, `receipt`, `adjustment`, `dispatch`, `order_receipt` and `hotspot_delivery`. The order workflow writes dispatches and order receipts; district deliveries to hotspots write `hotspot_delivery` entries. Filter by `store_id`, `condom_id` or `reason`, and page with `limit` and `offset`.
+- **Summary** totals each product nationally: warehouse and district stock on hand and available, stock in transit, and, from alert orders raised before migration 22, quantity delivered to hotspots in the period and open hotspot requests. Held counts include held warehouse orders.
 
-Hotspot, movement and summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
+- **Store summary** (`GET /api/v1/inventory/store-summary?store_id=`) is one store at a glance, for the warehouse and district stock screens. Per product and unit, as of now: `on_hand`, `reserved`, `expired` (in batches past their expiry date), `expiring` (under three months left), `no_expiry`, `usable` (on hand less reserved and expired, what check-stock can still reserve) and `next_expiry`; in the period, `received` (registrations plus warehouse order receipts), `dispatched` (warehouse dispatches plus district deliveries to hotspots) and `written_off` (stock taken away by adjustments); and `dispatched_90_days`, whatever the period, from which the screen works out stock cover. For the orders district stores placed with the store, open now: `to_decide` (queued), `waiting_for_stock` (reviewed or on hold), `to_dispatch` (confirmed) and `in_transit` (dispatched, not yet received); and, counting workflow steps taken in the period, `dispatched`, `rejected`, `dispatched_in_full` (at least the quantity ordered), `districts_supplied`, `received_short` (the district counted less than was sent) and `median_days_to_dispatch`. The screen's success rate is dispatched over dispatched plus rejected. Users see their assigned store; `orders:all_stores` any store (404 for one that does not exist).
+
+Hotspot, movement, summary and store summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
 
 ## Recording stock
 
@@ -30,8 +37,45 @@ Hotspot, movement and summary reports accept a period as `from` and `to` dates (
 
 Stock cannot fall below what open orders have reserved; such an adjustment returns 409. Order dispatch and receipt continue to move stock themselves and record their own entries.
 
+`POST /api/v1/inventory/receipts` records a whole delivery: a `store_id`, an optional `note` (where it came from) and 1 to 50 `lines`, each a product, unit, `batch_number`, `expiry_date` and positive `quantity`. Every line becomes a `receipt` in one transaction, so the delivery is saved in full or not at all. A delivery is filed and dispatched by its batches, so each line needs a batch number and an expiry date after today (Uganda's date). The same batch may come on several lines with the same expiry date; a batch number given two expiry dates in one delivery, or already held at the store under another one, is refused. A refusal about one line starts with its number (`line 2: …`, 422, or 409 for a batch short of stock), so a client can show it on that line.
+
+## Batches and expiry
+
+A store's stock of a product in a unit is held in batches (`stock_batches`), each with an optional `batch_number` and `expiry_date`, adding up to the store total. A receipt or positive adjustment adds to the batch it names; a negative adjustment comes out of it (409 when the batch holds less). Without batch details the stock is in the unknown-expiry batch, which reports do not count as usable until reviewed. Migration 26 put each existing balance in an unknown-expiry batch.
+
+Stock leaves a store first expiry first out: warehouse dispatch and district deliveries to hotspots take the earliest-expiring batch first and unknown expiry last. Expired batches never leave, and a batch with under one calendar month left leaves only with an `expiry_exception_reason`, recorded with who authorised it and the rule version. What left is recorded per batch (`shipment_batches`), and a district's receipt puts the counted quantity into the batches the warehouse shipped: a shortfall comes off the latest-expiring batch, and a surplus goes to an unknown-expiry batch. Warehouse check-stock does not count expired stock as available. See [reports](reports.md#batches-and-expiry).
+
+`GET /api/v1/inventory/batches` lists the batches with stock at the stores the user may see, optionally for one `store_id` and `condom_id`, in the order dispatch takes them: earliest expiry first, unknown expiry last. Each has its `band` (`expired`, `under_1_month`, `under_3_months`, `under_6_months`, `ok`, or `unknown` without an expiry date) and `days_remaining`. It needs `inventory:read`, so warehouse and district staff can see their batches without report access.
+
+### Editing and deleting a batch
+
+A batch is **untouched** (`untouched` in the batch list) while nothing has left it or come into it through an order: its stock is exactly what the ledger entries naming it (its registrations and corrections) add up to, and no expiry exception was recorded against it. Order steps do not name a batch, so a dispatch, a district receipt or a hotspot delivery from it ends that.
+
+`PATCH /api/v1/inventory/batches/{id}` corrects a batch: `batch_number`, `expiry_date` (a past date is allowed, since a correction can find the stock expired), `on_hand` (at least 1) and a required `note`. A number already held at the store under another expiry date is refused (422); one held under the same expiry date joins the two into one batch, with both histories, and the reply is that batch, so its `id` can differ. A new quantity corrects the registration in place when the batch is untouched and was registered once, so the period's registered figure follows; otherwise it is an `adjustment` noted `Edited: <note>`. A changed expiry date drops the batch's expiry alerts, so the new date is announced. Audited as `inventory.batch_edited` with the before and after values.
+
+`DELETE /api/v1/inventory/batches/{id}` erases an untouched batch as if it was never registered: its stock comes off the store's balance, its ledger entries go (the `on_hand_after` of later entries moves to match), and so do its expiry alerts. A product left with no stock, history or batches at the store leaves its balances. Audited as `inventory.batch_deleted` with the batch, its quantity and the entries removed. A batch stock has left cannot be deleted (409); the web app writes off what is left with an adjustment instead, so the history stays.
+
+Neither may leave less on hand than open orders have reserved (409), and either works only at a store the user may manage. An empty batch is not listed and cannot be edited or deleted (409).
+
+### Expiry alerts
+
+The server checks batches every hour (`inventory.ExpiryAlerts`, started from `cmd/server/main.go`). The people who manage a store's stock (`inventory:manage` at the store), at NMS, JMS and district stores alike, are told once when a batch with stock comes within 3 months of its expiry date (`inventory.batch_expiring`, the `under_3_months` band and below) and once more when it expires (`inventory.batch_expired`). The batch ID is the idempotency key, so a restart or a second server never repeats one. A batch with nothing left, or with no expiry date, is not announced. A store with nobody to tell stores nothing, so its batches are announced once someone there manages its stock.
+
+| Type                       | Sent to                         | Resource      |
+| -------------------------- | ------------------------------- | ------------- |
+| `inventory.batch_expiring` | `inventory:manage` at the store | `stock_batch` |
+| `inventory.batch_expired`  | `inventory:manage` at the store | `stock_batch` |
+
+Their `data` has `store`, `store_id`, `product`, `unit`, `quantity` (on hand when announced), `batch` (the number, or empty), `batch_label` ("batch TGL24155" or "a batch with no number"), `expiry` ("31 Mar 2027") and `expiry_date` (`YYYY-MM-DD`).
+
 ## Access
 
 Users see and record stock for their assigned store (`users.store_id`), and a hotspot manager sees their hotspot. District users also see the hotspots their store supplies. `orders:all_stores` extends this to every store and hotspot and is required for the national summary.
 
 Migration 13 grants the inventory permissions to `admin` only. Grant `inventory:read` to roles that report on stock and `inventory:manage` to store staff who receive and count it, through `PUT /api/v1/roles/{id}/permissions`. The migration also turned existing balances into `opening` entries, so each store's ledger adds up to its balance. The legacy `condom_inventories` and `hot_spot_stocks` tables are not part of these reports.
+
+## District stock management
+
+The District store tab (`/dcfp/restock/store`) uses the signed-in user's assigned district store and the live inventory endpoints. It shows stock on hand, available to dispatch, received, dispatched, expired, expiring within three months, written off, and held without an expiry date. Current balances are separate from period activity; the period selector offers 30 days, 90 days and 12 months. Quantities in different units are never added together. Stock cover estimates months of supply from the previous 90 days of dispatches, not hotspot consumption.
+
+Staff can inspect products, filter batches by shelf life, and page through the movement ledger. `inventory:manage` allows registering receipts from other sources, correcting batches, and recording adjustments or write-offs with a reason. Warehouse deliveries must be received through their orders so the shipped batches are transferred once. `orders:supply_hotspots` allows dispatching available products against an open stockout notification; the API applies expiry rules and the hotspot manager acknowledges receipt. Successful writes refresh the balances and history. Missing assignments and empty stock have neutral empty states; failed API requests remain errors with retry actions.

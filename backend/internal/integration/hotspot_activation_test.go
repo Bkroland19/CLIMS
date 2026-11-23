@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,15 +106,20 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 		}
 		return false
 	}
-	notified := func(token, id, action string) bool {
+	// inbox returns the central-inbox notification of this type about the hotspot, if any.
+	inbox := func(token, id, action string) map[string]any {
 		t.Helper()
-		for _, event := range request("GET", "/hotspots/notifications", nil, token, 200)["data"].([]any) {
-			e := event.(map[string]any)
-			if e["hot_spot_id"] == id && e["action"] == action {
-				return true
+		for _, item := range request("GET", "/notifications?limit=100", nil, token, 200)["data"].([]any) {
+			n := item.(map[string]any)
+			if n["resource_type"] == "hotspot" && n["resource_id"] == id && n["type"] == "hotspot."+action {
+				return n
 			}
 		}
-		return false
+		return nil
+	}
+	notified := func(token, id, action string) bool {
+		t.Helper()
+		return inbox(token, id, action) != nil
 	}
 	state := func(h map[string]any, status, review string) {
 		t.Helper()
@@ -146,8 +152,16 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	request("POST", "/hotspots", submission("Not Allowed Bar"), dcfp, 403)
 
 	// Visibility: the submitter and their district's DCFP only.
-	if !notified(dcfp, id, "submitted") || notified(otherDCFP, id, "submitted") {
-		t.Fatal("submission notification reached the wrong district")
+	if !notified(dcfp, id, "submitted") || notified(otherDCFP, id, "submitted") || notified(storekeeper, id, "submitted") {
+		t.Fatal("submission notification reached the wrong people")
+	}
+	deprecated := false // The hotspot inbox keeps working until clients use the central one.
+	for _, event := range request("GET", "/hotspots/notifications", nil, dcfp, 200)["data"].([]any) {
+		e := event.(map[string]any)
+		deprecated = deprecated || e["hot_spot_id"] == id && e["action"] == "submitted"
+	}
+	if !deprecated {
+		t.Fatal("the deprecated hotspot inbox stopped receiving submissions")
 	}
 	if !listed(dcfp, "?status=inactive", id) || listed(dcfp, "?status=active", id) ||
 		listed(otherVHT, "", id) || listed(storekeeper, "", id) {
@@ -183,8 +197,10 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	request("POST", path+"/activate", reason, otherDCFP, 404)
 	request("POST", path+"/deactivate", reason, dcfp, 409)
 	state(data(request("POST", path+"/activate", reason, dcfp, 200)), "active", "active")
-	if !notified(vht, id, "activated") {
-		t.Fatal("activation did not notify the VHT")
+	activation := inbox(vht, id, "activated")
+	if activation == nil || activation["title"] != "Hotspot activated: Workflow Test Bar" ||
+		!strings.Contains(activation["body"].(string), "Comment: Verified on site") || activation["read_at"] != nil {
+		t.Fatalf("activation notification: %v", activation)
 	}
 	request("POST", path+"/activate", reason, dcfp, 409)
 	request("PUT", path, fixed, vht, 409)
@@ -274,7 +290,7 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/hotspots?review_status=verified", nil, dcfp, 400)
 	request("GET", "/hotspots?district_id=kampala", nil, national, 400)
 
-	// Location lookups chain region, district and subcounty for the submission form.
+	// The shared location lookups feed the submission form: region, district, subcounty.
 	includes := func(path, id string) bool {
 		t.Helper()
 		for _, item := range request("GET", path, nil, vht, 200)["data"].([]any) {
@@ -284,14 +300,14 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 		}
 		return false
 	}
-	if len(request("GET", "/hotspots/districts", nil, vht, 200)["data"].([]any)) < 146 ||
-		!includes("/hotspots/regions", region) || !includes("/hotspots/districts?region_id="+region, district) ||
-		includes("/hotspots/districts?region_id="+region, otherDistrict) && otherRegion != region ||
-		!includes("/hotspots/subcounties?district_id="+district, subcounty) ||
-		includes("/hotspots/subcounties?district_id="+district, otherSubcounty) {
+	if len(request("GET", "/locations/districts", nil, vht, 200)["data"].([]any)) < 146 ||
+		!includes("/locations/regions", region) || !includes("/locations/districts?region_id="+region, district) ||
+		includes("/locations/districts?region_id="+region, otherDistrict) && otherRegion != region ||
+		!includes("/locations/subcounties?district_id="+district, subcounty) ||
+		includes("/locations/subcounties?district_id="+district, otherSubcounty) {
 		t.Fatal("location lookups do not chain region, district and subcounty")
 	}
-	request("GET", "/hotspots/subcounties", nil, vht, 400)
-	request("GET", "/hotspots/districts?region_id=nope", nil, vht, 400)
-	request("GET", "/hotspots/regions", nil, dcfp, 403)
+	request("GET", "/locations/subcounties", nil, vht, 400)
+	request("GET", "/locations/districts?region_id=nope", nil, vht, 400)
+	request("GET", "/locations/regions", nil, dcfp, 200) // Any signed-in user can read locations.
 }

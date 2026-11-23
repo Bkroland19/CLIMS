@@ -52,6 +52,26 @@ jobs:
       - name: Validate development and production Compose models
         run: python scripts/check_environments.py
 
+  docs-site:
+    name: Documentation site build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - name: Build the site and fail on broken links or anchors
+        run: npm run build
+
   backend:
     name: Go lint and PostgreSQL tests
     runs-on: ubuntu-latest

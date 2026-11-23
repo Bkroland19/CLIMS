@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"clims-backend/internal/database"
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -55,7 +56,7 @@ func TestIdentitySyncRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	repo := users.NewRepository(pool)
+	repo := users.NewRepository(pool, audit.NewService(pool))
 
 	var roleID string
 	if err = pool.QueryRow(ctx, `SELECT id::text FROM roles ORDER BY id LIMIT 1`).Scan(&roleID); err != nil {
@@ -273,7 +274,7 @@ func TestIdentitySyncRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 		// A refresh before the revoke: the rotated token must die with the session too.
-		second, err = repo.RefreshSession(ctx, second.RefreshToken)
+		second, err = repo.RefreshSession(ctx, second.RefreshToken, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,7 +293,7 @@ func TestIdentitySyncRepository(t *testing.T) {
 			if active, err := repo.SessionActive(ctx, s.UserID, s.ID); err != nil || active {
 				t.Fatalf("session still active: %v %v", active, err)
 			}
-			if _, err := repo.RefreshSession(ctx, s.RefreshToken); !errors.Is(err, users.ErrRefreshInvalid) {
+			if _, err := repo.RefreshSession(ctx, s.RefreshToken, "", ""); !errors.Is(err, users.ErrRefreshInvalid) {
 				t.Fatalf("refresh after revoke: %v", err)
 			}
 		}
