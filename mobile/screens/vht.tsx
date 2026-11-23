@@ -53,6 +53,7 @@ import { useNav } from "@/lib/nav";
 import { useMe } from "@/lib/session";
 import { isClosedOrder } from "@/lib/orders";
 import { useStore, type RefreshResult } from "@/lib/store";
+import { newEntryId } from "@/lib/syncLog";
 import type { Order, Qty } from "@/lib/types";
 import { call, firstName, hotspotChip, inactiveNote, matches, shortId, stockStats } from "./common";
 import { TYPE } from "@/lib/fonts";
@@ -643,7 +644,7 @@ export function VhtMap() {
   const T = useT();
   const nav = useNav();
   const me = useMe();
-  const { send, queue, offline } = useStore();
+  const { send, queue, track, offline } = useStore();
   const scroll = useRef<ScrollViewInstance>(null);
   const [step, setStep] = useState(0);
   const [gpsAcc, setGpsAcc] = useState<number | null>(null);
@@ -735,13 +736,19 @@ export function VhtMap() {
       return;
     }
     setBusy(true);
+    const entry = newEntryId();
     try {
-      const res = await submitHotspot(body);
+      const res = await track(
+        entry,
+        "mapHotspot",
+        (id) => submitHotspot(body, id),
+        (h) => h.id,
+      );
       const r = send("mapHotspot", { hotspot: toLocalHotspot(res, me.name, body.comment) }, label);
       nav.replace(`map/${r.id ?? res.id}`);
     } catch (e) {
       if (isNetworkError(e)) {
-        queue("mapHotspot", { request: body }, label);
+        queue("mapHotspot", { request: body }, label, entry);
         nav.replace("map/queued");
         return;
       }
