@@ -33,6 +33,12 @@ type Config struct {
 	// TrustedProxiesSetting is TRUSTED_PROXIES: comma-separated IPs or CIDR ranges allowed to
 	// report the client address. Empty trusts private networks, where nginx reaches the API.
 	TrustedProxiesSetting string `mapstructure:"TRUSTED_PROXIES"`
+	// FirebaseCredentialsJSON is FIREBASE_CREDENTIALS_JSON: a Firebase service account key, as JSON
+	// or base64-encoded JSON, for push to the field app. FirebaseCredentialsFile
+	// (FIREBASE_CREDENTIALS_FILE) names a key file instead, for running outside Docker. Both are
+	// optional: without them the field app gets no pushes, and the inbox works as before.
+	FirebaseCredentialsJSON string `mapstructure:"FIREBASE_CREDENTIALS_JSON"`
+	FirebaseCredentialsFile string `mapstructure:"FIREBASE_CREDENTIALS_FILE"`
 	// TrustedProxies is TrustedProxiesSetting parsed and validated.
 	TrustedProxies []string `mapstructure:"-"`
 }
@@ -45,7 +51,8 @@ func LoadConfig() (cfg Config, err error) {
 	v.SetDefault("DB_SSLMODE", "disable")
 	// Binding includes environment-only keys in Unmarshal.
 	for _, key := range []string{"APP_ENV", "PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE", "JWT_SECRET",
-		"TRUSTED_PROXIES", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_PUBLIC_ORIGIN", "IDENTITY_SYNC_CLIENT_ID", "IDENTITY_SYNC_TEST_PROBE"} {
+		"TRUSTED_PROXIES", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_PUBLIC_ORIGIN", "IDENTITY_SYNC_CLIENT_ID", "IDENTITY_SYNC_TEST_PROBE",
+		"FIREBASE_CREDENTIALS_JSON", "FIREBASE_CREDENTIALS_FILE"} {
 		if err := v.BindEnv(key); err != nil {
 			return cfg, err
 		}

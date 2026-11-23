@@ -1,0 +1,6 @@
+BEGIN;
+
+DROP TABLE IF EXISTS push_outbox;
+DROP TABLE IF EXISTS push_devices;
+
+COMMIT;

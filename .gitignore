@@ -1,6 +1,9 @@
 .DS_Store
 infra/env/*.env
 !infra/env/*.env.example
+# Firebase files at the repository root (service account keys, google-services.json).
+/clims.json
+/google-services.json
 backend/bin/
 backend/server
 frontend/node_modules/

@@ -14,17 +14,21 @@ import (
 // quantity_ordered, quantity_dispatched, note, transport, from_store and to_store.
 func NotificationTypes() []notifications.Type {
 	inApp := []string{notifications.ChannelInApp}
+	// Field app users (hotspot managers and delivery agents) also get these as pushes.
+	inAppAndPush := []string{notifications.ChannelInApp, notifications.ChannelPush}
 	return []notifications.Type{
 		{Name: "order.stockout_reported", Channels: inApp,
 			Title: "Stockout at {{.hotspot}}",
 			Body: "{{.hotspot}}{{with .place}}, {{.}},{{end}} is out of {{.product}}." +
 				"{{with .message}} Message: \"{{.}}\"{{end}} Reported by {{.reporter}}.{{with .contact}} Contact: {{.}}.{{end}}"},
-		{Name: "order.hotspot_delivery", Channels: inApp,
+		{Name: "order.hotspot_delivery", Channels: inAppAndPush,
 			Title: "Stock on the way to {{.hotspot}}",
 			Body:  "The district sent {{.pieces}} for your stockout notification. Acknowledge the pieces you receive."},
 		// The delivery agent named for a delivery: what to carry, where, and who to call.
-		{Name: "order.delivery_assigned", Channels: inApp,
-			Title: "Deliver to {{.hotspot}}",
+		// The push leaves out the contact's phone number, which shows on the lock screen.
+		{Name: "order.delivery_assigned", Channels: inAppAndPush,
+			Title:    "Deliver to {{.hotspot}}",
+			PushBody: "Carry {{.pieces}} to {{.hotspot}}{{with .place}}, {{.}}{{end}}. Tap for the contact and details.",
 			Body: "Carry {{.pieces}} from the district store to {{.hotspot}}{{with .place}}, {{.}}{{end}}." +
 				"{{with .contact}} Contact: {{.}}.{{end}}"},
 		{Name: "order.delivery_acknowledged", Channels: inApp,

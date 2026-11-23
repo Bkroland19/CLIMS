@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "@/lib/theme";
 import { useMe } from "@/lib/session";
 import { isUnread } from "@/lib/notifications";
+import { shownAsPush } from "@/lib/push";
 import { useNotes, useStore } from "@/lib/store";
 import type { AppEvent } from "@/lib/types";
 import { orgOf, useOpenNote } from "@/screens/shared";
@@ -43,7 +44,13 @@ export default function PushBanner() {
       seen.current = new Set(notes.map((x) => x.id));
       e = notes.find((x) => isUnread(x, read));
     } else {
-      e = notes.find((x) => !seen.current!.has(x.id) && isUnread(x, read));
+      // One that already popped up as a system push isn't announced again.
+      e = notes.find(
+        (x) =>
+          !seen.current!.has(x.id) &&
+          isUnread(x, read) &&
+          !(x.serverId && shownAsPush.has(x.serverId)),
+      );
       for (const x of notes) seen.current.add(x.id);
     }
     if (!e) return;

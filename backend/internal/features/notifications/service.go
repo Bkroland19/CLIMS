@@ -33,8 +33,9 @@ var (
 
 type registeredType struct {
 	Type
-	title *template.Template
-	body  *template.Template
+	title    *template.Template
+	body     *template.Template
+	pushBody *template.Template
 }
 
 // Service is the Notifier. Its channels deliver a recorded notification to its recipients.
@@ -44,12 +45,21 @@ type Service struct {
 	channels map[string]Channel
 }
 
-// NewService returns a Notifier that delivers in-app.
+// NewService returns a Notifier that delivers in-app. Call EnablePush to add push.
 func NewService() *Service {
 	return &Service{
 		types:    map[string]registeredType{},
 		channels: map[string]Channel{ChannelInApp: inAppChannel{}},
 	}
+}
+
+// EnablePush makes types that list ChannelPush queue pushes for a PushWorker to send. Without it
+// (no Firebase credentials) push is skipped like any other channel that is not available, and the
+// in-app inbox still receives every notification.
+func (s *Service) EnablePush() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.channels[ChannelPush] = pushChannel{}
 }
 
 func (s *Service) Register(t Type) error {
@@ -60,7 +70,7 @@ func (s *Service) Register(t Type) error {
 		return fmt.Errorf("notification type %s declares no channels", t.Name)
 	}
 	for _, channel := range t.Channels {
-		if !slices.Contains([]string{ChannelInApp, ChannelEmail, ChannelSMS}, channel) {
+		if !slices.Contains([]string{ChannelInApp, ChannelPush, ChannelEmail, ChannelSMS}, channel) {
 			return fmt.Errorf("notification type %s: unknown channel %q", t.Name, channel)
 		}
 	}
@@ -73,12 +83,18 @@ func (s *Service) Register(t Type) error {
 	if err != nil {
 		return fmt.Errorf("notification type %s body: %w", t.Name, err)
 	}
+	var pushBody *template.Template
+	if t.PushBody != "" {
+		if pushBody, err = template.New(t.Name + ".push").Option("missingkey=error").Parse(t.PushBody); err != nil {
+			return fmt.Errorf("notification type %s push body: %w", t.Name, err)
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.types[t.Name]; exists {
 		return fmt.Errorf("notification type %s is already registered", t.Name)
 	}
-	s.types[t.Name] = registeredType{Type: t, title: title, body: body}
+	s.types[t.Name] = registeredType{Type: t, title: title, body: body, pushBody: pushBody}
 	return nil
 }
 
@@ -94,6 +110,12 @@ func (s *Service) MustRegister(types ...Type) {
 func (s *Service) Notify(ctx context.Context, tx pgx.Tx, msg Message) error {
 	s.mu.RLock()
 	t, ok := s.types[msg.Type]
+	channels := make(map[string]Channel, len(t.Channels))
+	for _, name := range t.Channels {
+		if channel, available := s.channels[name]; available {
+			channels[name] = channel
+		}
+	}
 	s.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrUnknownType, msg.Type)
@@ -122,16 +144,30 @@ func (s *Service) Notify(ctx context.Context, tx pgx.Tx, msg Message) error {
 	if err != nil || !inserted {
 		return err
 	}
-	for _, name := range t.Channels {
-		channel, available := s.channels[name]
-		if !available {
-			continue // Email and SMS are declared ahead of having a provider.
+	delivery := Delivery{NotificationID: id, Recipients: recipients, PushTitle: title, PushBody: body}
+	if _, push := channels[ChannelPush]; push && t.pushBody != nil {
+		if delivery.PushBody, err = execute(t.pushBody, msg.Data); err != nil {
+			return fmt.Errorf("render %s push body: %w", t.Name, err)
 		}
-		if err := channel.Deliver(ctx, tx, id, recipients); err != nil {
+	}
+	for _, name := range t.Channels {
+		channel, available := channels[name]
+		if !available {
+			continue // Push without Firebase, and email and SMS ahead of having a provider.
+		}
+		if err := channel.Deliver(ctx, tx, delivery); err != nil {
 			return fmt.Errorf("deliver %s via %s: %w", msg.Type, name, err)
 		}
 	}
 	return nil
+}
+
+func execute(tmpl *template.Template, data map[string]any) (string, error) {
+	var out bytes.Buffer
+	if err := tmpl.Execute(&out, data); err != nil {
+		return "", err
+	}
+	return out.String(), nil
 }
 
 func (t registeredType) render(data map[string]any) (string, string, error) {

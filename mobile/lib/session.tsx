@@ -20,6 +20,7 @@ import {
   type StoredTokens,
 } from "./api";
 import { DEFAULT_PERSONAS } from "./seed";
+import { clearShownNotifications } from "./push";
 import type { AppRole } from "./types";
 
 export interface SessionUser {
@@ -226,6 +227,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     const t = getTokens();
+    // Ending the session below stops this phone's pushes; clear the ones already shown too.
+    clearShownNotifications();
     await clearLocal();
     // Revoke the session on the server without making the user wait for the network.
     if (t) endRemoteSession(t);

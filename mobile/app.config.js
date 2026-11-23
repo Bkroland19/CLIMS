@@ -1,6 +1,7 @@
-// Expo reads app.json first and passes it here as `config`; app.json stays the source of truth (the
-// release script updates its version). This only adds Android size settings when a build profile asks
-// for them with CLIMS_SLIM_ANDROID=1, which eas.json sets for the "preview" profile.
+const { existsSync } = require("node:fs");
+const { join } = require("node:path");
+
+// Expo reads app.json first. The preview build profile enables the optional Android size settings.
 //
 // The slim preview APK:
 // - targets 64-bit ARM phones only (arm64-v8a), instead of four CPU types in one universal APK;
@@ -18,6 +19,13 @@ const SLIM_ANDROID = {
 const pluginName = (plugin) => (Array.isArray(plugin) ? plugin[0] : plugin);
 
 module.exports = ({ config }) => {
+  const localGoogleServicesFile = join(__dirname, "../google-services.json");
+  const googleServicesFile =
+    process.env.GOOGLE_SERVICES_JSON ||
+    (existsSync(localGoogleServicesFile) ? localGoogleServicesFile : undefined);
+  if (googleServicesFile) {
+    config = { ...config, android: { ...config.android, googleServicesFile } };
+  }
   if (process.env.CLIMS_SLIM_ANDROID !== "1") return config;
   const plugins = (config.plugins ?? []).filter((p) => pluginName(p) !== "expo-build-properties");
   return {

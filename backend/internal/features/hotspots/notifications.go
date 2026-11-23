@@ -13,6 +13,9 @@ import (
 // Templates receive name, district and, where the step has one, comment.
 func NotificationTypes() []notifications.Type {
 	inApp := []string{notifications.ChannelInApp}
+	// The submitter (a VHT in the field app) also gets the DCFP's decisions and comments as pushes.
+	// DCFPs use the website, which registers no push device, so they keep receiving them in-app only.
+	inAppAndPush := []string{notifications.ChannelInApp, notifications.ChannelPush}
 	return []notifications.Type{
 		{Name: "hotspot.submitted", Channels: inApp,
 			Title: "New hotspot to verify: {{.name}}",
@@ -23,16 +26,16 @@ func NotificationTypes() []notifications.Type {
 		{Name: "hotspot.resubmitted", Channels: inApp,
 			Title: "Hotspot resubmitted: {{.name}}",
 			Body:  "{{.name}} in {{.district}} was corrected after rejection and is waiting for verification."},
-		{Name: "hotspot.commented", Channels: inApp,
+		{Name: "hotspot.commented", Channels: inAppAndPush,
 			Title: "New comment on {{.name}}",
 			Body:  "{{.comment}}"},
-		{Name: "hotspot.activated", Channels: inApp,
+		{Name: "hotspot.activated", Channels: inAppAndPush,
 			Title: "Hotspot activated: {{.name}}",
 			Body:  "{{.name}} in {{.district}} is now active. Comment: {{.comment}}"},
-		{Name: "hotspot.deactivated", Channels: inApp,
+		{Name: "hotspot.deactivated", Channels: inAppAndPush,
 			Title: "Hotspot deactivated: {{.name}}",
 			Body:  "{{.name}} in {{.district}} was deactivated. Reason: {{.comment}}"},
-		{Name: "hotspot.rejected", Channels: inApp,
+		{Name: "hotspot.rejected", Channels: inAppAndPush,
 			Title: "Hotspot rejected: {{.name}}",
 			Body:  "{{.name}} in {{.district}} was rejected. Reason: {{.comment}} Edit the hotspot to resubmit it."},
 	}

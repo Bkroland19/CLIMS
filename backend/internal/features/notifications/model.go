@@ -8,10 +8,12 @@ import (
 	"time"
 )
 
-// Channel names a delivery channel a notification type can use. Only in-app
-// delivery exists for now; email and SMS follow once a provider is funded.
+// Channel names a delivery channel a notification type can use. In-app delivery always
+// exists; push exists when Firebase is configured (see EnablePush); email and SMS follow
+// once a provider is funded.
 const (
 	ChannelInApp = "in_app"
+	ChannelPush  = "push"
 	ChannelEmail = "email"
 	ChannelSMS   = "sms"
 )
@@ -23,6 +25,9 @@ type Type struct {
 	// Title and Body are text/template strings rendered with Message.Data at send time.
 	Title string
 	Body  string
+	// PushBody, when set, replaces Body in push notifications. A push shows on the lock screen and
+	// passes through Google, so it can leave out details, such as phone numbers, that the inbox keeps.
+	PushBody string
 	// Channels the type is delivered through; channels that are not available yet are skipped.
 	Channels []string
 	// IncludeActor keeps the person who caused the notification among its recipients.

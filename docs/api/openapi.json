@@ -3792,6 +3792,48 @@
         }
       }
     },
+    "/api/v1/notifications/devices": {
+      "post": {
+        "tags": ["Notifications"],
+        "operationId": "registerPushDevice",
+        "summary": "Register this phone for push notifications",
+        "description": "Any signed-in user. Records the device's Firebase Cloud Messaging token (`token`, the app's native push token) for the session that makes the request, so the user's notifications whose type allows push also arrive as pushes. Signing out or revoking the session stops them. A token registered before moves to the new user and session, and the session's previous token is forgotten; repeating the call changes nothing. When the server has no Firebase credentials the device is still recorded and no pushes are sent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/notifications/{id}/read": {
       "post": {
         "tags": ["Notifications"],
@@ -8007,6 +8049,23 @@
           },
           "active": {
             "type": "boolean"
+          }
+        }
+      },
+      "PushDeviceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["token", "platform"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "The device's FCM registration token."
+          },
+          "platform": {
+            "type": "string",
+            "enum": ["android", "ios"]
           }
         }
       },
