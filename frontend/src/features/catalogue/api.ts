@@ -74,7 +74,8 @@ export interface ProductInput {
   type_id: string;
   brand_id: string;
   unit_id: string;
-  pieces_per_unit: number;
+  /** May be omitted for Piece/Pieces; the API uses one condom per piece. */
+  pieces_per_unit?: number;
 }
 
 /** Any subset of a product's fields, and whether it is active. */

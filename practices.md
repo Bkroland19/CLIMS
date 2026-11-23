@@ -1,43 +1,57 @@
 # Engineering practices
 
-Every change is held to the 20 practices in the project brief. A commit that applies one names
-it by number, for example `feat(tokens): exp always set (6, 9, 14)`.
+These practices apply to CLIMS: the Go API, Next.js web app, mobile app and operational tooling.
+Keep changes scoped to the requested work, preserve API contracts, and use existing components
+before introducing another implementation. A commit that applies a practice may name its number,
+for example `feat(tables): shared column filters (3, 5, 14, 18)`.
 
-Practices 1–9, 12, 13, 14 and 18 match Israel Josué Parra Rosales,
-[20 Best Programming Practices](https://medium.com/@josueparra2892/20-best-programming-practices-407df688b96e),
-as cited in duara-geo. The wording of the rest comes from the Duara Meet brief.
+| #   | Practice                | How it applies to CLIMS                                                                                                      |
+| --- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Descriptive names       | Use the domain's terms: district store, hotspot, stockout, dispatch, receipt and catalogue unit.                             |
+| 2   | Comments say why        | Explain stock allocation, idempotency, permissions and unusual constraints, rather than narrating syntax.                    |
+| 3   | DRY                     | Reuse `DataTable`, `Button`, field components, API clients and existing validation functions.                                |
+| 4   | Test domain behaviour   | Test quantity rules, date boundaries, filtering, allocation and permission decisions.                                        |
+| 5   | One style               | Run ESLint, Prettier, TypeScript, gofmt and the relevant CI checks. Shared-control and table rules are enforced by ESLint.   |
+| 6   | Handle every error      | Distinguish empty records, missing assignments, permission refusals and outages. Explain when displayed data could be stale. |
+| 7   | Document                | Keep API contracts in OpenAPI and module docs; document shared frontend contracts in `docs/frontend-ui.md`.                  |
+| 8   | Optimise where measured | Keep filtering responsive, bound rendered option lists and measure before introducing caching or virtualisation.             |
+| 9   | Security first          | Validate at the API boundary; respect store assignments and permissions; never commit secrets or bypass checks.              |
+| 10  | Git hygiene             | Keep focused, reviewable changes and preserve unrelated work. Do not commit without authorization.                           |
+| 11  | Plan before coding      | Audit existing patterns and describe significant refactors before changing them.                                             |
+| 12  | Simplest data structure | Prefer typed arrays, records and sets over unnecessary layers or custom frameworks.                                          |
+| 13  | Modular                 | Keep domain logic in features, reusable UI in components and transport in the shared API client.                             |
+| 14  | Test edge cases         | Cover empty lists, missing values, invalid dates, reversed ranges, zero quantities, retry ambiguity and denied access.       |
+| 15  | Refactor continuously   | Improve the code being touched; avoid unrelated rewrites.                                                                    |
+| 16  | No mutable globals      | Keep application state in providers, query caches and component state; inject external dependencies.                         |
+| 17  | Changelog               | Record meaningful user-visible changes in `docs/CHANGELOG.md`.                                                               |
+| 18  | Single responsibility   | The API enforces business rules; features supply data and actions; shared components own presentation and interaction.       |
+| 19  | Memory as well as time  | Bound API payloads, pagination and large option lists. Never describe partially loaded results as complete.                  |
+| 20  | Learn from mistakes     | Record recurring bugs, their causes and prevention in `docs/lessons.md`.                                                     |
 
-| #   | Practice                        | How it shows here                                                                                                              |
-| --- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Descriptive names               | `room_name`, `short_code`, `lobby_bypass`: the names Jitsi and the brief use, not new ones                                     |
-| 2   | Comments say why                | The spike's config comments say _why_ `JICOFO_ENABLE_AUTH=0` is needed, not what it does                                       |
-| 3   | DRY                             | One policy resolver (ADM-01); one token minter; one place that knows Jitsi's claim names                                       |
-| 4   | Unit-test every domain function | Table-driven Go tests; domain coverage ≥ 80%                                                                                   |
-| 5   | One style                       | gofmt + golangci-lint, ESLint + Prettier, enforced in CI                                                                       |
-| 6   | Handle every error              | Wrapped with context; clients get safe messages; Jitsi refusals are told apart from outages                                    |
-| 7   | Document                        | GoDoc/TSDoc, OpenAPI, ADRs in `docs/adr/`                                                                                      |
-| 8   | Optimise where measured         | Token issue and the join page are the hot paths; measured before tuned                                                         |
-| 9   | Security first                  | Tokens scoped to one room, always expiring, never wildcard; secrets generated per install; input validated at the API boundary |
-| 10  | Git hygiene                     | Small conventional commits, feature branches, PRs                                                                              |
-| 11  | Plan before coding              | Each phase starts with its design/ADR                                                                                          |
-| 12  | Simplest data structure         | Policy and branding are single rows; attendance comes from Prosody's own records                                               |
-| 13  | Modular                         | One Go package per domain module; domain code depends on interfaces (`Mailer`, `TokenSigner`, `Clock`, …)                      |
-| 14  | Test edge cases                 | Expired, tampered and wrong-room tokens; DST; invalid branding; SMTP down; network drops                                       |
-| 15  | Refactor continuously           | Leave code cleaner than found                                                                                                  |
-| 16  | No mutable globals              | Dependencies injected from `cmd/`                                                                                              |
-| 17  | CHANGELOG                       | `docs/CHANGELOG.md`                                                                                                            |
-| 18  | Single responsibility           | Jitsi does media; the API decides; the web app displays                                                                        |
-| 19  | Memory as well as time          | Bounded request bodies, bounded queues, streaming exports                                                                      |
-| 20  | Learn from mistakes             | Notable bugs and root causes go in `docs/lessons.md`                                                                           |
+## Frontend rules
 
-**Two more rules:**
-
-- Jitsi source is never modified.
-- A security control is never weakened to make a test pass.
+- Record lists use `DataTable`. Fixed line items inside a form or detail card use its `embedded`
+  variant, which keeps every line visible. Do not create a second table implementation.
+- Use `Button` for actions and links styled as buttons (`asChild`). Use the shared input, select,
+  radio and checkbox primitives. Native controls belong inside those primitives.
+- Prefer `TextField`, `TextareaField`, `SelectField` and `ComboboxField` for labelled forms. Custom
+  compositions must still have labels, associated descriptions/errors and keyboard access.
+- Keep validation in the relevant feature or shared validator. Match API limits, reject impossible
+  dates and non-finite numbers, and preserve passwords exactly as entered. Client checks do not
+  replace server validation.
+- Column `value` functions return real sortable/filterable values, including `null` for missing
+  values. Use `cell` for display formatting. Declare `filter: 'select'` for categories and
+  `filter: 'date'` for ISO dates/timestamps; numeric columns get number ranges automatically.
+- Keep filters visible and removable, and retain search/sort/pagination semantics across screens.
+  Loaded-page filters are explicitly limited to loaded records; server-side filters remain in the
+  URL. Never silently export a filtered subset as if it were a full report.
+- Use shared spacing, colour and typography tokens. Check narrow screens, focus states, loading,
+  errors and empty states as part of the feature.
 
 ## A change is done when
 
-1. Lint and tests pass, and new behaviour has a test (4, 5, 14).
-2. A new endpoint is in the OpenAPI document (7).
-3. Anything that touches Jitsi has been run against the real pinned stack, not only fakes. Jitsi's
-   behaviour lives in its config and plugins, which is where the assumptions hide (14).
+1. Relevant lint, types and tests pass; new domain behaviour and failure cases have tests.
+2. New or changed endpoints are reflected in OpenAPI and module documentation.
+3. Shared UI changes have been exercised in representative real browser workflows and at a narrow
+   viewport. Use test data for writes; do not mutate operational stock to test a screen.
+4. A security or validation control has not been weakened to make a test pass.

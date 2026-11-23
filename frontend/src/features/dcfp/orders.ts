@@ -8,6 +8,9 @@ import type { Order, OrderStatus, StockoutReport, Warehouse } from './api';
 export const DCFP_PATHS = {
   dashboard: '/dcfp',
   stockouts: '/dcfp/stockouts',
+  dispatch: '/dcfp/stockouts/dispatch',
+  dispatchFor: (reportId: string) =>
+    `/dcfp/stockouts/dispatch?report=${encodeURIComponent(reportId)}`,
   orders: '/dcfp/restock',
   store: '/dcfp/restock/store',
   newOrder: '/dcfp/restock/new',
@@ -20,6 +23,16 @@ export const DCFP_PATHS = {
   hotspots: '/dcfp/hotspots',
   hotspot: (id: string) => `/dcfp/hotspots/${encodeURIComponent(id)}`,
 } as const;
+
+export const STOCKOUT_STATUS: Record<
+  NonNullable<StockoutReport['status']>,
+  { label: string; tone: StatusTone }
+> = {
+  awaiting_supply: { label: 'Awaiting supply', tone: 'negative' },
+  awaiting_acknowledgement: { label: 'Awaiting receipt', tone: 'info' },
+  partly_received: { label: 'Partly received', tone: 'caution' },
+  fulfilled: { label: 'Fulfilled', tone: 'positive' },
+};
 
 /** What each status means to the DCFP who placed the order. */
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: StatusTone }> = {
@@ -93,9 +106,17 @@ const STEPS_DONE: Partial<Record<OrderStatus, number>> = {
 /**
  * The order's progress for the step tracker. A held order is marked for attention on the
  * stock check, since it waits there until the warehouse has the stock. A rejected order stops
- * at the warehouse's decision, marked for attention, since it goes no further.
+ * at the warehouse's decision, marked for attention, since it goes no further. Stock the warehouse
+ * sent without an order has only the dispatch and the receipt.
  */
-export function orderSteps(status: OrderStatus): Step[] {
+export function orderSteps(status: OrderStatus, unrequested = false): Step[] {
+  // The warehouse sent this stock without an order: it arrives to be counted, nothing more.
+  if (unrequested) {
+    return [
+      { id: 'dispatched', label: 'Sent by the warehouse', state: 'done' },
+      { id: 'received', label: 'Received', state: status === 'received' ? 'done' : 'current' },
+    ];
+  }
   if (status === 'rejected') {
     return [
       { id: 'sent', label: 'Sent to warehouse', state: 'done' },

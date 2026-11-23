@@ -275,7 +275,8 @@ describe('Dispatching a confirmed order', () => {
     expect(posts(requests)).toEqual([]);
 
     await user.type(reason, 'District out of stock; used within the week');
-    await user.type(screen.getByLabelText(/Waybill number/), ' WB-104 ');
+    expect(screen.queryByLabelText(/Waybill number/)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/Vehicle registration/), ' UAX 123B ');
     await user.click(screen.getByRole('button', { name: 'Dispatch to Gulu' }));
     await waitFor(() => {
       expect(posts(requests)).toEqual([
@@ -283,7 +284,7 @@ describe('Dispatching a confirmed order', () => {
           url: action('dispatch'),
           body: {
             expiry_exception_reason: 'District out of stock; used within the week',
-            waybill_number: 'WB-104',
+            vehicle_registration: 'UAX 123B',
           },
         },
       ]);
@@ -333,7 +334,8 @@ describe('Orders the warehouse has finished with', () => {
     );
 
     expect(await screen.findByText('Gulu counted 490 box of 500 box')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Waybill WB-104' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dispatch' })).toBeInTheDocument();
+    expect(screen.queryByText(/WB-104/)).not.toBeInTheDocument();
     expect(screen.getByText('John Okello (0772 000000)')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Dispatch|Approve|Reject/ }),

@@ -23,6 +23,8 @@ interface ConfirmDialogProps {
   isPending?: boolean;
   /** Set when the action failed; shown in the dialog so it can be retried in place. */
   error?: unknown;
+  /** Where focus goes on close, when the element that opened the dialog has gone. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /** Asks before an action that cannot be undone. */
@@ -35,10 +37,11 @@ export function ConfirmDialog({
   onConfirm,
   isPending = false,
   error,
+  onCloseAutoFocus,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle className="wrap-anywhere">{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

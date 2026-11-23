@@ -115,7 +115,6 @@ function OrderAudit({ detail }: { detail: OrderDetail }) {
                         />
                       ),
                     },
-                    { label: 'Waybill', value: request.dispatch?.waybill ?? EMPTY_VALUE },
                     { label: 'Goods received note', value: request.receipt?.grn ?? EMPTY_VALUE },
                   ]}
                 />

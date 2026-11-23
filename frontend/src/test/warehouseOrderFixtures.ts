@@ -91,6 +91,7 @@ export function aStockBatch(overrides: Partial<StockBatch> = {}): StockBatch {
     band: 'ok',
     on_hand: 500,
     created_at: '2026-10-01T08:00:00Z',
+    untouched: true,
     ...overrides,
   };
 }
@@ -103,6 +104,8 @@ export interface WarehouseOrderData {
   products?: Product[];
   movements?: Movement[];
   summary?: StoreSummary;
+  /** What `GET /locations/districts` lists; by default the three district stores and Kotido. */
+  districts?: { id: string; name: string }[];
 }
 
 /** A product's line in a store summary: 910 boxes of Engabu Free Female at NMS. */
@@ -176,6 +179,15 @@ export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<strin
         ? { status: 200, body: envelope(found) }
         : { status: 404, body: { success: false, message: 'order not found' } };
     }
+    if (path === '/locations/districts') {
+      const districts =
+        data.districts ??
+        ['Gulu', 'Kotido', 'Mukono', 'Wakiso'].map((name) => ({
+          id: `d-${name.toLowerCase()}`,
+          name,
+        }));
+      return { status: 200, body: envelope(districts) };
+    }
     if (path === '/locations/stores') {
       const national = [NMS, JMS].map((store) => ({
         ...store,
@@ -190,7 +202,13 @@ export function warehouseOrderApi(data: WarehouseOrderData, writes: Record<strin
     if (path === '/inventory/stock') return { status: 200, body: envelope(data.balances ?? []) };
     if (path === '/inventory/batches') return { status: 200, body: envelope(data.batches ?? []) };
     if (path === '/inventory/movements') {
-      return { status: 200, body: envelope(data.movements ?? []) };
+      // Paged and filtered as the API does it: newest first, at most `limit` from `offset`.
+      const params = new URLSearchParams(request.url.split('?')[1] ?? '');
+      const reason = params.get('reason');
+      const limit = Number(params.get('limit') ?? 50);
+      const offset = Number(params.get('offset') ?? 0);
+      const kept = (data.movements ?? []).filter((m) => !reason || m.reason === reason);
+      return { status: 200, body: envelope(kept.slice(offset, offset + limit)) };
     }
     if (path === '/inventory/store-summary') {
       return { status: 200, body: envelope(data.summary ?? aStoreSummary({ products: [] })) };

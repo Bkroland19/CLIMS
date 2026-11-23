@@ -111,6 +111,17 @@ const STEPS_DONE: Partial<Record<OrderStatus, number>> = {
  */
 export function requestSteps(order: Order): Step[] {
   const { order_status: status } = order;
+  // Stock sent without an order skipped the decision and the reservation.
+  if (order.unrequested) {
+    return [
+      { id: 'dispatched', label: 'Sent without an order', state: 'done' },
+      {
+        id: 'counted',
+        label: 'District receipt',
+        state: status === 'received' ? 'done' : 'current',
+      },
+    ];
+  }
   if (status === 'rejected') {
     return [
       { id: 'received', label: 'Order received', state: 'done' },
@@ -180,7 +191,7 @@ export function requestBanner(
       return {
         variant: 'info',
         title: `${quantity(order.quantity_issued)} on the way to ${district}`,
-        body: 'The district counts it when it arrives; you are told what it counted.',
+        body: `${order.unrequested ? `Sent without an order from ${district}. ` : ''}The district counts it when it arrives; you are told what it counted.`,
       };
     case 'received': {
       const differs = order.quantity_received !== order.quantity_issued;

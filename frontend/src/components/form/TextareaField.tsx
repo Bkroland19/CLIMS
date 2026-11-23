@@ -3,7 +3,7 @@ import { useId, type ComponentProps } from 'react';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 
-interface TextareaFieldProps extends Omit<ComponentProps<typeof Textarea>, 'id'> {
+interface TextareaFieldProps extends ComponentProps<typeof Textarea> {
   label: string;
   /** Validation message; its presence marks the field invalid. */
   error?: string;
@@ -22,10 +22,14 @@ export function TextareaField({
   error,
   description,
   required,
+  id: providedId,
+  'aria-describedby': describedBy,
+  'aria-invalid': invalid,
   rows = 3,
   ...textareaProps
 }: TextareaFieldProps) {
-  const id = useId();
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
   const descriptionId = description ? `${id}-description` : undefined;
   const errorId = error ? `${id}-error` : undefined;
 
@@ -39,8 +43,10 @@ export function TextareaField({
         id={id}
         rows={rows}
         required={required}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={[descriptionId, errorId].filter(Boolean).join(' ') || undefined}
+        aria-invalid={error ? true : invalid}
+        aria-describedby={
+          [descriptionId, errorId, describedBy].filter(Boolean).join(' ') || undefined
+        }
         {...textareaProps}
       />
       {description ? <FieldDescription id={descriptionId}>{description}</FieldDescription> : null}

@@ -267,8 +267,8 @@ describe('WarehouseOrderPage', () => {
         }),
       ],
     });
-    expect(await screen.findByText('WB-104')).toBeInTheDocument();
-    expect(screen.getByText('John Okello (0772 000000)')).toBeInTheDocument();
+    expect(await screen.findByText('John Okello (0772 000000)')).toBeInTheDocument();
+    expect(screen.queryByText('WB-104')).not.toBeInTheDocument();
     expect(screen.queryByText('Vehicle')).not.toBeInTheDocument();
     expect(screen.queryByText('NMS approved part of this order')).not.toBeInTheDocument();
   });

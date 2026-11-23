@@ -93,6 +93,7 @@ export function LookupsPage({ kind }: LookupsPageProps) {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (lookup) => (lookup.active ? 'Active' : 'Inactive'),
         cell: (lookup) => (
@@ -174,6 +175,7 @@ export function LookupsPage({ kind }: LookupsPageProps) {
       />
       <DataTable
         label={text.title}
+        preferencesKey={`catalogue-${kind}`}
         columns={columns}
         rows={rows}
         getRowId={(lookup) => lookup.id}

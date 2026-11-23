@@ -42,6 +42,12 @@ interface StatCardProps {
   label: string;
   /** Already formatted for display. */
   value: string;
+  /**
+   * The same figure in other units, on a quieter line under the value, e.g. "2,383,520 Box ·
+   * 114,840 Carton" under "31,635,000 Piece". Units are never added together, and three of them
+   * at full size would bury the figure.
+   */
+  extra?: string;
   icon: LucideIcon;
   /** Icon and sparkline colour. Defaults to neutral. */
   accent?: StatCardAccent;
@@ -71,6 +77,7 @@ interface StatCardProps {
 export function StatCard({
   label,
   value,
+  extra,
   icon: Icon,
   accent = 'neutral',
   trend,
@@ -103,6 +110,11 @@ export function StatCard({
             <p className="text-foreground text-2xl leading-8 font-bold tracking-tight break-words tabular-nums">
               {value}
             </p>
+            {extra ? (
+              <p className="text-foreground/80 -mt-1 text-sm font-semibold break-words tabular-nums">
+                {extra}
+              </p>
+            ) : null}
             {trend && change ? (
               <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
                 <span

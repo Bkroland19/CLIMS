@@ -16,6 +16,10 @@ import {
   warehouseOrderApi,
 } from '@/test/warehouseOrderFixtures';
 
+function sidebarLink(name: RegExp) {
+  return within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name });
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-20T09:00:00Z') });
 });
@@ -128,6 +132,29 @@ describe('District requests', () => {
       ),
     ).toHaveAttribute('aria-current', 'true');
   });
+
+  it('narrows the list to the district in the address', async () => {
+    renderOrders('/warehouse/requests?store=NMS&district=Mukono');
+    const table = await screen.findByRole('table', { name: 'District orders at NMS' });
+    expect(await within(table).findByRole('link', { name: 'Mukono' })).toHaveAttribute(
+      'href',
+      '/warehouse/requests/o-mukono?store=NMS',
+    );
+    expect(within(table).queryByText('Gulu')).not.toBeInTheDocument();
+  });
+
+  it('names the district when it has ordered nothing from the store, and keeps the badge store-wide', async () => {
+    renderOrders('/warehouse/requests?store=NMS&district=Kotido');
+
+    expect(await screen.findByText('No orders from Kotido at NMS yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Choose All districts in the District menu to see every order at NMS.'),
+    ).toBeInTheDocument();
+    // The badge is the work waiting at NMS, whichever district is in view.
+    await waitFor(() => {
+      expect(sidebarLink(/District requests/)).toHaveTextContent('2');
+    });
+  });
 });
 
 /** NMS's FC2 boxes: one batch expired, one under a month, one fine, and some never batched. */
@@ -160,35 +187,45 @@ const BATCHES = [
 ];
 
 describe('Warehouse stock', () => {
-  function renderStock(route: string, data: Parameters<typeof warehouseOrderApi>[0] = {}) {
+  function renderStock(
+    route: string,
+    data: Parameters<typeof warehouseOrderApi>[0] = {},
+    writes: Parameters<typeof warehouseOrderApi>[1] = {},
+  ) {
     return renderApp(<AppUnderTest />, {
       route,
       signedIn: true,
       replies: [
-        warehouseOrderApi({
-          balances: [aBalance({ on_hand: 910, reserved: 300, available: 610 })],
-          batches: BATCHES,
-          summary: aStoreSummary(),
-          movements: [
-            aMovement({
-              id: 'm2',
-              reason: 'dispatch',
-              quantity: -80,
-              order_id: 'o1',
-              note: null,
-              batch_number: null,
-              expiry_date: null,
-            }),
-            aMovement(),
-          ],
-          ...data,
-        }),
+        warehouseOrderApi(
+          {
+            balances: [aBalance({ on_hand: 910, reserved: 300, available: 610 })],
+            batches: BATCHES,
+            summary: aStoreSummary(),
+            movements: [
+              aMovement({
+                id: 'm2',
+                reason: 'dispatch',
+                quantity: -80,
+                order_id: 'o1',
+                note: null,
+                batch_number: null,
+                expiry_date: null,
+              }),
+              aMovement(),
+            ],
+            ...data,
+          },
+          writes,
+        ),
       ],
     });
   }
 
+  /** A headline figure, found by its label among the figures (the shelf-life legend repeats some). */
   const card = (label: string | RegExp) =>
-    screen.getByText(label, { selector: 'span' }).closest('a') as HTMLElement;
+    within(screen.getByRole('region', { name: /stock at a glance/ }))
+      .getByText(label, { selector: 'span' })
+      .closest('a') as HTMLElement;
 
   it('shows what is held, what went out and what is waiting, each figure linking to its list', async () => {
     renderStock('/warehouse/stock?store=NMS');
@@ -214,6 +251,86 @@ describe('Warehouse stock', () => {
     // 570 free over 100 a month dispatched in the last 90 days.
     expect(row).toHaveTextContent('570');
     expect(row).toHaveTextContent('5.7 months');
+  });
+
+  it('opens a product to show its batches, first expiry first', async () => {
+    const user = userEvent.setup();
+    renderStock('/warehouse/stock?store=NMS');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Show batches of Engabu Free Female, box' }),
+    );
+
+    const own = screen.getByRole('table', { name: 'Batches of Engabu Free Female, box' });
+    const numbers = within(own)
+      .getAllByRole('row')
+      .slice(1, -1)
+      .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+    expect(numbers).toEqual([
+      'FC2-2311-090',
+      'FC2-2405-002',
+      'FC2-2502-118',
+      'No batch numberCount it and record its batches',
+    ]);
+    expect(within(own).getAllByRole('row').at(-1)).toHaveTextContent('910 box');
+  });
+
+  it('shows the shelf life of everything held and what needs doing about it', async () => {
+    renderStock('/warehouse/stock?store=NMS');
+
+    const bands = await screen.findByRole('list', { name: 'Shelf-life bands' });
+    expect(within(bands).getByRole('link', { name: /Expired40 box · 1 batch/ })).toHaveAttribute(
+      'href',
+      '/warehouse/stock?view=batches&band=expired&store=NMS',
+    );
+    expect(within(bands).queryByRole('link', { name: /Under 3 months/ })).not.toBeInTheDocument();
+
+    const tasks = await screen.findByRole('list', { name: 'Needs attention at NMS' });
+    expect(
+      within(tasks)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining('Write off 1 batch'),
+      expect.stringContaining('1 batch expires within a month'),
+      expect.stringContaining('Record expiry dates for 1 batch'),
+    ]);
+  });
+
+  it('pages through the whole ledger instead of stopping at the newest hundred', async () => {
+    const user = userEvent.setup();
+    const ledger = Array.from({ length: 130 }, (_, index) =>
+      aMovement({ id: `m${String(index)}`, note: `Entry ${String(index)}` }),
+    );
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=movements', {
+      movements: ledger,
+    });
+
+    expect(
+      await screen.findByText('Showing 1–25 of the 100 movements loaded so far'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more movements' }));
+
+    expect(await screen.findByText('Showing 1–25 of 130')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more movements' })).not.toBeInTheDocument();
+    expect(
+      requests
+        .filter((request: RecordedRequest) => request.url.startsWith('/inventory/movements'))
+        .map((request: RecordedRequest) => request.url),
+    ).toEqual([
+      `/inventory/movements?store_id=${NMS.id}&limit=100`,
+      `/inventory/movements?store_id=${NMS.id}&limit=100&offset=100`,
+    ]);
+  });
+
+  it('asks the server for one kind of movement', async () => {
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=movements&reason=adjustment');
+
+    expect(await screen.findByText('No adjustment entries')).toBeInTheDocument();
+    expect(
+      requests.find((request: RecordedRequest) => request.url.startsWith('/inventory/movements'))
+        ?.url,
+    ).toBe(`/inventory/movements?store_id=${NMS.id}&reason=adjustment&limit=100`);
   });
 
   it('asks the server for the period chosen', async () => {
@@ -316,6 +433,118 @@ describe('Warehouse stock', () => {
     });
   });
 
+  it('edits a batch: its number, expiry and quantity, with why', async () => {
+    const user = userEvent.setup();
+    const saved = aStockBatch({ id: 'b-late', batch_number: 'FC2-2502-119', on_hand: 590 });
+    const { requests } = renderStock(
+      '/warehouse/stock?store=NMS&view=batches',
+      {},
+      {
+        'PATCH /inventory/batches/b-late': { status: 200, body: { success: true, data: saved } },
+      },
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for batch FC2-2502-118' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Edit batch…',
+      'Adjust stock…',
+      'Delete batch…',
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: 'Edit batch…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit batch FC2-2502-118' });
+    const number = within(dialog).getByLabelText('Batch number');
+    expect(number).toHaveValue('FC2-2502-118');
+    expect(within(dialog).getByLabelText('Expiry date')).toHaveValue('2028-06-30');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    expect(within(dialog).getByText(/^Nothing has changed yet/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Say why the batch is changing.')).toBeInTheDocument();
+
+    // A number held under another expiry date is refused before it is sent.
+    await user.clear(number);
+    await user.type(number, 'FC2-2405-002');
+    expect(
+      within(dialog).getByText(/^Batch FC2-2405-002 is already held with expiry/),
+    ).toBeInTheDocument();
+
+    await user.clear(number);
+    await user.type(number, 'FC2-2502-119');
+    const quantity = within(dialog).getByLabelText('Quantity on hand');
+    await user.clear(quantity);
+    await user.type(quantity, '590');
+    expect(within(dialog).getByText('Was 600: −10 box.')).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText('Why'), 'Mistyped when registered');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => {
+      expect(requests.find((request: RecordedRequest) => request.method === 'PATCH')).toMatchObject(
+        {
+          url: '/inventory/batches/b-late',
+          body: {
+            batch_number: 'FC2-2502-119',
+            expiry_date: '2028-06-30',
+            on_hand: 590,
+            note: 'Mistyped when registered',
+          },
+        },
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('deletes a batch nothing has left as if it was never registered', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=batches');
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for batch FC2-2502-118' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete batch…' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete batch FC2-2502-118?' });
+    expect(dialog).toHaveTextContent(
+      /as if it was never registered: 600 box of Engabu Free Female/,
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Delete batch' }));
+    await waitFor(() => {
+      expect(
+        requests.find((request: RecordedRequest) => request.method === 'DELETE'),
+      ).toMatchObject({
+        url: '/inventory/batches/b-late',
+      });
+    });
+  });
+
+  it('writes off what is left of a batch stock has gone out of, with the reason', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=batches', {
+      batches: BATCHES.map((batch) =>
+        batch.id === 'b-none' ? { ...batch, untouched: false } : batch,
+      ),
+    });
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Actions for batch No batch number' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Delete batch…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this stock' });
+    expect(dialog).toHaveTextContent(/so it can't be erased and its history stays/);
+    const submit = within(dialog).getByRole('button', { name: 'Write off 210 box' });
+    await user.click(submit);
+    expect(within(dialog).getByText('Choose why the stock is leaving.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Say what happened to it.')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('radio', { name: /Lost/ }));
+    await user.type(within(dialog).getByLabelText('What happened'), 'Not found at the count');
+    await user.click(submit);
+    await waitFor(() => {
+      const posted = requests.find((request: RecordedRequest) => request.method === 'POST');
+      expect(posted).toMatchObject({
+        url: '/inventory/movements',
+        body: { reason: 'adjustment', quantity: -210, note: 'Lost: Not found at the count' },
+      });
+      expect(posted?.body).not.toHaveProperty('batch_number');
+    });
+    expect(requests.some((request: RecordedRequest) => request.method === 'DELETE')).toBe(false);
+  });
+
   it('says when the store holds nothing, and offers to register stock', async () => {
     renderStock('/warehouse/stock?store=NMS', {
       balances: [],
@@ -327,6 +556,69 @@ describe('Warehouse stock', () => {
     expect(card('On hand')).toHaveTextContent(/^On hand0/);
     expect(card('Expired')).toHaveTextContent('NoneNothing past its expiry date');
     expect(screen.getAllByRole('button', { name: 'Register stock' })).toHaveLength(2);
+  });
+
+  it('shows an empty summary when there is no stock or order activity', async () => {
+    renderStock('/warehouse/stock?store=NMS', {
+      balances: [],
+      batches: [],
+      movements: [],
+      summary: aStoreSummary({
+        products: [],
+        orders: {
+          to_decide: 0,
+          waiting_for_stock: 0,
+          to_dispatch: 0,
+          in_transit: 0,
+          dispatched: 0,
+          rejected: 0,
+          dispatched_in_full: 0,
+          districts_supplied: 0,
+          received_short: 0,
+          median_days_to_dispatch: null,
+        },
+      }),
+    });
+
+    expect(await screen.findByText('No stock data at NMS yet')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing to check yet')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load NMS stock')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  });
+
+  it.each([403, 500])('distinguishes a %s response from empty stock', async (status) => {
+    const api = warehouseOrderApi({});
+    renderApp(<AppUnderTest />, {
+      route: '/warehouse/stock?store=NMS',
+      signedIn: true,
+      replies: [
+        (request) =>
+          request.url.startsWith('/inventory/store-summary')
+            ? {
+                status,
+                body: {
+                  success: false,
+                  message:
+                    status === 403 ? 'this store is outside your assignment' : 'Server error',
+                },
+              }
+            : api(request),
+      ],
+    });
+
+    if (status === 403) {
+      expect(await screen.findByText('NMS stock is unavailable')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Ask an administrator to check your store assignment/),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Register stock' })).not.toBeInTheDocument();
+      expect(screen.queryByText('No stock held at NMS')).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByText('Could not load NMS stock')).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
+    }
+    expect(screen.queryByText('No stock data at NMS yet')).not.toBeInTheDocument();
   });
 });
 
@@ -353,7 +645,7 @@ describe('Registering stock', () => {
     await within(sheet).findByRole('combobox', { name: 'Product' });
     await user.click(within(sheet).getByRole('button', { name: 'Register stock' }));
     expect(within(sheet).getByText('Choose the product.')).toBeInTheDocument();
-    expect(within(sheet).getByText('Enter the batch number on the carton.')).toBeInTheDocument();
+    expect(within(sheet).getByText('Enter the batch number on the packaging.')).toBeInTheDocument();
     expect(requests.some((request) => request.method === 'POST')).toBe(false);
 
     await user.click(within(sheet).getByRole('combobox', { name: 'Product' }));
@@ -489,5 +781,31 @@ describe('Warehouse dashboard', () => {
       'href',
       '/warehouse/stock?band=expired&store=NMS',
     );
+  });
+
+  it('says when nothing from the picked district needs doing, and keeps the badge store-wide', async () => {
+    renderApp(<AppUnderTest />, {
+      route: '/warehouse?store=NMS&district=Kotido',
+      signedIn: true,
+      replies: [
+        warehouseOrderApi({
+          orders: [
+            aWarehouseOrder({ id: 'o-gulu', ordered_for_store_id: 'store-gulu' }),
+            aWarehouseOrder({
+              id: 'o-mukono',
+              ordered_for_store_id: 'store-mukono',
+              order_status: 'confirmed',
+              quantity_approved: 300,
+            }),
+          ],
+        }),
+      ],
+    });
+
+    expect(await screen.findByText('Nothing from Kotido needs you right now')).toBeInTheDocument();
+    expect(screen.getByText('New orders from Kotido will appear here.')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(sidebarLink(/District requests/)).toHaveTextContent('2');
+    });
   });
 });

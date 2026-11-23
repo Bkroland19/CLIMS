@@ -1,3 +1,4 @@
+import { Radio } from '@/components/ui/radio';
 import { useId, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -78,8 +79,7 @@ export function RadioCardGroup<Value extends string>({
                 'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60',
               )}
             >
-              <input
-                type="radio"
+              <Radio
                 name={name}
                 value={option.value}
                 checked={value === option.value}

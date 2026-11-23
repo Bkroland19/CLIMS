@@ -276,4 +276,29 @@ func testCatalogue(t *testing.T, pool *pgxpool.Pool, request func(string, string
 	if inactiveBrands := list("/catalogue/brands?active=false", admin); len(inactiveBrands) != 0 {
 		t.Fatalf("unexpected inactive brands: %v", inactiveBrands)
 	}
+
+	// Single pieces need no pack-size input, including when changing from packaged stock.
+	for _, name := range []string{"Piece", "PIECES"} {
+		pieceUnit := data(request("POST", "/catalogue/units", map[string]any{"name": name}, admin, 201))["id"].(string)
+		input := valid(map[string]any{"unit_id": pieceUnit})
+		delete(input, "pieces_per_unit")
+		piece := data(request("POST", "/catalogue/products", input, admin, 201))
+		if piece["pieces_per_unit"] != float64(1) {
+			t.Fatalf("%s without a count should be one condom: %v", name, piece)
+		}
+		piecePath := "/catalogue/products/" + piece["id"].(string)
+		request("PATCH", piecePath, map[string]any{"unit_id": unitID, "pieces_per_unit": 12}, admin, 200)
+		changed := data(request("PATCH", piecePath, map[string]any{"unit_id": pieceUnit}, admin, 200))
+		if changed["pieces_per_unit"] != float64(1) {
+			t.Fatalf("piece inherited the old pack size: %v", changed)
+		}
+		expectFields("piece cannot contain several condoms", request("PATCH", piecePath,
+			map[string]any{"pieces_per_unit": 3}, admin, 422),
+			map[string]string{"pieces_per_unit": "A piece is one condom. Omit the count or use 1."})
+		request("DELETE", piecePath, nil, admin, 200)
+	}
+	missingPack := valid(nil)
+	delete(missingPack, "pieces_per_unit")
+	expectFields("pack size is still required", request("POST", "/catalogue/products", missingPack, admin, 422),
+		map[string]string{"pieces_per_unit": "Enter how many condoms one unit holds."})
 }

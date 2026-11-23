@@ -61,6 +61,11 @@ const batchSchema = z.object({
   band: z.enum(BANDS),
   on_hand: count,
   created_at: z.string(),
+  /**
+   * Nothing has left the batch or come into it through an order. Deleting it erases it as if it
+   * was never registered; otherwise what is left is written off and the history stays.
+   */
+  untouched: z.boolean(),
 });
 
 export type StockBatch = z.infer<typeof batchSchema>;
@@ -113,6 +118,7 @@ export const MOVEMENT_REASONS = [
   'adjustment',
   'dispatch',
   'order_receipt',
+  'hotspot_delivery',
 ] as const;
 export type MovementReason = (typeof MOVEMENT_REASONS)[number];
 
@@ -140,14 +146,22 @@ const movementSchema = z.object({
 
 export type Movement = z.infer<typeof movementSchema>;
 
-/** The store's ledger, newest first. */
+/** The most entries the API returns at once. */
+export const MOVEMENTS_PAGE_SIZE = 100;
+
+/** The store's ledger, newest first, one page of it (`offset` skips the newest entries). */
 export async function listMovements(
   http: HttpClient,
-  filter: { storeId?: string; limit?: number },
+  filter: { storeId?: string; limit?: number; offset?: number; reason?: MovementReason },
   signal?: AbortSignal,
 ): Promise<Movement[]> {
   const body = await http.get(
-    `/inventory/movements${query({ store_id: filter.storeId, limit: String(filter.limit ?? 100) })}`,
+    `/inventory/movements${query({
+      store_id: filter.storeId,
+      reason: filter.reason,
+      limit: String(filter.limit ?? MOVEMENTS_PAGE_SIZE),
+      offset: filter.offset ? String(filter.offset) : undefined,
+    })}`,
     { signal },
   );
   return parseList(movementSchema, body, 'stock movements');
@@ -175,6 +189,38 @@ export async function recordMovement(http: HttpClient, input: MovementInput): Pr
     await http.post('/inventory/movements', input),
     'stock movement',
   );
+}
+
+/** A batch as it should be, and why it changed. */
+export interface BatchEditInput {
+  batch_number: string;
+  /** YYYY-MM-DD; a past date is allowed, since a correction can find the stock expired. */
+  expiry_date: string;
+  /** At least 1; deleting the batch removes all of it. */
+  on_hand: number;
+  note: string;
+}
+
+/**
+ * Corrects a batch's number, expiry date and quantity. Renamed to a batch the store already holds,
+ * the two become one, so the batch returned can have another id. A new quantity corrects the
+ * registration of an untouched batch registered once, and is an adjustment otherwise.
+ */
+export async function editBatch(
+  http: HttpClient,
+  id: string,
+  input: BatchEditInput,
+): Promise<StockBatch> {
+  return parseBody(
+    batchSchema,
+    await http.patch(`/inventory/batches/${encodeURIComponent(id)}`, input),
+    'batch',
+  );
+}
+
+/** Erases an untouched batch as if it was never registered (409 once stock has left it). */
+export async function deleteBatch(http: HttpClient, id: string): Promise<void> {
+  await http.delete(`/inventory/batches/${encodeURIComponent(id)}`);
 }
 
 /** One batch of a delivery, as printed on its cartons. */

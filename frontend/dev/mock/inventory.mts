@@ -5,15 +5,22 @@
  *
  * - `GET /inventory/stock?store_id=&condom_id=`: balances, with reserved and available.
  * - `GET /inventory/batches?store_id=&condom_id=`: batches with stock, first expiry first out.
- * - `GET /inventory/movements?store_id=` and `POST /inventory/movements`: the ledger, and a
- *   delivery (`receipt`) into a batch or an `adjustment` of one, with a note.
+ * - `GET /inventory/movements?store_id=&reason=&limit=&offset=` and `POST /inventory/movements`:
+ *   the ledger, newest first and paged like the API (at most 100 at a time), and a delivery
+ *   (`receipt`) into a batch or an `adjustment` of one, with a note.
  * - `POST /inventory/receipts`: a whole delivery, every batch or none.
+ * - `PATCH /inventory/batches/{id}` and `DELETE /inventory/batches/{id}`: correct a batch's number,
+ *   expiry and quantity, or erase an untouched batch as if it was never registered.
  * - `GET /inventory/store-summary?store_id=&from=&to=`: one store at a glance, its orders read
  *   from the order mock (`dcfp.mts`) through the router.
  *
  * The order mock (`dcfp.mts`) reserves, dispatches and receives through the functions exported
  * here, so a dispatch takes stock from the warehouse's batches and the district's receipt adds
  * it to batches there. Dates are relative to today, so the shelf-life bands stay meaningful.
+ *
+ * `MOCK_DATA=scale` adds a warehouse's worth of volume at NMS on top of the demo: about 250
+ * products in three units, around a thousand batches across every shelf-life band, and a year of
+ * movements, so the stock screens can be checked at the size a national store reaches.
  */
 import { mockProductId, mockUnitId } from './admin.mts';
 import { MOCK_STORES, mockDistrictStoreId } from './hotspots.mts';
@@ -81,6 +88,8 @@ export interface Movement {
   batch_number: string | null;
   expiry_date: string | null;
   created_at: string;
+  /** The batch a receipt or adjustment changed; not part of the API's reply. */
+  stock_batch_id: string | null;
 }
 
 const ACTOR = '00000000-0000-4000-8002-000000000009';
@@ -156,6 +165,7 @@ export function seedInventory(dataset: string): void {
     );
     entry.on_hand_after = running.get(key) ?? b.on_hand;
   }
+  if (dataset === 'scale') seedVolume();
   if (dataset === 'worst') {
     state.batches.push(
       batch(
@@ -169,6 +179,107 @@ export function seedInventory(dataset: string): void {
       ),
     );
   }
+}
+
+/** A repeatable sequence of numbers in [0, 1), so the volume data is the same on every start. */
+function sequence(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 1_664_525 + 1_013_904_223) % 4_294_967_296;
+    return state / 4_294_967_296;
+  };
+}
+
+const VOLUME_BRANDS = ['Engabu', 'Lifeguard', 'Protector', 'Trust', 'Panther', 'Kinga', 'Salama'];
+const VOLUME_KINDS = ['Free', 'Studded', 'Ribbed', 'Ultra thin', 'Large', 'Flavoured'];
+
+/** NMS at national scale: many products, about a thousand batches, a year of movements. */
+function seedVolume(): void {
+  const random = sequence(20_261_123);
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T;
+  // Every band, weighted the way a real store's shelf looks: mostly healthy, some at risk.
+  const expiries = [
+    () => day(-Math.ceil(random() * 90)),
+    () => day(Math.ceil(random() * 28)),
+    () => day(30 + Math.ceil(random() * 55)),
+    () => day(92 + Math.ceil(random() * 85)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => null,
+  ];
+  let n = 1000;
+  for (let product = 0; product < 250; product += 1) {
+    const index = 1000 + product;
+    const category = product % 3 === 2 ? 'female' : 'male';
+    PRODUCTS[mockProductId(index)] = {
+      name: `${VOLUME_BRANDS[product % VOLUME_BRANDS.length] ?? 'Engabu'} ${
+        VOLUME_KINDS[Math.floor(product / VOLUME_BRANDS.length) % VOLUME_KINDS.length] ?? 'Free'
+      } ${category === 'female' ? 'Female' : 'Male'} ${String(product + 1).padStart(3, '0')}`,
+      category,
+    };
+    const unit = 1 + (product % 3);
+    const size = unit === 1 ? 5_000 : unit === 2 ? 400 : 20;
+    const batches = 1 + Math.floor(random() * 7);
+    for (let k = 0; k < batches; k += 1) {
+      n += 1;
+      const expiry = pick(expiries)();
+      const quantity = Math.ceil(random() * 40) * size;
+      const held = batch(
+        n,
+        NMS,
+        index,
+        unit,
+        expiry === null && random() < 0.5
+          ? null
+          : `V${String(index)}-${String(k + 1).padStart(2, '0')}`,
+        expiry,
+        quantity,
+      );
+      held.created_at = new Date(Date.now() - Math.ceil(random() * 360) * DAY).toISOString();
+      state.batches.push(held);
+      log(
+        NMS,
+        held.condom_id,
+        held.unit_of_measure_id,
+        'receipt',
+        quantity,
+        {
+          note: 'Delivery from the supplier',
+          batch: held,
+        },
+        held.created_at,
+      );
+      // Some of each batch has already gone out to districts.
+      const dispatches = Math.floor(random() * 3);
+      for (let d = 0; d < dispatches; d += 1) {
+        // Never in the future: a batch registered last week has had at most a week of dispatches.
+        const at = new Date(
+          Math.min(
+            new Date(held.created_at).getTime() + Math.ceil(random() * 20) * DAY,
+            Date.now() - (d + 1) * 3_600_000,
+          ),
+        ).toISOString();
+        const out = Math.min(size * Math.ceil(random() * 4), held.on_hand - size);
+        if (out <= 0) continue;
+        held.on_hand -= out;
+        log(
+          NMS,
+          held.condom_id,
+          held.unit_of_measure_id,
+          'dispatch',
+          -out,
+          {
+            note: 'Dispatched to a district store',
+            batch: held,
+          },
+          at,
+        );
+      }
+    }
+  }
+  state.movements.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 function onHandOf(storeId: string, condomId: string, unitId: string): number {
@@ -202,6 +313,7 @@ export function log(
     batch_number: extra.batch?.batch_number ?? null,
     expiry_date: extra.batch?.expiry_date ?? null,
     created_at: at,
+    stock_batch_id: extra.batch?.id ?? null,
   };
   state.movements.unshift(entry);
   return entry;
@@ -245,7 +357,24 @@ function present(b: Batch) {
     band: bandOf(b.expiry_date),
     on_hand: b.on_hand,
     created_at: b.created_at,
+    untouched: untouched(b),
   };
+}
+
+/**
+ * The ledger entries that name a batch, as the Go API keeps them: its receipts and adjustments.
+ * Order steps never name a batch there, so one logged here with a batch is left out.
+ */
+function entriesOf(b: Batch): Movement[] {
+  return state.movements.filter(
+    (m) => m.stock_batch_id === b.id && (m.reason === 'receipt' || m.reason === 'adjustment'),
+  );
+}
+
+/** Like the Go API: the batch holds exactly what its own entries add up to. */
+function untouched(b: Batch): boolean {
+  const entries = entriesOf(b);
+  return entries.length > 0 && entries.reduce((sum, m) => sum + m.quantity, 0) === b.on_hand;
 }
 
 /** First expiry first out: earliest expiry first, unknown expiry last, then oldest first. */
@@ -395,8 +524,11 @@ function balances(query: URLSearchParams) {
 }
 
 function presentMovement(m: Movement) {
+  // The batch link is internal; the API names a batch by number and expiry.
+  const reply: Partial<Movement> = { ...m };
+  delete reply.stock_batch_id;
   return {
-    ...m,
+    ...reply,
     store_name: storeOf(m.store_id)?.name ?? 'Store',
     product: PRODUCTS[m.condom_id]?.name ?? 'Condoms',
     unit: UNIT_NAMES[m.unit_of_measure_id] ?? 'Unit',
@@ -644,6 +776,107 @@ function storeSummary(query: URLSearchParams, orders: readonly SummaryOrder[]): 
   });
 }
 
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const RESERVED =
+  "open orders have reserved this product's stock here, and this would leave less on hand than they need";
+
+/** Like the Go API: corrects a batch's number, expiry and quantity, merging into a batch it now names. */
+function editBatch(batchId: string, body: Record<string, unknown>): Reply {
+  const number = text(body.batch_number);
+  const expiry = text(body.expiry_date);
+  const note = text(body.note);
+  const onHand = body.on_hand;
+  if (!number || !expiry) return fail(422, 'batch_number and expiry_date are required');
+  if (!DATE.test(expiry)) return fail(422, 'expiry_date must be a YYYY-MM-DD date');
+  if (typeof onHand !== 'number' || !Number.isInteger(onHand) || onHand < 1) {
+    return fail(
+      422,
+      'on_hand must be between 1 and 1,000,000,000; delete the batch to remove all of it',
+    );
+  }
+  if (!note) return fail(422, 'a note saying why the batch is being changed is required');
+  const found = state.batches.find((b) => b.id === batchId);
+  if (!found) return fail(404, 'batch not found');
+  if (found.on_hand === 0) return fail(409, 'this batch holds no stock');
+  const delta = onHand - found.on_hand;
+  if (found.batch_number === number && found.expiry_date === expiry && delta === 0) {
+    return fail(
+      422,
+      'nothing to change: the batch already has this number, expiry date and quantity',
+    );
+  }
+  const reserved =
+    state.reserved.get(keyOf(found.store_id, found.condom_id, found.unit_of_measure_id)) ?? 0;
+  if (onHandOf(found.store_id, found.condom_id, found.unit_of_measure_id) + delta < reserved) {
+    return fail(409, RESERVED);
+  }
+  const same = (b: Batch) =>
+    b.id !== found.id &&
+    b.store_id === found.store_id &&
+    b.condom_id === found.condom_id &&
+    b.unit_of_measure_id === found.unit_of_measure_id &&
+    b.batch_number === number;
+  if (state.batches.some((b) => same(b) && b.expiry_date !== expiry && b.on_hand > 0)) {
+    return fail(422, 'this batch number is already held with another expiry date');
+  }
+  const entries = entriesOf(found);
+  const receipt = untouched(found) && entries.length === 1 ? entries[0] : undefined;
+  let result = found;
+  const target = state.batches.find((b) => same(b) && b.expiry_date === expiry);
+  if (target) {
+    target.on_hand += found.on_hand;
+    for (const m of state.movements)
+      if (m.stock_batch_id === found.id) m.stock_batch_id = target.id;
+    state.batches = state.batches.filter((b) => b.id !== found.id);
+    result = target;
+  } else {
+    found.batch_number = number;
+    found.expiry_date = expiry;
+  }
+  for (const m of state.movements.filter((m) => m.stock_batch_id === result.id)) {
+    m.batch_number = number;
+    m.expiry_date = expiry;
+  }
+  if (delta !== 0) {
+    result.on_hand += delta;
+    if (receipt && !target) {
+      receipt.quantity += delta;
+      receipt.on_hand_after += delta;
+    } else {
+      log(found.store_id, found.condom_id, found.unit_of_measure_id, 'adjustment', delta, {
+        note: `Edited: ${note}`,
+        batch: result,
+      });
+    }
+  }
+  return ok(present(result));
+}
+
+/** Like the Go API: erases an untouched batch with its ledger entries. */
+function deleteBatch(batchId: string): Reply {
+  const found = state.batches.find((b) => b.id === batchId);
+  if (!found) return fail(404, 'batch not found');
+  if (found.on_hand === 0) return fail(409, 'this batch holds no stock');
+  if (!untouched(found)) {
+    return fail(
+      409,
+      'stock has already left this batch or arrived in it through an order, so it cannot be deleted; write off what is left instead',
+    );
+  }
+  const reserved =
+    state.reserved.get(keyOf(found.store_id, found.condom_id, found.unit_of_measure_id)) ?? 0;
+  if (
+    onHandOf(found.store_id, found.condom_id, found.unit_of_measure_id) - found.on_hand <
+    reserved
+  ) {
+    return fail(409, RESERVED);
+  }
+  const erased = new Set(entriesOf(found));
+  state.movements = state.movements.filter((m) => !erased.has(m));
+  state.batches = state.batches.filter((b) => b.id !== found.id);
+  return ok(null);
+}
+
 /** Answers `/inventory/…`, or returns null for any other path. */
 export function handleInventory(
   method: string,
@@ -652,19 +885,25 @@ export function handleInventory(
   body: Record<string, unknown> = {},
   orders: () => readonly SummaryOrder[] = () => [],
 ): Reply | null {
-  const [resource, target] = parts;
+  const [resource, target, batchId] = parts;
   if (resource !== 'inventory') return null;
+  if (target === 'batches' && batchId) {
+    if (method === 'PATCH') return editBatch(batchId, body);
+    if (method === 'DELETE') return deleteBatch(batchId);
+  }
   if (method === 'POST' && target === 'receipts') return receive(body);
   if (method === 'GET' && target === 'store-summary') return storeSummary(query, orders());
   if (target === 'movements') {
     if (method === 'POST') return record(body);
     if (method === 'GET') {
       const storeId = query.get('store_id');
+      const reason = query.get('reason');
       const limit = Math.min(Number(query.get('limit') ?? 50) || 50, 100);
+      const offset = Math.max(Number(query.get('offset') ?? 0) || 0, 0);
       return ok(
         state.movements
-          .filter((m) => !storeId || m.store_id === storeId)
-          .slice(0, limit)
+          .filter((m) => (!storeId || m.store_id === storeId) && (!reason || m.reason === reason))
+          .slice(offset, offset + limit)
           .map(presentMovement),
       );
     }

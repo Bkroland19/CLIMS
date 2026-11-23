@@ -85,6 +85,7 @@ export default function ProductsPage() {
     () => [
       {
         id: 'brand',
+        filter: 'select',
         header: 'Brand',
         value: (product) => product.brand?.name ?? null,
         cell: (product) => (
@@ -98,15 +99,22 @@ export default function ProductsPage() {
       },
       {
         id: 'category',
+        filter: 'select',
         header: 'Category',
         value: (product) => (product.category ? categoryLabel(product.category) : null),
       },
       {
         id: 'type',
+        filter: 'select',
         header: 'Type',
         value: (product) => product.type?.name ?? null,
       },
-      { id: 'unit', header: 'Unit', value: (product) => product.unit?.name ?? null },
+      {
+        id: 'unit',
+        filter: 'select',
+        header: 'Unit',
+        value: (product) => product.unit?.name ?? null,
+      },
       {
         id: 'per',
         header: 'Condoms per unit',
@@ -117,6 +125,7 @@ export default function ProductsPage() {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (product) =>
           [product.active ? 'Active' : 'Inactive', isComplete(product) ? null : 'Incomplete']
@@ -165,16 +174,14 @@ export default function ProductsPage() {
         },
       });
     }
-    if (!product.in_use) {
-      actions.push(ROW_ACTION_SEPARATOR, {
-        label: 'Delete',
-        icon: Trash2,
-        destructive: true,
-        onSelect: () => {
-          setProductToDelete(product);
-        },
-      });
-    }
+    actions.push(ROW_ACTION_SEPARATOR, {
+      label: 'Delete',
+      icon: Trash2,
+      destructive: true,
+      onSelect: () => {
+        setProductToDelete(product);
+      },
+    });
     return actions;
   }
 
@@ -221,6 +228,7 @@ export default function ProductsPage() {
       />
       <DataTable
         label="Products"
+        preferencesKey="catalogue-products"
         columns={columns}
         rows={rows}
         getRowId={(product) => product.id}
@@ -278,7 +286,7 @@ export default function ProductsPage() {
           deleteProduct.reset();
         }}
         title={productToDelete ? `Delete ${productName(productToDelete)}?` : 'Delete product?'}
-        description="It is removed from the catalogue for good. This cannot be undone."
+        description="This permanently removes the product from the catalogue. Products linked to stock or order records cannot be deleted; deactivate them instead."
         confirmLabel="Delete product"
         isPending={deleteProduct.isPending}
         error={deleteProduct.error}

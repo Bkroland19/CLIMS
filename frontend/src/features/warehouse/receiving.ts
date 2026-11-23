@@ -1,3 +1,5 @@
+import { isCalendarDate } from '@/lib/validation';
+
 /*
  * A delivery into a warehouse, batch by batch (docs/modules/inventory.md#batches-and-expiry). Each
  * batch is recorded as a receipt into the batch it names; stock leaves first expiry first out, so
@@ -36,10 +38,10 @@ export function checkDelivery(
   if (!fields.productId) errors.productId = 'Choose the product.';
   if (!fields.unitId) errors.unitId = 'Choose the unit it was counted in.';
   const number = fields.batchNumber.trim();
-  if (!number) errors.batchNumber = 'Enter the batch number on the carton.';
+  if (!number) errors.batchNumber = 'Enter the batch number on the packaging.';
   else if (number.length > 60) errors.batchNumber = 'Batch numbers are at most 60 characters.';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fields.expiryDate)) {
-    errors.expiryDate = 'Enter the expiry date printed on the carton.';
+  if (!isCalendarDate(fields.expiryDate)) {
+    errors.expiryDate = 'Enter the expiry date printed on the packaging.';
   } else if (fields.expiryDate <= today) {
     errors.expiryDate = 'This batch has expired. Expired stock cannot be registered for issue.';
   }
@@ -47,6 +49,8 @@ export function checkDelivery(
   const quantity = /^\d+$/.test(trimmed) ? Number(trimmed) : null;
   if (quantity === null || quantity < 1 || !Number.isSafeInteger(quantity)) {
     errors.quantity = 'Enter how many, as a whole number.';
+  } else if (quantity > 1_000_000_000) {
+    errors.quantity = 'Enter at most 1,000,000,000 units per batch.';
   }
   const shortShelf = !errors.expiryDate && fields.expiryDate < addMonths(today, SHORT_SHELF_MONTHS);
   return { errors, quantity: errors.quantity ? null : quantity, shortShelf };

@@ -64,6 +64,17 @@ describe('requestSteps', () => {
       ['Order received', 'Rejected'],
     );
   });
+
+  it('skips the decision and the reservation for stock sent without an order', () => {
+    const sent = aWarehouseOrder({ order_status: 'dispatched', unrequested: true });
+    expect(requestSteps(sent).map((s) => [s.label, s.state])).toEqual([
+      ['Sent without an order', 'done'],
+      ['District receipt', 'current'],
+    ]);
+    expect(requestBanner(sent, 'Wakiso', 'Female condoms', quantity).body).toMatch(
+      /^Sent without an order from Wakiso\./,
+    );
+  });
 });
 
 describe('requestBanner', () => {

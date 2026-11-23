@@ -32,7 +32,7 @@ const geography = {
 const ok = (data: unknown) => ({ status: 200, body: { success: true, data } });
 
 describe('StoresPage', () => {
-  it('lists national warehouses and district stores with their stock and flags', async () => {
+  it('lists national warehouses and district stores with live stock in separate units', async () => {
     renderApp(<StoresPage />, {
       signedIn: true,
       replies: [
@@ -41,13 +41,16 @@ describe('StoresPage', () => {
             id: 'store-nms',
             name: 'NMS · Entebbe',
             kind: 'national',
-            organisation: 'National Medical Stores',
             region: 'Central',
             district: 'Wakiso',
             code: 'nms',
             user_count: 1,
-            on_hand: { male: 2_960_000, female: 118_000 },
-            needs_confirmation: true,
+            on_hand: [
+              { category: 'male', unit_id: 'box', unit: 'boxes', quantity: 20 },
+              { category: 'male', unit_id: 'piece', unit: 'pieces', quantity: 100 },
+              { category: 'female', unit_id: 'piece', unit: 'pieces', quantity: 118_000 },
+              { category: null, unit_id: 'piece', unit: 'pieces', quantity: 7 },
+            ],
           },
         ]),
       ],
@@ -55,14 +58,46 @@ describe('StoresPage', () => {
 
     const row = (await screen.findByText('NMS · Entebbe')).closest('tr');
     if (!row) throw new Error('NMS has no table row');
-    expect(within(row).getByText('Confirm with data team')).toBeInTheDocument();
-    expect(within(row).getByText('2,960,000 / 118,000')).toBeInTheDocument();
-    expect(screen.getByText('Sample data')).toBeInTheDocument();
+    expect(within(row).getByText('Male: 20 boxes')).toBeInTheDocument();
+    expect(within(row).getByText('Male: 100 pieces')).toBeInTheDocument();
+    expect(within(row).getByText('Female: 118,000 pieces')).toBeInTheDocument();
+    expect(within(row).getByText('Unclassified: 7 pieces')).toBeInTheDocument();
+    expect(screen.queryByText('Sample data')).not.toBeInTheDocument();
   });
 
   it('says so when there are no stores', async () => {
     renderApp(<StoresPage />, { signedIn: true, replies: [ok([])] });
     expect(await screen.findByText('No stores yet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps stores with no stock visible', async () => {
+    renderApp(<StoresPage />, {
+      signedIn: true,
+      replies: [
+        ok([
+          {
+            id: 'store-wakiso',
+            name: 'Wakiso district store',
+            kind: 'district',
+            region: 'Central',
+            district: 'Wakiso',
+            code: 'wakiso',
+            user_count: 0,
+            on_hand: [],
+          },
+        ]),
+      ],
+    });
+    expect(await screen.findByText('Wakiso district store')).toBeInTheDocument();
+    expect(screen.getByText('No stock')).toBeInTheDocument();
+    expect(screen.queryByText('No stores yet')).not.toBeInTheDocument();
+  });
+
+  it.each([403, 500])('does not disguise a %s response as an empty list', async (status) => {
+    renderApp(<StoresPage />, { signedIn: true, replies: [{ status, body: {} }] });
+    expect(await screen.findByText('Could not load stores')).toBeInTheDocument();
+    expect(screen.queryByText('No stores yet')).not.toBeInTheDocument();
   });
 });
 

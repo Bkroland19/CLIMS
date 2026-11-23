@@ -325,7 +325,15 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Stockouts',
                 title: 'Stockout notifications',
                 description:
-                  'Hotspots in your district that have run out, with their message and who to call. Order stock from NMS or JMS when it is needed.',
+                  'Hotspots that have run out. Dispatch from your district store, or order more stock from NMS or JMS.',
+                layout: 'table',
+              },
+              {
+                path: '/dcfp/stockouts/dispatch',
+                tab: 'Dispatch',
+                title: 'Dispatch to hotspots',
+                description:
+                  'Choose a hotspot request, send available district stock and follow receipt confirmations.',
                 layout: 'table',
               },
             ],
@@ -458,7 +466,7 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Stock',
                 title: 'Warehouse stock',
                 description:
-                  'What the warehouse holds, what went out and what is waiting; register stock here.',
+                  'What the warehouse holds, what went out and what is waiting; register stock, or dispatch it to a district before it orders.',
                 layout: 'table',
               },
             ],

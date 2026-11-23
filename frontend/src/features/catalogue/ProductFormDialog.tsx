@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 
 import { FormDialog } from '@/components/form/FormDialog';
 import { SelectField } from '@/components/form/SelectField';
@@ -20,7 +20,8 @@ import {
 import {
   PRODUCT_FIELDS,
   productDefaults,
-  productSchema,
+  isPieceUnit,
+  productSchemaForUnits,
   toProductInput,
   type ProductFormInput,
   type ProductFormOutput,
@@ -77,6 +78,11 @@ export function ProductFormDialog({
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const mutation = product ? updateProduct : createProduct;
+  const knownUnits: CatalogueRef[] = [...(units.data ?? [])];
+  if (product?.unit && !knownUnits.some((unit) => unit.id === product.unit?.id)) {
+    // The current unit remains usable while lookups load, including inactive units.
+    knownUnits.push(product.unit);
+  }
   const {
     control,
     register,
@@ -84,9 +90,11 @@ export function ProductFormDialog({
     setError,
     formState: { errors, isDirty },
   } = useForm<ProductFormInput, unknown, ProductFormOutput>({
-    resolver: zodResolver(productSchema),
+    resolver: zodResolver(productSchemaForUnits(knownUnits)),
     defaultValues: productDefaults(product),
   });
+  const unitId = useWatch({ control, name: 'unit_id' });
+  const pieceUnit = isPieceUnit(knownUnits.find((unit) => unit.id === unitId));
   const [formError, setFormError] = useState<string | null>(null);
 
   const onSubmit = handleSubmit((values) => {
@@ -203,15 +211,17 @@ export function ProductFormDialog({
           />
         )}
       />
-      <TextField
-        label="Condoms per unit"
-        required
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder="e.g. 144"
-        error={errors.pieces_per_unit?.message}
-        {...register('pieces_per_unit')}
-      />
+      {!pieceUnit ? (
+        <TextField
+          label="Condoms per unit"
+          required
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="e.g. 144"
+          error={errors.pieces_per_unit?.message}
+          {...register('pieces_per_unit')}
+        />
+      ) : null}
     </FormDialog>
   );
 }
