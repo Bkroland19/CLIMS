@@ -134,11 +134,13 @@ describe('AuditLogPage', () => {
     // A user record reads by its username; a record without a name by the start of its ID.
     expect(screen.getAllByText('User grace')).not.toHaveLength(0);
     expect(screen.getAllByText(`Hotspot ${HOTSPOT.slice(0, 8)}`)).not.toHaveLength(0);
-    expect(screen.getByText('2 entries')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1–2 of 2')).toBeInTheDocument();
     expect(screen.queryByText('Sample data')).not.toBeInTheDocument();
     expect(requests[0]?.url).toBe('/audit?exclude_domain=audit&limit=50');
 
-    await user.click(screen.getByText('sarah.namubiru'));
+    await user.click(
+      screen.getByRole('button', { name: /^Show details of hotspot activated at / }),
+    );
     const changes = screen.getByRole('table', { name: 'What changed: hotspot activated' });
     expect(within(changes).getByText('approved')).toBeInTheDocument();
     expect(screen.getAllByText('41.210.1.2 · Chrome on Android')[0]).toBeVisible();
@@ -189,12 +191,14 @@ describe('AuditLogPage', () => {
       ],
     });
 
-    expect(await screen.findByText('50+ entries')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(
+      await screen.findByText('Showing 1–25 of the 50 entries loaded so far'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more entries' }));
 
-    expect(await screen.findByText('51 entries')).toBeInTheDocument();
+    expect(await screen.findByText('Showing 1–25 of 51')).toBeInTheDocument();
     expect(query(requests.at(-1)).get('offset')).toBe('50');
-    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more entries' })).not.toBeInTheDocument();
   });
 
   it('clears the filters from the empty state', async () => {
