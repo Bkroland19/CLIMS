@@ -93,9 +93,17 @@ const STEPS_DONE: Partial<Record<OrderStatus, number>> = {
 /**
  * The order's progress for the step tracker. A held order is marked for attention on the
  * stock check, since it waits there until the warehouse has the stock. A rejected order stops
- * at the warehouse's decision, marked for attention, since it goes no further.
+ * at the warehouse's decision, marked for attention, since it goes no further. Stock the warehouse
+ * sent without an order has only the dispatch and the receipt.
  */
-export function orderSteps(status: OrderStatus): Step[] {
+export function orderSteps(status: OrderStatus, unrequested = false): Step[] {
+  // The warehouse sent this stock without an order: it arrives to be counted, nothing more.
+  if (unrequested) {
+    return [
+      { id: 'dispatched', label: 'Sent by the warehouse', state: 'done' },
+      { id: 'received', label: 'Received', state: status === 'received' ? 'done' : 'current' },
+    ];
+  }
   if (status === 'rejected') {
     return [
       { id: 'sent', label: 'Sent to warehouse', state: 'done' },

@@ -42,5 +42,7 @@ export const WAREHOUSE_PATHS = {
   stock: '/warehouse/stock',
   /** The stock page with the register-stock panel open. */
   register: '/warehouse/stock?register=1',
+  /** The stock page with the dispatch-to-district panel open. */
+  dispatch: '/warehouse/stock?dispatch=1',
   stockWithBand: (band: string) => `/warehouse/stock?band=${encodeURIComponent(band)}`,
 } as const;

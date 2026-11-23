@@ -5,6 +5,8 @@
  *   DCFPs; it is not an order.
  * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS,
  *   with no unit; the warehouse chooses the product and the order takes that product's unit.
+ * - `POST /orders/district-dispatches`: NMS or JMS sends free stock to a district store before it
+ *   orders, one dispatched order per product, all lines or none.
  * - `GET /orders`, `/orders/:id`, `/orders/:id/events`, and `POST /orders/:id/actions/{review,
  *   check-stock,reject,dispatch,receive}`: the warehouse approves, reserves and dispatches from
  *   the batches in `inventory.mts`, first expiry first out; the district's receipt adds to the
@@ -52,6 +54,8 @@ interface Order {
   vehicle_registration: string | null;
   driver_name: string | null;
   driver_phone: string | null;
+  /** Stock the warehouse sent without an order. */
+  unrequested: boolean;
   hot_spot_id: null;
   parent_order_id: null;
   rider_id: null;
@@ -176,6 +180,7 @@ function order(
     vehicle_registration: null,
     driver_name: null,
     driver_phone: null,
+    unrequested: false,
     hot_spot_id: null,
     parent_order_id: null,
     rider_id: null,
@@ -585,6 +590,122 @@ function dispatch(o: Order, body: Body): Reply {
   return ok(o);
 }
 
+const DISPATCH_FIELDS = new Set([
+  'warehouse_store_id',
+  'district_store_id',
+  'lines',
+  'note',
+  'expiry_exception_reason',
+  'waybill_number',
+  'vehicle_registration',
+  'driver_name',
+  'driver_phone',
+]);
+
+/**
+ * Like the Go API: free stock (unexpired, unreserved) goes to a district store before it orders,
+ * first expiry first out, as one dispatched order per line. Every line is checked before any
+ * stock moves, so the lines go together or not at all.
+ */
+function districtDispatch(body: Body): Reply {
+  if (Object.keys(body).some((key) => !DISPATCH_FIELDS.has(key))) {
+    return fail(400, 'invalid request body');
+  }
+  const warehouse = text(body.warehouse_store_id);
+  const district = text(body.district_store_id);
+  if (!NATIONAL.has(warehouse)) {
+    const message = 'warehouse_store_id must name a national warehouse (NMS or JMS)';
+    return fail(422, message, { warehouse_store_id: message });
+  }
+  if (!MOCK_STORES.some((store) => store.id === district && store.store_type === 'district')) {
+    const message = 'district_store_id must name a district store';
+    return fail(422, message, { district_store_id: message });
+  }
+  const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
+  if (lines.length < 1 || lines.length > 20) {
+    const message = 'a dispatch needs between 1 and 20 lines';
+    return fail(422, message, { lines: message });
+  }
+  const reason = text(body.expiry_exception_reason);
+  const planned = [];
+  for (const [index, line] of lines.entries()) {
+    const at = `line ${String(index + 1)}: `;
+    const product = text(line.condom_id);
+    const quantity = line.quantity;
+    const first = lines.findIndex((other) => text(other.condom_id) === product);
+    if (first < index) {
+      return fail(
+        422,
+        `${at}the product is already on line ${String(first + 1)}; put its whole quantity on one line`,
+      );
+    }
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) {
+      return fail(422, `${at}quantity must be a whole number from 1 to 10000000`);
+    }
+    const unit = PRODUCTS[product]?.unit;
+    if (!PRODUCTS[product]) return fail(422, `${at}condom_id does not name a product`);
+    if (!unit) {
+      return fail(
+        422,
+        `${at}the product chosen has no unit in the catalogue; give it one before sending it`,
+      );
+    }
+    if (reservableFor(warehouse, product, unit) < quantity) {
+      return fail(
+        409,
+        `${at}not enough free stock: on hand less reserved and expired stock does not cover it`,
+      );
+    }
+    const plan = planTake(warehouse, product, unit, quantity);
+    if (!plan)
+      return fail(409, `${at}not enough unexpired stock: expired batches cannot be issued`);
+    if (plan.nearExpiry && !reason) {
+      const message = `${at}stock expiring within one month needs expiry_exception_reason`;
+      return fail(422, message, { expiry_exception_reason: message });
+    }
+    planned.push({ product, unit, quantity, plan });
+  }
+  const created = planned.map(({ product, unit, quantity, plan }) => {
+    const sent = order(
+      (state.next += 1),
+      {
+        order_status: 'dispatched',
+        condom_id: product,
+        condom_category: categoryOf(product),
+        unit_of_measure_id: unit,
+        quantity_needed: quantity,
+        quantity_approved: quantity,
+        quantity_issued: quantity,
+        ordered_by_id: WAREHOUSE_STAFF,
+        handled_by_id: WAREHOUSE_STAFF,
+        ordered_for_store_id: district,
+        ordered_from_store_id: warehouse,
+        comment: text(body.note) || null,
+        waybill_number: text(body.waybill_number) || null,
+        vehicle_registration: text(body.vehicle_registration) || null,
+        driver_name: text(body.driver_name) || null,
+        driver_phone: text(body.driver_phone) || null,
+        unrequested: true,
+      },
+      0,
+    );
+    sent.updated_at = sent.created_at;
+    state.shipments.set(sent.id, take(plan.takes));
+    log(warehouse, product, unit, 'dispatch', -quantity, { orderId: sent.id });
+    state.orders.unshift(sent);
+    state.events.push({
+      id: `${sent.id}-e${String(state.events.length)}`,
+      order_id: sent.id,
+      actor_id: WAREHOUSE_STAFF,
+      action: 'dispatch',
+      status: 'dispatched',
+      created_at: sent.created_at,
+    });
+    return sent;
+  });
+  return ok(created, 201);
+}
+
 /** The district's batches are the ones shipped: a shortfall comes off the last of them. */
 function receiveIntoBatches(o: Order, counted: number): void {
   if (!o.condom_id || !o.unit_of_measure_id || counted <= 0) return;
@@ -705,6 +826,7 @@ export function handleDcfp(
     if (method === 'POST') return reportStockout(body);
   }
   if (target === 'warehouse-requests' && method === 'POST') return placeWarehouseOrder(body);
+  if (target === 'district-dispatches' && method === 'POST') return districtDispatch(body);
   const found = state.orders.find((candidate) => candidate.id === target);
   if (!found) return fail(404, 'order not found');
   if (method === 'GET' && segment === undefined) return ok(found);

@@ -142,10 +142,11 @@ func (r *Repository) storeSummary(ctx context.Context, storeID string, p period,
 	}
 	summary.Products = products
 
-	// Orders from district stores; hotspot alert orders and the removed generic orders are not the warehouse's.
+	// Orders from district stores; hotspot alert orders and the removed generic orders are not the warehouse's,
+	// and stock sent without an order answers no request (its quantity still counts as dispatched above).
 	o := &summary.Orders
 	err = r.db.QueryRow(ctx, `WITH placed AS (
-			SELECT * FROM orders WHERE ordered_from_store_id = $1 AND hot_spot_id IS NULL
+			SELECT * FROM orders WHERE ordered_from_store_id = $1 AND hot_spot_id IS NULL AND NOT unrequested
 				AND order_status NOT IN ('pending', 'fulfilled')),
 		steps AS (
 			SELECT e.action, e.created_at AS at, p.* FROM order_events e JOIN placed p ON p.id = e.order_id

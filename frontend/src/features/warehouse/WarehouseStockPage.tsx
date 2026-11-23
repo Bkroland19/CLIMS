@@ -27,6 +27,7 @@ import { ErrorState } from '@/components/states/ErrorState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
+import { useCan } from '@/features/auth/queries';
 import type {
   Movement,
   MovementReason,
@@ -41,6 +42,7 @@ import { useReadOnly } from '@/navigation/useAccess';
 import { AdjustBatchDialog } from './AdjustBatchDialog';
 import { DeleteBatchDialog } from './DeleteBatchDialog';
 import { EditBatchDialog } from './EditBatchDialog';
+import { DispatchToDistrictSheet } from './DispatchToDistrictSheet';
 import { useCurrentWarehouse, useStoreBatches } from './orderQueries';
 import { WAREHOUSE_PATHS, withStore } from './paths';
 import { RegisterStockSheet } from './RegisterStockSheet';
@@ -522,6 +524,7 @@ export default function WarehouseStockPage() {
   const params = useSearchParams();
   const router = useRouter();
   const readOnly = useReadOnly();
+  const can = useCan();
   const view = viewFrom(params);
   const band = batchFilterFrom(params.get('band'));
   const period = periodFrom(params.get('period'));
@@ -586,6 +589,18 @@ export default function WarehouseStockPage() {
     // Opened from a link (?register=1): closing leaves the address as the page's own.
     if (!open && params.get('register')) router.replace(pathFor({}), { scroll: false });
   };
+  // Sending stock to a district before it orders is an order step, so it needs orders:process.
+  const canDispatch = can('orders:process');
+  const [dispatching, setDispatching] = useState(() => params.get('dispatch') === '1');
+  const [dispatchProduct, setDispatchProduct] = useState<string | null>(null);
+  const openDispatch = (productId: string | null = null) => {
+    setDispatchProduct(productId);
+    setDispatching(true);
+  };
+  const closeDispatch = (open: boolean) => {
+    setDispatching(open);
+    if (!open && params.get('dispatch')) router.replace(pathFor({}), { scroll: false });
+  };
 
   const products = summary.data?.products;
   const orders = summary.data?.orders;
@@ -635,6 +650,20 @@ export default function WarehouseStockPage() {
       </Button>
     </WriteAction>
   );
+  const dispatchButton = canDispatch ? (
+    <WriteAction>
+      <Button
+        variant="outline"
+        onClick={() => {
+          openDispatch();
+        }}
+        disabled={!enabled}
+      >
+        <Truck data-icon="inline-start" />
+        Dispatch to district
+      </Button>
+    </WriteAction>
+  ) : null;
 
   return (
     <div className="gap-section flex flex-col">
@@ -652,7 +681,10 @@ export default function WarehouseStockPage() {
               router.replace(pathFor({ period: next }), { scroll: false });
             }}
           />
-          <PageActions>{registerButton}</PageActions>
+          <PageActions>
+            {dispatchButton}
+            {registerButton}
+          </PageActions>
         </div>
       </div>
 
@@ -841,6 +873,17 @@ export default function WarehouseStockPage() {
                             openRegister(row.condom_id);
                           },
                         },
+                        ...(canDispatch
+                          ? [
+                              {
+                                label: 'Dispatch to a district…',
+                                icon: Truck,
+                                onSelect: () => {
+                                  openDispatch(row.condom_id);
+                                },
+                              },
+                            ]
+                          : []),
                       ]}
                     />
                   )
@@ -980,6 +1023,16 @@ export default function WarehouseStockPage() {
         warehouse={warehouse}
         startProductId={startProduct}
       />
+
+      {canDispatch ? (
+        <DispatchToDistrictSheet
+          open={dispatching}
+          onOpenChange={closeDispatch}
+          code={code}
+          warehouse={warehouse}
+          startProductId={dispatchProduct}
+        />
+      ) : null}
 
       {adjusting ? (
         <AdjustBatchDialog

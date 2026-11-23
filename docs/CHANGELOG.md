@@ -6,6 +6,16 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **NMS and JMS send stock to a district before it orders.** `POST /api/v1/orders/district-dispatches`
+  (`orders:process`) takes the sending warehouse, a district store and up to 20 lines (product and
+  quantity, in the product's catalogue unit), with an optional note and transport. Each line becomes an
+  order created `dispatched` with `unrequested: true`, taking free stock (on hand less reserved and
+  expired) first expiry first out; the lines go together or not at all, and a refusal names the line.
+  The district is told the stock comes without an order and receives it as usual. The warehouse request
+  report and the store summary's order counts leave such orders out. Migration 34 adds
+  `orders.unrequested`. Web: **Dispatch to district** on the warehouse stock page, and on each
+  product's row, opens a panel to choose the district and the products; the DCFP's order page says the
+  stock was sent without an order.
 - **The warehouse stock page at a glance.** `GET /api/v1/inventory/store-summary?store_id=&from=&to=`
   reports one store: per product and unit, what is on hand, reserved, expired, expiring within three
   months, usable and next to expire, what was received, dispatched and written off in the period, and
