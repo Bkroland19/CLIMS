@@ -9,12 +9,12 @@ import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
-import { formatTimestamp } from '@/lib/format';
+import { formatNumber, formatTimestamp } from '@/lib/format';
 
 import type { Order } from './api';
 import { DCFP_PATHS, ORDER_STATUS, warehouseOrders } from './orders';
 import { useOrders } from './queries';
-import { useOrderNames } from './useOrderNames';
+import { UNIT_PENDING, useOrderNames } from './useOrderNames';
 
 /** The DCFP's orders to NMS and JMS, and the consignments waiting to be received. */
 export default function WarehouseOrdersPage() {
@@ -47,7 +47,15 @@ export default function WarehouseOrdersPage() {
         header: 'Quantity ordered',
         numeric: true,
         value: (order) => order.quantity_needed,
-        cell: (order) => names.quantity(order.quantity_needed, order.unit_of_measure_id),
+        cell: (order) =>
+          order.unit_of_measure_id === null && order.quantity_needed !== null ? (
+            <>
+              {formatNumber(order.quantity_needed)}{' '}
+              <span className="text-muted-foreground">· {UNIT_PENDING}</span>
+            </>
+          ) : (
+            names.quantity(order.quantity_needed, order.unit_of_measure_id)
+          ),
       },
       {
         id: 'warehouse',

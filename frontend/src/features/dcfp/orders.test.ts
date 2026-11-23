@@ -130,11 +130,20 @@ describe('dcfpTasks', () => {
     expect(tasks.map((task) => task.id)).toEqual(['receive-arrived', 'stockout-r1']);
     expect(tasks[0]?.href).toBe(DCFP_PATHS.order('arrived'));
     expect(tasks[1]).toMatchObject({
-      action: 'Order stock',
-      href: DCFP_PATHS.newOrderFor('female'),
+      action: 'Manage request',
+      href: DCFP_PATHS.stockout('r1'),
       title: 'Kisenyi Landing is out of female condoms',
     });
     expect(tasks[1]?.detail).toContain('Dispenser empty since Monday');
+  });
+
+  it('drops a stockout once the district has sent the hotspot stock', () => {
+    for (const status of ['awaiting_acknowledgement', 'partly_received', 'fulfilled'] as const) {
+      expect(dcfpTasks([aReport({ status })], [], names, now, time)).toEqual([]);
+    }
+    expect(dcfpTasks([aReport({ status: 'awaiting_supply' })], [], names, now, time)).toHaveLength(
+      1,
+    );
   });
 
   it('drops a stockout once its condom type has been ordered since it was reported', () => {

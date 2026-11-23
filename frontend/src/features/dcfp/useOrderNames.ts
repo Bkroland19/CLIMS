@@ -8,11 +8,18 @@ import type { Warehouse } from './api';
 import { categoryLabel, warehouseLabel } from './orders';
 import { useWarehouses } from './queries';
 
+/** Said after the number of an order whose product, and so its unit, the warehouse has not chosen. */
+export const UNIT_PENDING = 'unit set by warehouse';
+
 export interface OrderNames {
   /** The product's name, else the category requested until the warehouse chooses a product. */
   product: (id: string | null, category: string | null) => string;
   warehouse: (id: string) => Warehouse | undefined;
-  /** "500 boxes", or the bare number when the unit is unknown. */
+  /**
+   * "500 boxes"; "500 · unit set by warehouse" before the warehouse has chosen the product (an
+   * order names a category and a number, and takes the product's unit at review); the bare number
+   * while units load.
+   */
   quantity: (value: number | null, unitId: string | null) => string;
   warehouseLabel: (id: string) => string;
   warehouses: readonly Warehouse[] | undefined;
@@ -43,7 +50,8 @@ export function useOrderNames(): OrderNames {
       warehouseLabel: (id) => warehouseLabel(warehouseById.get(id)),
       quantity: (value, unitId) => {
         if (value === null) return '—';
-        const unit = unitId ? unitById.get(unitId) : undefined;
+        if (unitId === null) return `${formatNumber(value)} · ${UNIT_PENDING}`;
+        const unit = unitById.get(unitId);
         return unit ? `${formatNumber(value)} ${unit}` : formatNumber(value);
       },
       warehouses: warehouses.data,

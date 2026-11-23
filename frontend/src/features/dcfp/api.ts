@@ -38,6 +38,9 @@ const stockoutReportSchema = z.object({
   reported_by: z.string(),
   /** The hotspot's message for the DCFP. */
   comment: text,
+  /** Further reports while this one was open: the hotspot says it again rather than raising another. */
+  repeat_count: z.number().int().nonnegative().optional(),
+  last_reported_at: z.string().optional(),
   created_at: z.string(),
   status: z
     .enum(['awaiting_supply', 'awaiting_acknowledgement', 'partly_received', 'fulfilled'])
@@ -51,7 +54,30 @@ const riderSchema = z.object({ id: z.string(), name: z.string(), phone: text });
 
 export type Rider = z.infer<typeof riderSchema>;
 
+const eventLine = z.object({ category: z.enum(['male', 'female']), pieces: z.number() });
+
+/**
+ * One step in a report's life, oldest first. `data` depends on the action: `raised` and the
+ * repeats carry the hotspot's `comment`; `delivered` and `acknowledged` carry `lines` in pieces.
+ */
+const reportEventSchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  selection: z.string(),
+  data: z
+    .object({
+      comment: z.string().nullable().optional(),
+      reported: z.string().optional(),
+      lines: z.array(eventLine).optional(),
+    })
+    .nullable(),
+  created_at: z.string(),
+});
+
+export type ReportEvent = z.infer<typeof reportEventSchema>;
+
 const stockoutDetailSchema = stockoutReportSchema.extend({
+  events: z.array(reportEventSchema).default([]),
   deliveries: z.array(
     z.object({
       id: z.string(),

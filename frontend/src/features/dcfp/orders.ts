@@ -8,9 +8,8 @@ import type { Order, OrderStatus, StockoutReport, Warehouse } from './api';
 export const DCFP_PATHS = {
   dashboard: '/dcfp',
   stockouts: '/dcfp/stockouts',
-  dispatch: '/dcfp/stockouts/dispatch',
-  dispatchFor: (reportId: string) =>
-    `/dcfp/stockouts/dispatch?report=${encodeURIComponent(reportId)}`,
+  /** One hotspot's request: what it asked for, and the form to send it stock. */
+  stockout: (reportId: string) => `/dcfp/stockouts/${encodeURIComponent(reportId)}`,
   orders: '/dcfp/restock',
   store: '/dcfp/restock/store',
   newOrder: '/dcfp/restock/new',
@@ -33,6 +32,56 @@ export const STOCKOUT_STATUS: Record<
   partly_received: { label: 'Partly received', tone: 'caution' },
   fulfilled: { label: 'Fulfilled', tone: 'positive' },
 };
+
+export type StockoutStatus = keyof typeof STOCKOUT_STATUS;
+
+/** A report's status; one from before statuses existed has had nothing sent. */
+export function stockoutStatus(report: Pick<StockoutReport, 'status'>): StockoutStatus {
+  return report.status ?? 'awaiting_supply';
+}
+
+/** The stockout list's filters. "Open" is everything the hotspot has not confirmed in full. */
+export const STOCKOUT_FILTERS = [
+  { value: 'open', label: 'Open' },
+  { value: 'awaiting_supply', label: 'Awaiting supply' },
+  { value: 'awaiting_acknowledgement', label: 'Awaiting receipt' },
+  { value: 'partly_received', label: 'Partly received' },
+  { value: 'fulfilled', label: 'Fulfilled' },
+  { value: 'all', label: 'All' },
+] as const;
+
+export type StockoutFilter = (typeof STOCKOUT_FILTERS)[number]['value'];
+
+export function matchesStockoutFilter(report: StockoutReport, filter: StockoutFilter): boolean {
+  const status = stockoutStatus(report);
+  if (filter === 'all') return true;
+  if (filter === 'open') return status !== 'fulfilled';
+  return status === filter;
+}
+
+/**
+ * A request's progress: the hotspot reported, the district sent stock, the hotspot confirmed it.
+ * Partly received marks the last step for attention: something sent has not been confirmed in full.
+ */
+export function stockoutSteps(status: StockoutStatus): Step[] {
+  const sent = status !== 'awaiting_supply';
+  return [
+    { id: 'reported', label: 'Reported', state: 'done' },
+    { id: 'sent', label: 'Stock sent', state: sent ? 'done' : 'current' },
+    {
+      id: 'received',
+      label: 'Received by hotspot',
+      state:
+        status === 'fulfilled'
+          ? 'done'
+          : status === 'partly_received'
+            ? 'attention'
+            : sent
+              ? 'current'
+              : 'upcoming',
+    },
+  ];
+}
 
 /** What each status means to the DCFP who placed the order. */
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: StatusTone }> = {
@@ -238,8 +287,8 @@ export interface DcfpTask {
 
 /**
  * What needs the DCFP, in the order it needs doing: record receipts for stock that has
- * arrived, then answer the week's stockout reports. A report drops off once the district has
- * ordered that product since it came in.
+ * arrived, then answer the week's stockout reports. A report drops off once the district has sent
+ * the hotspot stock, or ordered that product since it came in.
  */
 export function dcfpTasks(
   reports: readonly StockoutReport[],
@@ -262,6 +311,8 @@ export function dcfpTasks(
       href: DCFP_PATHS.order(order.id),
     }));
   for (const report of recentReports(reports, now)) {
+    // Once stock is on its way, the hotspot's confirmation is the next step, not the DCFP's.
+    if (stockoutStatus(report) !== 'awaiting_supply') continue;
     const reported = Date.parse(report.created_at);
     const answered = orders.some(
       (order) =>
@@ -276,8 +327,8 @@ export function dcfpTasks(
       detail: [report.comment, `Reported ${formatTime(report.created_at)} by ${report.reported_by}`]
         .filter(Boolean)
         .join(' · '),
-      action: 'Order stock',
-      href: DCFP_PATHS.newOrderFor(report.selection),
+      action: 'Manage request',
+      href: DCFP_PATHS.stockout(report.id),
     });
   }
   return tasks;

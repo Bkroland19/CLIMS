@@ -17,7 +17,7 @@ test.beforeEach(async ({ request }) => {
   await resetMock(request);
 });
 
-test('shows a stockout with the hotspot’s details and message, and orders stock for it', async ({
+test('shows a stockout with the hotspot’s details and message, and orders stock from its request', async ({
   page,
 }) => {
   await open(page, '/dcfp/stockouts', 'Stockout notifications');
@@ -26,8 +26,10 @@ test('shows a stockout with the hotspot’s details and message, and orders stoc
   await expect(row).toContainText('Dispenser empty since Monday');
   await expect(row).toContainText('Peter Okello · 0772 123456');
 
-  await row.getByRole('button', { name: 'Actions for Kisenyi Landing Site' }).click();
-  await page.getByRole('menuitem', { name: 'Order stock from a warehouse' }).click();
+  // The row opens the request; ordering from a warehouse is one of its next steps.
+  await row.getByRole('link', { name: /^(Manage|View) Kisenyi Landing Site$/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Stockout request' })).toBeVisible();
+  await page.getByRole('link', { name: 'Order from a warehouse' }).first().click();
 
   await expect(page.getByRole('heading', { level: 1, name: 'New warehouse order' })).toBeVisible();
   // The stockout names the condom type; the warehouse chooses the product and its unit.

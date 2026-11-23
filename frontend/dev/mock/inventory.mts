@@ -80,7 +80,7 @@ export interface Movement {
   store_id: string;
   condom_id: string;
   unit_of_measure_id: string;
-  reason: 'opening' | 'receipt' | 'adjustment' | 'dispatch' | 'order_receipt';
+  reason: 'opening' | 'receipt' | 'adjustment' | 'dispatch' | 'order_receipt' | 'hotspot_delivery';
   quantity: number;
   on_hand_after: number;
   order_id: string | null;

@@ -183,6 +183,7 @@ export const PERMISSIONS = [
   'orders:receive',
   'orders:replenish',
   'orders:stockout',
+  'orders:supply_hotspots',
   'roles:assign',
   'roles:manage',
   'roles:read',
@@ -327,6 +328,19 @@ const TYPE = (n: number) => uuid(23, n);
 /** A seeded catalogue product's or unit's id, for other mocks that refer to them. */
 export const mockProductId = (n: number) => uuid(20, n);
 export const mockUnitId = UNIT;
+
+/** A catalogue product's category, unit and pack size, for mocks that send it; null when unknown. */
+export function mockProductFacts(productId: string) {
+  const found = state.products.find((product) => product.id === productId);
+  return found
+    ? {
+        category: found.category,
+        unit_id: found.unit_id,
+        pieces_per_unit: found.pieces_per_unit,
+        active: found.active,
+      }
+    : null;
+}
 
 function lookup(id: string, name: string, note: string | null, active = true, age = 400): Lookup {
   return { id, name, note, active, created_at: daysAgo(age), updated_at: daysAgo(age / 2) };
@@ -1534,6 +1548,9 @@ export function signedInUser(email: string | null = null) {
     status: 'active',
     role: admin,
     roles: admin ? [admin] : [],
+    // `MOCK_STORE=Wakiso` assigns that district's store, for the screens that act from one
+    // (sending stock to a hotspot); by default the user works across stores.
+    ...(process.env.MOCK_STORE ? { store_id: mockDistrictStoreId(process.env.MOCK_STORE) } : {}),
   };
 }
 
