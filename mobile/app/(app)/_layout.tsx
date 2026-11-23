@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Redirect, Tabs } from "expo-router";
 import { useT } from "@/lib/theme";
 import PushBanner from "@/components/m/PushBanner";
+import PushNotifications from "@/components/m/PushNotifications";
 import TabBar from "@/components/m/TabBar";
 import { Skeleton, SkeletonList } from "@/components/m/kit";
 import { useColumn } from "@/hooks/useResponsive";
@@ -46,6 +47,7 @@ function Signed() {
         ))}
       </Tabs>
       <PushBanner />
+      <PushNotifications />
     </View>
   );
 }
