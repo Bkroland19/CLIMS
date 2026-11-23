@@ -271,9 +271,15 @@ func (s *identitySync) probeCreate(c fiber.Ctx) error {
 
 // probeCheck answers 200 while the probe's session would still authorize a CLIMS request, applying
 // the same checks as the JWT middleware and users.ActiveUser, and 401 once it is revoked or expired.
+// A missing, empty or repeated X-Test-Session header is 400.
 func (s *identitySync) probeCheck(c fiber.Ctx) error {
+	// Exactly one non-empty X-Test-Session header; anything else is a malformed request.
+	values := c.Request().Header.PeekAll(testSessionHeader)
+	if len(values) != 1 || len(values[0]) == 0 {
+		return syncError(c, fiber.StatusBadRequest, "invalid_request")
+	}
 	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(c.Get(testSessionHeader), claims, func(*jwt.Token) (any, error) {
+	_, err := jwt.ParseWithClaims(string(values[0]), claims, func(*jwt.Token) (any, error) {
 		return []byte(s.cfg.JWTSecret), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
 	if err != nil {

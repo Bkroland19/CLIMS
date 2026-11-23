@@ -301,8 +301,9 @@ func (h *syncHarness) do(method, path, token, body string, status int, headers .
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	// Add, not Set, so a test can repeat a header.
 	for i := 0; i+1 < len(headers); i += 2 {
-		req.Header.Set(headers[i], headers[i+1])
+		req.Header.Add(headers[i], headers[i+1])
 	}
 	res, err := h.app.Test(req)
 	if err != nil {
@@ -525,7 +526,10 @@ func TestIdentitySyncRevokeAndProbe(t *testing.T) {
 	check(newSession("subject-a"), 200) // signing in again after a revoke works while access remains
 
 	h.do("POST", "/test/sessions", h.token, h.identity("never-linked"), 404)
-	check("", 401)
+	// A missing, empty or repeated X-Test-Session header is a malformed request (contract appendix).
+	h.do("GET", "/test/sessions/check", h.token, "", 400)
+	check("", 400)
+	h.do("GET", "/test/sessions/check", h.token, "", 400, testSessionHeader, bystander, testSessionHeader, bystander)
 	check("garbage", 401)
 	forged, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": a, "sid": uuid.NewString(),
 		"exp": time.Now().Add(time.Minute).Unix()}).SignedString([]byte("another-secret"))

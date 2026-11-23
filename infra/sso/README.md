@@ -106,10 +106,10 @@ suite. They use the same bearer checks as the endpoints above:
 
 - `POST /test/sessions` with `{"issuer","subject"}` starts a real CLIMS session
   for the linked account and returns `201 {"sessionToken": "..."}`, or 404 when
-  nothing is linked.
+  nothing is linked or the linked account is disabled or has no role.
 - `GET /test/sessions/check` with header `X-Test-Session: <token>` returns 200
-  while that session would still authorize a request, and 401 once it is
-  revoked or expired.
+  while that session would still authorize a request, 401 once it is revoked
+  or expired, and 400 when the header is missing, empty or repeated.
 
 Never set this flag outside a disposable test environment. Without it the
 routes do not exist. The backend refuses to start when the flag has any value
