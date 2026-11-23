@@ -22,6 +22,7 @@ import (
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/reports"
+	"clims-backend/internal/features/synclog"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -153,6 +154,7 @@ func main() {
 	notifications.RegisterRoutes(v1, notifications.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 	audit.RegisterRoutes(v1, audit.NewRepository(dbPool), auditor, jwtAuthMiddleware, activeUser, rbac.RequirePermission("audit:read"))
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(dbPool, auditor), jwtAuthMiddleware, activeUser)
+	synclog.RegisterRoutes(v1, synclog.NewRepository(dbPool), jwtAuthMiddleware, activeUser)
 
 	// Tells each store when a batch it holds is about to expire, and when it has. Every replica may run
 	// it: each batch is announced once per state.

@@ -20,6 +20,7 @@ import (
 	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/reports"
+	"clims-backend/internal/features/synclog"
 	"clims-backend/internal/features/users"
 	"clims-backend/internal/middleware"
 
@@ -46,6 +47,7 @@ func documentationApp() *fiber.App {
 	notifications.RegisterRoutes(v1, notifications.NewRepository(nil), jwt, active)
 	catalogue.RegisterRoutes(v1, catalogue.NewRepository(nil, auditor), jwt, active)
 	audit.RegisterRoutes(v1, audit.NewRepository(nil), auditor, jwt, active, rbac.RequirePermission("audit:read"))
+	synclog.RegisterRoutes(v1, synclog.NewRepository(nil), jwt, active)
 	health.RegisterRoutes(app, health.NewHandler(nil, "test", "test", "test"))
 	apidocs.RegisterRoutes(app, os.DirFS(filepath.Join("..", "..", "..", "docs", "api")))
 	return app
