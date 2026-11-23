@@ -51,8 +51,22 @@ const OUTCOME_TABS = [
 
 const isArea = (value: string): value is AuditArea => AUDIT_AREAS.some((area) => area === value);
 
-const subjectName = (subject: AuditSubject): string =>
-  `${subjectLabel(subject.type)} ${shortId(subject.id)}`;
+/** "User felix" where the API names the record, otherwise "Hotspot 1a2b3c4d". */
+function subjectName(subject: AuditSubject, typeCase: 'upper' | 'lower' = 'upper'): string {
+  const type = subjectLabel(subject.type);
+  return `${typeCase === 'lower' ? type.toLowerCase() : type} ${subject.name ?? shortId(subject.id)}`;
+}
+
+/** The subject with its name from any loaded entry that mentions it; the address carries only its ID. */
+function namedIn(entries: readonly AuditEntry[], subject: AuditSubject): AuditSubject {
+  for (const entry of entries) {
+    const found = entry.subjects.find(
+      (candidate) => candidate.type === subject.type && candidate.id === subject.id,
+    );
+    if (found?.name) return found;
+  }
+  return subject;
+}
 
 /** Who did what, to which record, what changed and from where, newest first. */
 export default function AuditLogPage() {
@@ -118,7 +132,7 @@ export default function AuditLogPage() {
           ) : null}
           {filters.subject ? (
             <FilterChip
-              label={`History of ${subjectName(filters.subject).toLowerCase()}`}
+              label={`History of ${subjectName(namedIn(entries, filters.subject), 'lower')}`}
               onClear={() => {
                 go({ subject: null });
               }}

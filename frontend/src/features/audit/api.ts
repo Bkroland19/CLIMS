@@ -14,7 +14,12 @@ import { parseList, type HttpClient } from '@/lib/api';
 
 export const PAGE_SIZE = 50;
 
-const subjectSchema = z.object({ type: z.string(), id: z.string() });
+const subjectSchema = z.object({
+  type: z.string(),
+  id: z.string(),
+  /** The record's current name where the API can look it up: a user's username. */
+  name: z.string().nullable().optional(),
+});
 export type AuditSubject = z.infer<typeof subjectSchema>;
 
 const changeSchema = z.object({ before: z.unknown(), after: z.unknown() });

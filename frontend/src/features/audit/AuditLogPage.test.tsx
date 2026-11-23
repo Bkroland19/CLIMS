@@ -13,6 +13,7 @@ import { auditFiltersFrom, auditHref } from './links';
 const HOTSPOT = '11111111-1111-4111-8111-111111111111';
 const DISTRICT = '22222222-2222-4222-8222-222222222222';
 const SARAH = '33333333-3333-4333-8333-333333333333';
+const GRACE = '44444444-4444-4444-8444-444444444444';
 
 const base: AuditEntry = {
   id: 'e-0',
@@ -46,8 +47,8 @@ const entries: AuditEntry[] = [
     outcome: 'failure',
     reason: 'wrong_password',
     actor: null,
-    target: null,
-    subjects: [],
+    target: { type: 'user', id: GRACE, name: 'grace' },
+    subjects: [{ type: 'user', id: GRACE, name: 'grace' }],
     changes: null,
     details: { identifier: 'grace' },
   },
@@ -130,6 +131,9 @@ describe('AuditLogPage', () => {
     expect(screen.getAllByText('Hotspot activated')).not.toHaveLength(0);
     expect(screen.getAllByText('Sign-in failed')).not.toHaveLength(0);
     expect(screen.getByText('Not signed in')).toBeInTheDocument();
+    // A user record reads by its username; a record without a name by the start of its ID.
+    expect(screen.getAllByText('User grace')).not.toHaveLength(0);
+    expect(screen.getAllByText(`Hotspot ${HOTSPOT.slice(0, 8)}`)).not.toHaveLength(0);
     expect(screen.getByText('2 entries')).toBeInTheDocument();
     expect(screen.queryByText('Sample data')).not.toBeInTheDocument();
     expect(requests[0]?.url).toBe('/audit?exclude_domain=audit&limit=50');

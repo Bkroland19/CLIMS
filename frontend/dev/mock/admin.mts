@@ -1621,7 +1621,23 @@ function searchAudit(query: URLSearchParams): Reply {
         (!to || entry.occurred_at < new Date(to).toISOString()),
     )
     .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
-  return ok(matches.slice(offset, offset + limit));
+  // Like the Go search, user records carry the account's current username.
+  const name = (subject: AuditSubject): AuditSubject & { name: string | null } => ({
+    ...subject,
+    name:
+      subject.type !== 'user'
+        ? null
+        : subject.id === ACTOR.id
+          ? ACTOR.username
+          : (state.users.find((user) => user.id === subject.id)?.username ?? null),
+  });
+  return ok(
+    matches.slice(offset, offset + limit).map((entry) => ({
+      ...entry,
+      target: entry.target && name(entry.target),
+      subjects: entry.subjects.map(name),
+    })),
+  );
 }
 
 // ---------------------------------------------------------------- entry point

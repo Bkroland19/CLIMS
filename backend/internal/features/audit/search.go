@@ -25,14 +25,23 @@ type Record struct {
 	Reason     *string         `json:"reason"`
 	Actor      *ActorSnapshot  `json:"actor"`
 	System     *string         `json:"system_actor"`
-	Target     *Subject        `json:"target"`
-	Subjects   []Subject       `json:"subjects"`
+	Target     *NamedSubject   `json:"target"`
+	Subjects   []NamedSubject  `json:"subjects"`
 	Changes    json.RawMessage `json:"changes"`
 	Details    json.RawMessage `json:"details"`
 	IPAddress  *string         `json:"ip_address"`
 	UserAgent  *string         `json:"user_agent"`
 	RequestID  *string         `json:"request_id"`
 	SessionID  *string         `json:"session_id"`
+}
+
+// NamedSubject is a target or related record as the search API returns it.
+// Name is the record's current name where the log can look it up (a user's
+// username) and null otherwise, e.g. once the account is deleted.
+type NamedSubject struct {
+	Type string  `json:"type"`
+	ID   string  `json:"id"`
+	Name *string `json:"name"`
 }
 
 // ActorSnapshot is the acting user as they were when the entry was written.
@@ -69,7 +78,9 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func (r *Repository) search(ctx context.Context, f Filter, limit, offset int32) ([]Record, error) {
 	rows, err := r.db.Query(ctx, `SELECT a.id, a.occurred_at, a.action, a.outcome, a.reason,
 			a.actor_id, a.actor_username, a.actor_roles, a.system_actor, a.target_type, a.target_id,
-			coalesce((SELECT jsonb_agg(jsonb_build_object('type', s.subject_type, 'id', s.subject_id)
+			`+subjectName("a.target_type", "a.target_id")+`,
+			coalesce((SELECT jsonb_agg(jsonb_build_object('type', s.subject_type, 'id', s.subject_id,
+					'name', `+subjectName("s.subject_type", "s.subject_id")+`)
 				ORDER BY s.subject_type, s.subject_id) FROM audit_log_subjects s WHERE s.audit_id = a.id), '[]'),
 			a.changes, a.details, a.ip_address, a.user_agent, a.request_id, a.session_id
 		FROM audit_log a
@@ -85,11 +96,11 @@ func (r *Repository) search(ctx context.Context, f Filter, limit, offset int32) 
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Record, error) {
 		var rec Record
-		var actorID, actorName, targetType, targetID *string
+		var actorID, actorName, targetType, targetID, targetName *string
 		var roles []string
 		var subjects []byte
 		err := row.Scan(&rec.ID, &rec.OccurredAt, &rec.Action, &rec.Outcome, &rec.Reason,
-			&actorID, &actorName, &roles, &rec.System, &targetType, &targetID, &subjects,
+			&actorID, &actorName, &roles, &rec.System, &targetType, &targetID, &targetName, &subjects,
 			&rec.Changes, &rec.Details, &rec.IPAddress, &rec.UserAgent, &rec.RequestID, &rec.SessionID)
 		if err != nil {
 			return rec, err
@@ -98,13 +109,21 @@ func (r *Repository) search(ctx context.Context, f Filter, limit, offset int32) 
 			rec.Actor = &ActorSnapshot{ID: *actorID, Username: actorName, Roles: roles}
 		}
 		if targetType != nil && targetID != nil {
-			rec.Target = &Subject{Type: *targetType, ID: *targetID}
+			rec.Target = &NamedSubject{Type: *targetType, ID: *targetID, Name: targetName}
 		}
 		if rec.Changes == nil {
 			rec.Changes = json.RawMessage("null")
 		}
 		return rec, json.Unmarshal(subjects, &rec.Subjects)
 	})
+}
+
+// subjectName is SQL for a record's current name, given its type and ID
+// columns: a user's username, or NULL. Subject IDs are text, so the join
+// compares as text rather than casting an ID that may not be a UUID.
+func subjectName(typeColumn, idColumn string) string {
+	return `CASE WHEN ` + typeColumn + ` = 'user' THEN
+		(SELECT u.username FROM users u WHERE u.id::text = ` + idColumn + `) END`
 }
 
 type Handler struct {

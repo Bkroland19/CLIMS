@@ -138,6 +138,15 @@ func testAudit(t *testing.T, pool *pgxpool.Pool, repo *users.Repository, service
 		wrongPassword["target"].(map[string]any)["id"] != userID || wrongPassword["actor"] != nil {
 		t.Fatalf("wrong password entry: %v", wrongPassword)
 	}
+	// A user record carries the account's current username; other records carry none.
+	if name := wrongPassword["target"].(map[string]any)["name"]; name != "audit-user" {
+		t.Fatalf("wrong password target name = %v, want audit-user", name)
+	}
+	for _, subject := range wrongPassword["subjects"].([]any) {
+		if subject := subject.(map[string]any); subject["type"] == "user" && subject["name"] != "audit-user" {
+			t.Fatalf("user subject name = %v, want audit-user", subject["name"])
+		}
+	}
 	if unknownAccount == nil || unknownAccount["target"] != nil {
 		t.Fatalf("unknown account entry: %v", unknownAccount)
 	}

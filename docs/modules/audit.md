@@ -9,7 +9,7 @@ The audit log records who did what, to which record, when and from where. Entrie
 - **Actor:** the signed-in user's ID with a copy of their username and roles at that moment, or a named `system_actor` for an automated job or command.
 - **Action:** `<domain>.<event>`, such as `auth.login_failed`.
 - **Outcome:** `success` or `failure`, with a `reason` for failures.
-- **Target and related records (`subjects`):** the record acted on and the other records the action concerns. Searching by a subject returns entries where it is the target or a related record, which isolates the history of one hotspot, order, district, store or user.
+- **Target and related records (`subjects`):** the record acted on and the other records the action concerns. Searching by a subject returns entries where it is the target or a related record, which isolates the history of one hotspot, order, district, store or user. Search results give each user record its current `name` (the username) for display; the entry itself stores only the ID, so a deleted account's name is null.
 - **Changes:** for data changes, only the fields that changed, before and after.
 - **Details:** other facts, such as the identifier typed at a failed login.
 - **Context:** the client's IP address, user agent, request ID (matching the server log line) and session.
