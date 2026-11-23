@@ -39,6 +39,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+	// Refuse to start with the test probe in production, before touching the database.
+	probe, err := config.IdentitySyncProbe(cfg.AppEnv, cfg.IdentitySyncTestProbe)
+	if err != nil {
+		log.Fatalf("CLIMS identity sync configuration: %v", err)
+	}
+	if probe && cfg.IdentitySyncClientID == "" {
+		log.Fatalf("CLIMS identity sync configuration: IDENTITY_SYNC_TEST_PROBE=1 requires IDENTITY_SYNC_CLIENT_ID")
+	}
 
 	if err := database.RunMigrations(cfg.DSN()); err != nil {
 		log.Fatalf("Migration error: %v", err)
@@ -79,9 +87,8 @@ func main() {
 	userRepo := users.NewRepository(dbPool)
 	if cfg.IdentitySyncClientID != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		probe := cfg.IdentitySyncTestProbe == "1"
 		if probe {
-			log.Printf("WARNING: identity-sync test session probe is on (IDENTITY_SYNC_TEST_PROBE=1); never use this outside a test environment")
+			log.Printf("WARNING: identity-sync test session probe is on (APP_ENV=%s, IDENTITY_SYNC_TEST_PROBE=1); never use this outside a test environment", cfg.AppEnv)
 		}
 		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, auth.IdentitySyncConfig{
 			Issuer: cfg.OIDCIssuer, ServiceClient: cfg.IdentitySyncClientID, TestProbe: probe, JWTSecret: cfg.JWTSecret,

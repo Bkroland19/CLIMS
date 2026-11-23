@@ -54,6 +54,7 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_PUBLIC_ORIGIN: ${OIDC_PUBLIC_ORIGIN:-}
       IDENTITY_SYNC_CLIENT_ID: ${IDENTITY_SYNC_CLIENT_ID:-}
+      APP_ENV: ${APP_ENV:-production}
       PORT: 8080
     expose: ["8080"]
     depends_on:

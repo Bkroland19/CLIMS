@@ -43,6 +43,7 @@ CLIMS offers password sign-in only.
 | `OIDC_PUBLIC_ORIGIN`       | The CLIMS address users see, scheme and host only, e.g. `https://clims.health.go.ug`                                                                                                                                   |
 | `IDENTITY_SYNC_CLIENT_ID`  | `clims-identity-sync`, the dashboard reconciler's service client. Optional; it turns on the identity-sync endpoints, which require an HTTPS issuer. Its service account holds the `clims` client role `identity_sync`. |
 | `IDENTITY_SYNC_TEST_PROBE` | Leave unset. `1` adds the conformance suite's session probe; test environments only.                                                                                                                                   |
+| `APP_ENV`                  | `production` (the default when unset), `development` or `test`. The backend refuses to start when `IDENTITY_SYNC_TEST_PROBE` is set unless `APP_ENV` is `development` or `test`.                                       |
 
 The portal tile opens `/api/v1/auth/sso/start`. The flow is:
 
@@ -111,8 +112,10 @@ suite. They use the same bearer checks as the endpoints above:
   revoked or expired.
 
 Never set this flag outside a disposable test environment. Without it the
-routes do not exist, and the backend logs a warning at startup whenever it is
-on.
+routes do not exist. The backend refuses to start when the flag has any value
+other than `1`, when `APP_ENV` is not exactly `development` or `test` (an unset
+`APP_ENV` counts as production), or when `IDENTITY_SYNC_CLIENT_ID` is empty. It
+logs a warning at startup whenever the probe is on.
 
 Keep the launcher in the registration workflow until pilot users have signed
 in from the portal and CLIMS authorization has been verified with users from
