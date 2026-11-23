@@ -91,7 +91,8 @@ func main() {
 			log.Printf("WARNING: identity-sync test session probe is on (APP_ENV=%s, IDENTITY_SYNC_TEST_PROBE=1); never use this outside a test environment", cfg.AppEnv)
 		}
 		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, auth.IdentitySyncConfig{
-			Issuer: cfg.OIDCIssuer, ServiceClient: cfg.IdentitySyncClientID, TestProbe: probe, JWTSecret: cfg.JWTSecret,
+			Issuer: cfg.OIDCIssuer, Audience: cfg.OIDCClientID, ServiceClient: cfg.IdentitySyncClientID,
+			TestProbe: probe, JWTSecret: cfg.JWTSecret,
 		})
 		cancel()
 		if err != nil {

@@ -82,15 +82,16 @@ Signing out of CLIMS ends the CLIMS session only; the Keycloak session stays.
 With `IDENTITY_SYNC_CLIENT_ID` set, CLIMS serves the MoH identity-sync contract
 v1.1 at `/api/v1/internal/identity-sync`. The contract is defined in the
 dashboard repository (`docs/integrations/identity-sync-contract.md`). Every
-request needs a Keycloak access token for `aud` `clims`, `azp` equal to
-`IDENTITY_SYNC_CLIENT_ID`, `typ` `Bearer`, and the `clims` client role
-`identity_sync`. A token that is missing, badly signed, expired, from another
+request needs a Keycloak access token whose `aud` contains CLIMS's own client
+ID (`OIDC_CLIENT_ID`, or `clims` when that is unset), with `azp` equal to
+`IDENTITY_SYNC_CLIENT_ID`, `typ` `Bearer`, and the client role `identity_sync`
+on that same client. A token that is missing, badly signed, expired, from another
 issuer or for another audience gets 401. A valid token that fails any of the
 other checks gets 403.
 
 | Endpoint                      | Purpose                                                                                                                                                                                                                                              |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /`                       | Descriptor: application `clims`, account IDs `uuid`, page size 100, capabilities `accounts.list`, `identity.link`, `sessions.revoke`                                                                                                                 |
+| `GET /`                       | Descriptor: application `OIDC_CLIENT_ID` (default `clims`), account IDs `uuid`, page size 100, capabilities `accounts.list`, `identity.link`, `sessions.revoke`                                                                                      |
 | `GET /accounts?after=&limit=` | Active accounts with at least one role, in UUID order, each with its current `link` for `OIDC_ISSUER` or `null`                                                                                                                                      |
 | `PUT /accounts/{id}/identity` | Records a link. It never replaces a link or grants roles.                                                                                                                                                                                            |
 | `POST /sessions/revoke`       | Ends every CLIMS session of the linked account at once. Access tokens stop working on their next request, because each request checks its session, and refresh tokens are refused. The link and roles stay. Returns 204 even when nothing is linked. |

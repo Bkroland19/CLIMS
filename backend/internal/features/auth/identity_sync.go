@@ -25,10 +25,11 @@ import (
 // The MoH identity-sync contract, version 1.1. The MoH SSO Dashboard calls these endpoints to link
 // existing CLIMS accounts to Keycloak identities and to end their sessions when portal access is removed.
 const (
-	identitySyncPath     = "/api/v1/internal/identity-sync"
-	identitySyncAudience = "clims"
-	identitySyncRole     = "identity_sync"
-	maxIdentitySyncBody  = 4 << 10
+	identitySyncPath = "/api/v1/internal/identity-sync"
+	// DefaultIdentitySyncAudience is CLIMS's Keycloak client ID when OIDC_CLIENT_ID is not set.
+	DefaultIdentitySyncAudience = "clims"
+	identitySyncRole            = "identity_sync"
+	maxIdentitySyncBody         = 4 << 10
 	// testSessionHeader carries the session token the test probe issued.
 	testSessionHeader = "X-Test-Session"
 )
@@ -50,6 +51,10 @@ type IdentitySyncAccounts interface {
 type IdentitySyncConfig struct {
 	// Issuer is the public Keycloak realm issuer, exactly as it appears in iss.
 	Issuer string
+	// Audience is CLIMS's own Keycloak client ID (OIDC_CLIENT_ID). Tokens must name it in aud and hold
+	// the identity_sync role on it, and the descriptor reports it as the application. Empty means
+	// DefaultIdentitySyncAudience.
+	Audience string
 	// ServiceClient is the dashboard's dedicated client, such as clims-identity-sync.
 	ServiceClient string
 	// TestProbe adds the session probe routes the conformance suite uses. Turn it on only in a test
@@ -61,9 +66,12 @@ type IdentitySyncConfig struct {
 
 // RegisterIdentitySync exposes the identity-sync contract to one dedicated Keycloak client.
 func RegisterIdentitySync(ctx context.Context, app *fiber.App, repo IdentitySyncAccounts, cfg IdentitySyncConfig) error {
+	if cfg.Audience == "" {
+		cfg.Audience = DefaultIdentitySyncAudience
+	}
 	u, err := url.Parse(cfg.Issuer)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
-		cfg.ServiceClient == "" || cfg.ServiceClient == identitySyncAudience {
+		cfg.ServiceClient == "" || cfg.ServiceClient == cfg.Audience {
 		return errors.New("CLIMS identity sync requires an HTTPS issuer and a dedicated service client")
 	}
 	if cfg.TestProbe && cfg.JWTSecret == "" {
@@ -73,7 +81,7 @@ func RegisterIdentitySync(ctx context.Context, app *fiber.App, repo IdentitySync
 	if err != nil {
 		return err
 	}
-	verifier := provider.Verifier(&oidc.Config{ClientID: identitySyncAudience, SupportedSigningAlgs: []string{oidc.RS256}})
+	verifier := provider.Verifier(&oidc.Config{ClientID: cfg.Audience, SupportedSigningAlgs: []string{oidc.RS256}})
 	s := &identitySync{repo: repo, cfg: cfg}
 	group := app.Group(identitySyncPath, s.authorize(verifier))
 	group.Get("/", s.describe)
@@ -127,7 +135,7 @@ func (s *identitySync) authorize(verifier *oidc.IDTokenVerifier) fiber.Handler {
 			} `json:"resource_access"`
 		}
 		if err := verified.Claims(&claims); err != nil || claims.Type != "Bearer" || claims.Client != s.cfg.ServiceClient ||
-			!slices.Contains(claims.Roles[identitySyncAudience].Roles, identitySyncRole) {
+			!slices.Contains(claims.Roles[s.cfg.Audience].Roles, identitySyncRole) {
 			return syncError(c, fiber.StatusForbidden, "")
 		}
 		c.SetContext(ctx)
@@ -138,7 +146,7 @@ func (s *identitySync) authorize(verifier *oidc.IDTokenVerifier) fiber.Handler {
 func (s *identitySync) describe(c fiber.Ctx) error {
 	capabilities := []string{"accounts.list", "identity.link", "sessions.revoke"}
 	return c.JSON(fiber.Map{
-		"contract": "moh-identity-sync", "version": "1.1", "application": identitySyncAudience,
+		"contract": "moh-identity-sync", "version": "1.1", "application": s.cfg.Audience,
 		"accountIdFormat": "uuid", "maxPageSize": users.MaxIdentitySyncPage, "capabilities": capabilities,
 	})
 }

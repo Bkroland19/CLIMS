@@ -651,3 +651,42 @@ func TestProbeRefusesIneligibleAccounts(t *testing.T) {
 		t.Fatalf("the probe created %d sessions for ineligible accounts", len(h.repo.sessions))
 	}
 }
+
+// TestIdentitySyncAudienceFollowsClientID: the audience, the client-role key and the descriptor's
+// application all come from CLIMS's own Keycloak client ID (OIDC_CLIENT_ID), not a fixed "clims".
+func TestIdentitySyncAudienceFollowsClientID(t *testing.T) {
+	idp := newTestIdP(t)
+	app := fiber.New()
+	const audience = "clims-staging"
+	err := RegisterIdentitySync(context.Background(), app, newFakeAccounts(), IdentitySyncConfig{
+		Issuer: idp.issuer, Audience: audience, ServiceClient: syncClient, JWTSecret: syncSecret,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &syncHarness{t: t, app: app, idp: idp, repo: newFakeAccounts()}
+	forAudience := func(c jwt.MapClaims) {
+		c["aud"] = []string{audience, "account"}
+		c["resource_access"] = map[string]any{audience: map[string]any{"roles": []string{"identity_sync"}}}
+	}
+	var d map[string]any
+	if err := json.Unmarshal(h.do("GET", "/", idp.serviceToken(t, forAudience), "", 200), &d); err != nil {
+		t.Fatal(err)
+	}
+	if d["application"] != audience {
+		t.Fatalf("descriptor application %v, want %q", d["application"], audience)
+	}
+	// A token for the default "clims" client is for another audience here.
+	h.do("GET", "/", idp.serviceToken(t, nil), "", 401)
+	// The role must sit on this application's client.
+	h.do("GET", "/", idp.serviceToken(t, func(c jwt.MapClaims) {
+		forAudience(c)
+		c["resource_access"] = map[string]any{"clims": map[string]any{"roles": []string{"identity_sync"}}}
+	}), "", 403)
+	// The service client can never be the interactive client itself.
+	if err := RegisterIdentitySync(context.Background(), fiber.New(), newFakeAccounts(), IdentitySyncConfig{
+		Issuer: idp.issuer, Audience: audience, ServiceClient: audience,
+	}); err == nil {
+		t.Fatal("accepted the interactive client as the service client")
+	}
+}
