@@ -285,7 +285,7 @@ export const workspaces: readonly Workspace[] = [
           },
           {
             id: 'audit',
-            label: 'Audit log',
+            label: 'Audit',
             icon: ShieldCheck,
             pages: [
               {
@@ -296,6 +296,15 @@ export const workspaces: readonly Workspace[] = [
                   'Sign-ins, account changes and every change to records: who, what, when and from where.',
                 layout: 'table',
                 permission: 'audit:read',
+              },
+              {
+                path: '/moh/audit/sync-log',
+                tab: 'Sync log',
+                title: 'Sync log',
+                description:
+                  'What field phones report about sending the actions their users saved, online or offline.',
+                layout: 'table',
+                permission: 'sync_logs:read',
               },
             ],
           },
