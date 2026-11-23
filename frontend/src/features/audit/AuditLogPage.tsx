@@ -106,6 +106,14 @@ export default function AuditLogPage() {
             }}
           />
         ) : null}
+        {filters.clientEntry ? (
+          <FilterChip
+            label={`Recorded for phone entry ${filters.clientEntry}`}
+            onClear={() => {
+              go({ clientEntry: null });
+            }}
+          />
+        ) : null}
         {filters.subject ? (
           <FilterChip
             label={`History of ${subjectName(namedIn(entries ?? [], filters.subject), 'lower')}`}

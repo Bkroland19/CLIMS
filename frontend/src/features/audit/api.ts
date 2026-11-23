@@ -6,7 +6,7 @@ import { parseList, type HttpClient } from '@/lib/api';
  * The audit log: who did what, to which record, what changed, and from where
  * (`backend/internal/features/audit`, `docs/modules/audit.md`).
  *
- *   GET /audit?domain=&exclude_domain=&outcome=&actor_id=&subject_type=&subject_id=&from=&to=&limit=&offset=
+ *   GET /audit?domain=&exclude_domain=&outcome=&actor_id=&subject_type=&subject_id=&client_entry_id=&from=&to=&limit=&offset=
  *     → AuditEntry[], newest first. Needs `audit:read`.
  *
  * Every search is itself recorded as `audit.searched`.
@@ -118,6 +118,8 @@ export interface AuditFilters {
   actor: string | null;
   /** One record: its target or related-record entries. */
   subject: AuditSubject | null;
+  /** A field phone's sync log entry: what the server recorded for the requests it tagged. */
+  clientEntry: string | null;
 }
 
 export const NO_FILTERS: AuditFilters = {
@@ -127,6 +129,7 @@ export const NO_FILTERS: AuditFilters = {
   to: null,
   actor: null,
   subject: null,
+  clientEntry: null,
 };
 
 /** The start of a local day as an RFC 3339 time, or null for a malformed date. */
@@ -149,6 +152,7 @@ export function auditQuery(filters: AuditFilters, offset = 0): URLSearchParams {
     params.set('subject_type', filters.subject.type);
     params.set('subject_id', filters.subject.id);
   }
+  if (filters.clientEntry) params.set('client_entry_id', filters.clientEntry);
   const from = filters.from && startOfDay(filters.from);
   // The API's `to` is exclusive: the day after the last one shown.
   const to = filters.to && startOfDay(filters.to, 1);
