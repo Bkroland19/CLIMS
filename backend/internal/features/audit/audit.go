@@ -57,6 +57,9 @@ type Auditor interface {
 
 var actionPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`)
 
+// domainPattern matches the part of an action before the dot.
+var domainPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
 // Service is the Auditor backed by PostgreSQL.
 type Service struct {
 	db *pgxpool.Pool

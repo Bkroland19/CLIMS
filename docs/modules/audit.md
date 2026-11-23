@@ -85,6 +85,8 @@ Name actions `<domain>.<event>` and keep them as constants in the feature. Add t
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `actor_id`                    | Entries by one user                                                                 |
 | `action`                      | One action, e.g. `auth.login_failed`                                                |
+| `domain`                      | Actions in these domains (before the dot), comma-separated, e.g. `user,role`        |
+| `exclude_domain`              | Leaves out these domains, comma-separated, e.g. `audit` to hide searches of the log |
 | `outcome`                     | `success` or `failure`                                                              |
 | `subject_type` + `subject_id` | Entries whose target or related records include that record                         |
 | `from`, `to`                  | A date (`2026-11-21`, from its start in UTC) or an RFC 3339 time; `to` is exclusive |

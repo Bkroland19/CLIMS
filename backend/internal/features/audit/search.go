@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"clims-backend/internal/pkg/request"
@@ -48,7 +49,11 @@ type Filter struct {
 	Outcome     string
 	SubjectType string
 	SubjectID   string
-	From, To    *time.Time
+	// Domains keeps and ExcludeDomains leaves out actions by the part before
+	// the dot, e.g. "hotspot" for hotspot.activated.
+	Domains        []string
+	ExcludeDomains []string
+	From, To       *time.Time
 }
 
 type Repository struct {
@@ -71,8 +76,10 @@ func (r *Repository) search(ctx context.Context, f Filter, limit, offset int32) 
 		WHERE ($1::uuid IS NULL OR a.actor_id = $1) AND ($2 = '' OR a.action = $2) AND ($3 = '' OR a.outcome = $3)
 			AND ($4::timestamptz IS NULL OR a.occurred_at >= $4) AND ($5::timestamptz IS NULL OR a.occurred_at < $5)
 			AND ($6 = '' OR a.id IN (SELECT audit_id FROM audit_log_subjects WHERE subject_type = $6 AND subject_id = $7))
-		ORDER BY a.occurred_at DESC, a.id DESC LIMIT $8 OFFSET $9`,
-		f.ActorID, f.Action, f.Outcome, f.From, f.To, f.SubjectType, f.SubjectID, limit, offset)
+			AND (cardinality($8::text[]) = 0 OR split_part(a.action, '.', 1) = ANY($8))
+			AND NOT split_part(a.action, '.', 1) = ANY($9::text[])
+		ORDER BY a.occurred_at DESC, a.id DESC LIMIT $10 OFFSET $11`,
+		f.ActorID, f.Action, f.Outcome, f.From, f.To, f.SubjectType, f.SubjectID, f.Domains, f.ExcludeDomains, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +128,13 @@ func (h *Handler) search(c fiber.Ctx) error {
 	}
 	f := Filter{Action: c.Query("action"), Outcome: c.Query("outcome"),
 		SubjectType: c.Query("subject_type"), SubjectID: c.Query("subject_id")}
+	for name, target := range map[string]*[]string{"domain": &f.Domains, "exclude_domain": &f.ExcludeDomains} {
+		domains, ok := parseDomains(c.Query(name))
+		if !ok {
+			return response.Error(c, 400, name+" must be action domains separated by commas, such as hotspot,order", nil)
+		}
+		*target = domains
+	}
 	if raw := c.Query("actor_id"); raw != "" {
 		id, err := request.ParseUUID(raw)
 		if err != nil {
@@ -157,6 +171,22 @@ func (h *Handler) search(c fiber.Ctx) error {
 		return response.Error(c, 500, "audit search failed", nil)
 	}
 	return response.Success(c, 200, "audit entries retrieved", records)
+}
+
+// parseDomains splits a comma-separated list of action domains. It is never
+// nil, so the query compares against an empty array rather than NULL.
+func parseDomains(raw string) ([]string, bool) {
+	domains := []string{}
+	if raw == "" {
+		return domains, true
+	}
+	for _, domain := range strings.Split(raw, ",") {
+		if !domainPattern.MatchString(domain) {
+			return nil, false
+		}
+		domains = append(domains, domain)
+	}
+	return domains, true
 }
 
 // parseTime accepts a date, meaning its start in UTC, or an RFC 3339 time.
