@@ -31,6 +31,7 @@ const fieldSyncNote = "Counts what field phones in this area have reported about
 var (
 	notificationActions = []string{"stockout", "acknowledge"}
 	hmisActions         = []string{"acknowledge"}
+	hotspotActions      = []string{"mapHotspot"}
 	phoneOnlyActions    = []string{"notify", "confirmReceipt", "pickup", "deliver"}
 )
 

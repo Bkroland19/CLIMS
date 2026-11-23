@@ -61,7 +61,7 @@ Migration 38 grants `sync_logs:read` to `moh` and `admin`. Change who holds it o
 **Roles & permissions** page. The web app shows the log on the **Sync log** tab of **Audit** in the
 MOH workspace.
 
-The notification and HMIS 105 reports count pending, refused and phone-only entries in the reader's
+The notification, HMIS 105 and hotspot reports count pending, refused and phone-only entries in the reader's
 area, without `sync_logs:read`; see [reports](reports.md#field-data-not-yet-received).
 
 ## On the phone

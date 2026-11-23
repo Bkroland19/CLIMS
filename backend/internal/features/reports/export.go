@@ -87,13 +87,18 @@ var exportColumns = map[string][]Column{
 		"expiry_date", "Expiry date", "days_remaining", "Days remaining", "quantity", "Quantity", "reason", "Reason",
 		"authorized_by", "Authorised by", "rule_version", "Rule version", "order_id", "Warehouse request",
 		"hotspot_delivery_id", "Hotspot delivery"),
+	"hotspot-status": cols("id", "Hotspot ID", "name", "Hotspot", "village", "Village", "subcounty", "Subcounty", "district",
+		"District", "status", "Status", "effective_event", "Status set by", "effective_at", "Status since",
+		"contact_only", "Contact only", "manager_accounts", "Manager accounts", "submitted_by", "Submitted by",
+		"created_at", "Recorded"),
 	"hmis-105": cols("district", "District", "subcounty", "Subcounty", "ct11_female_pieces", "105-CT11 Female condoms (pieces)",
 		"ct12_male_pieces", "105-CT12 Male condoms (pieces)", "acknowledgements", "Acknowledgements", "hotspots", "Hotspots",
 		"unacknowledged_lines", "Unacknowledged lines (not counted)"),
 }
 
 var exportTitles = map[string]string{"notifications": "Notification fulfilment", "warehouse-requests": "Warehouse requests",
-	"stock": "Store stock", "batches": "Batches and expiry", "expiry-exceptions": "Expiry exceptions", "hmis-105": "HMIS 105 readiness"}
+	"stock": "Store stock", "batches": "Batches and expiry", "expiry-exceptions": "Expiry exceptions", "hmis-105": "HMIS 105 readiness",
+	"hotspot-status": "Hotspot status"}
 
 var exportDefinitions = map[string][]string{
 	"notifications": {"Notifications raised in the period, counted once each; repeats are shown, not counted again.",
@@ -106,6 +111,9 @@ var exportDefinitions = map[string][]string{
 		"Months of stock is issue-based over the last three complete months, and Unavailable without reconciled history."},
 	"batches":           {"Bands by calendar months left: expired, under 1 month, under 3 months, under 6 months, ok, unknown."},
 	"expiry-exceptions": {"Batches with under one month left that left a store in the period, with the documented reason."},
+	"hotspot-status": {"Status: active (approved and active), pending_review, inactive (deactivated or switched off) or rejected.",
+		"Contact only: a contact person is recorded but no active account manages the hotspot yet.",
+		"Coordinates and contact details are not exported; the map shows locations under its own access rules."},
 	"hmis-105": {"Acknowledged receipts at hotspots dated by acknowledgement: operational evidence of supply, not condoms dispensed.",
 		"Not submitted: the counting event, dispensing channel and subcounty reporting units await programme approval."},
 }
@@ -116,7 +124,7 @@ var exportDefinitions = map[string][]string{
 func (h *Handler) build(ctx context.Context, user *users.User, report string, p params) (any, Table, error) {
 	columns, ok := exportColumns[report]
 	if !ok {
-		return nil, Table{}, errInvalid{errors.New("report must be notifications, warehouse-requests, stock, batches, expiry-exceptions or hmis-105")}
+		return nil, Table{}, errInvalid{errors.New("report must be notifications, warehouse-requests, stock, batches, expiry-exceptions, hmis-105 or hotspot-status")}
 	}
 	for key := range p {
 		if !filterKeys[key] {
@@ -159,6 +167,23 @@ func (h *Handler) build(ctx context.Context, user *users.User, report string, p 
 		t.Period = sum.Period.From + " to " + sum.Period.To
 		t.Filters["from"], t.Filters["to"] = sum.Period.From, sum.Period.To
 		t.Filters["deadline_days"], t.Filters["target_percent"] = strconv.Itoa(f.DeadlineDays), strconv.Itoa(f.Target)
+	case "hotspot-status":
+		f, sc, err := h.hotspotStatusFilter(ctx, user, p)
+		if err != nil {
+			return nil, Table{}, errInvalid{err}
+		}
+		s, district = sc, f.DistrictID
+		r, err := h.repo.hotspotStatusReport(ctx, s, f, h.now())
+		if err != nil {
+			return nil, Table{}, err
+		}
+		f.Limit = exportLimit + 1
+		if rows, err = h.repo.hotspotStatusRecords(ctx, s, f); err != nil {
+			return nil, Table{}, err
+		}
+		summary, t.DataUpdatedAt = r, r.StatusDate
+		t.Period = "Status on " + r.StatusDate.In(Kampala).Format(time.DateOnly) + "; decisions " + r.Period.From + " to " + r.Period.To
+		t.Filters["from"], t.Filters["to"] = r.Period.From, r.Period.To
 	case "hmis-105":
 		month, d, err := h.hmisFilter(p)
 		if err != nil {

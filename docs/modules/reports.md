@@ -10,6 +10,8 @@ The reports module serves the programme reports described in the reporting requi
 | GET    | `/api/v1/reports/notifications/records`      | `reports:read`      |
 | GET    | `/api/v1/reports/warehouse-requests`         | `reports:read`      |
 | GET    | `/api/v1/reports/warehouse-requests/records` | `reports:read`      |
+| GET    | `/api/v1/reports/hotspot-status`             | `reports:read`      |
+| GET    | `/api/v1/reports/hotspot-status/records`     | `reports:read`      |
 | GET    | `/api/v1/reports/stock`                      | `reports:read`      |
 | GET    | `/api/v1/reports/batches`                    | `reports:read`      |
 | GET    | `/api/v1/reports/expiry-exceptions`          | `reports:read`      |
@@ -64,6 +66,25 @@ A hotspot stockout notification names Male, Female or Both and no quantity. The 
 
 `GET /api/v1/reports/warehouse-requests/records` lists the requests behind those totals, newest first, in units and pieces. Filter both by `warehouse_store_id`, `district_id` and `category`.
 
+## Hotspot status
+
+`GET /api/v1/reports/hotspot-status` is the current status of hotspots (RF13), in total and by district. [Hotspot coverage](#hotspot-coverage) counts the same hotspots by region, venue type, dispenser and registration month instead.
+
+| Status           | Meaning                                                     |
+| ---------------- | ----------------------------------------------------------- |
+| `active`         | Approved by the district and active                         |
+| `pending_review` | Submitted or resubmitted by a VHT, waiting for the district |
+| `inactive`       | Deactivated by the district                                 |
+| `rejected`       | Rejected by the district, until the VHT resubmits it        |
+
+- **Contact only**: hotspots with a contact person and no active account for the hotspot yet, whatever their status. A contact is valid before that person registers.
+- **Decisions**: the submissions, resubmissions, activations, rejections and deactivations made in the period (`from` and `to`, default the current month to date), from the hotspots' history. Comments and edits are not decisions.
+- **Not recorded**: `not_recorded` lists what the draft asks for and no record holds: the last field check, whose recheck rules await district and field approval, and a separate duplicate status. Duplicates are rejected like any other submission, so they count as rejected.
+
+`GET /api/v1/reports/hotspot-status/records` lists the hotspots behind the counts by district and name, with each one's `status`, the event that set it (`effective_event`) and when (`effective_at`); a hotspot with no recorded event takes the time it was recorded. Filter by `status` and page with `limit` and `offset`. Coordinates and contact details are left out: the map shows locations under its own access rules.
+
+National users see every hotspot. Others see the hotspots of the district they work in, their own hotspot and the ones they submitted, and `district_id` only narrows that.
+
 ## Store stock
 
 `GET /api/v1/reports/stock` is a current, dated view of stock at warehouses and district stores, separate from any reporting period (`stock_date`). Each line is a store, product and unit:
@@ -112,11 +133,11 @@ A user sets targets for their assigned store only (RN11); national settings and 
 
 ## Exports
 
-`GET /api/v1/reports/export/{report}` returns a report's rows exactly as the screen shows them (RF15, RN02): `notifications`, `warehouse-requests`, `stock`, `batches`, `expiry-exceptions` or `hmis-105`, with that report's own query parameters and access rules. Each export carries the period, [date basis](#filters-and-dates), data update time, scope, product, rule version and the definitions that apply, and the server defines the columns and their headers. `format=csv` downloads a CSV that starts with that information, then the headers and rows, with times in Kampala. Text that a spreadsheet could run as a formula is prefixed with an apostrophe. Without `format`, the JSON table is what the web screens show and turn into Excel. A blank cell means not applicable or not recorded, while 0 is a recorded zero. An export holds at most 50,000 rows; beyond that it asks for narrower filters.
+`GET /api/v1/reports/export/{report}` returns a report's rows exactly as the screen shows them (RF15, RN02): `notifications`, `warehouse-requests`, `stock`, `batches`, `expiry-exceptions`, `hmis-105` or `hotspot-status`, with that report's own query parameters and access rules. Each export carries the period, [date basis](#filters-and-dates), data update time, scope, product, rule version and the definitions that apply, and the server defines the columns and their headers. `format=csv` downloads a CSV that starts with that information, then the headers and rows, with times in Kampala. Text that a spreadsheet could run as a formula is prefixed with an apostrophe. Without `format`, the JSON table is what the web screens show and turn into Excel. A blank cell means not applicable or not recorded, while 0 is a recorded zero. An export holds at most 50,000 rows; beyond that it asks for narrower filters.
 
 ## Approved versions
 
-`POST /api/v1/reports/versions` approves a report as calculated now for its filters, saving the figures and rows unchanged with who approved them and an optional note (RF15, RN04). The saved filters pin the period, and for notifications the deadline and target, so a recalculation covers the same period. Stock and batches are current views, so a recalculation reads current stock.
+`POST /api/v1/reports/versions` approves a report as calculated now for its filters, saving the figures and rows unchanged with who approved them and an optional note (RF15, RN04). The saved filters pin the period, and for notifications the deadline and target, so a recalculation covers the same period. Stock, batches and hotspot statuses are current views, so a recalculation reads them as they are now.
 
 A correction (`POST /api/v1/reports/versions/{id}/corrections`, with a reason) recalculates from the saved filters and saves a new version that supersedes the old one. The old version keeps its figures, so it can still be reproduced. Only the latest version can be corrected, and a second correction of the same version is refused (409).
 
@@ -143,13 +164,14 @@ Each report names its **date basis**, the date that places a record in its perio
 | Warehouse requests        | When the district raised the request; later activity counts up to data time   |
 | Expiry exceptions         | When the batch left the store under the exception (in the export)             |
 | HMIS 105                  | When the hotspot manager acknowledged receipt                                 |
+| Hotspot status            | Status on the data update date; decisions by when they were made              |
 | Stock and batches         | The stock date, not a reporting period                                        |
 
 Exports carry the same text in `date_basis` and in the CSV header. The expiry exceptions endpoint returns a plain list, so its date basis is in the export only.
 
 ## Field data not yet received
 
-The notification and HMIS 105 reports carry `field_sync`, built from what field phones report in the [sync log](sync-log.md), so a reader can tell whether work still on phones may change the totals (RN06). It counts the phones of users in the reader's area: every phone for national users, otherwise those of the district the reader works in, their hotspot and their own. A user's district is that of their district store, else their subcounty, else their hotspot. A `district_id` filter narrows it to that district, and `hot_spot_id` to the hotspot's district, since an entry names its hotspot only once it reaches the server.
+The notification, HMIS 105 and hotspot reports carry `field_sync`, built from what field phones report in the [sync log](sync-log.md), so a reader can tell whether work still on phones may change the totals (RN06). It counts the phones of users in the reader's area: every phone for national users, otherwise those of the district the reader works in, their hotspot and their own. A user's district is that of their district store, else their subcounty, else their hotspot. A `district_id` filter narrows it to that district, and `hot_spot_id` to the hotspot's district, since an entry names its hotspot only once it reaches the server.
 
 | Field                      | Counts                                                                                      |
 | -------------------------- | ------------------------------------------------------------------------------------------- |
@@ -159,7 +181,7 @@ The notification and HMIS 105 reports carry `field_sync`, built from what field 
 | `phone_only`               | Entries saved in the period that only the phone holds: the API has no endpoint for them yet |
 | `last_received_at`         | When a phone in the area last uploaded its log                                              |
 
-The notification report's actions are `stockout` and `acknowledge`; HMIS 105's is `acknowledge`. `phone_only` counts entries saved on the phone (`saved_on_phone`) and the actions without an endpoint (`notify`, `confirmReceipt`, `pickup` and `deliver`), for either report.
+The notification report's actions are `stockout` and `acknowledge`; HMIS 105's is `acknowledge`; the hotspot report's is `mapHotspot`. `phone_only` counts entries saved on the phone (`saved_on_phone`) and the actions without an endpoint (`notify`, `confirmReceipt`, `pickup` and `deliver`), for either report.
 
 The server dates an action when it arrives, not when the phone saved it, so a pending action counts in the period it arrives in. A pending acknowledgement can still complete a notification raised in an earlier period. A phone that has never uploaded its log is not counted. `note` says so with the counts.
 

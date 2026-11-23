@@ -19,4 +19,5 @@ var exportDateBasis = map[string]string{
 	"batches":            stockDateBasis,
 	"expiry-exceptions":  dispatchedBasis,
 	"hmis-105":           acknowledgedBasis,
+	"hotspot-status":     hotspotStatusBasis,
 }

@@ -5109,7 +5109,8 @@
                 "stock",
                 "batches",
                 "expiry-exceptions",
-                "hmis-105"
+                "hmis-105",
+                "hotspot-status"
               ]
             }
           },
@@ -5172,7 +5173,8 @@
                 "stock",
                 "batches",
                 "expiry-exceptions",
-                "hmis-105"
+                "hmis-105",
+                "hotspot-status"
               ]
             }
           },
@@ -5815,6 +5817,158 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/hotspot-status": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getHotspotStatusReport",
+        "summary": "Hotspot status by district",
+        "description": "Requires reports:read. Current hotspots by status (active, pending review, inactive, rejected) in total and by district, contact-only hotspots, and the submissions and decisions made in the period. Last field check and a separate duplicate status are not recorded and are listed in not_recorded. orders:all_stores sees every hotspot; others see those of the district they work in, their own hotspot and those they submitted. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period for decisions and field sync, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotStatusReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/hotspot-status/records": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listHotspotStatusRecords",
+        "summary": "Hotspots behind the report counts",
+        "description": "Requires reports:read. The hotspots behind /reports/hotspot-status by district and name, with each one's status, when it was set and by which event. Coordinates and contact details are left out. orders:all_stores sees every hotspot; others see those of the district they work in, their own hotspot and those they submitted. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period for decisions and field sync, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "One status.",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "pending_review", "inactive", "rejected"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotStatusRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -10376,7 +10530,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "title": {
@@ -10471,7 +10626,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "title": {
@@ -10551,7 +10707,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "title": {
@@ -10671,7 +10828,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "filters": {
@@ -12128,6 +12286,253 @@
             "format": "date-time",
             "nullable": true,
             "description": "When a phone in the area last uploaded its log."
+          }
+        }
+      },
+      "HotspotStatusCounts": {
+        "type": "object",
+        "description": "Hotspots in each report status. Contact-only hotspots have a contact person and no active account for the hotspot yet, whatever their status.",
+        "required": ["total", "active", "pending_review", "inactive", "rejected", "contact_only"],
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "integer"
+          },
+          "pending_review": {
+            "type": "integer"
+          },
+          "inactive": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          },
+          "contact_only": {
+            "type": "integer"
+          }
+        }
+      },
+      "HotspotStatusDistrict": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/HotspotStatusCounts"
+          },
+          {
+            "type": "object",
+            "required": ["district_id", "district"],
+            "properties": {
+              "district_id": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true
+              },
+              "district": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "HotspotStatusDecisions": {
+        "type": "object",
+        "description": "Submissions and district decisions made in the period, from the hotspots' history.",
+        "required": ["submitted", "resubmitted", "activated", "rejected", "deactivated"],
+        "properties": {
+          "submitted": {
+            "type": "integer"
+          },
+          "resubmitted": {
+            "type": "integer"
+          },
+          "activated": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          },
+          "deactivated": {
+            "type": "integer"
+          }
+        }
+      },
+      "HotspotStatusReport": {
+        "type": "object",
+        "description": "Current hotspot status by district (RF13), with the period's decisions.",
+        "required": [
+          "status_date",
+          "period",
+          "date_basis",
+          "total",
+          "districts",
+          "decisions",
+          "not_recorded",
+          "field_sync"
+        ],
+        "properties": {
+          "status_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "period": {
+            "type": "object",
+            "description": "The period of the decisions and field sync counts; the statuses are current.",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "date_basis": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/HotspotStatusCounts"
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotStatusDistrict"
+            }
+          },
+          "decisions": {
+            "$ref": "#/components/schemas/HotspotStatusDecisions"
+          },
+          "not_recorded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Measures the draft asks for that no record holds yet."
+          },
+          "field_sync": {
+            "$ref": "#/components/schemas/FieldSync"
+          }
+        }
+      },
+      "HotspotStatusRecord": {
+        "type": "object",
+        "description": "One hotspot behind the counts. Coordinates and contact details are left out.",
+        "required": [
+          "id",
+          "name",
+          "village",
+          "district_id",
+          "district",
+          "subcounty_id",
+          "subcounty",
+          "status",
+          "review_status",
+          "effective_event",
+          "effective_at",
+          "contact_only",
+          "manager_accounts",
+          "submitted_by",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "village": {
+            "type": "string",
+            "nullable": true
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subcounty": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "pending_review", "inactive", "rejected"]
+          },
+          "review_status": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["submitted", "rejected", "active", "deactivated"]
+          },
+          "effective_event": {
+            "type": "string",
+            "nullable": true,
+            "description": "The event that set the current status; null when none is recorded and effective_at is when the hotspot was recorded.",
+            "enum": ["submitted", "resubmitted", "activated", "rejected", "deactivated"]
+          },
+          "effective_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contact_only": {
+            "type": "boolean"
+          },
+          "manager_accounts": {
+            "type": "integer"
+          },
+          "submitted_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotStatusReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotspotStatusReport"
+          }
+        }
+      },
+      "HotspotStatusRecordListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotStatusRecord"
+            }
           }
         }
       }

@@ -37,6 +37,8 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/hmis-105", h.hmis)
 	group.Get("/trends", h.trends)
 	group.Get("/hotspots", h.hotspots)
+	group.Get("/hotspot-status", h.hotspotStatus)
+	group.Get("/hotspot-status/records", h.hotspotStatusRecords)
 	group.Get("/export/:report", h.export)
 	group.Get("/versions", h.listVersions)
 	group.Post("/versions", rbac.RequirePermission("reports:approve"), h.createVersion)
@@ -373,6 +375,59 @@ func (h *Handler) hotspots(c fiber.Ctx) error {
 		return response.Error(c, 500, "the report could not be calculated", nil)
 	}
 	return response.Success(c, 200, "", report)
+}
+
+// hotspotStatusFilter reads the period of the decisions counted (default the current month to date),
+// a district and, for records, a status.
+func (h *Handler) hotspotStatusFilter(ctx context.Context, user *users.User, p params) (Filter, scope, error) {
+	f, err := ParseFilter(p.get("from"), p.get("to"), "", "7", "80", h.now())
+	if err != nil {
+		return Filter{}, scope{}, err
+	}
+	if raw := p.get("district_id"); raw != "" {
+		id, err := request.ParseUUID(raw)
+		if err != nil {
+			return Filter{}, scope{}, errors.New("district_id must be a UUID")
+		}
+		f.DistrictID = &id
+	}
+	f.Status = p.get("status")
+	if !ValidHotspotStatus(f.Status) {
+		return Filter{}, scope{}, errors.New("status must be active, pending_review, inactive or rejected")
+	}
+	s, err := h.repo.scopeFor(ctx, user)
+	return f, s, err
+}
+
+// hotspotStatus reports where hotspots stand in review, by district, with the period's decisions.
+func (h *Handler) hotspotStatus(c fiber.Ctx) error {
+	f, s, err := h.hotspotStatusFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	report, err := h.repo.hotspotStatusReport(c.Context(), s, f, h.now())
+	if err != nil {
+		slog.Error("hotspot status report failed", "error", err)
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	return response.Success(c, 200, "", report)
+}
+
+func (h *Handler) hotspotStatusRecords(c fiber.Ctx) error {
+	p := params(c.Queries())
+	f, s, err := h.hotspotStatusFilter(c.Context(), users.CurrentUser(c), p)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	if f.Limit, f.Offset, err = page(p); err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	records, err := h.repo.hotspotStatusRecords(c.Context(), s, f)
+	if err != nil {
+		slog.Error("hotspot status records failed", "error", err)
+		return response.Error(c, 500, "the records could not be loaded", nil)
+	}
+	return response.Success(c, 200, "", records)
 }
 
 // page reads a list's limit (default 50, at most 100) and offset (default 0).
