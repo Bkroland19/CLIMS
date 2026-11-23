@@ -14,7 +14,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { getErrorMessage } from '@/lib/api';
-import { ACTIVATED_PARAM } from '@/navigation/paths';
+import { ACTIVATED_PARAM, SSO_ERROR_PARAM } from '@/navigation/paths';
 
 import { useSignIn } from './hooks';
 
@@ -30,12 +30,25 @@ type CredentialsForm = z.infer<typeof credentialsSchema>;
 /** `?activated=1`: the visitor has just activated an invitation (see the onboarding feature). */
 const activatedParamSchema = z.literal('1');
 
+/** Why portal sign-in sent the visitor here instead (`?sso_error=`), as the API and the handoff page report it. */
+const PORTAL_ERRORS = new Map(
+  Object.entries({
+    denied:
+      'Your portal account does not have access to CLIMS. Ask your administrator to grant it.',
+    unavailable:
+      'Your portal account is not linked to an active CLIMS account. Ask your administrator to link it.',
+    expired: 'Portal sign-in took too long or was already used. Open CLIMS from the portal again.',
+    invalid: 'Portal sign-in could not be verified. Open CLIMS from the portal again.',
+    failed: 'Portal sign-in is not available right now. Try again shortly or sign in below.',
+  }),
+);
+
 /** The sign-in screen. On success the guard around it moves the user on. */
 export default function SignInPage() {
   const signIn = useSignIn();
-  const isJustActivated = activatedParamSchema.safeParse(
-    useSearchParams().get(ACTIVATED_PARAM),
-  ).success;
+  const searchParams = useSearchParams();
+  const isJustActivated = activatedParamSchema.safeParse(searchParams.get(ACTIVATED_PARAM)).success;
+  const portalError = PORTAL_ERRORS.get(searchParams.get(SSO_ERROR_PARAM) ?? '') ?? null;
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const {
     register,
@@ -72,6 +85,13 @@ export default function SignInPage() {
                   <AlertDescription>
                     Sign in with your email address and the password you just created.
                   </AlertDescription>
+                </Alert>
+              ) : null}
+              {portalError && !signIn.isError ? (
+                <Alert variant="destructive">
+                  <CircleAlert aria-hidden="true" />
+                  <AlertTitle>Could not sign in from the portal</AlertTitle>
+                  <AlertDescription>{portalError}</AlertDescription>
                 </Alert>
               ) : null}
               {signIn.isError ? (

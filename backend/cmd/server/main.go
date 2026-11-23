@@ -45,6 +45,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+	// Refuse to start with the test probe in production, before touching the database.
+	probe, err := config.IdentitySyncProbe(cfg.AppEnv, cfg.IdentitySyncTestProbe)
+	if err != nil {
+		log.Fatalf("CLIMS identity sync configuration: %v", err)
+	}
+	if probe && cfg.IdentitySyncClientID == "" {
+		log.Fatalf("CLIMS identity sync configuration: IDENTITY_SYNC_TEST_PROBE=1 requires IDENTITY_SYNC_CLIENT_ID")
+	}
 
 	if err := database.RunMigrations(cfg.DSN()); err != nil {
 		log.Fatalf("Migration error: %v", err)
@@ -90,13 +98,28 @@ func main() {
 	jwtAuthMiddleware := middleware.NewJWTMiddleware(cfg.JWTSecret)
 
 	userRepo := users.NewRepository(dbPool, auditor)
-	if client := os.Getenv("IDENTITY_SYNC_CLIENT_ID"); client != "" {
+	if cfg.IdentitySyncClientID != "" {
 		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, os.Getenv("OIDC_ISSUER"), client)
+		if probe {
+			log.Printf("WARNING: identity-sync test session probe is on (APP_ENV=%s, IDENTITY_SYNC_TEST_PROBE=1); never use this outside a test environment", cfg.AppEnv)
+		}
+		err := auth.RegisterIdentitySync(discoveryCtx, app, userRepo, auth.IdentitySyncConfig{
+			Issuer: cfg.OIDCIssuer, Audience: cfg.OIDCClientID, ServiceClient: cfg.IdentitySyncClientID,
+			TestProbe: probe, JWTSecret: cfg.JWTSecret,
+		})
 		cancel()
 		if err != nil {
 			log.Fatalf("CLIMS identity sync configuration: %v", err)
 		}
+	}
+	if cfg.OIDCClientID != "" {
+		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		sso, err := auth.NewSSO(discoveryCtx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.OIDCPublicOrigin, cfg.JWTSecret, userRepo)
+		cancel()
+		if err != nil {
+			log.Fatalf("CLIMS portal sign-in configuration: %v", err)
+		}
+		sso.Register(app)
 	}
 	userService := users.NewService(userRepo)
 	roleRepo := rbac.NewRepository(dbPool, auditor)

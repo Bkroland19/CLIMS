@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError, createHttpClient } from '@/lib/api';
 import { createFakeAdapter } from '@/test/fakeAdapter';
 
-import { getCurrentUser, listMySessions, revokeMySession, signIn } from './api';
+import {
+  completePortalSignIn,
+  getCurrentUser,
+  listMySessions,
+  revokeMySession,
+  signIn,
+} from './api';
 
 function setup(...script: Parameters<typeof createFakeAdapter>) {
   const { adapter, requests } = createFakeAdapter(...script);
@@ -201,5 +207,44 @@ describe('revokeMySession', () => {
   it('rejects not_found when the device was already signed out', async () => {
     const { http } = setup({ status: 404, body: { success: false, message: 'session not found' } });
     await expect(revokeMySession(http, goSession.id)).rejects.toMatchObject({ kind: 'not_found' });
+  });
+});
+
+describe('completePortalSignIn', () => {
+  it('claims the handed-off session without sending a stored token', async () => {
+    const { http, requests } = setup({
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          token: 'tok_sso',
+          refresh_token: 'refresh_sso',
+          user: {
+            id: '6f1c2a7e-0000-4000-8000-000000000001',
+            username: 'akello',
+            role: { id: 2, name: 'dcfp', permissions: [] },
+          },
+        },
+      },
+    });
+
+    const session = await completePortalSignIn(http);
+
+    expect(session).toMatchObject({
+      token: 'tok_sso',
+      refresh_token: 'refresh_sso',
+      user: { username: 'akello' },
+    });
+    expect(requests[0]).toMatchObject({ method: 'POST', url: '/auth/sso/exchange' });
+    expect(requests[0]?.authorization).toBeNull();
+  });
+
+  it('rejects an expired or reused handoff without ending a local session', async () => {
+    const { http, onUnauthorized } = setup({
+      status: 401,
+      body: { success: false, message: 'start sign-in again from the portal' },
+    });
+    await expect(completePortalSignIn(http)).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 });

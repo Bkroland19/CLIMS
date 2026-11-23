@@ -49,6 +49,12 @@ services:
       DB_NAME: ${DB_NAME:-clims_db}
       DB_SSLMODE: ${DB_SSLMODE:-disable}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the selected environment file}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_PUBLIC_ORIGIN: ${OIDC_PUBLIC_ORIGIN:-}
+      IDENTITY_SYNC_CLIENT_ID: ${IDENTITY_SYNC_CLIENT_ID:-}
+      APP_ENV: ${APP_ENV:-production}
       # Addresses allowed to report the client IP; empty trusts the private container network.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       # Optional push to the field app: a Firebase service account key, as JSON or base64. Empty or

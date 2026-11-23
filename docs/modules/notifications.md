@@ -79,4 +79,4 @@ The field app needs the Android app's `google-services.json` from the same Fireb
 
 ## Storage
 
-`notifications` stores each send once, with its rendered text. `notification_recipients` holds one row per person with their `read_at`. Migration 20 created both and dropped Laravel's unused, empty `notifications` table. Migration 36 added `push_devices` and `push_outbox` for [push](#push). The legacy `user_notifications` table is kept as history. Notifications are kept indefinitely.
+`notifications` stores each send once, with its rendered text. `notification_recipients` holds one row per person with their `read_at`. Migration 20 created both and dropped Laravel's unused, empty `notifications` table. Migration 37 added `push_devices` and `push_outbox` for [push](#push). The legacy `user_notifications` table is kept as history. Notifications are kept indefinitely.

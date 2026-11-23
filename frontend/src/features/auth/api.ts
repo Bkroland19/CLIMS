@@ -57,6 +57,15 @@ export async function signIn(http: HttpClient, credentials: Credentials): Promis
 }
 
 /**
+ * Claims the session that portal sign-in started. The API reads it from an
+ * HttpOnly cookie it set on the callback, and the claim works once.
+ */
+export async function completePortalSignIn(http: HttpClient): Promise<Session> {
+  const body = await http.post('/auth/sso/exchange', undefined, { anonymous: true });
+  return parseBody(sessionSchema, body, 'portal sign-in');
+}
+
+/**
  * The signed-in user as the server has them now. A deactivated account
  * rejects with a `forbidden` ApiError ("account is disabled").
  */
