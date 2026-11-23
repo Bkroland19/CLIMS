@@ -86,9 +86,16 @@ function OrderDetail({
       <DetailHeader
         title={`${names.product(order.condom_id, order.condom_category)} from ${names.warehouseLabel(order.ordered_from_store_id)}`}
         status={<StatusBadge status={status.label} tone={status.tone} />}
-        description={`Ordered ${formatDate(order.order_date)}`}
+        description={
+          order.unrequested
+            ? `Sent ${formatDate(order.order_date)} without an order`
+            : `Ordered ${formatDate(order.order_date)}`
+        }
       >
-        <StepTracker aria-label="Order progress" steps={orderSteps(order.order_status)} />
+        <StepTracker
+          aria-label="Order progress"
+          steps={orderSteps(order.order_status, order.unrequested)}
+        />
       </DetailHeader>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -135,16 +142,21 @@ function OrderDetail({
               items={[
                 { label: 'Product', value: names.product(order.condom_id, order.condom_category) },
                 {
-                  label: 'Ordered from',
+                  label: order.unrequested ? 'Sent by' : 'Ordered from',
                   value:
                     names.warehouse(order.ordered_from_store_id)?.name ??
                     names.warehouseLabel(order.ordered_from_store_id),
                 },
-                {
-                  label: 'Quantity ordered',
-                  value: names.quantity(order.quantity_needed, order.unit_of_measure_id),
-                },
-                ...(order.quantity_approved !== null
+                // Stock sent without an order was neither ordered nor approved.
+                ...(order.unrequested
+                  ? []
+                  : [
+                      {
+                        label: 'Quantity ordered',
+                        value: names.quantity(order.quantity_needed, order.unit_of_measure_id),
+                      },
+                    ]),
+                ...(order.quantity_approved !== null && !order.unrequested
                   ? [
                       {
                         label: 'Quantity approved',
@@ -169,7 +181,10 @@ function OrderDetail({
                 ...(differs && order.discrepancy_note
                   ? [{ label: 'Why it differs', value: order.discrepancy_note }]
                   : []),
-                { label: 'Comment', value: order.comment ?? '—' },
+                {
+                  label: order.unrequested ? 'Note from the warehouse' : 'Comment',
+                  value: order.comment ?? '—',
+                },
               ]}
             />
           </CardContent>
@@ -188,6 +203,21 @@ const APPROVED = new Set(['reviewed', 'on_hold', 'confirmed']);
  */
 function DecisionNotice({ order, names }: { order: Order; names: OrderNames }) {
   const warehouse = names.warehouseLabel(order.ordered_from_store_id);
+  if (order.unrequested && order.order_status === 'dispatched') {
+    return (
+      <Alert>
+        <AlertTitle>{warehouse} sent this stock without an order</AlertTitle>
+        <AlertDescription>
+          {order.comment ? (
+            <p className="break-words whitespace-pre-line">{`“${order.comment}”`}</p>
+          ) : null}
+          <p>
+            Nobody in your district ordered it. Count it when it arrives and record the receipt.
+          </p>
+        </AlertDescription>
+      </Alert>
+    );
+  }
   if (order.order_status === 'rejected') {
     return (
       <Alert variant="destructive">

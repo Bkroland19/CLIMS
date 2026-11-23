@@ -69,9 +69,9 @@ func TestWarehouseStepText(t *testing.T) {
 		return map[string]any{"product": "Engabu Free Male", "unit": "cartons", "from_store": "National Medical Stores",
 			"to_store": "Wakiso District Store", "quantity": quantityFor(order, action),
 			"quantity_ordered": value(order.QuantityNeeded), "quantity_dispatched": value(order.QuantityIssued),
-			"note": noteFor(order, action), "transport": transportOf(order)}
+			"note": noteFor(order, action), "transport": transportOf(order), "unrequested": order.Unrequested}
 	}
-	full, partial, rejected, sent, counted, exact := order, order, order, order, order, order
+	full, partial, rejected, sent, counted, exact, pushed := order, order, order, order, order, order, order
 	full.QuantityApproved = count(500)
 	partial.QuantityApproved = count(300)
 	rejected.RejectionReason = text("Out of stock until March")
@@ -80,6 +80,7 @@ func TestWarehouseStepText(t *testing.T) {
 	sent.DriverName, sent.DriverPhone = text("John Okello"), text("0772 000000")
 	counted.QuantityIssued, counted.QuantityReceived, counted.DiscrepancyNote = count(280), count(270), text("Ten missing")
 	exact.QuantityIssued, exact.QuantityReceived = count(280), count(280)
+	pushed.QuantityIssued, pushed.Unrequested, pushed.Comment = count(200), true, text("Quarterly allocation")
 	for _, tc := range []struct {
 		typeName, action string
 		order            Order
@@ -95,6 +96,9 @@ func TestWarehouseStepText(t *testing.T) {
 			"National Medical Stores dispatched 280 cartons of Engabu Free Male. Waybill WB-104, vehicle UAX 123B, driver John Okello (0772 000000). Record the receipt when it arrives."},
 		{"order.shipment_dispatched", "dispatch", exact,
 			"National Medical Stores dispatched 280 cartons of Engabu Free Male. Record the receipt when it arrives."},
+		// Stock sent without an order says so and carries the warehouse's note; an order's comment is the DCFP's own.
+		{"order.shipment_dispatched", "dispatch", pushed,
+			`National Medical Stores dispatched 200 cartons of Engabu Free Male to Wakiso District Store without an order. Note: "Quarterly allocation". Record the receipt when it arrives.`},
 		{"order.shipment_received", "receive", counted,
 			`270 cartons of Engabu Free Male from National Medical Stores arrived at Wakiso District Store. 280 were dispatched. Note: "Ten missing"`},
 		{"order.shipment_received", "receive", exact,

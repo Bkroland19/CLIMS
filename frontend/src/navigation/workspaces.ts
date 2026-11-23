@@ -458,7 +458,7 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Stock',
                 title: 'Warehouse stock',
                 description:
-                  'What the warehouse holds, what went out and what is waiting; register stock here.',
+                  'What the warehouse holds, what went out and what is waiting; register stock, or dispatch it to a district before it orders.',
                 layout: 'table',
               },
             ],

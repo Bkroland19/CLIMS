@@ -219,6 +219,54 @@
         }
       }
     },
+    "/api/v1/orders/district-dispatches": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "createDistrictDispatch",
+        "summary": "Send stock to a district store before it orders",
+        "description": "Requires orders:process and an assigned store that is the sending warehouse (`warehouse_store_id`; orders:all_stores may send from either). Sends stock from NMS or JMS to a district store (`district_store_id`) that has not ordered it: one line per product, each with a `quantity` counted in the product's catalogue unit (sending `unit_of_measure_id` returns 400). Each line becomes an order created `dispatched`, marked `unrequested: true`, with `quantity_needed`, `quantity_approved` and `quantity_issued` all equal to the line's quantity. Only free stock goes: on hand less what district orders have reserved and less expired batches; more returns 409. Stock leaves first expiry first out, and a batch with under one month left needs `expiry_exception_reason` (422 with `error.expiry_exception_reason`). The `note` and transport apply to every line. A line that fails leaves the whole dispatch unsent, and the message starts `line N:`. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`; a destination that is not a district store, 422 with `error.district_store_id`. The district's staff with orders:receive are notified (`order.shipment_dispatched`, saying it was sent without an order and quoting the note) and receive each order with `POST /api/v1/orders/{id}/actions/receive`. Such orders cannot be rejected, and the warehouse request report and the store summary's order counts leave them out; their quantity still counts as dispatched stock.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DistrictDispatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/events": {
       "get": {
         "tags": ["Orders"],
@@ -5498,6 +5546,10 @@
             "type": "string",
             "nullable": true,
             "description": "Transport recorded at dispatch, if given."
+          },
+          "unrequested": {
+            "type": "boolean",
+            "description": "True for stock the warehouse sent without an order (POST /api/v1/orders/district-dispatches): created dispatched, received like any shipment, and left out of request statistics."
           }
         }
       },
@@ -7799,6 +7851,99 @@
           "condom_category": "male",
           "quantity": 1,
           "comment": "Two hotspots are out"
+        }
+      },
+      "DistrictDispatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["warehouse_store_id", "district_store_id", "lines"],
+        "properties": {
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The sending national store, NMS or JMS: the caller's own store unless they have orders:all_stores."
+          },
+          "district_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The district store the stock goes to."
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "One line per product; a product may appear on one line only.",
+            "items": {
+              "$ref": "#/components/schemas/DistrictDispatchLine"
+            }
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000,
+            "description": "The warehouse's word to the district, e.g. why the stock is sent. Stored as each order's comment."
+          },
+          "expiry_exception_reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Required when a batch with under one month left would go; recorded as an expiry exception."
+          },
+          "waybill_number": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "description": "Transport, each optional; blank counts as not given."
+          },
+          "vehicle_registration": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Transport, optional."
+          },
+          "driver_name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "Transport, optional."
+          },
+          "driver_phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Transport, optional."
+          }
+        },
+        "example": {
+          "warehouse_store_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "district_store_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "lines": [
+            {
+              "condom_id": "0b1c2d3e-4f5a-4b6c-8d7e-8f9a0b1c2d3e",
+              "quantity": 200
+            }
+          ],
+          "note": "Quarterly allocation",
+          "waybill_number": "WB-900"
+        }
+      },
+      "DistrictDispatchLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["condom_id", "quantity"],
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An active product with a catalogue unit."
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 10000000,
+            "description": "How many, in the product's catalogue unit."
+          }
         }
       },
       "StockoutReport": {

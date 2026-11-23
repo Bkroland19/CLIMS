@@ -39,10 +39,12 @@ func NotificationTypes() []notifications.Type {
 			Title: "Order rejected by {{.from_store}}",
 			Body: "{{.from_store}} rejected the order for {{.quantity_ordered}} {{.unit}} of {{.product}} " +
 				"from {{.to_store}}. Reason: \"{{.note}}\""},
+		// Stock sent without an order says so, with the warehouse's note.
 		{Name: "order.shipment_dispatched", Channels: inApp,
 			Title: "Stock on the way from {{.from_store}}",
-			Body: "{{.from_store}} dispatched {{.quantity}} {{.unit}} of {{.product}}.{{with .transport}} {{.}}.{{end}}" +
-				" Record the receipt when it arrives."},
+			Body: "{{.from_store}} dispatched {{.quantity}} {{.unit}} of {{.product}}" +
+				"{{if .unrequested}} to {{.to_store}} without an order{{end}}.{{with .transport}} {{.}}.{{end}}" +
+				"{{with .note}} Note: \"{{.}}\".{{end}} Record the receipt when it arrives."},
 		// The DCFPs who ordered and the warehouse that dispatched both receive this one.
 		{Name: "order.shipment_received", Channels: inApp,
 			Title: "Stock received at {{.to_store}}",
@@ -120,7 +122,7 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, before *Order, order
 	data := map[string]any{"product": product, "from_store": fromStore, "to_store": toStore,
 		"unit": "units", "quantity": quantityFor(order, action), "quantity_ordered": value(order.QuantityNeeded),
 		"quantity_dispatched": value(order.QuantityIssued), "note": noteFor(order, action),
-		"transport": transportOf(order)}
+		"transport": transportOf(order), "unrequested": order.Unrequested}
 	if unit != nil {
 		data["unit"] = *unit
 	}
@@ -142,8 +144,8 @@ func (r *Repository) record(ctx context.Context, tx pgx.Tx, before *Order, order
 	})
 }
 
-// noteFor is the person's words on a step: the rejection reason or the discrepancy note, or "" when
-// the step has none.
+// noteFor is the person's words on a step: the rejection reason, the discrepancy note or the note on
+// stock sent without an order, or "" when the step has none.
 func noteFor(order Order, action string) string {
 	var note *string
 	switch action {
@@ -151,6 +153,11 @@ func noteFor(order Order, action string) string {
 		note = order.RejectionReason
 	case "receive":
 		note = order.DiscrepancyNote
+	case "dispatch":
+		// Only stock sent without an order carries the warehouse's note; an order's comment is the DCFP's.
+		if order.Unrequested {
+			note = order.Comment
+		}
 	}
 	if note == nil {
 		return ""

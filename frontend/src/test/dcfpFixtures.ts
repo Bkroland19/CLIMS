@@ -102,6 +102,7 @@ export function anOrder(overrides: Partial<Order> = {}): Order {
     vehicle_registration: null,
     driver_name: null,
     driver_phone: null,
+    unrequested: false,
     hot_spot_id: null,
     created_at: '2026-11-21T08:00:00Z',
     updated_at: '2026-11-21T08:00:00Z',
