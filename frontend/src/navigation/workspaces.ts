@@ -287,8 +287,9 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Audit log',
                 title: 'Audit log',
                 description:
-                  'Every create, update and delete in CLIMS, with who did it and what changed.',
+                  'Sign-ins, account changes and every change to records: who, what, when and from where.',
                 layout: 'table',
+                permission: 'audit:read',
               },
             ],
           },
