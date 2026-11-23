@@ -269,6 +269,29 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	if districts := after["districts"].([]any); len(districts) != 1 || districts[0].(map[string]any)["notifications_fulfilled"] != float64(1) {
 		t.Fatalf("district comparison: %v", districts)
 	}
+	// Receipt activity counts what the manager acknowledged in the period, by acknowledgement date:
+	// 290 male, then 0 and 100 female pieces, all against this one notification.
+	acknowledged := "Date the hotspot manager acknowledged receipt, in Africa/Kampala."
+	expect("receipts", after["receipts"].(map[string]any), map[string]any{"date_basis": acknowledged,
+		"acknowledgements": float64(3), "notifications": float64(1), "raised_before_period": float64(0),
+		"male_pieces": float64(290), "female_pieces": float64(100)})
+	expect("female receipts", summary(admin, "&category=female")["receipts"].(map[string]any),
+		map[string]any{"acknowledgements": float64(2), "male_pieces": float64(0), "female_pieces": float64(100)})
+	if !strings.HasPrefix(after["date_basis"].(string), "Date the notification was first raised") {
+		t.Fatalf("notification date basis: %v", after["date_basis"])
+	}
+	// Raised yesterday and acknowledged today: today's receipts include it, though it was not raised today.
+	var raisedAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT created_at FROM stockout_reports WHERE id = $1`, openReport).Scan(&raisedAt); err != nil {
+		t.Fatal(err)
+	}
+	exec(`UPDATE stockout_reports SET created_at = created_at - interval '2 days' WHERE id = $1`, openReport)
+	today := time.Now().In(time.FixedZone("EAT", 3*3600)).Format(time.DateOnly)
+	earlier := summary(admin, "&from="+today+"&to="+today)
+	expect("raised earlier", earlier, map[string]any{"notifications_raised": float64(0)})
+	expect("receipts raised earlier", earlier["receipts"].(map[string]any), map[string]any{"notifications": float64(1),
+		"raised_before_period": float64(1), "male_pieces": float64(290)})
+	exec(`UPDATE stockout_reports SET created_at = $2 WHERE id = $1`, openReport, raisedAt)
 	records := request("GET", "/reports/notifications/records?hot_spot_id="+hotSpot, nil, districtToken, 200)["data"].([]any)
 	if len(records) != 1 {
 		t.Fatalf("records: %v", records)

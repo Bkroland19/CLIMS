@@ -46,6 +46,7 @@ A hotspot stockout notification names Male, Female or Both and no quantity. The 
 - **Backlog**: open notifications raised before the period, kept apart from it.
 - **Acknowledgement overdue**: a quality issue, counting notifications with a delivery left unacknowledged for longer than the deadline.
 - **Districts**: raised, fulfilled and rate per district, for comparison.
+- **Receipts**: what hotspot managers acknowledged **during the period**, whenever the notification was raised: the lines acknowledged (including those acknowledged with zero pieces), the notifications they belong to, how many of those were raised before the period, and the male and female pieces. This is receipt activity, so unlike the measures above it can include earlier notifications. With `category`, it counts that type's lines only.
 
 `GET /api/v1/reports/notifications/records` lists the notifications behind those totals for the same filters, newest first, with the pieces delivered and acknowledged per type, the response time and the overdue flag. Filter by `status` and page with `limit` and `offset`. `GET /api/v1/orders/stockouts/{id}` opens one notification's deliveries, acknowledgements and history.
 
@@ -111,7 +112,7 @@ A user sets targets for their assigned store only (RN11); national settings and 
 
 ## Exports
 
-`GET /api/v1/reports/export/{report}` returns a report's rows exactly as the screen shows them (RF15, RN02): `notifications`, `warehouse-requests`, `stock`, `batches`, `expiry-exceptions` or `hmis-105`, with that report's own query parameters and access rules. Each export carries the period, data update time, scope, product, rule version and the definitions that apply, and the server defines the columns and their headers. `format=csv` downloads a CSV that starts with that information, then the headers and rows, with times in Kampala. Text that a spreadsheet could run as a formula is prefixed with an apostrophe. Without `format`, the JSON table is what the web screens show and turn into Excel. A blank cell means not applicable or not recorded, while 0 is a recorded zero. An export holds at most 50,000 rows; beyond that it asks for narrower filters.
+`GET /api/v1/reports/export/{report}` returns a report's rows exactly as the screen shows them (RF15, RN02): `notifications`, `warehouse-requests`, `stock`, `batches`, `expiry-exceptions` or `hmis-105`, with that report's own query parameters and access rules. Each export carries the period, [date basis](#filters-and-dates), data update time, scope, product, rule version and the definitions that apply, and the server defines the columns and their headers. `format=csv` downloads a CSV that starts with that information, then the headers and rows, with times in Kampala. Text that a spreadsheet could run as a formula is prefixed with an apostrophe. Without `format`, the JSON table is what the web screens show and turn into Excel. A blank cell means not applicable or not recorded, while 0 is a recorded zero. An export holds at most 50,000 rows; beyond that it asks for narrower filters.
 
 ## Approved versions
 
@@ -132,6 +133,19 @@ Guideline thresholds shown on the charts come from the Condom Distribution Guide
 ## Filters and dates
 
 The notification and warehouse request reports accept `from` and `to` as calendar days in Africa/Kampala (`YYYY-MM-DD`, both included), defaulting to the current review cycle to date for notifications and the current month to date for warehouse requests, and `district_id`, `hot_spot_id`, `category`, `deadline_days` and `target_percent`. Timestamps are stored with their time zone and periods are cut at Kampala midnight (RN09).
+
+Each report names its **date basis**, the date that places a record in its period, in `date_basis`:
+
+| Report                    | Date basis                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| Notifications             | When the notification was first raised; later activity counts up to data time |
+| Notifications, `receipts` | When the hotspot manager acknowledged receipt                                 |
+| Warehouse requests        | When the district raised the request; later activity counts up to data time   |
+| Expiry exceptions         | When the batch left the store under the exception (in the export)             |
+| HMIS 105                  | When the hotspot manager acknowledged receipt                                 |
+| Stock and batches         | The stock date, not a reporting period                                        |
+
+Exports carry the same text in `date_basis` and in the CSV header. The expiry exceptions endpoint returns a plain list, so its date basis is in the export only.
 
 ## Access
 

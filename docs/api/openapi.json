@@ -9149,6 +9149,10 @@
               }
             }
           },
+          "date_basis": {
+            "type": "string",
+            "description": "The date that places a notification in the period: when it was first raised, in Africa/Kampala."
+          },
           "data_updated_at": {
             "type": "string",
             "format": "date-time"
@@ -9334,6 +9338,9 @@
                 }
               }
             }
+          },
+          "receipts": {
+            "$ref": "#/components/schemas/ReceiptActivity"
           },
           "settings": {
             "$ref": "#/components/schemas/ResponseSettings"
@@ -9547,6 +9554,10 @@
                 "format": "date"
               }
             }
+          },
+          "date_basis": {
+            "type": "string",
+            "description": "The date that places a request in the period: when the district raised it, in Africa/Kampala."
           },
           "data_updated_at": {
             "type": "string",
@@ -9867,6 +9878,10 @@
             "format": "date-time",
             "description": "When the balances were read, separate from any reporting period."
           },
+          "date_basis": {
+            "type": "string",
+            "description": "Stock is held on the stock date, not limited to a reporting period."
+          },
           "coverage_window": {
             "type": "object",
             "properties": {
@@ -9993,6 +10008,10 @@
           "stock_date": {
             "type": "string",
             "format": "date-time"
+          },
+          "date_basis": {
+            "type": "string",
+            "description": "Batches are held on the stock date, not limited to a reporting period."
           },
           "rule_version": {
             "type": "string"
@@ -10360,6 +10379,10 @@
           "period": {
             "type": "string",
             "example": "2026-11-01 to 2026-11-22"
+          },
+          "date_basis": {
+            "type": "string",
+            "description": "The report's date basis, also written to the CSV header. Versions saved before it was recorded have none."
           },
           "data_updated_at": {
             "type": "string",
@@ -12021,6 +12044,42 @@
             "items": {
               "$ref": "#/components/schemas/SyncLogEntry"
             }
+          }
+        }
+      },
+      "ReceiptActivity": {
+        "type": "object",
+        "description": "What hotspot managers acknowledged during the period, whenever the notification was raised. With a category filter, that type's lines only.",
+        "required": [
+          "date_basis",
+          "acknowledgements",
+          "notifications",
+          "raised_before_period",
+          "male_pieces",
+          "female_pieces"
+        ],
+        "properties": {
+          "date_basis": {
+            "type": "string",
+            "description": "When the hotspot manager acknowledged receipt, in Africa/Kampala."
+          },
+          "acknowledgements": {
+            "type": "integer",
+            "description": "Delivery lines acknowledged in the period, including those acknowledged with zero pieces."
+          },
+          "notifications": {
+            "type": "integer",
+            "description": "Notifications with an acknowledgement in the period."
+          },
+          "raised_before_period": {
+            "type": "integer",
+            "description": "Of those notifications, the ones raised before the period."
+          },
+          "male_pieces": {
+            "type": "integer"
+          },
+          "female_pieces": {
+            "type": "integer"
           }
         }
       }

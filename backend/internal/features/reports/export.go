@@ -38,6 +38,7 @@ type Table struct {
 	Report        string            `json:"report"`
 	Title         string            `json:"title"`
 	Period        string            `json:"period"`
+	DateBasis     string            `json:"date_basis"`
 	DataUpdatedAt time.Time         `json:"data_updated_at"`
 	Scope         string            `json:"scope"`
 	Product       string            `json:"product"`
@@ -122,7 +123,8 @@ func (h *Handler) build(ctx context.Context, user *users.User, report string, p 
 			return nil, Table{}, errInvalid{fmt.Errorf("%s is not a filter of this report", key)}
 		}
 	}
-	t := Table{Report: report, Title: exportTitles[report], RuleVersion: stock.RuleVersion, Columns: columns,
+	t := Table{Report: report, Title: exportTitles[report], DateBasis: exportDateBasis[report],
+		RuleVersion: stock.RuleVersion, Columns: columns,
 		Definitions: append(append([]string{}, exportDefinitions[report]...), blankRule), Filters: map[string]string{}}
 	for key, value := range p {
 		t.Filters[key] = value
@@ -262,9 +264,13 @@ func (r *Repository) scopeLabel(ctx context.Context, s scope, district, store, h
 // writeCSV writes the table's header block, a blank line, then the column headers and rows.
 func writeCSV(w io.Writer, t Table) error {
 	out := csv.NewWriter(w)
-	header := [][]string{{"Report", t.Title}, {"Period", t.Period},
-		{"Data updated", t.DataUpdatedAt.In(Kampala).Format("2006-01-02 15:04")}, {"Scope", t.Scope},
-		{"Product", t.Product}, {"Rule version", t.RuleVersion}}
+	header := [][]string{{"Report", t.Title}, {"Period", t.Period}}
+	// Versions saved before the date basis was recorded have none.
+	if t.DateBasis != "" {
+		header = append(header, []string{"Date basis", t.DateBasis})
+	}
+	header = append(header, [][]string{{"Data updated", t.DataUpdatedAt.In(Kampala).Format("2006-01-02 15:04")}, {"Scope", t.Scope},
+		{"Product", t.Product}, {"Rule version", t.RuleVersion}}...)
 	for _, d := range t.Definitions {
 		header = append(header, []string{"Definition", d})
 	}

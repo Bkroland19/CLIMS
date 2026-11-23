@@ -55,7 +55,7 @@ func (r *Repository) hmisReadiness(ctx context.Context, s scope, month time.Time
 	out := HMISReadiness{
 		Month:         start.Format("2006-01"),
 		DataUpdatedAt: now,
-		DateBasis:     "Date the hotspot manager acknowledged receipt, in Africa/Kampala.",
+		DateBasis:     acknowledgedBasis,
 		Measure:       "Acknowledged receipts at hotspots: operational evidence of supply, not condoms dispensed.",
 		DataElements:  map[string]string{"105-CT11": "Female condoms (pieces)", "105-CT12": "Male condoms (pieces)"},
 		PendingDecisions: []string{
