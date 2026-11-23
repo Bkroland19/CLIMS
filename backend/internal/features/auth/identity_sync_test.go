@@ -627,3 +627,19 @@ func TestRevokeEndsPortalSession(t *testing.T) {
 		t.Fatalf("sign-in without the role went to %q", loc)
 	}
 }
+
+// TestProbeRefusesIneligibleAccounts: the probe starts a session only where the portal callback
+// would, so a linked account that is disabled or has no role gets 404 and no session.
+func TestProbeRefusesIneligibleAccounts(t *testing.T) {
+	h := newSyncHarness(t, true)
+	disabled, roleless := uuid.NewString(), uuid.NewString()
+	h.repo.add(disabled, "inactive", "DCFP")
+	h.repo.add(roleless, "active")
+	h.repo.links["subject-disabled"], h.repo.links["subject-roleless"] = disabled, roleless
+	for _, subject := range []string{"subject-disabled", "subject-roleless"} {
+		h.do("POST", "/test/sessions", h.token, h.identity(subject), 404)
+	}
+	if len(h.repo.sessions) != 0 {
+		t.Fatalf("the probe created %d sessions for ineligible accounts", len(h.repo.sessions))
+	}
+}

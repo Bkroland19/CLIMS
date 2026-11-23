@@ -242,8 +242,8 @@ func (s *identitySync) revokeSessions(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// probeCreate starts a real CLIMS session for the linked account and returns its access token.
-// Test environments only.
+// probeCreate starts a real CLIMS session for the linked account, when the portal callback would
+// sign it in (active, with a role), and returns its access token. Test environments only.
 func (s *identitySync) probeCreate(c fiber.Ctx) error {
 	body, valid := s.identityBody(c)
 	if !valid {
@@ -255,6 +255,8 @@ func (s *identitySync) probeCreate(c fiber.Ctx) error {
 		return syncError(c, fiber.StatusNotFound, "account_ineligible")
 	case err != nil:
 		return syncError(c, fiber.StatusServiceUnavailable, "unavailable")
+	case !signInEligible(user):
+		return syncError(c, fiber.StatusNotFound, "account_ineligible")
 	}
 	session, err := s.repo.CreateSession(c.Context(), user.ID, "identity-sync test probe", c.IP())
 	if err != nil {

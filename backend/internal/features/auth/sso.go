@@ -160,8 +160,7 @@ func (s *SSO) callback(c fiber.Ctx) error {
 	case err != nil:
 		return s.fail(c, "failed")
 	}
-	// The same accounts identity sync offers for linking: active, with at least one role.
-	if user.Status != "active" || len(user.Roles) == 0 {
+	if !signInEligible(user) {
 		return s.fail(c, "unavailable")
 	}
 	session, err := s.accounts.CreateSession(ctx, user.ID, c.Get(fiber.HeaderUserAgent), c.IP())
@@ -170,6 +169,12 @@ func (s *SSO) callback(c fiber.Ctx) error {
 	}
 	s.cookie(c, handoffCookie, session.RefreshToken, ssoPath+"/exchange", handoffLifetime)
 	return c.Redirect().To(s.origin + completePath)
+}
+
+// signInEligible is the rule identity sync uses to offer accounts for linking: active, with at least
+// one role. The portal callback and the test probe start sessions only for these accounts.
+func signInEligible(user *users.User) bool {
+	return user != nil && user.Status == "active" && len(user.Roles) > 0
 }
 
 // exchange gives the SPA the session the callback started, in the same shape as a password login.
