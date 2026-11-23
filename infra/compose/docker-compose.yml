@@ -51,6 +51,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the selected environment file}
       # Addresses allowed to report the client IP; empty trusts the private container network.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # Optional push to the field app: a Firebase service account key, as JSON or base64. Empty or
+      # unusable disables push; the API still starts and notifications reach the in-app inbox.
+      FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
       PORT: 8080
     expose: ["8080"]
     depends_on:

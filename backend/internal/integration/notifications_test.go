@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"clims-backend/internal/features/notifications"
@@ -188,4 +189,126 @@ func testNotifications(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/notifications?unread=maybe", nil, listedToken, 400)
 	request("GET", "/notifications?limit=101", nil, listedToken, 400)
 	request("GET", "/notifications", nil, "", 401)
+
+	testPush(t, pool, request, listed, listedToken, inDistrict)
+}
+
+// fakePush records pushes and answers with err.
+type fakePush struct {
+	sent []notifications.PushMessage
+	err  error
+}
+
+func (f *fakePush) Send(_ context.Context, m notifications.PushMessage) error {
+	f.sent = append(f.sent, m)
+	return f.err
+}
+
+// testPush registers a phone for one user, queues pushes through the push channel and sends them
+// with a fake FCM. withDevice signs out at the end.
+func testPush(t *testing.T, pool *pgxpool.Pool, request func(string, string, any, string, int) map[string]any,
+	withDevice, withDeviceToken, withoutDevice string) {
+	t.Helper()
+	ctx := context.Background()
+	count := func(sql string, args ...any) int {
+		t.Helper()
+		var n int
+		if err := pool.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	request("POST", "/notifications/devices", map[string]any{"token": "fcm-1", "platform": "android"}, withDeviceToken, 200)
+	request("POST", "/notifications/devices", map[string]any{"token": "fcm-1", "platform": "web"}, withDeviceToken, 422)
+	request("POST", "/notifications/devices", map[string]any{"token": " ", "platform": "android"}, withDeviceToken, 422)
+	request("POST", "/notifications/devices", map[string]any{"token": "fcm-1", "platform": "android", "x": 1}, withDeviceToken, 400)
+	request("POST", "/notifications/devices", map[string]any{"token": "fcm-1", "platform": "android"}, "", 401)
+	// A new token for the same session replaces the old one.
+	request("POST", "/notifications/devices", map[string]any{"token": "fcm-2", "platform": "android"}, withDeviceToken, 200)
+	if count(`SELECT count(*) FROM push_devices WHERE user_id = $1`, withDevice) != 1 ||
+		count(`SELECT count(*) FROM push_devices WHERE token = 'fcm-2'`) != 1 {
+		t.Fatal("a session should keep only its latest token")
+	}
+
+	typ := notifications.Type{Name: "test.push", Title: "Deliver to {{.place}}", Body: "Call {{.phone}}",
+		PushBody: "Tap for details", Channels: []string{notifications.ChannelInApp, notifications.ChannelPush}}
+	send := func(svc *notifications.Service, key string) {
+		t.Helper()
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if err = svc.Notify(ctx, tx, notifications.Message{Type: "test.push", IdempotencyKey: key,
+			Data:    map[string]any{"place": "Kisenyi", "phone": "0700000000", "report_id": "r-1"},
+			Targets: []notifications.Target{{UserIDs: []string{withDevice, withoutDevice}}}}); err != nil {
+			t.Fatal(err)
+		}
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Without Firebase the type still reaches both inboxes, and nothing is queued.
+	off := notifications.NewService()
+	off.MustRegister(typ)
+	send(off, "push-off")
+	if count(`SELECT count(*) FROM push_outbox`) != 0 ||
+		count(`SELECT count(*) FROM notification_recipients nr JOIN notifications n ON n.id = nr.notification_id
+			WHERE n.idempotency_key = 'push-off'`) != 2 {
+		t.Fatal("push disabled: inbox only")
+	}
+
+	on := notifications.NewService()
+	on.MustRegister(typ)
+	on.EnablePush()
+	send(on, "push-on")
+	// Only the user with a phone gets a push, with the shorter push text.
+	if count(`SELECT count(*) FROM push_outbox WHERE user_id = $1 AND token = 'fcm-2' AND body = 'Tap for details'
+			AND title = 'Deliver to Kisenyi'`, withDevice) != 1 || count(`SELECT count(*) FROM push_outbox`) != 1 {
+		t.Fatal("push enabled: one queued push for the phone")
+	}
+
+	fake := &fakePush{err: errors.New("FCM unavailable")}
+	worker := notifications.NewPushWorker(pool, fake)
+	if n, err := worker.SendDue(ctx); err != nil || n != 1 {
+		t.Fatalf("send due: %d, %v", n, err)
+	}
+	if count(`SELECT count(*) FROM push_outbox WHERE attempts = 1 AND next_attempt_at > CURRENT_TIMESTAMP`) != 1 {
+		t.Fatal("a failed push should wait to be retried")
+	}
+	if n, _ := worker.SendDue(ctx); n != 0 {
+		t.Fatal("a push waiting for its retry was sent early")
+	}
+	pool.Exec(ctx, `UPDATE push_outbox SET next_attempt_at = CURRENT_TIMESTAMP`)
+	fake.err = nil
+	if n, err := worker.SendDue(ctx); err != nil || n != 1 || count(`SELECT count(*) FROM push_outbox`) != 0 {
+		t.Fatalf("retry: %d, %v", n, err)
+	}
+	m := fake.sent[len(fake.sent)-1]
+	if m.Token != "fcm-2" || m.Body != "Tap for details" || m.Data["user_id"] != withDevice ||
+		m.Data["report_id"] != "r-1" || m.Data["type"] != "test.push" || m.Data["notification_id"] == "" {
+		t.Fatalf("sent %+v", m)
+	}
+	if _, leaked := m.Data["phone"]; leaked {
+		t.Fatal("push data must carry IDs only")
+	}
+
+	// A token FCM no longer knows removes the device.
+	send(on, "push-gone")
+	fake.err = notifications.ErrInvalidToken
+	if _, err := worker.SendDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if count(`SELECT count(*) FROM push_devices WHERE token = 'fcm-2'`) != 0 || count(`SELECT count(*) FROM push_outbox`) != 0 {
+		t.Fatal("an invalid token should remove its device")
+	}
+
+	// Signing out stops pushes to that phone.
+	request("POST", "/notifications/devices", map[string]any{"token": "fcm-3", "platform": "android"}, withDeviceToken, 200)
+	request("POST", "/auth/logout", nil, withDeviceToken, 200)
+	send(on, "push-signed-out")
+	if count(`SELECT count(*) FROM push_outbox`) != 0 {
+		t.Fatal("a signed-out session must not be queued pushes")
+	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -106,6 +107,17 @@ func main() {
 	notifier.MustRegister(hotspots.NotificationTypes()...)
 	notifier.MustRegister(orders.NotificationTypes()...)
 	notifier.MustRegister(inventory.NotificationTypes()...)
+	// Push to the field app needs Firebase credentials. Without them, or with unusable ones, the API
+	// still starts and notifications reach the inbox as before.
+	if fcm, err := notifications.ConfiguredFCM(cfg.FirebaseCredentialsJSON, cfg.FirebaseCredentialsFile); err != nil {
+		slog.Error("push notifications disabled: Firebase credentials are unusable", "error", err)
+	} else if fcm == nil {
+		slog.Info("push notifications disabled: FIREBASE_CREDENTIALS_JSON is not set")
+	} else {
+		notifier.EnablePush()
+		go notifications.NewPushWorker(dbPool, fcm).Run(ctx, 5*time.Second)
+		slog.Info("push notifications enabled")
+	}
 
 	auth.RegisterRoutes(v1, auth.NewHandler(userRepo, userService, cfg.JWTSecret, auditor), jwtAuthMiddleware, activeUser)
 	users.RegisterRoutes(v1, users.NewHandler(userRepo, userService), jwtAuthMiddleware, activeUser)
