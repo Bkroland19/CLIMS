@@ -26,9 +26,7 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
-      "defaultClientScopes": [
-        "roles"
-      ],
+      "defaultClientScopes": ["roles"],
       "attributes": {
         "portal.system": "false",
         "ui.displayInLauncher": "false",
