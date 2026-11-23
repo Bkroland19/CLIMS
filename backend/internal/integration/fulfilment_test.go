@@ -292,6 +292,58 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	expect("receipts raised earlier", earlier["receipts"].(map[string]any), map[string]any{"notifications": float64(1),
 		"raised_before_period": float64(1), "male_pieces": float64(290)})
 	exec(`UPDATE stockout_reports SET created_at = $2 WHERE id = $1`, openReport, raisedAt)
+	// RN06: what the hotspot manager's phone reports about sending its saved actions. A stockout and an
+	// acknowledgement still pending may change the totals; a refused acknowledgement and a delivery the API
+	// has no endpoint for are reported apart; a pending hotspot map and a sent stockout are not counted.
+	var manager string
+	if err := pool.QueryRow(ctx, `SELECT id FROM users WHERE hot_spot_id = $1 AND status = 'active' ORDER BY id LIMIT 1`,
+		hotSpot).Scan(&manager); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	oldest := now.Add(-2 * time.Hour)
+	for _, e := range []struct {
+		id, action, status string
+		queued             time.Time
+	}{
+		{"FS-stockout-retrying", "stockout", "retrying", oldest},
+		{"FS-ack-waiting", "acknowledge", "waiting", now.Add(-time.Hour)},
+		{"FS-map-waiting", "mapHotspot", "waiting", now.Add(-3 * time.Hour)},
+		{"FS-stockout-sent", "stockout", "sent", now.Add(-time.Minute)},
+		{"FS-ack-refused", "acknowledge", "refused", now.Add(-time.Minute)},
+		{"FS-deliver-phone", "deliver", "saved_on_phone", now.Add(-time.Minute)},
+	} {
+		exec(`INSERT INTO mobile_sync_log (user_id, client_entry_id, action, status, queued_at, changed_at, platform)
+			VALUES ($1, $2, $3, $4, $5, $5, 'android')`, manager, e.id, e.action, e.status, e.queued)
+	}
+	defer exec(`DELETE FROM mobile_sync_log WHERE client_entry_id LIKE 'FS-%'`)
+	fieldSync := func(data map[string]any) map[string]any {
+		t.Helper()
+		sync := data["field_sync"].(map[string]any)
+		if !strings.Contains(sync["note"].(string), "has not uploaded its log is not counted") {
+			t.Fatalf("field sync note: %v", sync["note"])
+		}
+		return sync
+	}
+	for who, token := range map[string]string{"admin": admin, "district": districtToken} {
+		sync := fieldSync(summary(token, ""))
+		expect(who+" field sync", sync, map[string]any{"pending": float64(2), "refused": float64(1), "phone_only": float64(1)})
+		if queued, err := time.Parse(time.RFC3339, sync["oldest_pending_queued_at"].(string)); err != nil || !queued.Equal(oldest) {
+			t.Fatalf("%s oldest pending: %v, want %v", who, sync["oldest_pending_queued_at"], oldest)
+		}
+		if sync["last_received_at"] == nil {
+			t.Fatalf("%s last upload missing: %v", who, sync)
+		}
+	}
+	// Another district's DCFP sees none of these phones, even when asking for this hotspot.
+	expect("other district field sync", fieldSync(summary(otherDistrictToken, "")), map[string]any{"pending": float64(0),
+		"refused": float64(0), "phone_only": float64(0), "last_received_at": nil})
+	// HMIS counts the pending acknowledgement only, for the same districts as its figures.
+	hmisSync := fieldSync(request("GET", "/reports/hmis-105", nil, districtToken, 200)["data"].(map[string]any))
+	expect("HMIS field sync", hmisSync, map[string]any{"pending": float64(1), "refused": float64(1), "phone_only": float64(1)})
+	expect("other district HMIS field sync", fieldSync(request("GET", "/reports/hmis-105", nil, otherDistrictToken, 200)["data"].(map[string]any)),
+		map[string]any{"pending": float64(0)})
+
 	records := request("GET", "/reports/notifications/records?hot_spot_id="+hotSpot, nil, districtToken, 200)["data"].([]any)
 	if len(records) != 1 {
 		t.Fatalf("records: %v", records)

@@ -147,6 +147,22 @@ Each report names its **date basis**, the date that places a record in its perio
 
 Exports carry the same text in `date_basis` and in the CSV header. The expiry exceptions endpoint returns a plain list, so its date basis is in the export only.
 
+## Field data not yet received
+
+The notification and HMIS 105 reports carry `field_sync`, built from what field phones report in the [sync log](sync-log.md), so a reader can tell whether work still on phones may change the totals (RN06). It counts the phones of users in the reader's area: every phone for national users, otherwise those of the district the reader works in, their hotspot and their own. A user's district is that of their district store, else their subcounty, else their hotspot. A `district_id` filter narrows it to that district, and `hot_spot_id` to the hotspot's district, since an entry names its hotspot only once it reaches the server.
+
+| Field                      | Counts                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| `pending`                  | Entries for the report's actions waiting or retrying now, whenever they were saved          |
+| `oldest_pending_queued_at` | When the oldest pending entry was saved, by the phone's clock                               |
+| `refused`                  | Entries for the report's actions saved in the period that the server refused                |
+| `phone_only`               | Entries saved in the period that only the phone holds: the API has no endpoint for them yet |
+| `last_received_at`         | When a phone in the area last uploaded its log                                              |
+
+The notification report's actions are `stockout` and `acknowledge`; HMIS 105's is `acknowledge`. `phone_only` counts entries saved on the phone (`saved_on_phone`) and the actions without an endpoint (`notify`, `confirmReceipt`, `pickup` and `deliver`), for either report.
+
+The server dates an action when it arrives, not when the phone saved it, so a pending action counts in the period it arrives in. A pending acknowledgement can still complete a notification raised in an earlier period. A phone that has never uploaded its log is not counted. `note` says so with the counts.
+
 ## Access
 
 Access is checked on the server for every request (RN01). `orders:all_stores` sees every notification, request and store, for national users. Warehouse request and stock reports show other users their assigned store only. For notifications, others see the notifications of their assigned district store, of their assigned hotspot, the ones they sent, and with `orders:stockout_district` the district they work in. Filters only narrow what the user can already see, so another district's data is never returned, including by asking for its hotspot.

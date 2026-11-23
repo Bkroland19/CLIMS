@@ -35,6 +35,7 @@ type HMISReadiness struct {
 	IntegrationEnabled bool              `json:"integration_enabled"`
 	Total              HMISRow           `json:"total"`
 	Rows               []HMISRow         `json:"rows"`
+	FieldSync          FieldSync         `json:"field_sync"`
 }
 
 // hmisScope limits HMIS figures to every district for national users, or the district the user works in.
@@ -63,7 +64,8 @@ func (r *Repository) hmisReadiness(ctx context.Context, s scope, month time.Time
 			"Dispensing channel: which of the four 2.4.2 channels community hotspot supply belongs to.",
 			"Subcounty reporting units: approval and DHIS2 metadata before any submission.",
 		},
-		Rows: []HMISRow{},
+		Rows:      []HMISRow{},
+		FieldSync: FieldSync{Note: fieldSyncNote},
 	}
 	var own *string
 	own, err := r.hmisDistrict(ctx, s)
@@ -108,5 +110,14 @@ func (r *Repository) hmisReadiness(ctx context.Context, s scope, month time.Time
 		out.Total.Hotspots += row.Hotspots
 		out.Total.UnacknowledgedLines += row.UnacknowledgedLines
 	}
-	return out, nil
+	// The phones counted are those of the same districts as the figures.
+	district := districtFilter
+	if !s.all {
+		if districtFilter != nil && *districtFilter != *own {
+			return out, nil // another district: no figures, so no phones either
+		}
+		district = own
+	}
+	out.FieldSync, err = r.fieldSync(ctx, scope{all: true}, district, nil, hmisActions, start, end)
+	return out, err
 }

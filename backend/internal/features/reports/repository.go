@@ -100,6 +100,7 @@ type NotificationSummary struct {
 	AcknowledgementOverdue int64                `json:"acknowledgement_overdue"`
 	Districts              []DistrictRow        `json:"districts"`
 	Receipts               ReceiptActivity      `json:"receipts"`
+	FieldSync              FieldSync            `json:"field_sync"`
 	// Settings are the review cycle, deadline and target in effect; request parameters may override them.
 	Settings ResponseSettings `json:"settings"`
 }
@@ -258,7 +259,8 @@ func (r *Repository) notificationSummary(ctx context.Context, s scope, f Filter,
 	if err != nil {
 		return NotificationSummary{}, err
 	}
-	return out, nil
+	out.FieldSync, err = r.fieldSync(ctx, s, f.DistrictID, f.HotSpotID, notificationActions, f.From, f.To)
+	return out, err
 }
 
 // NotificationRecord is one notification behind a report total (RF08), with what was delivered and

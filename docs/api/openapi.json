@@ -9342,6 +9342,9 @@
           "receipts": {
             "$ref": "#/components/schemas/ReceiptActivity"
           },
+          "field_sync": {
+            "$ref": "#/components/schemas/FieldSync"
+          },
           "settings": {
             "$ref": "#/components/schemas/ResponseSettings"
           }
@@ -10341,6 +10344,9 @@
             "items": {
               "$ref": "#/components/schemas/HMISRow"
             }
+          },
+          "field_sync": {
+            "$ref": "#/components/schemas/FieldSync"
           }
         }
       },
@@ -12080,6 +12086,48 @@
           },
           "female_pieces": {
             "type": "integer"
+          }
+        }
+      },
+      "FieldSync": {
+        "type": "object",
+        "description": "What field phones in the report's area have reported about sending their saved actions (docs/modules/sync-log.md). Counts only; reading it needs no sync_logs:read.",
+        "required": [
+          "note",
+          "pending",
+          "oldest_pending_queued_at",
+          "refused",
+          "phone_only",
+          "last_received_at"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "How to read these counts and their limits."
+          },
+          "pending": {
+            "type": "integer",
+            "description": "Entries for this report's actions waiting or retrying now, whenever they were saved. The server dates them when they arrive."
+          },
+          "oldest_pending_queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the oldest pending entry was saved, by the phone's clock."
+          },
+          "refused": {
+            "type": "integer",
+            "description": "Entries for this report's actions saved in the period and refused by the server."
+          },
+          "phone_only": {
+            "type": "integer",
+            "description": "Entries saved in the period that only the phone holds, because the API has no endpoint for them yet."
+          },
+          "last_received_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When a phone in the area last uploaded its log."
           }
         }
       }
