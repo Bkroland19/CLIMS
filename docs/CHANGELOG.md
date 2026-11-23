@@ -24,6 +24,16 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   permission (it held only `catalogue:manage`, so MOH accounts could open almost nothing), and NMS and
   JMS `reports:read`. The web app opens every workspace read-only for MOH, whose Orders tabs now show
   every district's real hotspot requests and district orders.
+- **Sync log of what field phones send.** The field app records each action it saves (mapping a
+  hotspot, requesting stock, counting a delivery and the rest): every try to send it and whether it
+  was sent, refused, is retrying after a network failure or changed only the phone because the API
+  has no endpoint for it yet. Phones upload metadata only, never payloads or typed text, with
+  `POST /api/v1/sync-log`; `GET /api/v1/sync-log` needs the new `sync_logs:read`, which migration 40
+  grants to MOH and administrators and which can be changed on **Roles & permissions**. Web: a
+  **Sync log** tab beside the audit log, under the sidebar item now named **Audit**. Requests a phone
+  tags with `X-Client-Entry-Id` leave that entry in their audit details, and
+  `GET /api/v1/audit?client_entry_id=` (`/moh/audit?entry=` on the web) shows what the server
+  recorded for it. Field users see no log; see [the module](modules/sync-log.md).
 
 ### Fixed
 
