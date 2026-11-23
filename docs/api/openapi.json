@@ -1156,7 +1156,7 @@
       "put": {
         "tags": ["Users"],
         "operationId": "setUserRoles",
-        "summary": "Replace a user\u2019s roles",
+        "summary": "Replace a user’s roles",
         "description": "Replaces the complete set of role assignments. Duplicate role IDs are ignored. An empty array removes every assignment. Unknown roles return 422. Removing the last active admin is rejected. Requires roles:assign.",
         "responses": {
           "200": {
@@ -3840,7 +3840,7 @@
         "tags": ["Orders"],
         "operationId": "getStockoutReport",
         "summary": "Get a stockout notification with its deliveries and history",
-        "description": "Requires orders:read and the same visibility as the list. Shows the deliveries, per-line acknowledgements and every event behind the notification's status.",
+        "description": "Requires orders:read, with the same visibility as the list; or orders:stockout, with which a reporter without orders:read (such as a VHT) sees only the reports they sent or about their own hotspot (404 otherwise). Shows the deliveries, per-line acknowledgements and every event behind the notification's status.",
         "parameters": [
           {
             "name": "id",
@@ -3886,7 +3886,7 @@
         "tags": ["Orders"],
         "operationId": "recordHotspotDelivery",
         "summary": "Record a district delivery to the hotspot",
-        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Each line is a product of a selected type in its catalogue unit, converted to pieces; it comes out of the store's available stock (409 when too little) and is written to the inventory ledger as a hotspot_delivery. The hotspot's manager accounts are notified. A fulfilled notification refuses deliveries (409). Lines are taken first expiry first out; expired batches are never delivered, and a batch with under one month left needs expiry_exception_reason.",
+        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Each line is a product of a selected type in its catalogue unit, converted to pieces; it comes out of the store's available stock (409 when too little) and is written to the inventory ledger as a hotspot_delivery. The hotspot's manager accounts are notified. A fulfilled notification refuses deliveries (409). Lines are taken first expiry first out; expired batches are never delivered, and a batch with under one month left needs expiry_exception_reason. Name a delivery agent with rider_id to have them carry it; they see it in GET /orders/deliveries.",
         "parameters": [
           {
             "name": "id",
@@ -3958,7 +3958,7 @@
         "tags": ["Orders"],
         "operationId": "acknowledgeHotspotDelivery",
         "summary": "Acknowledge pieces received at the hotspot",
-        "description": "Requires orders:stockout and the notification's hotspot as your assigned hotspot. Only the hotspot's manager acknowledges: district and national users cannot complete fulfilment. Each line records the pieces actually received. Sending a line's count again is accepted once; a different count for an acknowledged line returns 409. The notification is fulfilled when every selected type has a positive acknowledgement, and the district is notified.",
+        "description": "Requires orders:stockout and the notification's hotspot as your assigned hotspot, or orders:deliver as the delivery agent named for the delivery each line belongs to (when the hotspot's manager cannot confirm). District and national users cannot complete fulfilment; any other line is refused (403). Each line records the pieces actually received and who confirmed them. Sending a line's count again is accepted once; a different count for an acknowledged line returns 409, whoever recorded it. The notification is fulfilled when every selected type has a positive acknowledgement, and the district is notified, told when the delivery agent confirmed.",
         "parameters": [
           {
             "name": "id",
@@ -5265,6 +5265,107 @@
           }
         }
       }
+    },
+    "/api/v1/orders/stockouts/{id}/riders": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listStockoutRiders",
+        "summary": "List the delivery agents who may carry a delivery for a stockout",
+        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Lists active users with orders:deliver who work in the district of that store (their store's district, or else their subcounty's), by name.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/deliveries": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listMyHotspotDeliveries",
+        "summary": "List the hotspot deliveries named for you as delivery agent",
+        "description": "Requires orders:deliver. Returns only deliveries whose rider is the signed-in user, newest first, with the hotspot's details and contact, the lines, and whether the hotspot has confirmed receipt. Lists use limit (default 50, maximum 100) and offset.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiderDeliveryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5916,6 +6017,10 @@
           "hot_spot_id",
           "subcounty_id",
           "store_id",
+          "organisation_unit",
+          "hot_spot",
+          "subcounty",
+          "store",
           "first_name",
           "last_name",
           "location",
@@ -5975,6 +6080,142 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          },
+          "organisation_unit": {
+            "type": "object",
+            "nullable": true,
+            "description": "Assigned organisation unit details, or null when unassigned.",
+            "required": ["id", "uid", "name", "short_name", "subcounty", "district", "region"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "uid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "short_name": {
+                "type": "string"
+              },
+              "subcounty": {
+                "type": "string"
+              },
+              "district": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              }
+            }
+          },
+          "hot_spot": {
+            "type": "object",
+            "nullable": true,
+            "description": "Assigned hot spot details, or null when unassigned.",
+            "required": [
+              "id",
+              "name",
+              "type",
+              "status",
+              "village",
+              "subcounty",
+              "district",
+              "latitude",
+              "longitude"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
+              },
+              "type": {
+                "type": "string",
+                "nullable": true
+              },
+              "status": {
+                "type": "string"
+              },
+              "village": {
+                "type": "string",
+                "nullable": true
+              },
+              "subcounty": {
+                "type": "string",
+                "nullable": true
+              },
+              "district": {
+                "type": "string",
+                "nullable": true
+              },
+              "latitude": {
+                "type": "number",
+                "nullable": true
+              },
+              "longitude": {
+                "type": "number",
+                "nullable": true
+              }
+            }
+          },
+          "subcounty": {
+            "type": "object",
+            "nullable": true,
+            "description": "Assigned subcounty details, or null when unassigned.",
+            "required": ["id", "name", "district_id", "district_name"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "district_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "district_name": {
+                "type": "string"
+              }
+            }
+          },
+          "store": {
+            "type": "object",
+            "nullable": true,
+            "description": "Assigned store details, or null when unassigned.",
+            "required": ["id", "code", "name", "store_type", "district_id", "district_name"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "store_type": {
+                "type": "string",
+                "enum": ["national", "district"]
+              },
+              "district_id": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true
+              },
+              "district_name": {
+                "type": "string",
+                "nullable": true
+              }
+            }
           },
           "first_name": {
             "type": "string"
@@ -8238,6 +8479,15 @@
                           }
                         }
                       }
+                    },
+                    "rider": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Rider"
+                        }
+                      ],
+                      "nullable": true,
+                      "description": "The delivery agent carrying it, when the district named one."
                     }
                   }
                 }
@@ -8346,6 +8596,12 @@
             "maxLength": 1000,
             "nullable": true,
             "description": "Required when stock expiring within one calendar month would leave the store (first expiry first out). Recorded with who authorised it and the rule version."
+          },
+          "rider_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Optional delivery agent carrying it: an active user with orders:deliver working in the hotspot's district (GET /orders/stockouts/{id}/riders). Anyone else is refused (422, error.rider_id). The agent is notified (order.delivery_assigned)."
           }
         }
       },
@@ -9578,7 +9834,7 @@
           },
           "scope": {
             "type": "string",
-            "example": "National \u00b7 Kampala"
+            "example": "National · Kampala"
           },
           "product": {
             "type": "string"
@@ -10495,6 +10751,185 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StoreOverviewStock"
+            }
+          }
+        }
+      },
+      "Rider": {
+        "type": "object",
+        "required": ["id", "name", "phone"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name, or the username when no name is set."
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "description": "A delivery agent: an active user with orders:deliver."
+      },
+      "RiderListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rider"
+            }
+          }
+        }
+      },
+      "RiderDelivery": {
+        "type": "object",
+        "required": [
+          "id",
+          "stockout_report_id",
+          "hot_spot_id",
+          "hot_spot",
+          "note",
+          "created_at",
+          "lines",
+          "acknowledged"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stockout_report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hot_spot": {
+            "type": "object",
+            "required": [
+              "name",
+              "village",
+              "subcounty",
+              "district",
+              "contact_name",
+              "contact_phone"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "village": {
+                "type": "string",
+                "nullable": true
+              },
+              "subcounty": {
+                "type": "string",
+                "nullable": true
+              },
+              "district": {
+                "type": "string",
+                "nullable": true
+              },
+              "contact_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "contact_phone": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "description": "The hotspot's current details, and its latest contact person."
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "category": {
+                  "type": "string",
+                  "enum": ["male", "female"]
+                },
+                "condom_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "product": {
+                  "type": "string"
+                },
+                "unit_of_measure_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "pieces": {
+                  "type": "integer"
+                },
+                "acknowledged_pieces": {
+                  "type": "integer",
+                  "nullable": true
+                },
+                "acknowledged_by_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "nullable": true
+                },
+                "acknowledged_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "True once the hotspot's manager has confirmed every line."
+          }
+        },
+        "description": "A hotspot delivery named for the signed-in delivery agent."
+      },
+      "RiderDeliveryListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiderDelivery"
             }
           }
         }

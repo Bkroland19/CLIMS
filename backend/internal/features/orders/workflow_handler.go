@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/stock"
 	"clims-backend/internal/features/users"
@@ -67,7 +68,14 @@ func (h *Handler) stockoutDetail(c fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, 400, err.Error(), nil)
 	}
-	detail, err := h.repo.getStockout(c.Context(), scopeFor(users.CurrentUser(c)), id)
+	user := users.CurrentUser(c)
+	access := scopeFor(user)
+	if !user.HasPermission("orders:read") {
+		// A reporter without orders:read sees only reports they sent or about their own hotspot,
+		// whatever else their role holds.
+		access = scope{userID: user.ID, hotSpotID: user.HotSpotID}
+	}
+	detail, err := h.repo.getStockout(c.Context(), access, id)
 	if err != nil {
 		return workflowError(c, err)
 	}
@@ -118,6 +126,13 @@ func validDelivery(in *DeliveryInput) string {
 			}
 			line.UnitOfMeasureID = &unit
 		}
+	}
+	if in.RiderID != nil {
+		rider, err := request.ParseUUID(*in.RiderID)
+		if err != nil {
+			return "rider_id must be a UUID"
+		}
+		in.RiderID = &rider
 	}
 	var ok bool
 	if in.Note, ok = trimComment(in.Note); !ok {
@@ -341,6 +356,8 @@ func workflowError(c fiber.Ctx, err error) error {
 		return response.Error(c, 422, err.Error(), nil)
 	case errors.Is(err, stock.ErrNearExpiry):
 		return response.Error(c, 422, err.Error(), map[string]string{"expiry_exception_reason": err.Error()})
+	case errors.Is(err, errRiderNotEligible):
+		return response.Error(c, 422, err.Error(), map[string]string{"rider_id": err.Error()})
 	case errors.Is(err, errRejectReason):
 		return response.Error(c, 422, err.Error(), map[string]string{"reason": err.Error()})
 	case errors.Is(err, errNotWarehouse):
@@ -390,4 +407,54 @@ func trimComment(comment *string) (*string, bool) {
 		return nil, true
 	}
 	return &trimmed, len(trimmed) <= 4000
+}
+
+// riders lists the delivery agents who may carry a delivery for a stockout report: active users
+// with orders:deliver working in the district of the store the report went to.
+func (h *Handler) riders(c fiber.Ctx) error {
+	id, err := request.UUIDParam(c)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	riders, err := h.repo.listRiders(c.Context(), scopeFor(users.CurrentUser(c)), id)
+	if err != nil {
+		return workflowError(c, err)
+	}
+	return response.Success(c, 200, "", riders)
+}
+
+// myDeliveries lists the hotspot deliveries named for the signed-in delivery agent, newest first.
+func (h *Handler) myDeliveries(c fiber.Ctx) error {
+	limit, offset, ok := page(c)
+	if !ok {
+		return response.Error(c, 400, pageError, nil)
+	}
+	deliveries, err := h.repo.riderDeliveries(c.Context(), users.CurrentUser(c).ID, limit, offset)
+	if err != nil {
+		return workflowError(c, err)
+	}
+	return response.Success(c, 200, "", deliveries)
+}
+
+// requireReportReader lets a stockout report's details through to holders of orders:read, and to
+// those who report stockouts (orders:stockout), so a VHT can follow the requests they sent;
+// stockoutDetail limits the latter to their own reports.
+func requireReportReader(c fiber.Ctx) error {
+	user := users.CurrentUser(c)
+	if user.HasPermission("orders:read") || user.HasPermission("orders:stockout") {
+		return c.Next()
+	}
+	c.Locals(audit.DeniedPermissionKey, "orders:read")
+	return response.Error(c, 403, "permission denied", nil)
+}
+
+// requireAcknowledger lets through the hotspot's manager (orders:stockout) and delivery agents
+// (orders:deliver); acknowledge then limits an agent to the deliveries named for them.
+func requireAcknowledger(c fiber.Ctx) error {
+	user := users.CurrentUser(c)
+	if user.HasPermission("orders:stockout") || user.HasPermission("orders:deliver") {
+		return c.Next()
+	}
+	c.Locals(audit.DeniedPermissionKey, "orders:stockout")
+	return response.Error(c, 403, "permission denied", nil)
 }

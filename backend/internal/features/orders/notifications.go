@@ -22,9 +22,14 @@ func NotificationTypes() []notifications.Type {
 		{Name: "order.hotspot_delivery", Channels: inApp,
 			Title: "Stock on the way to {{.hotspot}}",
 			Body:  "The district sent {{.pieces}} for your stockout notification. Acknowledge the pieces you receive."},
+		// The delivery agent named for a delivery: what to carry, where, and who to call.
+		{Name: "order.delivery_assigned", Channels: inApp,
+			Title: "Deliver to {{.hotspot}}",
+			Body: "Carry {{.pieces}} from the district store to {{.hotspot}}{{with .place}}, {{.}}{{end}}." +
+				"{{with .contact}} Contact: {{.}}.{{end}}"},
 		{Name: "order.delivery_acknowledged", Channels: inApp,
 			Title: "{{.hotspot}} acknowledged its delivery",
-			Body: "{{.hotspot}} has acknowledged {{.pieces}} received." +
+			Body: "{{.hotspot}} has acknowledged {{.pieces}} received{{if index . \"by_agent\"}}, as confirmed by the delivery agent{{end}}." +
 				"{{if .fulfilled}} The notification is fulfilled.{{else}} The notification stays open until every selected type is received.{{end}}"},
 		{Name: "order.replenishment_requested", Channels: inApp,
 			Title: "Stock order from {{.to_store}}",

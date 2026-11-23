@@ -21,7 +21,8 @@ var (
 	errNotEnoughStock   = errors.New("not enough available stock at the district store for this delivery")
 	errAlreadyFulfilled = errors.New("this notification is already fulfilled")
 	errAckChanged       = errors.New("this line was already acknowledged with a different count")
-	errNotManager       = errors.New("only the hotspot's manager can acknowledge its deliveries")
+	errNotManager       = errors.New("only the hotspot's manager, or the delivery agent who carried it, can acknowledge a delivery")
+	errRiderNotEligible = errors.New("the delivery agent must be an active delivery agent working in the hotspot's district")
 )
 
 // Selections a notification can carry. A hotspot notification names the type it is out of and no quantity.
@@ -306,12 +307,14 @@ type DeliveryLine struct {
 }
 
 type Delivery struct {
-	ID              string         `json:"id"`
-	DeliveredByID   string         `json:"delivered_by_id"`
-	Note            *string        `json:"note"`
-	ClientReference *string        `json:"client_reference"`
-	CreatedAt       time.Time      `json:"created_at"`
-	Lines           []DeliveryLine `json:"lines"`
+	ID              string    `json:"id"`
+	DeliveredByID   string    `json:"delivered_by_id"`
+	Note            *string   `json:"note"`
+	ClientReference *string   `json:"client_reference"`
+	CreatedAt       time.Time `json:"created_at"`
+	// Rider is the delivery agent carrying it, when the district named one.
+	Rider *Rider         `json:"rider"`
+	Lines []DeliveryLine `json:"lines"`
 }
 
 type ReportEvent struct {
@@ -347,10 +350,12 @@ func (r *Repository) detail(ctx context.Context, q interface {
 }, report StockoutReport) (StockoutDetail, error) {
 	detail := StockoutDetail{StockoutReport: report, Deliveries: []Delivery{}}
 	rows, err := q.Query(ctx, `SELECT d.id, d.delivered_by_id, d.note, d.client_reference, d.created_at,
+			d.rider_id, `+riderName+`, ru.phone_number,
 			l.id, l.category, l.condom_id, `+productLabel+`, l.unit_of_measure_id, l.quantity, l.pieces,
 			l.acknowledged_pieces, l.acknowledged_by_id, l.acknowledged_at
 		FROM hotspot_deliveries d JOIN hotspot_delivery_lines l ON l.delivery_id = d.id
 		JOIN condoms c ON c.id = l.condom_id
+		LEFT JOIN users ru ON ru.id = d.rider_id
 		WHERE d.stockout_report_id = $1 ORDER BY d.created_at, d.id, l.category, l.id`, report.ID)
 	if err != nil {
 		return StockoutDetail{}, err
@@ -359,11 +364,14 @@ func (r *Repository) detail(ctx context.Context, q interface {
 	for rows.Next() {
 		var d Delivery
 		var l DeliveryLine
-		if err = rows.Scan(&d.ID, &d.DeliveredByID, &d.Note, &d.ClientReference, &d.CreatedAt, &l.ID, &l.Category,
+		var riderID, rider, riderPhone *string
+		if err = rows.Scan(&d.ID, &d.DeliveredByID, &d.Note, &d.ClientReference, &d.CreatedAt,
+			&riderID, &rider, &riderPhone, &l.ID, &l.Category,
 			&l.CondomID, &l.Product, &l.UnitOfMeasureID, &l.Quantity, &l.Pieces, &l.AcknowledgedPieces,
 			&l.AcknowledgedByID, &l.AcknowledgedAt); err != nil {
 			return StockoutDetail{}, err
 		}
+		d.Rider = riderOf(riderID, rider, riderPhone)
 		if n := len(detail.Deliveries); n == 0 || detail.Deliveries[n-1].ID != d.ID {
 			detail.Deliveries = append(detail.Deliveries, d)
 		}
@@ -392,6 +400,9 @@ type DeliveryInput struct {
 	} `json:"lines"`
 	Note            *string `json:"note"`
 	ClientReference *string `json:"client_reference"`
+	// RiderID optionally names the delivery agent carrying it: an active user with orders:deliver
+	// who works in the hotspot's district (see eligibleRider).
+	RiderID *string `json:"rider_id"`
 	// ExpiryExceptionReason documents delivering a batch with under one month left.
 	ExpiryExceptionReason *string `json:"expiry_exception_reason"`
 }
@@ -444,15 +455,29 @@ func (r *Repository) recordDelivery(ctx context.Context, access scope, reportID 
 		if !created {
 			return nil
 		}
-		return r.notifyManagers(ctx, tx, access.userID, report, deliveryID, detail)
+		if err = r.notifyManagers(ctx, tx, access.userID, report, deliveryID, detail); err != nil {
+			return err
+		}
+		return r.notifyRider(ctx, tx, access.userID, report, deliveryID, in.RiderID, detail)
 	})
 	return detail, created, err
 }
 
 func (r *Repository) deliver(ctx context.Context, tx pgx.Tx, actorID, reportID, storeID, selection string, in DeliveryInput) (string, error) {
 	var deliveryID string
-	if err := tx.QueryRow(ctx, `INSERT INTO hotspot_deliveries (stockout_report_id, district_store_id, delivered_by_id, note, client_reference)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id`, reportID, storeID, actorID, in.Note, in.ClientReference).Scan(&deliveryID); err != nil {
+	if in.RiderID != nil {
+		ok, err := eligibleRider(ctx, tx, storeID, *in.RiderID)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", errRiderNotEligible
+		}
+	}
+	if err := tx.QueryRow(ctx, `INSERT INTO hotspot_deliveries (stockout_report_id, district_store_id, delivered_by_id, note,
+			client_reference, rider_id)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, reportID, storeID, actorID, in.Note, in.ClientReference,
+		in.RiderID).Scan(&deliveryID); err != nil {
 		return "", err
 	}
 	summary := make([]map[string]any, 0, len(in.Lines))
@@ -598,22 +623,32 @@ func (r *Repository) acknowledge(ctx context.Context, access scope, reportID str
 		if err != nil {
 			return err
 		}
-		// Only the manager confirms receipt; district or national users cannot complete fulfilment.
-		if !assigned(access.hotSpotID, hotSpotID) {
-			return errNotManager
-		}
+		// The hotspot's manager confirms receipt, or, when they cannot, the delivery agent named for
+		// the delivery confirms its own lines. District or national users cannot complete fulfilment.
+		manager := assigned(access.hotSpotID, hotSpotID)
 		recorded := make([]map[string]any, 0, len(in.Lines))
+		byAgent := false
 		for _, line := range in.Lines {
 			var existing *int32
 			var category string
-			err = tx.QueryRow(ctx, `SELECT l.acknowledged_pieces, l.category FROM hotspot_delivery_lines l
+			var riderID *string
+			err = tx.QueryRow(ctx, `SELECT l.acknowledged_pieces, l.category, d.rider_id FROM hotspot_delivery_lines l
 				JOIN hotspot_deliveries d ON d.id = l.delivery_id
-				WHERE l.id = $1 AND d.stockout_report_id = $2 FOR UPDATE OF l`, line.LineID, reportID).Scan(&existing, &category)
+				WHERE l.id = $1 AND d.stockout_report_id = $2 FOR UPDATE OF l`, line.LineID, reportID).Scan(&existing, &category, &riderID)
 			if errors.Is(err, pgx.ErrNoRows) {
+				if !manager && !access.carrier {
+					return errNotManager
+				}
 				return errWorkflowInput
 			}
 			if err != nil {
 				return err
+			}
+			if !manager {
+				if !access.carrier || !assigned(riderID, access.userID) {
+					return errNotManager
+				}
+				byAgent = true
 			}
 			if existing != nil {
 				if *existing != line.Pieces {
@@ -668,7 +703,7 @@ func (r *Repository) acknowledge(ctx context.Context, access scope, reportID str
 			ActorID:  &access.userID,
 			Resource: &notifications.Resource{Type: "hotspot", ID: report.HotSpotID},
 			Data: map[string]any{"report_id": report.ID, "hotspot": report.HotSpot.Name,
-				"pieces": piecesSummary(lines, true), "fulfilled": report.Status == "fulfilled"},
+				"pieces": piecesSummary(lines, true), "fulfilled": report.Status == "fulfilled", "by_agent": byAgent},
 			IdempotencyKey: fmt.Sprintf("%s:%d", report.ID, len(detail.Events)),
 		})
 	})

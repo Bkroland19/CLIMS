@@ -25,9 +25,11 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/", rbac.RequirePermission("orders:read"), h.list)
 	group.Post("/stockouts", rbac.RequirePermission("orders:stockout"), h.stockout)
 	group.Get("/stockouts", rbac.RequirePermission("orders:read"), h.stockouts)
-	group.Get("/stockouts/:id", rbac.RequirePermission("orders:read"), h.stockoutDetail)
+	group.Get("/stockouts/:id", requireReportReader, h.stockoutDetail)
+	group.Get("/stockouts/:id/riders", rbac.RequirePermission("orders:supply_hotspots"), h.riders)
 	group.Post("/stockouts/:id/deliveries", rbac.RequirePermission("orders:supply_hotspots"), h.delivery)
-	group.Post("/stockouts/:id/acknowledgements", rbac.RequirePermission("orders:stockout"), h.acknowledgement)
+	group.Get("/deliveries", rbac.RequirePermission("orders:deliver"), h.myDeliveries)
+	group.Post("/stockouts/:id/acknowledgements", requireAcknowledger, h.acknowledgement)
 	group.Post("/warehouse-requests", rbac.RequirePermission("orders:replenish"), h.warehouseRequest)
 	group.Post("/district-dispatches", rbac.RequirePermission("orders:process"), h.districtDispatch)
 	group.Get("/:id/events", rbac.RequirePermission("orders:read"), h.events)
@@ -42,6 +44,7 @@ func scopeFor(user *users.User) scope {
 		userID:           user.ID,
 		allStores:        user.HasPermission("orders:all_stores"),
 		stockoutDistrict: user.HasPermission("orders:stockout_district"),
+		carrier:          user.HasPermission("orders:deliver"),
 	}
 }
 

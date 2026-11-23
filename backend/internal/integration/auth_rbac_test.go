@@ -221,8 +221,11 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("GET", "/roles", nil, adminToken, 200)
 	request("GET", "/permissions", nil, adminToken, 200)
 
-	var facilityID, hotSpotID string
-	if err = pool.QueryRow(ctx, `SELECT (SELECT id FROM organization_units LIMIT 1), (SELECT id FROM hot_spots LIMIT 1)`).Scan(&facilityID, &hotSpotID); err != nil {
+	var facilityID, hotSpotID, subcountyID, assignedStoreID string
+	if err = pool.QueryRow(ctx, `SELECT (SELECT id FROM organization_units LIMIT 1),
+		h.id, h.subcounty_id, (SELECT id FROM stores WHERE code = 'jms')
+		FROM hot_spots h WHERE h.name IS NOT NULL AND h.subcounty_id IS NOT NULL LIMIT 1`).
+		Scan(&facilityID, &hotSpotID, &subcountyID, &assignedStoreID); err != nil {
 		t.Fatal(err)
 	}
 	account := map[string]any{
@@ -231,11 +234,24 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	request("POST", "/users", account, adminToken, 422)
 	account["organisation_unit_id"] = facilityID
-	request("POST", "/users", account, adminToken, 201)
-	assignedToken := login("assigned@example.test", "test-password-123", 200)
+	assignedID := request("POST", "/users", account, adminToken, 201)["data"].(map[string]any)["user_id"]
+	if _, err = pool.Exec(ctx, `UPDATE users SET subcounty_id=$2, store_id=$3 WHERE id=$1`, assignedID, subcountyID, assignedStoreID); err != nil {
+		t.Fatal(err)
+	}
+	assignedLogin := request("POST", "/auth/login", map[string]any{
+		"login": "assigned@example.test", "password": "test-password-123",
+	}, "", 200)["data"].(map[string]any)
+	assignedToken := assignedLogin["token"].(string)
 	assignedProfile := request("GET", "/auth/me", nil, assignedToken, 200)["data"].(map[string]any)
-	if assignedProfile["organisation_unit_id"] != facilityID || assignedProfile["hot_spot_id"] != hotSpotID {
-		t.Fatalf("account assignment did not round-trip: %v", assignedProfile)
+	for _, profile := range []map[string]any{assignedLogin["user"].(map[string]any), assignedProfile} {
+		for key, id := range map[string]string{
+			"organisation_unit": facilityID, "hot_spot": hotSpotID, "subcounty": subcountyID, "store": assignedStoreID,
+		} {
+			details, ok := profile[key].(map[string]any)
+			if !ok || details["id"] != id || details["name"] == nil || details["name"] == "" || profile[key+"_id"] != id {
+				t.Fatalf("incorrect %s assignment: %v", key, details)
+			}
+		}
 	}
 
 	registration := map[string]any{"username": "newuser", "email": " NewUser@example.test ", "password": "test-password-123", "first_name": "New", "lastname": "User", "location": "Kampala"}
@@ -258,6 +274,11 @@ func TestAuthRBACIntegration(t *testing.T) {
 	me := request("GET", "/auth/me", nil, userToken, 200)["data"].(map[string]any)
 	loginData := request("POST", "/auth/login", map[string]any{"email": "newuser@example.test", "password": "test-password-123"}, "", 200)["data"].(map[string]any)
 	for _, profile := range []map[string]any{me, loginData["user"].(map[string]any)} {
+		for _, key := range []string{"organisation_unit", "hot_spot", "subcounty", "store"} {
+			if details, present := profile[key]; !present || details != nil {
+				t.Fatalf("expected null %s assignment, got %v", key, details)
+			}
+		}
 		if profile["first_name"] != "New" || profile["last_name"] != "User" || profile["location"] != "Kampala" ||
 			profile["created_at"] == nil || profile["updated_at"] == nil {
 			t.Fatalf("profile fields did not round-trip: %v", profile)
@@ -376,8 +397,15 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("POST", orderPath+"/actions/review", nil, adminToken, 409) // generic orders have no workflow
 	var removed int
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM permissions
-		WHERE name IN ('orders:create', 'orders:fulfill', 'orders:deliver')`).Scan(&removed); err != nil || removed != 0 {
+		WHERE name IN ('orders:create', 'orders:fulfill')`).Scan(&removed); err != nil || removed != 0 {
 		t.Fatalf("unused order permissions remain: %d %v", removed, err)
+	}
+	// orders:deliver, removed with the old rider dispatch, returns for delivery agents (migration 35).
+	var agents bool
+	if err = pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
+		JOIN permissions p ON p.id = rp.permission_id WHERE r.name = 'delivery agent' AND p.name = 'orders:deliver')`).
+		Scan(&agents); err != nil || !agents {
+		t.Fatalf("delivery agents should hold orders:deliver: %v %v", agents, err)
 	}
 	if _, err = pool.Exec(ctx, `UPDATE users SET store_id=NULL WHERE id=$1`, id); err != nil {
 		t.Fatal(err)
@@ -474,14 +502,15 @@ func TestAuthRBACIntegration(t *testing.T) {
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms, and migration 31
-	// gives the warehouse and DCFP roles their order and inventory defaults; every other non-admin
-	// grant is the custom one.
+	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms, migration 31
+	// gives the warehouse and DCFP roles their order and inventory defaults, and migration 35 gives
+	// delivery agents orders:deliver; every other non-admin grant is the custom one.
 	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'
-			AND NOT (r.name IN ('nms', 'jms', 'dfcp') AND (p.name LIKE 'orders:%' OR p.name LIKE 'inventory:%'))),
+			AND NOT (r.name IN ('nms', 'jms', 'dfcp') AND (p.name LIKE 'orders:%' OR p.name LIKE 'inventory:%'))
+			AND NOT (r.name = 'delivery agent' AND p.name = 'orders:deliver')),
 		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
 		&userCount, &roleCount, &catalogueManagers); err != nil {
