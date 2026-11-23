@@ -76,8 +76,12 @@ workflow already requires, because both are served by the same Nginx.
 ### 5. Updated with releases
 
 The public site changes only when a stable release deploys, like the rest of production. Rolling
-back a release rolls back its docs. Contributors preview changes with `make docs-serve`; development
-Compose has no docs container.
+back a release rolls back its docs.
+
+In development, Compose runs the Docusaurus dev server with live reload, so the site is at
+`http://localhost:8080/handbook/` beside the web app and the API, and the API reference's "Try it
+out" reaches the local API. Nginx also forwards the dev server's live-reload socket, `/ws`. `make
+docs-serve` runs the same server on the host without Docker.
 
 ### 6. Kept small
 

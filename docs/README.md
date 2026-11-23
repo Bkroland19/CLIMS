@@ -32,7 +32,7 @@ The API contract is maintained in [`api/openapi.json`](api/openapi.json). It doc
 
 ## Documentation site
 
-These files are also published as a Docusaurus site from [`website/`](../website/docusaurus.config.ts). Run `make docs-serve` to preview it with live reload, or `make docs-build` to build it; the build fails on broken links and anchors.
+These files are also published as a Docusaurus site from [`website/`](../website/docusaurus.config.ts). With the development stack running it is at <http://localhost:8080/handbook/> and reloads as you edit. Without Docker, run `make docs-serve` (<http://localhost:3000/handbook/>); `make docs-build` builds it, and the build fails on broken links and anchors.
 
 - Write plain Markdown (`.md`). It is parsed as CommonMark, so `<`, `>` and `{` need no escaping. Only `.mdx` files are parsed as MDX.
 - Keep links relative to the file, as on GitHub. Links to files outside `docs/` are rewritten to GitHub when the site is built, and links to `api/openapi.json` go to the copy the site publishes. The site's [API reference](api/reference.mdx) page shows this folder's Swagger UI, with the same settings (`api/swagger-config.js`) as the API's `/docs/` page.

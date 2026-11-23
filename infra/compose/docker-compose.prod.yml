@@ -35,7 +35,7 @@ services:
         NEXT_PUBLIC_MAP_TILES: ${NEXT_PUBLIC_MAP_TILES:-}
         NEXT_PUBLIC_MAP_ATTRIBUTION: ${NEXT_PUBLIC_MAP_ATTRIBUTION:-}
 
-  # Production only: development previews the site with make docs-serve.
+  # The static site build; development runs the Docusaurus dev server instead.
   docs:
     image: ${DOCS_IMAGE:-clims-docs:prod}
     build:
