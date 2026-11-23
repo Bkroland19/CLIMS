@@ -1,5 +1,10 @@
 # CLIMS in the MoH SSO Dashboard
 
+This is the runbook. For the overview (how the systems connect, who owns each
+step, the credentials map, Keycloak import files, rotation and
+troubleshooting), read
+[SSO and identity sync onboarding](../../docs/sso-and-identity-sync.md) first.
+
 `clims.application.yaml` is the portal import template for launching CLIMS in
 its own tab. Fill in the target environment, deployment URL, support URL and
 owner details. The URLs and contact in the template are placeholders.

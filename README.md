@@ -14,6 +14,7 @@ Project documentation lives in the root [`docs/`](docs/README.md) folder:
 - [Authentication module](docs/modules/auth.md)
 - [Users module](docs/modules/users.md)
 - [RBAC module](docs/modules/rbac.md)
+- [SSO and identity sync onboarding](docs/sso-and-identity-sync.md): Keycloak, Integrated Health Portal and MoH SSO Dashboard
 - [Web and mobile projects](docs/clients.md)
 - [Web app guide](frontend/README.md) and [frontend stack decision](docs/adr/0001-frontend-stack.md)
 - [API reference and Swagger](docs/api/README.md)

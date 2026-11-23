@@ -1,0 +1,46 @@
+{
+  "clientId": "clims",
+  "name": "CLIMS",
+  "description": "Laboratory orders, specimens and results",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": false,
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "fullScopeAllowed": true,
+  "baseUrl": "https://clims.example.org/api/v1/auth/sso/start",
+  "redirectUris": ["https://clims.example.org/api/v1/auth/sso/callback"],
+  "webOrigins": [],
+  "defaultClientScopes": [],
+  "optionalClientScopes": ["offline_access"],
+  "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "portal.system": "true",
+    "portal.accessRoles": "clims_access",
+    "ui.systemType": "external",
+    "ui.displayInLauncher": "true",
+    "ui.displayInSideNav": "false",
+    "ui.launchMode": "new_tab",
+    "ui.category": "Laboratory",
+    "ui.launchUrl": "https://clims.example.org/api/v1/auth/sso/start"
+  },
+  "protocolMappers": [
+    {
+      "name": "CLIMS access roles",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-client-role-mapper",
+      "consentRequired": false,
+      "config": {
+        "multivalued": "true",
+        "userinfo.token.claim": "false",
+        "id.token.claim": "true",
+        "access.token.claim": "false",
+        "claim.name": "clims_roles",
+        "jsonType.label": "String",
+        "usermodel.clientRoleMapping.clientId": "clims"
+      }
+    }
+  ]
+}

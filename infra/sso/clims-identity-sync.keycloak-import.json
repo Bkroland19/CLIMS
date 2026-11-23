@@ -1,0 +1,52 @@
+{
+  "roles": {
+    "client": {
+      "clims": [
+        {
+          "name": "clims_access",
+          "description": "Portal access to CLIMS"
+        },
+        {
+          "name": "identity_sync",
+          "description": "Lets the dashboard reconciler list accounts and record identity links"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "clims-identity-sync",
+      "name": "clims identity sync",
+      "description": "MoH SSO Dashboard reconciler: lists clims accounts and records Keycloak identity links",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": ["roles"],
+      "attributes": {
+        "portal.system": "false",
+        "ui.displayInLauncher": "false",
+        "ui.displayInSideNav": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "clims-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "clims",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ]
+}
