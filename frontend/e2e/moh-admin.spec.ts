@@ -61,10 +61,9 @@ test.describe('users', () => {
     await page.getByRole('menuitem', { name: 'Edit roles' }).click();
 
     const dialog = page.getByRole('dialog');
-    const vht = dialog.getByRole('checkbox', { name: /^VHT/ });
-    const wasChecked = await vht.isChecked();
-    await vht.setChecked(!wasChecked);
-    await dialog.getByRole('button', { name: 'Save roles' }).click();
+    await dialog.getByRole('radio', { name: /^VHT/ }).check();
+    await expect(dialog.getByRole('radio', { checked: true })).toHaveCount(1);
+    await dialog.getByRole('button', { name: 'Save role' }).click();
 
     await expectToast(page, 'Roles updated');
     await expect(dialog).toBeHidden();

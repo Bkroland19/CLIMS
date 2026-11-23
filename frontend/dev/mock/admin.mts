@@ -8,7 +8,7 @@
  * validation failures under JSON field names with the validator's messages
  * (`{ "username": "Use at least 3 characters." }`).
  *
- * Stores, geography and the audit log are NOT YET IN THE GO API.
+ * Geography and the audit log are NOT YET IN THE GO API; stores mirror the live endpoint.
  * Their paths and shapes are the contract in `src/features/{stores,audit}/api.ts`
  * (Phase 7 of `design/IMPLEMENTATION_PLAN.md`). Replies use the Go API's
  * `{ success, data }` envelope and `{ success: false, message, error }` failures.
@@ -77,13 +77,16 @@ interface Store {
   id: string;
   name: string;
   kind: 'national' | 'district';
-  organisation: string | null;
   region: string | null;
   district: string | null;
   code: string;
   user_count: number;
-  on_hand: { male: number; female: number };
-  needs_confirmation: boolean;
+  on_hand: {
+    category: 'male' | 'female' | null;
+    unit_id: string;
+    unit: string;
+    quantity: number;
+  }[];
 }
 
 interface Subcounty {
@@ -404,38 +407,41 @@ function seedStores(dataset: string): Store[] {
     id,
     name: `${name} district store`,
     kind: 'district',
-    organisation: null,
     region,
     district: name,
     code,
     user_count,
-    on_hand: { male, female },
-    needs_confirmation: false,
+    on_hand: [
+      { category: 'male', unit_id: 'piece', unit: 'pieces', quantity: male },
+      { category: 'female', unit_id: 'piece', unit: 'pieces', quantity: female },
+    ],
   });
   return [
     {
       id: 'store-jms',
       name: 'JMS · Kampala',
       kind: 'national',
-      organisation: 'Joint Medical Store',
       region: 'Central',
       district: 'Kampala',
       code: 'jms',
       user_count: 1,
-      on_hand: { male: 1_840_000, female: 52_000 },
-      needs_confirmation: false,
+      on_hand: [
+        { category: 'male', unit_id: 'piece', unit: 'pieces', quantity: 1_840_000 },
+        { category: 'female', unit_id: 'piece', unit: 'pieces', quantity: 52_000 },
+      ],
     },
     {
       id: 'store-nms',
       name: 'NMS · Entebbe',
       kind: 'national',
-      organisation: 'National Medical Stores',
       region: 'Central',
       district: 'Wakiso',
       code: 'nms',
       user_count: 1,
-      on_hand: { male: 2_960_000, female: 118_000 },
-      needs_confirmation: true,
+      on_hand: [
+        { category: 'male', unit_id: 'piece', unit: 'pieces', quantity: 2_960_000 },
+        { category: 'female', unit_id: 'piece', unit: 'pieces', quantity: 118_000 },
+      ],
     },
     district('store-wakiso', 'Wakiso', 'Central', 'aXmBzv61LbM', 4, 14_400, 600),
     district('store-mukono', 'Mukono', 'Central', 'ccs8Ldr4qRf', 1, 3_900, 210),

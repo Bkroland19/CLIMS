@@ -6,10 +6,8 @@ import { parseBody, parseList, type HttpClient } from '@/lib/api';
  * Stock-holding points (national warehouses and district stores) and the
  * geography they sit in (regions, districts, sub-counties), synced from DHIS2.
  *
- * NOT YET IN THE GO API. These paths and shapes are the contract the web
- * client is written against and the mock API (`dev/mock/admin.mts`) serves;
- * Phase 7 of `design/IMPLEMENTATION_PLAN.md` lists them for the backend.
- * Both screens show a sample-data notice until they exist.
+ * Stores come from the Go API, with inventory access scoped to the user's store.
+ * Geography and sync are still served only by the mock API (`dev/mock/admin.mts`).
  *
  *   GET  /stores          → Store[]
  *   GET  /geography       → Geography
@@ -25,16 +23,20 @@ const storeSchema = z.object({
   id: z.string(),
   name: z.string(),
   kind: z.enum(STORE_KINDS),
-  /** The organisation that runs it, e.g. "National Medical Stores". */
-  organisation: z.string().nullable(),
   region: z.string().nullable(),
   district: z.string().nullable(),
   /** `nms` / `jms` for the national warehouses; the DHIS2 org unit id for district stores. */
   code: z.string(),
   user_count: count,
-  on_hand: z.object({ male: count, female: count }),
-  /** The store's details still need confirming with the data team. */
-  needs_confirmation: z.boolean(),
+  /** Physical stock, including reserved and expired stock, grouped by category and unit. */
+  on_hand: z.array(
+    z.object({
+      category: z.enum(['male', 'female']).nullable(),
+      unit_id: z.string(),
+      unit: z.string(),
+      quantity: count,
+    }),
+  ),
 });
 
 export type Store = z.infer<typeof storeSchema>;

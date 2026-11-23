@@ -71,7 +71,22 @@ export function FormDialog({
           if (isDirty) event.preventDefault();
         }}
       >
-        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form
+          noValidate
+          onSubmit={(event) => {
+            const form = event.currentTarget;
+            onSubmit?.(event);
+            // Let validation render first; the same focus behaviour covers every dialog.
+            requestAnimationFrame(() => {
+              form
+                .querySelector<HTMLElement>(
+                  'input[aria-invalid="true"], textarea[aria-invalid="true"], button[aria-invalid="true"]',
+                )
+                ?.focus();
+            });
+          }}
+          className="flex flex-col gap-4"
+        >
           <DialogHeader>
             <DialogTitle className="wrap-anywhere">{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>

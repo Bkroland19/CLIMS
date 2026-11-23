@@ -144,7 +144,9 @@ export function Segmented<Value extends string>({
       {options.map((option, index) => {
         const checked = option.value === value;
         return (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             key={option.value}
             type="button"
             role="radio"
@@ -175,7 +177,7 @@ export function Segmented<Value extends string>({
           >
             {option.icon}
             {option.label}
-          </button>
+          </Button>
         );
       })}
     </div>

@@ -152,13 +152,15 @@ export function NotificationsBell({ notifications, actions }: NotificationsBellP
                       {content}
                     </Link>
                   ) : actions && !read ? (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       type="button"
                       onClick={openItem}
-                      className="hover:bg-accent focus-visible:bg-accent flex w-full gap-3 px-3 py-2.5 text-left outline-none"
+                      className="hover:bg-accent focus-visible:bg-accent flex h-auto min-h-7 w-full justify-start gap-3 px-3 py-2.5 text-left whitespace-normal outline-none"
                     >
                       {content}
-                    </button>
+                    </Button>
                   ) : (
                     <div className="flex gap-3 px-3 py-2.5">{content}</div>
                   )}

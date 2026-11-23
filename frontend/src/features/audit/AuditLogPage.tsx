@@ -162,6 +162,7 @@ export default function AuditLogPage() {
 const AUDIT_COLUMNS: DataTableColumn<AuditEntry>[] = [
   {
     id: 'at',
+    filter: 'date',
     header: 'When',
     value: (entry) => entry.at,
     cell: (entry) => (
@@ -182,6 +183,7 @@ const AUDIT_COLUMNS: DataTableColumn<AuditEntry>[] = [
   },
   {
     id: 'action',
+    filter: 'select',
     header: 'Action',
     value: (entry) => actionLabel(entry.action),
     cell: (entry) => (
@@ -205,6 +207,7 @@ const AUDIT_COLUMNS: DataTableColumn<AuditEntry>[] = [
   },
   {
     id: 'source',
+    filter: 'select',
     header: 'From',
     value: (entry) => entry.source,
     defaultHidden: true,

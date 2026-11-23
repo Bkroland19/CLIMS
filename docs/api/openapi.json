@@ -1156,7 +1156,7 @@
       "put": {
         "tags": ["Users"],
         "operationId": "setUserRoles",
-        "summary": "Replace a user’s roles",
+        "summary": "Replace a user\u2019s roles",
         "description": "Replaces the complete set of role assignments. Duplicate role IDs are ignored. An empty array removes every assignment. Unknown roles return 422. Removing the last active admin is rejected. Requires roles:assign.",
         "responses": {
           "200": {
@@ -1795,7 +1795,14 @@
             "description": "One kind of movement.",
             "schema": {
               "type": "string",
-              "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+              "enum": [
+                "opening",
+                "receipt",
+                "adjustment",
+                "dispatch",
+                "order_receipt",
+                "hotspot_delivery"
+              ]
             }
           },
           {
@@ -5214,6 +5221,50 @@
           }
         }
       }
+    },
+    "/api/v1/stores": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List stores with assigned-user counts and physical stock",
+        "operationId": "listStoreOverview",
+        "description": "Requires inventory:read. Returns the assigned store, or every store with orders:all_stores, national warehouses first. An unassigned user receives an empty array. Counts all accounts assigned to each store. Physical stock includes reserved and expired quantities, grouped by category and unit; units are never added together. Stores without stock have on_hand: []. National stores have no district or region assignment.",
+        "responses": {
+          "200": {
+            "description": "Store overview list; data is always an array.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "data"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreOverview"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6606,7 +6657,14 @@
           },
           "reason": {
             "type": "string",
-            "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+            "enum": [
+              "opening",
+              "receipt",
+              "adjustment",
+              "dispatch",
+              "order_receipt",
+              "hotspot_delivery"
+            ]
           },
           "quantity": {
             "type": "integer",
@@ -7319,7 +7377,7 @@
       },
       "Product": {
         "type": "object",
-        "description": "A condom product. Converted legacy products may have null category, type, brand, unit or pieces_per_unit; every field is required to create a product and before one is activated or edited.",
+        "description": "A condom product. Converted legacy products may have null category, type, brand, unit or pieces_per_unit; A complete product is required on creation, editing or activation. For units named Piece or Pieces (case-insensitive), pieces_per_unit may be omitted and is stored as 1; other units need a pack size.",
         "required": [
           "id",
           "category",
@@ -7429,7 +7487,7 @@
       "CreateProductRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["category", "type_id", "brand_id", "unit_id", "pieces_per_unit"],
+        "required": ["category", "type_id", "brand_id", "unit_id"],
         "properties": {
           "category": {
             "type": "string",
@@ -7451,6 +7509,7 @@
             "description": "An active unit of measure."
           },
           "pieces_per_unit": {
+            "description": "Optional for a unit named Piece or Pieces (case-insensitive): omitted counts become 1 and other counts are rejected. Required for other units on creation; PATCH otherwise preserves an existing count.",
             "type": "integer",
             "minimum": 1,
             "maximum": 100000
@@ -7483,6 +7542,7 @@
             "description": "An active unit of measure."
           },
           "pieces_per_unit": {
+            "description": "Optional for a unit named Piece or Pieces (case-insensitive): omitted counts become 1 and other counts are rejected. Required for other units on creation; PATCH otherwise preserves an existing count.",
             "type": "integer",
             "minimum": 1,
             "maximum": 100000
@@ -9518,7 +9578,7 @@
           },
           "scope": {
             "type": "string",
-            "example": "National · Kampala"
+            "example": "National \u00b7 Kampala"
           },
           "product": {
             "type": "string"
@@ -10253,12 +10313,12 @@
           "received": {
             "type": "integer",
             "format": "int64",
-            "description": "Receipts in the period."
+            "description": "Stock registrations and warehouse order receipts in the period (receipt and order_receipt)."
           },
           "dispatched": {
             "type": "integer",
             "format": "int64",
-            "description": "Dispatched to district stores in the period."
+            "description": "Stock dispatched to district stores or hotspots in the period (dispatch and hotspot_delivery)."
           },
           "written_off": {
             "type": "integer",
@@ -10268,7 +10328,7 @@
           "dispatched_90_days": {
             "type": "integer",
             "format": "int64",
-            "description": "Dispatched in the 90 days to now, whatever the period."
+            "description": "Stock dispatched to district stores or hotspots in the 90 days to now, whatever the selected period."
           }
         }
       },
@@ -10374,6 +10434,68 @@
           },
           "data": {
             "$ref": "#/components/schemas/StoreStockSummary"
+          }
+        }
+      },
+      "StoreOverviewStock": {
+        "type": "object",
+        "required": ["category", "unit_id", "unit", "quantity"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["male", "female", null],
+            "nullable": true
+          },
+          "unit_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "StoreOverview": {
+        "type": "object",
+        "required": ["id", "name", "kind", "region", "district", "code", "user_count", "on_hand"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string"
+          },
+          "user_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "on_hand": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreOverviewStock"
+            }
           }
         }
       }

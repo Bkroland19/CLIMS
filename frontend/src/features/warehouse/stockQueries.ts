@@ -21,18 +21,14 @@ import { batchLabel } from '@/features/inventory/bands';
 import { useApiQuery, useHttp, type ApiError } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 
-import { warehouseOrderKeys } from './orderQueries';
+import { warehouseOrderKeys, warehouseStockKeys } from './queryKeys';
+export { warehouseStockKeys } from './queryKeys';
 
 /*
  * A warehouse's ledger on the Go API, and the writes that change its stock. Recording a delivery
  * or adjusting a batch changes the balances, the batches and the ledger, and what an order's
  * approval and dispatch see, so each write refetches the lot.
  */
-const ROOT = 'warehouse-stock';
-export const warehouseStockKeys = {
-  all: [ROOT] as const,
-  movements: (storeId: string) => [ROOT, storeId, 'movements'] as const,
-};
 
 /**
  * The store's figures for a period. Kept under the order keys, so an order step (an approval

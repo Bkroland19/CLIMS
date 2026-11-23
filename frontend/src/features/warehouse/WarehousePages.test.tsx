@@ -557,6 +557,69 @@ describe('Warehouse stock', () => {
     expect(card('Expired')).toHaveTextContent('NoneNothing past its expiry date');
     expect(screen.getAllByRole('button', { name: 'Register stock' })).toHaveLength(2);
   });
+
+  it('shows an empty summary when there is no stock or order activity', async () => {
+    renderStock('/warehouse/stock?store=NMS', {
+      balances: [],
+      batches: [],
+      movements: [],
+      summary: aStoreSummary({
+        products: [],
+        orders: {
+          to_decide: 0,
+          waiting_for_stock: 0,
+          to_dispatch: 0,
+          in_transit: 0,
+          dispatched: 0,
+          rejected: 0,
+          dispatched_in_full: 0,
+          districts_supplied: 0,
+          received_short: 0,
+          median_days_to_dispatch: null,
+        },
+      }),
+    });
+
+    expect(await screen.findByText('No stock data at NMS yet')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing to check yet')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load NMS stock')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  });
+
+  it.each([403, 500])('distinguishes a %s response from empty stock', async (status) => {
+    const api = warehouseOrderApi({});
+    renderApp(<AppUnderTest />, {
+      route: '/warehouse/stock?store=NMS',
+      signedIn: true,
+      replies: [
+        (request) =>
+          request.url.startsWith('/inventory/store-summary')
+            ? {
+                status,
+                body: {
+                  success: false,
+                  message:
+                    status === 403 ? 'this store is outside your assignment' : 'Server error',
+                },
+              }
+            : api(request),
+      ],
+    });
+
+    if (status === 403) {
+      expect(await screen.findByText('NMS stock is unavailable')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Ask an administrator to check your store assignment/),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Register stock' })).not.toBeInTheDocument();
+      expect(screen.queryByText('No stock held at NMS')).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByText('Could not load NMS stock')).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
+    }
+    expect(screen.queryByText('No stock data at NMS yet')).not.toBeInTheDocument();
+  });
 });
 
 describe('Registering stock', () => {
@@ -582,7 +645,7 @@ describe('Registering stock', () => {
     await within(sheet).findByRole('combobox', { name: 'Product' });
     await user.click(within(sheet).getByRole('button', { name: 'Register stock' }));
     expect(within(sheet).getByText('Choose the product.')).toBeInTheDocument();
-    expect(within(sheet).getByText('Enter the batch number on the carton.')).toBeInTheDocument();
+    expect(within(sheet).getByText('Enter the batch number on the packaging.')).toBeInTheDocument();
     expect(requests.some((request) => request.method === 'POST')).toBe(false);
 
     await user.click(within(sheet).getByRole('combobox', { name: 'Product' }));

@@ -2,6 +2,17 @@
 
 Notable bugs and mistakes, with their root cause and what now prevents a repeat.
 
+## 2026-11-23: Shared table behaviour and frontend dependencies
+
+- A missing font package in the Docker dependency volume left Turbopack serving a cached CSS
+  compilation error even after the package was installed. Refresh container dependencies and clear
+  the generated development cache when module resolution remains stale; verify a served page and
+  its font asset, not only the host installation.
+- Keeping old table rows after a failed refresh hid the outage. Shared tables now keep those rows
+  with an explicit stale-data warning and retry, so an error cannot be mistaken for current data.
+- Receipt dates were checked for shape only, allowing impossible dates to reach the API. Shared
+  calendar validation now rejects rollover dates and tests leap-year boundaries.
+
 ## 2026-11-12: Importing the web app
 
 ### A credential was committed to source

@@ -79,6 +79,61 @@ export default tseslint.config(
   },
 
   {
+    // CLIMS practices 3/5/18: feature screens compose the shared controls.
+    files: [
+      'src/features/**/*.tsx',
+      'src/components/**/*.tsx',
+      'src/navigation/**/*.tsx',
+      'src/app/**/*.tsx',
+    ],
+    ignores: ['src/components/ui/**', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['button', 'input', 'select', 'textarea'].map((name) => ({
+          selector: `JSXOpeningElement[name.name='${name}']`,
+          message:
+            'Use the shared Button, Input, Select, Textarea, Checkbox or Radio component. See practices.md.',
+        })),
+      ],
+    },
+  },
+  {
+    files: [
+      'src/features/**/*.tsx',
+      'src/components/**/*.tsx',
+      'src/navigation/**/*.tsx',
+      'src/app/**/*.tsx',
+    ],
+    ignores: ['src/components/ui/**', 'src/components/data-table/**', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/components/ui/table', '**/ui/table'],
+              message:
+                'Use DataTable (list or embedded), so filtering, states and accessibility stay consistent.',
+            },
+          ],
+        },
+      ],
+      // Include the control rules here too: flat-config rules replace, rather than append.
+      'no-restricted-syntax': [
+        'error',
+        ...['button', 'input', 'select', 'textarea', 'table', 'Table'].map((name) => ({
+          selector: `JSXOpeningElement[name.name='${name}']`,
+          message:
+            name === 'table' || name === 'Table'
+              ? 'Use the shared DataTable. See practices.md.'
+              : 'Use a shared control component. See practices.md.',
+        })),
+      ],
+    },
+  },
+
+  {
     files: ['**/*.test.{ts,tsx}', 'src/test/**'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: {

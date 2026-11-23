@@ -109,4 +109,84 @@ func testStoreAssignment(t *testing.T, pool *pgxpool.Pool,
 	request("PATCH", path, map[string]any{"store_id": 5}, admin, 400)
 	request("PATCH", "/users/"+uuid.NewString()+"/store", map[string]any{"store_id": jmsID}, admin, 404)
 	request("PATCH", path, map[string]any{"store_id": jmsID}, reader, 403)
+	testStoreOverview(t, pool, request, admin)
+}
+
+func testStoreOverview(t *testing.T, pool *pgxpool.Pool,
+	request func(string, string, any, string, int) map[string]any, admin string,
+) {
+	t.Helper()
+	ctx := context.Background()
+	var role, store, emptyStore, product, otherProduct, box, piece, brand string
+	const newProduct = `INSERT INTO condoms (category, type_id, brand_id, unit_id, pieces_per_unit)
+		SELECT 'male', (SELECT id FROM product_types ORDER BY name LIMIT 1),
+			(SELECT id FROM brands WHERE name = 'overview brand'),
+			(SELECT id FROM unit_of_measures WHERE name = 'overview box'), 100 RETURNING id`
+	for _, setup := range []struct {
+		query string
+		id    *string
+	}{
+		{`INSERT INTO roles (name) VALUES ('store-overview-reader') RETURNING id`, &role},
+		{`INSERT INTO stores (code, name, store_type) VALUES ('overview-test', 'Overview warehouse', 'national') RETURNING id`, &store},
+		{`INSERT INTO stores (code, name, store_type) VALUES ('overview-empty', 'Empty warehouse', 'national') RETURNING id`, &emptyStore},
+		{`INSERT INTO unit_of_measures (name) VALUES ('overview box') RETURNING id`, &box},
+		{`INSERT INTO unit_of_measures (name) VALUES ('overview piece') RETURNING id`, &piece},
+		{`INSERT INTO brands (name) VALUES ('overview brand') RETURNING id`, &brand},
+		{newProduct, &product},
+		{newProduct, &otherProduct},
+	} {
+		if err := pool.QueryRow(ctx, setup.query).Scan(setup.id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO order_store_stock (store_id, condom_id, unit_of_measure_id, on_hand)
+		VALUES ($1, $2, $4, 10), ($1, $3, $4, 5), ($1, $2, $5, 100)`, store, product, otherProduct, box, piece); err != nil {
+		t.Fatal(err)
+	}
+	account := map[string]any{"username": "overview-reader", "email": "overview-reader@example.test", "password": "test-password-123", "role_ids": []string{role}}
+	id := request("POST", "/users", account, admin, 201)["data"].(map[string]any)["user_id"].(string)
+	token := request("POST", "/auth/login", map[string]any{"login": account["email"], "password": account["password"]}, "", 200)["data"].(map[string]any)["token"].(string)
+	request("GET", "/stores", nil, "", 401)
+	request("GET", "/stores", nil, token, 403)
+	request("PUT", "/roles/"+role+"/permissions", map[string]any{"permissions": []string{"inventory:read"}}, admin, 200)
+	if rows := request("GET", "/stores", nil, token, 200)["data"].([]any); len(rows) != 0 {
+		t.Fatalf("unassigned user saw stores: %v", rows)
+	}
+	request("PATCH", "/users/"+id+"/store", map[string]any{"store_id": store}, admin, 200)
+	rows := request("GET", "/stores", nil, token, 200)["data"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("assigned user saw %d stores", len(rows))
+	}
+	row := rows[0].(map[string]any)
+	if row["id"] != store || row["user_count"] != float64(1) {
+		t.Fatalf("wrong store or user count: %v", row)
+	}
+	stock := row["on_hand"].([]any)
+	if len(stock) != 2 {
+		t.Fatalf("expected two units, got %v", stock)
+	}
+	for _, raw := range stock {
+		line := raw.(map[string]any)
+		want := float64(100)
+		if line["unit_id"] == box {
+			want = 15
+		}
+		if line["category"] != "male" || line["quantity"] != want {
+			t.Fatalf("incorrect stock aggregation: %v", line)
+		}
+	}
+	all := request("GET", "/stores", nil, admin, 200)["data"].([]any)
+	foundEmpty := false
+	for _, raw := range all {
+		row := raw.(map[string]any)
+		if row["id"] == emptyStore {
+			foundEmpty = true
+			if row["user_count"] != float64(0) || len(row["on_hand"].([]any)) != 0 {
+				t.Fatalf("empty store: %v", row)
+			}
+		}
+	}
+	if !foundEmpty {
+		t.Fatal("administrator cannot see the empty store")
+	}
 }

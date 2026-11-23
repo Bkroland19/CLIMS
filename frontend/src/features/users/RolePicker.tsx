@@ -1,3 +1,4 @@
+import { Radio } from '@/components/ui/radio';
 import { useId, type Ref } from 'react';
 
 import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@/components/ui/field';
@@ -24,8 +25,8 @@ interface RolePickerProps {
 }
 
 /**
- * Every role as a card, one of which can be chosen: a new user starts with a
- * single role. Arrow keys move between them. Spans both columns of a `FormDialog`.
+ * Every role as a card, one of which can be chosen. Arrow keys move between
+ * them. Spans both columns of a `FormDialog`.
  */
 export function RolePicker({
   roles,
@@ -62,7 +63,7 @@ export function RolePicker({
         Role
       </FieldLegend>
       <FieldDescription id={descriptionId} className="-mt-3">
-        What the person can see and do. Start with one; add more later with Edit roles.
+        What the person can see and do. Choose one role.
       </FieldDescription>
       {isLoading ? (
         <div className="grid gap-2 sm:grid-cols-2" aria-hidden="true">
@@ -79,9 +80,8 @@ export function RolePicker({
             return (
               <li key={role.id}>
                 <RoleOption role={role} selected={checked}>
-                  <input
+                  <Radio
                     ref={index === focusIndex ? inputRef : undefined}
-                    type="radio"
                     name={id}
                     value={role.id}
                     checked={checked}

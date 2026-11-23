@@ -423,15 +423,17 @@ function HmisCards({ filters }: { filters: ReportFilters }) {
         <AlertDescription>
           These are acknowledged receipts at hotspots: evidence of supply, not condoms dispensed.
           Submission stays off until the programme approves how they are counted.{' '}
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
-            className="underline underline-offset-4"
+            className="h-auto px-0 text-current underline"
             onClick={() => {
               setShowDecisions((open) => !open);
             }}
           >
             {showDecisions ? 'Hide' : 'Show'} pending decisions
-          </button>
+          </Button>
           {showDecisions && data ? (
             <ul className="mt-2 list-disc pl-5">
               {data.pending_decisions.map((text) => (
@@ -482,9 +484,15 @@ function SummaryError({ onRetry }: { onRetry: () => void }) {
       <AlertTitle>The summary figures could not be loaded</AlertTitle>
       <AlertDescription>
         They are not zero; the request failed.{' '}
-        <button type="button" className="underline underline-offset-4" onClick={onRetry}>
+        <Button
+          variant="link"
+          size="sm"
+          type="button"
+          className="h-auto px-0 text-current underline"
+          onClick={onRetry}
+        >
           Try again
-        </button>
+        </Button>
       </AlertDescription>
     </Alert>
   );

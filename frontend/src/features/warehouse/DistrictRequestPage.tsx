@@ -618,14 +618,12 @@ function RejectPanel({
 }
 
 interface Transport {
-  waybill_number: string;
   vehicle_registration: string;
   driver_name: string;
   driver_phone: string;
 }
 
 const TRANSPORT_FIELDS: { key: keyof Transport; label: string; max: number }[] = [
-  { key: 'waybill_number', label: 'Waybill number', max: 100 },
   { key: 'vehicle_registration', label: 'Vehicle registration', max: 30 },
   { key: 'driver_name', label: 'Driver', max: 200 },
   { key: 'driver_phone', label: "Driver's phone", max: 30 },
@@ -649,7 +647,6 @@ function DispatchCard({ order, district, quantity }: DetailProps) {
   const [typed, setTyped] = useState(String(approved));
   const [reason, setReason] = useState('');
   const [transport, setTransport] = useState<Transport>({
-    waybill_number: '',
     vehicle_registration: '',
     driver_name: '',
     driver_phone: '',
@@ -914,9 +911,7 @@ function ShipmentCard({ order, quantity }: DetailProps) {
   return (
     <Card className="min-w-0">
       <CardHeader>
-        <CardTitle className="wrap-anywhere">
-          {order.waybill_number ? `Waybill ${order.waybill_number}` : 'Dispatch'}
-        </CardTitle>
+        <CardTitle>Dispatch</CardTitle>
       </CardHeader>
       <CardContent>
         <DetailList items={items} />

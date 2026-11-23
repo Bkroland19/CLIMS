@@ -51,17 +51,20 @@ export default function WarehouseOrdersPage() {
       },
       {
         id: 'warehouse',
+        filter: 'select',
         header: 'Ordered from',
         value: (order) => names.warehouseLabel(order.ordered_from_store_id),
       },
       {
         id: 'ordered',
+        filter: 'date',
         header: 'Ordered',
         value: (order) => order.created_at,
         cell: (order) => formatTimestamp(order.created_at),
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (order) => ORDER_STATUS[order.order_status].label,
         cell: (order) => (

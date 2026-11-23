@@ -42,6 +42,21 @@ describe('checkDelivery', () => {
     ).toMatch(/expired/);
   });
 
+  it('rejects impossible expiry dates and quantities above the API limit', () => {
+    expect(
+      checkDelivery({ ...valid, expiryDate: '2027-02-30' }, '2026-11-22').errors.expiryDate,
+    ).toBeDefined();
+    expect(
+      checkDelivery({ ...valid, expiryDate: '2028-02-29' }, '2026-11-22').errors.expiryDate,
+    ).toBeUndefined();
+    expect(
+      checkDelivery({ ...valid, quantity: '1000000001' }, '2026-11-22').errors.quantity,
+    ).toBeDefined();
+    expect(checkDelivery({ ...valid, quantity: '1000000000' }, '2026-11-22').quantity).toBe(
+      1_000_000_000,
+    );
+  });
+
   it('warns about a batch arriving with under six months left', () => {
     expect(checkDelivery({ ...valid, expiryDate: '2027-05-21' }, '2026-11-22').shortShelf).toBe(
       true,

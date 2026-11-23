@@ -4,8 +4,10 @@ import {
   ArrowUpDown,
   ChevronRight,
   Inbox,
+  RefreshCw,
   Search,
   SearchX,
+  X,
 } from 'lucide-react';
 import {
   Fragment,
@@ -20,6 +22,7 @@ import {
 
 import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorState } from '@/components/states/ErrorState';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -32,6 +35,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getErrorMessage } from '@/lib/api';
+import { matchesFilter, type ColumnFilter, type FilterKind } from '@/lib/table/columnFilters';
 import { formatNumber, formatText } from '@/lib/format';
 import {
   nextSort,
@@ -44,6 +49,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import { TableFooterBar, type DataTableMore } from './TableFooterBar';
+import { TableFilters, ActiveTableFilters, type FilterColumn } from './TableFilters';
 import { TableViewMenu } from './TableViewMenu';
 import { useTablePreferences, type TableDensity } from './useTablePreferences';
 
@@ -62,6 +68,8 @@ export interface DataTableColumn<Row> {
   cell?: (row: Row) => ReactNode;
   /** Defaults to true in a list and false in an embedded table. Needs `value`. */
   sortable?: boolean;
+  /** List columns default to text (numbers when `numeric`). Use select for categories or date for ISO dates. */
+  filter?: FilterKind | false;
   /** Right-aligns numeric columns so digits line up. */
   numeric?: boolean;
   /** Offered in the View menu, so a viewer can hide it. */
@@ -139,12 +147,16 @@ interface DataTableProps<Row> {
   className?: string;
 }
 
-const isHideable = (column: { hideable?: boolean; defaultHidden?: boolean }) =>
-  column.hideable === true || column.defaultHidden === true;
+const isHideable = (column: {
+  hideable?: boolean;
+  defaultHidden?: boolean;
+  value?: unknown;
+  srOnlyHeader?: boolean;
+}) => column.hideable !== false && column.value !== undefined && !column.srOnlyHeader;
 
 const DENSITY_CLASSES: Record<TableDensity, string> = {
-  comfortable: 'py-1.5',
-  compact: 'py-0.5',
+  comfortable: 'py-2.5',
+  compact: 'py-1',
 };
 
 const ROW_TONES: Record<DataTableRowTone, string> = {
@@ -195,10 +207,7 @@ const NO_ROWS: readonly never[] = [];
 const STICKY_ACTIONS_CLASS = 'sticky right-0 z-10';
 /** Cells are 6 × 12px (2px when compact), with 16px at the table's outer edges. */
 const EDGE_CLASS = 'px-3 first:pl-4 last:pr-4';
-const HEAD_CLASS = cn(
-  EDGE_CLASS,
-  'text-muted-foreground h-auto py-1.5 text-[0.6875rem] font-semibold tracking-wider uppercase',
-);
+const HEAD_CLASS = cn(EDGE_CLASS, 'text-muted-foreground h-10 py-2 text-xs font-semibold');
 /**
  * From 50 rows a page the table is taller than the screen, so it scrolls inside
  * its card and the header stays in view; shorter pages scroll with the page.
@@ -244,6 +253,7 @@ export function DataTable<Row>({
   const tableId = useId();
   const searchId = useId();
   const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<ColumnFilter[]>([]);
   // Typing stays responsive on a long list: the filter catches up a frame later.
   const searched = useDeferredValue(query);
   const [sort, setSort] = useState<SortState | null>(defaultSort ?? null);
@@ -256,12 +266,54 @@ export function DataTable<Row>({
     pageSize,
   });
   const hidden = new Set(preferences.hidden);
+  // Stale preferences must never produce a table with no readable columns.
+  if (
+    columns.length > 0 &&
+    columns.every((column) => isHideable(column) && hidden.has(column.id))
+  ) {
+    hidden.delete(columns[0]?.id ?? '');
+  }
   const shownColumns = columns.filter((column) => !isHideable(column) || !hidden.has(column.id));
   const rowPadding = embedded ? 'py-1.5' : DENSITY_CLASSES[preferences.density];
   const canSort = (column: DataTableColumn<Row>) =>
     column.value !== undefined && (column.sortable ?? !embedded);
 
   const all = rows ?? NO_ROWS;
+  const filterColumns = useMemo<FilterColumn[]>(
+    () =>
+      columns.flatMap((column) => {
+        if (!column.value || column.filter === false || column.srOnlyHeader) return [];
+        const kind = column.filter || (column.numeric ? 'number' : 'text');
+        const options =
+          kind === 'select'
+            ? [
+                ...new Set(
+                  all
+                    .map((row) => column.value?.(row))
+                    .filter(
+                      (value) =>
+                        value !== null && value !== undefined && String(value).trim() !== '',
+                    )
+                    .map(String),
+                ),
+              ].sort((a, b) => a.localeCompare(b))
+            : undefined;
+        return [{ id: column.id, header: column.header, kind, options }];
+      }),
+    [columns, all],
+  );
+  const activeFilters = filters.filter((filter) =>
+    filterColumns.some((column) => column.id === filter.columnId),
+  );
+  const changeFilters = (next: ColumnFilter[]) => {
+    setFilters(next);
+    setRequestedPage(1);
+  };
+  const clearFilters = () => {
+    setQuery('');
+    changeFilters([]);
+  };
+
   // Hidden columns are still searched: hiding a column tidies the view, it does not narrow it.
   const index = useMemo(
     () => searchIndex(all, (row) => columns.map((column) => column.value?.(row))),
@@ -269,10 +321,19 @@ export function DataTable<Row>({
   );
   const matching = useMemo(
     () =>
-      sortRows(index.search(searched), sort, (row, columnId) =>
-        columns.find((column) => column.id === columnId)?.value?.(row),
+      sortRows(
+        index.search(searched).filter((row) =>
+          filters.every((filter) => {
+            const column = columns.find(
+              (item) => item.id === filter.columnId && item.filter !== false,
+            );
+            return !column?.value || matchesFilter(column.value(row), filter.rule);
+          }),
+        ),
+        sort,
+        (row, columnId) => columns.find((column) => column.id === columnId)?.value?.(row),
       ),
-    [index, searched, sort, columns],
+    [index, searched, sort, columns, filters],
   );
   const page = embedded
     ? paginate(matching, 1, Math.max(1, matching.length))
@@ -284,7 +345,7 @@ export function DataTable<Row>({
   const showError = Boolean(error) && !hasRows;
   const isLong = !embedded && page.rows.length >= LONG_PAGE;
   const hasTotals = page.total > 0 && shownColumns.some((column) => column.total);
-  const isSearching = searched.trim() !== '';
+  const isSearching = searched.trim() !== '' || activeFilters.length > 0;
 
   const idOf = (row: Row) => String(getRowId(row));
   const pageIds = page.rows.map(idOf);
@@ -326,9 +387,18 @@ export function DataTable<Row>({
       : `Total of all ${formatNumber(page.total)}`;
 
   return (
-    <div className={cn('flex min-w-0 flex-col gap-3', className)}>
+    <div
+      className={cn(
+        'flex min-w-0 flex-col',
+        !embedded && 'bg-card rounded-card overflow-hidden border shadow-xs',
+        className,
+      )}
+    >
       {!embedded && (isLoading || hasRows || toolbar) ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          data-print-hide
+          className="bg-muted/15 flex flex-wrap items-center gap-2 border-b px-4 py-3"
+        >
           <div className="relative w-full sm:max-w-xs">
             <label htmlFor={searchId} className="sr-only">
               Search {label.toLowerCase()}
@@ -352,12 +422,34 @@ export function DataTable<Row>({
               disabled={!hasRows}
             />
           </div>
+          <TableFilters
+            label={label}
+            columns={filterColumns}
+            filters={activeFilters}
+            onChange={changeFilters}
+          />
           {toolbar}
-          <div className="sm:ml-auto">
+          <div className="flex items-center gap-2 sm:ml-auto">
+            {onRetry ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Refresh ${label.toLowerCase()}`}
+                disabled={isLoading || isRetrying}
+                onClick={onRetry}
+              >
+                <RefreshCw
+                  className={cn(isRetrying && 'animate-spin motion-reduce:animate-none')}
+                  aria-hidden="true"
+                />
+              </Button>
+            ) : null}
             <TableViewMenu
               label={label}
               columns={hideable}
-              preferences={preferences}
+              preferences={{ ...preferences, hidden: [...hidden] }}
+              hasFixedColumns={columns.some((column) => !isHideable(column))}
               onChange={(change) => {
                 setPreferences(change);
                 if (change.pageSize) setRequestedPage(1);
@@ -367,7 +459,61 @@ export function DataTable<Row>({
         </div>
       ) : null}
 
-      <div className={cn('min-w-0', !embedded && 'bg-card rounded-card overflow-hidden border')}>
+      {!embedded && (query || activeFilters.length > 0) ? (
+        <div
+          className="flex flex-wrap items-center gap-2 border-b px-4 py-2"
+          aria-label="Active table filters"
+        >
+          <span className="text-muted-foreground mr-1 text-xs tabular-nums" aria-live="polite">
+            {formatNumber(matching.length)} matching{more?.hasMore ? ' loaded records' : ' records'}
+          </span>
+          {query ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="max-w-full"
+              aria-label={`Search: ${query}. Remove filter`}
+              data-print-text
+              onClick={() => {
+                setQuery('');
+                setRequestedPage(1);
+              }}
+            >
+              <span className="truncate">Search: {query}</span>
+              <X aria-hidden="true" />
+            </Button>
+          ) : null}
+          <ActiveTableFilters
+            columns={filterColumns}
+            filters={activeFilters}
+            onChange={changeFilters}
+          />
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            Clear all filters
+          </Button>
+        </div>
+      ) : null}
+      {Boolean(error) && hasRows ? (
+        <Alert variant="warning" className="rounded-none border-x-0 border-t-0">
+          <AlertTitle>Could not refresh {label.toLowerCase()}</AlertTitle>
+          <AlertDescription>
+            Showing the last loaded records. {getErrorMessage(error)}
+            {onRetry ? (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                disabled={isRetrying}
+                onClick={onRetry}
+              >
+                Try again
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="min-w-0">
         {showError ? (
           <ErrorState
             title={`Could not load ${label.toLowerCase()}`}
@@ -471,19 +617,22 @@ export function DataTable<Row>({
                           ) : !canSort(column) ? (
                             column.header
                           ) : (
-                            <button
+                            <Button
+                              data-print-text
+                              variant="ghost"
+                              size="sm"
                               type="button"
                               onClick={() => {
                                 setSort((current) => nextSort(current, column.id));
                               }}
                               className={cn(
-                                'hover:text-foreground focus-visible:ring-ring -mx-1 inline-flex items-center gap-1 rounded-sm px-1 tracking-wider uppercase outline-none focus-visible:ring-2',
+                                'hover:text-foreground -mx-2 h-7 gap-1.5 px-2 text-xs font-semibold',
                                 sorted && 'text-foreground',
                               )}
                             >
                               {column.header}
                               <SortIcon className="size-3" aria-hidden="true" />
-                            </button>
+                            </Button>
                           )}
                         </TableHead>
                       );
@@ -522,19 +671,21 @@ export function DataTable<Row>({
                             icon={SearchX}
                             title="No matches"
                             description={
-                              more?.hasMore
-                                ? `Nothing in the ${formatNumber(all.length)} ${more.noun} loaded so far matches “${searched.trim()}”. Load more to search further back, or clear the search.`
-                                : `Nothing matches “${searched.trim()}”. Check the spelling or clear the search.`
+                              activeFilters.length > 0
+                                ? `No records match these filters.${more?.hasMore ? ' Filters cover loaded records only. Load more to search further back.' : ' Try removing a filter or changing its value.'}`
+                                : more?.hasMore
+                                  ? `Nothing in the ${formatNumber(all.length)} ${more.noun} loaded so far matches “${searched.trim()}”. Load more to search further back, or clear the search.`
+                                  : `Nothing matches “${searched.trim()}”. Check the spelling or clear the search.`
                             }
                             action={
                               <div className="flex flex-wrap justify-center gap-2">
                                 <Button
                                   variant="outline"
                                   onClick={() => {
-                                    setQuery('');
+                                    clearFilters();
                                   }}
                                 >
-                                  Clear search
+                                  {activeFilters.length > 0 ? 'Clear filters' : 'Clear search'}
                                 </Button>
                                 {more?.hasMore ? (
                                   <Button
@@ -700,8 +851,18 @@ export function DataTable<Row>({
           </>
         )}
 
-        {!embedded && !showError && (page.total > 0 || more?.hasMore) ? (
-          <TableFooterBar label={label} page={page} onPage={setRequestedPage} more={more} />
+        {!embedded && !showError && (hasRows || more?.hasMore) ? (
+          <TableFooterBar
+            label={label}
+            page={page}
+            onPage={setRequestedPage}
+            more={more}
+            pageSize={preferences.pageSize}
+            onPageSize={(size) => {
+              setPreferences({ pageSize: size });
+              setRequestedPage(1);
+            }}
+          />
         ) : null}
       </div>
     </div>

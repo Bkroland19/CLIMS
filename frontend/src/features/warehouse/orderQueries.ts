@@ -25,22 +25,14 @@ import { formatNumber } from '@/lib/format';
 
 import { ordersAt, warehouseStoreOf } from './requests';
 import { useWarehouseStore } from './useWarehouseStore';
+import { warehouseOrderKeys } from './queryKeys';
+export { warehouseOrderKeys } from './queryKeys';
 
 /*
  * The warehouse's district orders and the stock it decides and dispatches from, on the Go API.
  * Every key starts with `warehouse-orders`: one step changes the order, the lists, the stock and
  * the batches together, so each write refetches the lot, and the DCFP's views of the same order.
  */
-const ROOT = 'warehouse-orders';
-export const warehouseOrderKeys = {
-  all: [ROOT] as const,
-  warehouses: [ROOT, 'warehouses'] as const,
-  orders: [ROOT, 'orders'] as const,
-  order: (id: string) => [ROOT, 'orders', id] as const,
-  events: (id: string) => [ROOT, 'orders', id, 'events'] as const,
-  stock: (storeId: string) => [ROOT, 'stock', storeId] as const,
-  batches: (storeId: string) => [ROOT, 'batches', storeId] as const,
-};
 
 interface ReadOptions {
   enabled?: boolean;

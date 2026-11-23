@@ -27,6 +27,7 @@ function columnsFor(names: RequestNames, href: (path: string) => string): DataTa
   return [
     {
       id: 'district',
+      filter: 'select',
       header: 'Ordered for',
       value: (order) => names.store(order.ordered_for_store_id),
       cell: (order) => (
@@ -65,12 +66,14 @@ function columnsFor(names: RequestNames, href: (path: string) => string): DataTa
     },
     {
       id: 'received',
+      filter: 'date',
       header: 'Received',
       value: (order) => order.created_at,
       cell: (order) => formatTimestamp(order.created_at),
     },
     {
       id: 'status',
+      filter: 'select',
       header: 'Status',
       value: (order) => requestStatus(order).label,
       cell: (order) => {

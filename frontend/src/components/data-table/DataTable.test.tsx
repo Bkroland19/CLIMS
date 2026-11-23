@@ -135,7 +135,7 @@ describe('DataTable', () => {
   it('keeps showing rows it already has when a background refresh fails', () => {
     renderTable({ error: new ApiError({ kind: 'server', message: 'Server problem.' }) });
     expect(names()).toHaveLength(10);
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Showing the last loaded records.');
   });
 
   it('renders a dash for missing values and never the text "null"', () => {

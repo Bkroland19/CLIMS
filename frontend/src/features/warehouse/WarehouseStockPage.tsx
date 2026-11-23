@@ -5,7 +5,9 @@ import {
   CalendarX2,
   ClockAlert,
   Inbox,
+  LockKeyhole,
   Package,
+  PackageOpen,
   PackagePlus,
   Pencil,
   Scale,
@@ -24,6 +26,7 @@ import { PageActions } from '@/components/PageActions';
 import { StatCard } from '@/components/StatCard';
 import { TaskList } from '@/components/TaskList';
 import { ErrorState } from '@/components/states/ErrorState';
+import { EmptyState } from '@/components/states/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
@@ -289,7 +292,7 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
       header: 'Stock cover',
       numeric: true,
       hideable: true,
-      value: (row) => stockCover(row) ?? -1,
+      value: (row) => stockCover(row),
       cell: (row) => {
         const months = stockCover(row);
         return months === null ? (
@@ -303,9 +306,10 @@ function productColumns(period: Period): DataTableColumn<ProductSummary>[] {
     },
     {
       id: 'next_expiry',
+      filter: 'date',
       header: 'Next expiry',
       hideable: true,
-      value: (row) => row.next_expiry ?? '9999',
+      value: (row) => row.next_expiry,
       cell: (row) =>
         row.next_expiry ? (
           <span className="whitespace-nowrap">{formatDate(row.next_expiry)}</span>
@@ -353,8 +357,9 @@ const batchColumns: DataTableColumn<StockBatch>[] = [
   },
   {
     id: 'expires',
+    filter: 'date',
     header: 'Expires',
-    value: (batch) => batch.expiry_date ?? '9999',
+    value: (batch) => batch.expiry_date,
     cell: (batch) =>
       batch.expiry_date ? (
         <div>
@@ -367,6 +372,7 @@ const batchColumns: DataTableColumn<StockBatch>[] = [
   },
   {
     id: 'band',
+    filter: 'select',
     header: 'Shelf life',
     value: (batch) => BAND_STATUS[batch.band].label,
     cell: (batch) => (
@@ -428,6 +434,7 @@ function movementColumns(href: (path: string) => string): DataTableColumn<Moveme
   return [
     {
       id: 'at',
+      filter: 'date',
       header: 'When',
       value: (movement) => movement.created_at,
       cell: (movement) => (
@@ -436,6 +443,7 @@ function movementColumns(href: (path: string) => string): DataTableColumn<Moveme
     },
     {
       id: 'reason',
+      filter: 'select',
       header: 'What',
       value: (movement) => MOVEMENT_LABEL[movement.reason].label,
       cell: (movement) => {
@@ -605,6 +613,11 @@ export default function WarehouseStockPage() {
   const products = summary.data?.products;
   const orders = summary.data?.orders;
   const figuresLoading = waiting || summary.isPending;
+  const summaryEmpty =
+    !figuresLoading &&
+    products?.length === 0 &&
+    orders &&
+    Object.values(orders).every((value) => value === 0 || value === null);
   const amounts = (pick: (row: ProductSummary) => number, none?: string) =>
     products ? formatAmounts(totalsByUnit(products, pick), none) : '—';
   /** A headline amount: the unit holding most as the figure, any other units on a line under it. */
@@ -665,6 +678,24 @@ export default function WarehouseStockPage() {
     </WriteAction>
   ) : null;
 
+  if (summary.error?.kind === 'forbidden') {
+    return (
+      <div className="gap-section flex flex-col">
+        <StoreSwitch
+          store={code}
+          hrefFor={(other) => withStore(stockPath(view, band, period, reason), other)}
+        />
+        <div className="bg-card rounded-card border">
+          <EmptyState
+            icon={LockKeyhole}
+            title={`${code} stock is unavailable`}
+            description="You do not have access to this warehouse's stock. Ask an administrator to check your store assignment and permissions."
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="gap-section flex flex-col">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
@@ -702,6 +733,14 @@ export default function WarehouseStockPage() {
                 void summary.refetch();
               }}
               isRetrying={summary.isRefetching}
+            />
+          </div>
+        ) : summaryEmpty ? (
+          <div className="bg-card rounded-card border">
+            <EmptyState
+              icon={PackageOpen}
+              title={`No stock data at ${code} yet`}
+              description="Stock and district order activity will appear here once recorded."
             />
           </div>
         ) : (
