@@ -11,6 +11,7 @@ import {
   getStockout,
   listOrderEvents,
   listOrders,
+  listStockoutRiders,
   listStockouts,
   listWarehouses,
   receiveOrder,
@@ -28,6 +29,7 @@ export const dcfpKeys = {
   all: [ROOT] as const,
   stockouts: [ROOT, 'stockouts'] as const,
   stockout: (id: string) => [ROOT, 'stockouts', id] as const,
+  riders: (reportId: string) => [ROOT, 'stockouts', reportId, 'riders'] as const,
   orders: [ROOT, 'orders'] as const,
   order: (id: string) => [ROOT, 'orders', id] as const,
   events: (id: string) => [ROOT, 'orders', id, 'events'] as const,
@@ -47,6 +49,15 @@ export function useStockout(id: string | undefined) {
     dcfpKeys.stockout(id ?? ''),
     (http, signal) => getStockout(http, id ?? '', signal),
     { enabled: Boolean(id) },
+  );
+}
+
+/** The delivery agents who may carry a delivery for a report, once one is chosen. */
+export function useStockoutRiders(reportId: string) {
+  return useApiQuery(
+    dcfpKeys.riders(reportId),
+    (http, signal) => listStockoutRiders(http, reportId, signal),
+    { enabled: Boolean(reportId) },
   );
 }
 

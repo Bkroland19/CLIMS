@@ -99,11 +99,24 @@ interface Report {
   fulfilled_at: string | null;
 }
 
+interface Rider {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+
+/** Delivery agents working in the mock DCFP's district (GET /orders/stockouts/:id/riders). */
+const riders = (): Rider[] => [
+  { id: id(11, 1), name: 'Moses Kato', phone: '0772 000111' },
+  { id: id(11, 2), name: 'Sarah Achieng', phone: null },
+];
+
 interface Delivery {
   id: string;
   delivered_by_id: string;
   note: string | null;
   created_at: string;
+  rider: Rider | null;
   lines: {
     id: string;
     category: 'male' | 'female';
@@ -327,6 +340,13 @@ function deliver(r: Report, body: Body): Reply {
       acknowledged_at: null,
     });
   }
+  const riderId = text(body.rider_id);
+  const rider = riderId ? riders().find((candidate) => candidate.id === riderId) : null;
+  if (riderId && !rider) {
+    const message =
+      "the delivery agent must be an active delivery agent working in the hotspot's district";
+    return fail(422, message, { rider_id: message });
+  }
   const detail = stockoutDetail(r);
   state.deliveries[r.id] = [
     ...detail.deliveries,
@@ -335,6 +355,7 @@ function deliver(r: Report, body: Body): Reply {
       delivered_by_id: ME,
       note: text(body.note) || null,
       created_at: now,
+      rider: rider ?? null,
       lines: recorded,
     },
   ];
@@ -950,6 +971,7 @@ export function handleDcfp(
       if (!r) return fail(404, 'stockout notification not found');
       if (method === 'GET' && action === undefined) return ok(stockoutDetail(r));
       if (method === 'POST' && action === 'deliveries') return deliver(r, body);
+      if (method === 'GET' && action === 'riders') return ok(riders());
       return fail(404, 'Not found');
     }
     if (method === 'GET') return ok(state.reports);

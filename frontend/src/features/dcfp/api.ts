@@ -46,12 +46,19 @@ const stockoutReportSchema = z.object({
 
 export type StockoutReport = z.infer<typeof stockoutReportSchema>;
 
+/** A delivery agent: an active user with `orders:deliver` working in the hotspot's district. */
+const riderSchema = z.object({ id: z.string(), name: z.string(), phone: text });
+
+export type Rider = z.infer<typeof riderSchema>;
+
 const stockoutDetailSchema = stockoutReportSchema.extend({
   deliveries: z.array(
     z.object({
       id: z.string(),
       note: text,
       created_at: z.string(),
+      /** The delivery agent carrying it, when one was named. */
+      rider: riderSchema.nullish(),
       lines: z.array(
         z.object({
           id: z.string(),
@@ -81,10 +88,24 @@ export async function getStockout(
   );
 }
 
+/** The delivery agents who may carry a delivery for a report, by name. */
+export async function listStockoutRiders(
+  http: HttpClient,
+  reportId: string,
+  signal?: AbortSignal,
+): Promise<Rider[]> {
+  const body = await http.get(`/orders/stockouts/${encodeURIComponent(reportId)}/riders`, {
+    signal,
+  });
+  return parseList(riderSchema, body, 'delivery agents');
+}
+
 export interface HotspotDeliveryInput {
   lines: { condom_id: string; unit_of_measure_id: string; quantity: number }[];
   client_reference: string;
   note?: string;
+  /** Optional delivery agent carrying it; see {@link listStockoutRiders}. */
+  rider_id?: string;
   expiry_exception_reason?: string;
 }
 
