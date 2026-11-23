@@ -3,8 +3,8 @@
  *
  * - `GET/POST /orders/stockouts`: hotspot stockout reports. A report notifies the district's
  *   DCFPs; it is not an order.
- * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS;
- *   the warehouse chooses the product.
+ * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS,
+ *   with no unit; the warehouse chooses the product and the order takes that product's unit.
  * - `GET /orders`, `/orders/:id`, `/orders/:id/events`, and `POST /orders/:id/actions/{review,
  *   check-stock,reject,dispatch,receive}`: the warehouse approves, reserves and dispatches from
  *   the batches in `inventory.mts`, first expiry first out; the district's receipt adds to the
@@ -42,7 +42,8 @@ interface Order {
   handled_by_id: string | null;
   ordered_for_store_id: string;
   ordered_from_store_id: string;
-  unit_of_measure_id: string;
+  /** Null until the warehouse chooses the product; then the product's catalogue unit. */
+  unit_of_measure_id: string | null;
   comment: string | null;
   discrepancy_note: string | null;
   quantity_approved: number | null;
@@ -166,7 +167,7 @@ function order(
     handled_by_id: null,
     ordered_for_store_id: DISTRICT,
     ordered_from_store_id: NMS,
-    unit_of_measure_id: mockUnitId(2),
+    unit_of_measure_id: product === null ? null : mockUnitId(2),
     comment: null,
     discrepancy_note: null,
     quantity_approved: null,
@@ -413,7 +414,7 @@ export function seedDcfp(dataset: string): void {
   state.shipments = new Map();
   // Confirmed orders hold their reservations at the warehouse.
   for (const o of state.orders) {
-    if (o.order_status === 'confirmed' && o.condom_id) {
+    if (o.order_status === 'confirmed' && o.condom_id && o.unit_of_measure_id) {
       reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, approvedOf(o));
     }
   }
@@ -425,12 +426,15 @@ export function seedDcfp(dataset: string): void {
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 function placeWarehouseOrder(body: Body): Reply {
+  // Like the Go API, which refuses unknown fields: the DCFP names no product and no unit.
+  if ('unit_of_measure_id' in body || 'condom_id' in body) return fail(400, 'invalid request body');
   const warehouse = text(body.warehouse_store_id);
-  const unit = text(body.unit_of_measure_id);
   const category = text(body.condom_category);
   const quantity = body.quantity;
-  if (!warehouse || !unit)
-    return fail(422, 'provide warehouse_store_id and unit_of_measure_id UUIDs');
+  if (!warehouse) {
+    const message = 'provide the warehouse_store_id UUID';
+    return fail(422, message, { warehouse_store_id: message });
+  }
   if (category !== 'male' && category !== 'female') {
     const message = 'condom_category must be male or female';
     return fail(422, message, { condom_category: message });
@@ -451,7 +455,6 @@ function placeWarehouseOrder(body: Body): Reply {
       condom_category: category,
       quantity_needed: quantity,
       ordered_from_store_id: warehouse,
-      unit_of_measure_id: unit,
       comment: text(body.comment) || null,
     },
     0,
@@ -497,7 +500,15 @@ function review(o: Order, body: Body): Reply {
     const message = 'the product chosen is not of the condom category requested';
     return fail(422, message, { condom_id: message });
   }
+  // The order is counted in the chosen product's catalogue unit.
+  const unit = PRODUCTS[chosen].unit;
+  if (!unit) {
+    const message =
+      'the product chosen has no unit in the catalogue; give it one before sending it';
+    return fail(422, message, { condom_id: message });
+  }
   o.condom_id = chosen;
+  o.unit_of_measure_id = unit;
   o.quantity_approved = quantity;
   step(o, 'review', 'reviewed');
   return ok(o);
@@ -505,7 +516,11 @@ function review(o: Order, body: Body): Reply {
 
 /** Reserves the approved quantity when enough unexpired stock is free, else holds the order. */
 function checkStock(o: Order): Reply {
-  if ((o.order_status !== 'reviewed' && o.order_status !== 'on_hold') || !o.condom_id) {
+  if (
+    (o.order_status !== 'reviewed' && o.order_status !== 'on_hold') ||
+    !o.condom_id ||
+    !o.unit_of_measure_id
+  ) {
     return conflict();
   }
   const approved = approvedOf(o);
@@ -524,7 +539,7 @@ function reject(o: Order, body: Body): Reply {
   if (!reason) {
     return fail(422, 'say why the order is rejected', { reason: 'say why the order is rejected' });
   }
-  if (o.order_status === 'confirmed' && o.condom_id) {
+  if (o.order_status === 'confirmed' && o.condom_id && o.unit_of_measure_id) {
     reserve(o.ordered_from_store_id, o.condom_id, o.unit_of_measure_id, -approvedOf(o));
   }
   o.rejection_reason = reason;
@@ -534,7 +549,7 @@ function reject(o: Order, body: Body): Reply {
 
 /** Like the Go API: dispatch what is reserved, or less, first expiry first out. */
 function dispatch(o: Order, body: Body): Reply {
-  if (o.order_status !== 'confirmed' || !o.condom_id) return conflict();
+  if (o.order_status !== 'confirmed' || !o.condom_id || !o.unit_of_measure_id) return conflict();
   const approved = approvedOf(o);
   const asked = body.quantity_issued;
   const quantity = asked === undefined ? approved : asked;
@@ -572,7 +587,7 @@ function dispatch(o: Order, body: Body): Reply {
 
 /** The district's batches are the ones shipped: a shortfall comes off the last of them. */
 function receiveIntoBatches(o: Order, counted: number): void {
-  if (!o.condom_id || counted <= 0) return;
+  if (!o.condom_id || !o.unit_of_measure_id || counted <= 0) return;
   let left = counted;
   for (const shipped of state.shipments.get(o.id) ?? []) {
     const quantity = Math.min(left, shipped.quantity);

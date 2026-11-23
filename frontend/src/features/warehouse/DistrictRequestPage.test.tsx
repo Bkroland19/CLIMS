@@ -78,6 +78,29 @@ describe('Deciding on an order', () => {
     });
   });
 
+  it('counts the order in the unit of the product it chooses', async () => {
+    // The district named no unit. NMS holds FC2 in cartons, but FC2's catalogue unit is the box,
+    // which the order would take, so none of that stock can be reserved for it.
+    render(gulu(), {
+      balances: [
+        aBalance({ condom_id: FEMALE.id, on_hand: 800 }),
+        aBalance({
+          condom_id: FEMALE_FC2.id,
+          product: 'FC2 Free Female',
+          unit_of_measure_id: 'u-carton',
+          unit: 'carton',
+          on_hand: 200,
+        }),
+      ],
+    });
+
+    const products = await screen.findByRole('group', { name: 'Product to send' });
+    expect(
+      await within(products).findByRole('radio', { name: 'FC2 · Female · Free, box of 100' }),
+    ).toHaveAccessibleDescription(/None that can be reserved.*Out of stock/);
+    expect(screen.getByText('of 500 box ordered')).toBeInTheDocument();
+  });
+
   it('approves part of the order, and says when it will wait for stock', async () => {
     const user = userEvent.setup();
     const { requests } = render(gulu());

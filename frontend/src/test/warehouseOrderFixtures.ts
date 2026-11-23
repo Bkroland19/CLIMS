@@ -34,12 +34,16 @@ export function aDistrictStore(name: string) {
   };
 }
 
-/** An order from Wakiso to NMS for female condoms, waiting for the warehouse. */
+/**
+ * An order from Wakiso to NMS for female condoms, waiting for the warehouse. The DCFP names no
+ * unit: the order takes the product's unit when the warehouse chooses one at review.
+ */
 export function aWarehouseOrder(overrides: Partial<Order> = {}): Order {
   return anOrder({
     id: 'o1',
     condom_id: null,
     condom_category: 'female',
+    unit_of_measure_id: overrides.condom_id ? BOX.id : null,
     ordered_for_store_id: 'store-wakiso',
     ordered_from_store_id: NMS.id,
     ...overrides,

@@ -376,7 +376,7 @@ describe('Warehouse dashboard', () => {
       'View stock',
     ]);
     expect(
-      within(items[0] ?? tasks).getByText("Decide on Gulu's order for 500 box"),
+      within(items[0] ?? tasks).getByText("Decide on Gulu's order for 500"),
     ).toBeInTheDocument();
     expect(within(items[0] ?? tasks).getByRole('link')).toHaveAttribute(
       'href',

@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { packLabel } from '@/features/catalogue/api';
+import { packLabel, type Product } from '@/features/catalogue/api';
 import type { StockBatch } from '@/features/inventory/api';
 import { BAND_STATUS, batchLabel, shelfLifeLeft } from '@/features/inventory/bands';
 import type { Order } from '@/features/orders/api';
@@ -195,6 +195,11 @@ function OrderDetail({
   );
 }
 
+/** The product's catalogue unit, the unit an order for it is counted in. */
+function catalogueUnit(products: readonly Product[], id: string | null): string | null {
+  return products.find((product) => product.id === id)?.unit?.id ?? null;
+}
+
 /** A whole number, or null for anything else (including blank). */
 function parseWhole(text: string): number | null {
   const trimmed = text.trim();
@@ -203,26 +208,33 @@ function parseWhole(text: string): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
-/** The warehouse's stock and batches, and what each product can still reserve in the order's unit. */
-function useReservable(order: Order) {
+/**
+ * The warehouse's stock and batches, and what each product can still reserve in the unit `unitOf`
+ * gives it: the order's unit once reviewed, else the product's catalogue unit, which the order takes
+ * when approved.
+ */
+function useReservable(order: Order, unitOf: (condomId: string | null) => string | null) {
   const storeId = order.ordered_from_store_id;
   const stock = useStoreStock(storeId);
   const batches = useStoreBatches(storeId);
-  const unit = order.unit_of_measure_id;
   return {
+    unitOf,
     isPending: stock.isPending || batches.isPending,
     error: stock.error ?? batches.error,
     retry: () => {
       void stock.refetch();
       void batches.refetch();
     },
-    of: (condomId: string) =>
-      reservable(
+    of: (condomId: string) => {
+      const unit = unitOf(condomId);
+      if (!unit) return 0;
+      return reservable(
         stock.data?.find((row) => row.condom_id === condomId && row.unit_of_measure_id === unit),
         batches.data?.filter(
           (batch) => batch.condom_id === condomId && batch.unit_of_measure_id === unit,
         ),
-      ),
+      );
+    },
   };
 }
 
@@ -234,12 +246,12 @@ function DecisionCard({
   order,
   names,
   district,
-  quantity,
   onCancel,
 }: DetailProps & { onCancel?: () => void }) {
-  const stock = useReservable(order);
-  const approve = useApproveOrder(order.id, district);
   const products = names.productsOf(order.condom_category);
+  // Approving counts the order in the chosen product's catalogue unit, so read each in its own.
+  const stock = useReservable(order, (id) => catalogueUnit(products, id));
+  const approve = useApproveOrder(order.id, district);
   const ordered = order.quantity_needed ?? 0;
   const inputId = useId();
   const [chosen, setChosen] = useState<string | null>(null);
@@ -254,6 +266,9 @@ function DecisionCard({
     return ranked[0]?.id ?? null;
   }, [products, stock]);
   const productId = chosen ?? order.condom_id ?? best;
+  // Quantities read in the chosen product's unit, which the order takes when approved.
+  const quantity = (amount: number | null, id: string | null = productId) =>
+    names.quantity(amount, stock.unitOf(id));
   const available = productId ? stock.of(productId) : 0;
   const offered = available > 0 ? Math.min(ordered, available) : ordered;
   const text = typed ?? String(offered);
@@ -322,7 +337,9 @@ function DecisionCard({
                   .filter(Boolean)
                   .join(', '),
                 description:
-                  free > 0 ? `${quantity(free)} can be reserved` : 'None that can be reserved',
+                  free > 0
+                    ? `${quantity(free, product.id)} can be reserved`
+                    : 'None that can be reserved',
                 aside:
                   free >= ordered ? (
                     <StatusBadge status="Covers the order" tone="positive" />
@@ -435,7 +452,7 @@ function DecisionCard({
  */
 function StockCheckCard(props: DetailProps) {
   const { order, district, quantity } = props;
-  const stock = useReservable(order);
+  const stock = useReservable(order, () => order.unit_of_measure_id);
   const check = useCheckStock(order.id, district);
   const [mode, setMode] = useState<'check' | 'change' | 'reject'>('check');
   const approved = order.quantity_approved ?? order.quantity_needed ?? 0;

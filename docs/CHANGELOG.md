@@ -6,6 +6,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- **The DCFP orders from the warehouse without choosing a unit.** `POST /api/v1/orders/warehouse-requests`
+  takes `warehouse_store_id`, `condom_category`, `quantity` and an optional `comment`; a body with
+  `unit_of_measure_id` is refused (400). The order's `unit_of_measure_id` stays null until the
+  warehouse chooses the product at `review`, which gives the order that product's catalogue unit (422
+  on `error.condom_id` when the product has none). Migration 33 lets an order lack a unit until it has
+  a product. Web: the new warehouse order form no longer asks for a unit, and the warehouse's approval
+  reads each product's stock in its own unit.
 - **Stockouts notify the DCFP; the DCFP orders from NMS or JMS.** `POST /api/v1/orders/stockouts` now
   records a stockout report and notifies the hotspot's district DCFPs (`orders:replenish`) with the
   hotspot's details, its contact and the message. It creates no order and returns a `StockoutReport`.

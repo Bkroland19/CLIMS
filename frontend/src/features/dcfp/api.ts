@@ -68,12 +68,14 @@ export async function listStockouts(
 
 /* Writes. */
 
-/** The district names a condom category; the warehouse chooses the product. */
+/**
+ * The district names a condom category and a quantity, with no product or unit: the warehouse
+ * chooses the product at review and the order is counted in that product's unit.
+ */
 export interface WarehouseOrderInput {
   warehouse_store_id: string;
   condom_category: 'male' | 'female';
   quantity: number;
-  unit_of_measure_id: string;
   comment: string | null;
 }
 

@@ -147,13 +147,14 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 		}
 		return result["data"].(map[string]any)
 	}
-	// Later checks read the product's catalogue unit, so put it back as found.
+	// The order is counted in the chosen product's catalogue unit, and later checks read that unit,
+	// so set it for the test and put it back as found.
 	var catalogueUnit *string
 	scalar(&catalogueUnit, `SELECT unit_id FROM condoms WHERE id = $1`, product)
 	defer exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, catalogueUnit)
 	exec(`UPDATE condoms SET unit_id = $2 WHERE id = $1`, product, unit)
 	valid := map[string]any{"warehouse_store_id": warehouse, "condom_category": category, "quantity": 50,
-		"unit_of_measure_id": unit, "comment": "Two hotspots are out"}
+		"comment": "Two hotspots are out"}
 	with := func(changes map[string]any) map[string]any {
 		body := map[string]any{}
 		for k, v := range valid {
@@ -173,12 +174,12 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	if res := order(districtToken, with(map[string]any{"condom_category": "both"}), 422); res["error"].(map[string]any)["condom_category"] == nil {
 		t.Fatalf("a warehouse request must name male or female: %v", res)
 	}
-	order(districtToken, with(map[string]any{"unit_of_measure_id": ""}), 422)
-	order(districtToken, with(map[string]any{"condom_id": product}), 400) // the warehouse chooses the product
+	order(districtToken, with(map[string]any{"unit_of_measure_id": unit}), 400) // the order takes the product's unit
+	order(districtToken, with(map[string]any{"condom_id": product}), 400)       // the warehouse chooses the product
 	order(districtToken, with(map[string]any{"hot_spot_id": hotSpot}), 400)
 	created := order(districtToken, valid, 201)
 	if created["order_status"] != "queued" || created["ordered_for_store_id"] != district || created["ordered_from_store_id"] != warehouse ||
-		created["quantity_needed"] != float64(50) || created["unit_of_measure_id"] != unit || created["hot_spot_id"] != nil ||
+		created["quantity_needed"] != float64(50) || created["unit_of_measure_id"] != nil || created["hot_spot_id"] != nil ||
 		created["parent_order_id"] != nil || created["comment"] != "Two hotspots are out" ||
 		created["condom_id"] != nil || created["condom_category"] != category {
 		t.Fatalf("unexpected warehouse order: %v", created)
@@ -219,8 +220,10 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	if otherCategory != nil {
 		act("review", warehouseToken, map[string]any{"condom_id": *otherCategory}, 422, "")
 	}
-	if reviewed := act("review", warehouseToken, map[string]any{"condom_id": product}, 200, "reviewed"); reviewed["condom_id"] != product {
-		t.Fatalf("the warehouse's product choice was not kept: %v", reviewed)
+	// The order is counted in the chosen product's catalogue unit from review onwards.
+	if reviewed := act("review", warehouseToken, map[string]any{"condom_id": product}, 200, "reviewed"); reviewed["condom_id"] != product ||
+		reviewed["unit_of_measure_id"] != unit {
+		t.Fatalf("the warehouse's product choice and its unit were not kept: %v", reviewed)
 	}
 	// The district hears what was approved, and which product is coming.
 	if approved := inbox(districtToken, "order", orderID, "order.replenishment_approved"); approved == nil ||

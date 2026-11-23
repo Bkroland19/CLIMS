@@ -183,19 +183,19 @@ func (h *Handler) stockouts(c fiber.Ctx) error {
 	return response.Success(c, 200, "", reports)
 }
 
-// warehouseRequest places a DCFP's order with NMS or JMS for a condom category and quantity; the
-// warehouse chooses the product at review.
+// warehouseRequest places a DCFP's order with NMS or JMS for a condom category and quantity, with no
+// product or unit: the warehouse chooses the product at review and the order takes its unit.
 func (h *Handler) warehouseRequest(c fiber.Ctx) error {
 	var input WarehouseRequestInput
 	if err := request.DecodeJSON(c, &input); err != nil {
 		return response.Error(c, 400, "invalid request body", nil)
 	}
-	warehouseID, warehouseErr := request.ParseUUID(input.WarehouseID)
-	unitID, unitErr := request.ParseUUID(input.UnitOfMeasureID)
-	if warehouseErr != nil || unitErr != nil {
-		return response.Error(c, 422, "provide warehouse_store_id and unit_of_measure_id UUIDs", nil)
+	warehouseID, err := request.ParseUUID(input.WarehouseID)
+	if err != nil {
+		const message = "provide the warehouse_store_id UUID"
+		return response.Error(c, 422, message, map[string]string{"warehouse_store_id": message})
 	}
-	input.WarehouseID, input.UnitOfMeasureID = warehouseID, unitID
+	input.WarehouseID = warehouseID
 	if input.CondomCategory != SelectionMale && input.CondomCategory != SelectionFemale {
 		const message = "condom_category must be male or female"
 		return response.Error(c, 422, message, map[string]string{"condom_category": message})
@@ -348,7 +348,7 @@ func workflowError(c fiber.Ctx, err error) error {
 	case errors.Is(err, errInactiveProduct):
 		const message = "This product is inactive and cannot be ordered."
 		return response.Error(c, 422, message, map[string]string{"condom_id": message})
-	case errors.Is(err, errChooseProduct), errors.Is(err, errWrongCategory):
+	case errors.Is(err, errChooseProduct), errors.Is(err, errWrongCategory), errors.Is(err, errProductUnit):
 		return response.Error(c, 422, err.Error(), map[string]string{"condom_id": err.Error()})
 	default:
 		return orderError(c, err)

@@ -244,7 +244,7 @@ func testCatalogue(t *testing.T, pool *pgxpool.Pool, request func(string, string
 	assign(destinationID)
 	defer assign(nil)
 	placed := data(request("POST", "/orders/warehouse-requests", map[string]any{"warehouse_store_id": sourceID,
-		"condom_category": categoryOf(t, pool, productID), "quantity": 10, "unit_of_measure_id": unitID}, admin, 201))
+		"condom_category": categoryOf(t, pool, productID), "quantity": 10}, admin, 201))
 	review := "/orders/" + placed["id"].(string) + "/actions/review"
 	request("PATCH", "/catalogue/products/"+productID, map[string]any{"active": false}, admin, 200)
 	expectFields("order inactive product", request("POST", review, map[string]any{"condom_id": productID}, admin, 422),

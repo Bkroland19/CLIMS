@@ -179,7 +179,7 @@
         "tags": ["Orders"],
         "operationId": "createWarehouseRequest",
         "summary": "Order stock from NMS or JMS",
-        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the condom category (`condom_category`, male or female), the `quantity` and its `unit_of_measure_id`. The warehouse chooses the product (`condom_id`) when it reviews the request; until then the order's `condom_id` is null. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
+        "description": "Requires orders:replenish and an assigned district store, which the order is for (orders:all_stores does not stand in for one: 403). Names the national warehouse (`warehouse_store_id`, NMS or JMS), the condom category (`condom_category`, male or female) and the `quantity`, with no product and no unit (sending `unit_of_measure_id` or `condom_id` returns 400). The warehouse chooses the product (`condom_id`) when it reviews the request, and the order takes that product's catalogue unit; until then `condom_id` and `unit_of_measure_id` are null. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`. The order starts `queued` and the warehouse's staff with orders:process are notified (`order.replenishment_requested`). The warehouse then runs review, check-stock and dispatch, and the district runs receive (`POST /api/v1/orders/{id}/actions/{action}`).",
         "responses": {
           "201": {
             "description": "Success",
@@ -286,7 +286,7 @@
         "tags": ["Orders"],
         "operationId": "transitionOrder",
         "summary": "Advance a warehouse order",
-        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest, and the transport: waybill_number, vehicle_registration, driver_name, driver_phone). Until dispatch (queued, reviewed, on_hold or confirmed) they may instead reject the order with a reason: it becomes rejected, keeps rejection_reason, releases any reservation, and takes no further step (409). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body; reject needs reason. review notifies the district of the approval (order.replenishment_approved), reject of the rejection (order.replenishment_rejected), and receive notifies the warehouse as well as the district. review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
+        "description": "Applies to orders a DCFP placed with a warehouse (`POST /api/v1/orders/warehouse-requests`) and to warehouse requests linked to older alert orders. Warehouse staff with orders:process at the supplying store run review (queued or on_hold), check-stock (reviewed or on_hold: reserves the quantity and confirms, or holds the order until stock arrives) and dispatch (confirmed; optionally a smaller quantity_issued, releasing the rest, and the transport: waybill_number, vehicle_registration, driver_name, driver_phone). Until dispatch (queued, reviewed, on_hold or confirmed) they may instead reject the order with a reason: it becomes rejected, keeps rejection_reason, releases any reservation, and takes no further step (409). The district store then runs receive (orders:receive) with quantity_received; a mismatch needs discrepancy_note. orders:all_stores overrides store assignment. Generic pending orders and alert orders raised before stockouts became reports return 409. review, check-stock and dispatch accept an empty body; reject needs reason. review notifies the district of the approval (order.replenishment_approved), reject of the rejection (order.replenishment_rejected), and receive notifies the warehouse as well as the district. review names the product to send (condom_id, of the category requested), and the order takes that product's catalogue unit as its unit_of_measure_id (422 on error.condom_id when the product has none). review may set quantity_approved (at most the requested quantity); check-stock reserves it and dispatch issues at most it. Each step's quantity is kept in the order's history. check-stock does not count expired stock as available. dispatch takes batches first expiry first out, never takes expired batches (409 when unexpired stock is short), and needs expiry_exception_reason for a batch with under one month left (422). receive puts the counted quantity into the batches the warehouse shipped; a shortfall comes off the latest-expiring batch and a surplus goes to an unknown-expiry batch.",
         "responses": {
           "200": {
             "description": "Success",
@@ -5151,7 +5151,7 @@
             "type": "string",
             "format": "uuid",
             "nullable": true,
-            "description": "Null on an open stockout alert until the DCFP sends stock."
+            "description": "Null on a warehouse request until the warehouse chooses the product at review, which sets the product's catalogue unit; also null on an open alert order raised before stockouts became reports."
           },
           "comment": {
             "type": "string",
@@ -7534,7 +7534,7 @@
       "WarehouseRequestRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["warehouse_store_id", "condom_category", "quantity", "unit_of_measure_id"],
+        "required": ["warehouse_store_id", "condom_category", "quantity"],
         "properties": {
           "warehouse_store_id": {
             "type": "string",
@@ -7549,11 +7549,8 @@
           "quantity": {
             "type": "integer",
             "format": "int32",
-            "minimum": 1
-          },
-          "unit_of_measure_id": {
-            "type": "string",
-            "format": "uuid"
+            "minimum": 1,
+            "description": "How many, counted in the catalogue unit of the product the warehouse chooses at review. The district names no unit."
           },
           "comment": {
             "type": "string",
@@ -7565,7 +7562,6 @@
           "warehouse_store_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "condom_category": "male",
           "quantity": 1,
-          "unit_of_measure_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "comment": "Two hotspots are out"
         }
       },
