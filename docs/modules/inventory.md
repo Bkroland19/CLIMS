@@ -8,6 +8,8 @@ The inventory API reports stock across the supply chain: the national warehouse,
 | ------ | --------------------------------- | ------------------ |
 | GET    | `/api/v1/inventory/stock`         | `inventory:read`   |
 | GET    | `/api/v1/inventory/batches`       | `inventory:read`   |
+| PATCH  | `/api/v1/inventory/batches/{id}`  | `inventory:manage` |
+| DELETE | `/api/v1/inventory/batches/{id}`  | `inventory:manage` |
 | GET    | `/api/v1/inventory/hotspots`      | `inventory:read`   |
 | GET    | `/api/v1/inventory/movements`     | `inventory:read`   |
 | POST   | `/api/v1/inventory/movements`     | `inventory:manage` |
@@ -44,6 +46,16 @@ A store's stock of a product in a unit is held in batches (`stock_batches`), eac
 Stock leaves a store first expiry first out: warehouse dispatch and district deliveries to hotspots take the earliest-expiring batch first and unknown expiry last. Expired batches never leave, and a batch with under one calendar month left leaves only with an `expiry_exception_reason`, recorded with who authorised it and the rule version. What left is recorded per batch (`shipment_batches`), and a district's receipt puts the counted quantity into the batches the warehouse shipped: a shortfall comes off the latest-expiring batch, and a surplus goes to an unknown-expiry batch. Warehouse check-stock does not count expired stock as available. See [reports](reports.md#batches-and-expiry).
 
 `GET /api/v1/inventory/batches` lists the batches with stock at the stores the user may see, optionally for one `store_id` and `condom_id`, in the order dispatch takes them: earliest expiry first, unknown expiry last. Each has its `band` (`expired`, `under_1_month`, `under_3_months`, `under_6_months`, `ok`, or `unknown` without an expiry date) and `days_remaining`. It needs `inventory:read`, so warehouse and district staff can see their batches without report access.
+
+### Editing and deleting a batch
+
+A batch is **untouched** (`untouched` in the batch list) while nothing has left it or come into it through an order: its stock is exactly what the ledger entries naming it (its registrations and corrections) add up to, and no expiry exception was recorded against it. Order steps do not name a batch, so a dispatch, a district receipt or a hotspot delivery from it ends that.
+
+`PATCH /api/v1/inventory/batches/{id}` corrects a batch: `batch_number`, `expiry_date` (a past date is allowed, since a correction can find the stock expired), `on_hand` (at least 1) and a required `note`. A number already held at the store under another expiry date is refused (422); one held under the same expiry date joins the two into one batch, with both histories, and the reply is that batch, so its `id` can differ. A new quantity corrects the registration in place when the batch is untouched and was registered once, so the period's registered figure follows; otherwise it is an `adjustment` noted `Edited: <note>`. A changed expiry date drops the batch's expiry alerts, so the new date is announced. Audited as `inventory.batch_edited` with the before and after values.
+
+`DELETE /api/v1/inventory/batches/{id}` erases an untouched batch as if it was never registered: its stock comes off the store's balance, its ledger entries go (the `on_hand_after` of later entries moves to match), and so do its expiry alerts. A product left with no stock, history or batches at the store leaves its balances. Audited as `inventory.batch_deleted` with the batch, its quantity and the entries removed. A batch stock has left cannot be deleted (409); the web app writes off what is left with an adjustment instead, so the history stays.
+
+Neither may leave less on hand than open orders have reserved (409), and either works only at a store the user may manage. An empty batch is not listed and cannot be edited or deleted (409).
 
 ### Expiry alerts
 

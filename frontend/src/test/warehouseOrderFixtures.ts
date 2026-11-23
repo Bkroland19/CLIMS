@@ -91,6 +91,7 @@ export function aStockBatch(overrides: Partial<StockBatch> = {}): StockBatch {
     band: 'ok',
     on_hand: 500,
     created_at: '2026-10-01T08:00:00Z',
+    untouched: true,
     ...overrides,
   };
 }

@@ -61,6 +61,11 @@ const batchSchema = z.object({
   band: z.enum(BANDS),
   on_hand: count,
   created_at: z.string(),
+  /**
+   * Nothing has left the batch or come into it through an order. Deleting it erases it as if it
+   * was never registered; otherwise what is left is written off and the history stays.
+   */
+  untouched: z.boolean(),
 });
 
 export type StockBatch = z.infer<typeof batchSchema>;
@@ -183,6 +188,38 @@ export async function recordMovement(http: HttpClient, input: MovementInput): Pr
     await http.post('/inventory/movements', input),
     'stock movement',
   );
+}
+
+/** A batch as it should be, and why it changed. */
+export interface BatchEditInput {
+  batch_number: string;
+  /** YYYY-MM-DD; a past date is allowed, since a correction can find the stock expired. */
+  expiry_date: string;
+  /** At least 1; deleting the batch removes all of it. */
+  on_hand: number;
+  note: string;
+}
+
+/**
+ * Corrects a batch's number, expiry date and quantity. Renamed to a batch the store already holds,
+ * the two become one, so the batch returned can have another id. A new quantity corrects the
+ * registration of an untouched batch registered once, and is an adjustment otherwise.
+ */
+export async function editBatch(
+  http: HttpClient,
+  id: string,
+  input: BatchEditInput,
+): Promise<StockBatch> {
+  return parseBody(
+    batchSchema,
+    await http.patch(`/inventory/batches/${encodeURIComponent(id)}`, input),
+    'batch',
+  );
+}
+
+/** Erases an untouched batch as if it was never registered (409 once stock has left it). */
+export async function deleteBatch(http: HttpClient, id: string): Promise<void> {
+  await http.delete(`/inventory/batches/${encodeURIComponent(id)}`);
 }
 
 /** One batch of a delivery, as printed on its cartons. */

@@ -3,17 +3,23 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 
 import {
+  deleteBatch,
+  editBatch,
   getStoreSummary,
   listMovements,
   MOVEMENTS_PAGE_SIZE,
   recordMovement,
   recordReceipt,
+  type BatchEditInput,
   type Movement,
   type MovementInput,
   type MovementReason,
   type ReceiptInput,
+  type StockBatch,
 } from '@/features/inventory/api';
+import { batchLabel } from '@/features/inventory/bands';
 import { useApiQuery, useHttp, type ApiError } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
 
 import { warehouseOrderKeys } from './orderQueries';
 
@@ -130,19 +136,62 @@ export function useRecordReceipt() {
   });
 }
 
-/** Corrects a batch after a count, or writes stock off. */
-export function useAdjustBatch() {
+/**
+ * Corrects a batch after a count, or writes stock off. `successMessage` replaces the toast, e.g.
+ * when writing off what is left of a batch deletes it from the list.
+ */
+export function useAdjustBatch(options: { successMessage?: string } = {}) {
   const http = useHttp();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: MovementInput) => recordMovement(http, input),
     onSuccess: async (_movement, input) => {
       toast.success(
-        input.batch_number ? `Batch ${input.batch_number} adjusted.` : 'Stock adjusted.',
+        options.successMessage ??
+          (input.batch_number ? `Batch ${input.batch_number} adjusted.` : 'Stock adjusted.'),
       );
       await refetchStock(queryClient);
     },
     // The dialog shows the failure next to what failed.
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+/** Corrects a batch's number, expiry date and quantity. */
+export function useEditBatch() {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ batch, input }: { batch: StockBatch; input: BatchEditInput }) =>
+      editBatch(http, batch.id, input),
+    onSuccess: async (saved, { batch }) => {
+      toast.success(
+        saved.id === batch.id
+          ? `Batch ${batchLabel(saved)} saved.`
+          : `Batch ${batchLabel(saved)} now holds ${formatNumber(saved.on_hand)} ${saved.unit}.`,
+      );
+      await refetchStock(queryClient);
+    },
+    // A refusal can mean the batch changed under the form: show the latest.
+    onError: () => refetchStock(queryClient),
+    // The dialog shows the failure next to what failed.
+    meta: { handlesOwnErrors: true },
+  });
+}
+
+/** Erases an untouched batch as if it was never registered. */
+export function useDeleteBatch() {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (batch: StockBatch) => deleteBatch(http, batch.id),
+    onSuccess: async (_result, batch) => {
+      toast.success(batch.batch_number ? `Batch ${batch.batch_number} deleted.` : 'Batch deleted.');
+      await refetchStock(queryClient);
+    },
+    // Stock may have left the batch since the list loaded: show the latest.
+    onError: () => refetchStock(queryClient),
+    // The dialog shows the failure.
     meta: { handlesOwnErrors: true },
   });
 }

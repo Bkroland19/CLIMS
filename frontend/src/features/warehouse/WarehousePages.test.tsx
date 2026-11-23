@@ -160,29 +160,36 @@ const BATCHES = [
 ];
 
 describe('Warehouse stock', () => {
-  function renderStock(route: string, data: Parameters<typeof warehouseOrderApi>[0] = {}) {
+  function renderStock(
+    route: string,
+    data: Parameters<typeof warehouseOrderApi>[0] = {},
+    writes: Parameters<typeof warehouseOrderApi>[1] = {},
+  ) {
     return renderApp(<AppUnderTest />, {
       route,
       signedIn: true,
       replies: [
-        warehouseOrderApi({
-          balances: [aBalance({ on_hand: 910, reserved: 300, available: 610 })],
-          batches: BATCHES,
-          summary: aStoreSummary(),
-          movements: [
-            aMovement({
-              id: 'm2',
-              reason: 'dispatch',
-              quantity: -80,
-              order_id: 'o1',
-              note: null,
-              batch_number: null,
-              expiry_date: null,
-            }),
-            aMovement(),
-          ],
-          ...data,
-        }),
+        warehouseOrderApi(
+          {
+            balances: [aBalance({ on_hand: 910, reserved: 300, available: 610 })],
+            batches: BATCHES,
+            summary: aStoreSummary(),
+            movements: [
+              aMovement({
+                id: 'm2',
+                reason: 'dispatch',
+                quantity: -80,
+                order_id: 'o1',
+                note: null,
+                batch_number: null,
+                expiry_date: null,
+              }),
+              aMovement(),
+            ],
+            ...data,
+          },
+          writes,
+        ),
       ],
     });
   }
@@ -397,6 +404,118 @@ describe('Warehouse stock', () => {
         batch_number: 'FC2-2311-090',
       });
     });
+  });
+
+  it('edits a batch: its number, expiry and quantity, with why', async () => {
+    const user = userEvent.setup();
+    const saved = aStockBatch({ id: 'b-late', batch_number: 'FC2-2502-119', on_hand: 590 });
+    const { requests } = renderStock(
+      '/warehouse/stock?store=NMS&view=batches',
+      {},
+      {
+        'PATCH /inventory/batches/b-late': { status: 200, body: { success: true, data: saved } },
+      },
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for batch FC2-2502-118' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Edit batch…',
+      'Adjust stock…',
+      'Delete batch…',
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: 'Edit batch…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit batch FC2-2502-118' });
+    const number = within(dialog).getByLabelText('Batch number');
+    expect(number).toHaveValue('FC2-2502-118');
+    expect(within(dialog).getByLabelText('Expiry date')).toHaveValue('2028-06-30');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    expect(within(dialog).getByText(/^Nothing has changed yet/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Say why the batch is changing.')).toBeInTheDocument();
+
+    // A number held under another expiry date is refused before it is sent.
+    await user.clear(number);
+    await user.type(number, 'FC2-2405-002');
+    expect(
+      within(dialog).getByText(/^Batch FC2-2405-002 is already held with expiry/),
+    ).toBeInTheDocument();
+
+    await user.clear(number);
+    await user.type(number, 'FC2-2502-119');
+    const quantity = within(dialog).getByLabelText('Quantity on hand');
+    await user.clear(quantity);
+    await user.type(quantity, '590');
+    expect(within(dialog).getByText('Was 600: −10 box.')).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText('Why'), 'Mistyped when registered');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => {
+      expect(requests.find((request: RecordedRequest) => request.method === 'PATCH')).toMatchObject(
+        {
+          url: '/inventory/batches/b-late',
+          body: {
+            batch_number: 'FC2-2502-119',
+            expiry_date: '2028-06-30',
+            on_hand: 590,
+            note: 'Mistyped when registered',
+          },
+        },
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('deletes a batch nothing has left as if it was never registered', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=batches');
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for batch FC2-2502-118' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete batch…' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete batch FC2-2502-118?' });
+    expect(dialog).toHaveTextContent(
+      /as if it was never registered: 600 box of Engabu Free Female/,
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Delete batch' }));
+    await waitFor(() => {
+      expect(
+        requests.find((request: RecordedRequest) => request.method === 'DELETE'),
+      ).toMatchObject({
+        url: '/inventory/batches/b-late',
+      });
+    });
+  });
+
+  it('writes off what is left of a batch stock has gone out of, with the reason', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=batches', {
+      batches: BATCHES.map((batch) =>
+        batch.id === 'b-none' ? { ...batch, untouched: false } : batch,
+      ),
+    });
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Actions for batch No batch number' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Delete batch…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this stock' });
+    expect(dialog).toHaveTextContent(/so it can't be erased and its history stays/);
+    const submit = within(dialog).getByRole('button', { name: 'Write off 210 box' });
+    await user.click(submit);
+    expect(within(dialog).getByText('Choose why the stock is leaving.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Say what happened to it.')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('radio', { name: /Lost/ }));
+    await user.type(within(dialog).getByLabelText('What happened'), 'Not found at the count');
+    await user.click(submit);
+    await waitFor(() => {
+      const posted = requests.find((request: RecordedRequest) => request.method === 'POST');
+      expect(posted).toMatchObject({
+        url: '/inventory/movements',
+        body: { reason: 'adjustment', quantity: -210, note: 'Lost: Not found at the count' },
+      });
+      expect(posted?.body).not.toHaveProperty('batch_number');
+    });
+    expect(requests.some((request: RecordedRequest) => request.method === 'DELETE')).toBe(false);
   });
 
   it('says when the store holds nothing, and offers to register stock', async () => {
