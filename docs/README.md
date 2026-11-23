@@ -16,6 +16,7 @@ See [creating PostgreSQL migrations](migrations.md) for pinned CLI scaffolding, 
 | [PostgreSQL](postgresql.md)               | Migrations, legacy imports, and data verification                                              |
 | [Module architecture](modules/README.md)  | Ownership, dependencies, request flow, and extension rules                                     |
 | [Auth](modules/auth.md)                   | Registration, login, JWTs, and rate limits                                                     |
+| [SSO and identity sync](sso-and-identity-sync.md) | Keycloak portal sign-in and MoH SSO Dashboard identity sync: roles, credentials, setup, troubleshooting |
 | [Users](modules/users.md)                 | Accounts, creation service, administration, and account status                                 |
 | [RBAC](modules/rbac.md)                   | Legacy roles, permissions, and administrator protections                                       |
 | [Hotspots](modules/hotspots.md)           | Hotspot submission, review, activation and deactivation                                        |

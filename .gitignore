@@ -25,3 +25,7 @@ node_modules/
 website/build/
 website/.docusaurus/
 website/generated/
+
+# Keycloak import copies holding real secrets (see docs/sso-and-identity-sync.md)
+infra/sso/*.secret.json
+infra/sso/*.dashboard.env
