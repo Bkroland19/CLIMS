@@ -39,6 +39,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   (`GET /inventory/movements?reason=&offset=`). A headline amount in several units shows the
   largest as the figure and the rest beneath. Mock: `MOCK_DATA=scale` adds a national store's
   volume at NMS (about 250 products, a thousand batches, two thousand movements).
+- **Batches can be edited and deleted.** `PATCH /api/v1/inventory/batches/{id}` corrects a batch's
+  number, expiry date and quantity with a note; a number already held under the same expiry joins the
+  two. `DELETE /api/v1/inventory/batches/{id}` erases a batch nothing has left yet (`untouched` in the
+  batch list) as if it was never registered; once stock has left a batch it is refused (409). Both are
+  audited and stop at what open orders have reserved. Web: each batch's menu on the stock page has
+  **Edit batch…** and **Delete batch…**; deleting a batch stock has left writes off what is left, with
+  the reason, and keeps its history.
 - Warehouse wording: a new district order's action reads **Manage order** (was "Decide on order"),
   on the requests list, the order page and the dashboard's tasks.
 

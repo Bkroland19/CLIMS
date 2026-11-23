@@ -7,7 +7,9 @@ import {
   Inbox,
   Package,
   PackagePlus,
+  Pencil,
   Scale,
+  Trash2,
   Truck,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -15,7 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { RowActions } from '@/components/data-table/RowActions';
+import { ROW_ACTION_SEPARATOR, RowActions } from '@/components/data-table/RowActions';
 import { FilterSelect } from '@/components/FilterSelect';
 import { FilterTabs } from '@/components/FilterTabs';
 import { PageActions } from '@/components/PageActions';
@@ -37,6 +39,8 @@ import { cn } from '@/lib/utils';
 import { useReadOnly } from '@/navigation/useAccess';
 
 import { AdjustBatchDialog } from './AdjustBatchDialog';
+import { DeleteBatchDialog } from './DeleteBatchDialog';
+import { EditBatchDialog } from './EditBatchDialog';
 import { useCurrentWarehouse, useStoreBatches } from './orderQueries';
 import { WAREHOUSE_PATHS, withStore } from './paths';
 import { RegisterStockSheet } from './RegisterStockSheet';
@@ -533,7 +537,33 @@ export default function WarehouseStockPage() {
   const [registering, setRegistering] = useState(() => params.get('register') === '1');
   const [startProduct, setStartProduct] = useState<string | null>(null);
   const [adjusting, setAdjusting] = useState<StockBatch | null>(null);
+  const [editing, setEditing] = useState<StockBatch | null>(null);
+  const [deleting, setDeleting] = useState<StockBatch | null>(null);
   const actionButtons = useRef(new Map<string, HTMLButtonElement>());
+  // Where the row whose menu opened a batch dialog sat, for when the batch leaves the list.
+  const openedFrom = useRef<{ rows: HTMLCollectionOf<HTMLTableRowElement>; index: number } | null>(
+    null,
+  );
+  const openFrom = (batchId: string) => {
+    const row = actionButtons.current.get(batchId)?.closest('tr');
+    const body = row?.closest('tbody');
+    openedFrom.current = row && body ? { rows: body.rows, index: row.sectionRowIndex } : null;
+  };
+  // The menu item that opened a batch dialog has gone; focus returns to the row's button or, once
+  // the batch has left the list (deleted, written off, joined to another), to the row in its place.
+  const focusRowButton = (batchId: string, event: Event) => {
+    let target = actionButtons.current.get(batchId);
+    if (!target?.isConnected && openedFrom.current) {
+      const { rows, index } = openedFrom.current;
+      target =
+        rows[Math.min(index, rows.length - 1)]?.querySelector<HTMLButtonElement>(
+          'button[aria-haspopup="menu"]',
+        ) ?? undefined;
+    }
+    if (!target?.isConnected) return;
+    event.preventDefault();
+    target.focus();
+  };
   const productCols = useMemo(() => productColumns(period), [period]);
   const movementCols = useMemo(() => movementColumns(href), [href]);
   const waiting = stores.isPending || !enabled;
@@ -868,10 +898,29 @@ export default function WarehouseStockPage() {
                       }}
                       actions={[
                         {
+                          label: 'Edit batch…',
+                          icon: Pencil,
+                          onSelect: () => {
+                            openFrom(batch.id);
+                            setEditing(batch);
+                          },
+                        },
+                        {
                           label: batch.band === 'expired' ? 'Write off…' : 'Adjust stock…',
                           icon: Scale,
                           onSelect: () => {
+                            openFrom(batch.id);
                             setAdjusting(batch);
+                          },
+                        },
+                        ROW_ACTION_SEPARATOR,
+                        {
+                          label: 'Delete batch…',
+                          icon: Trash2,
+                          destructive: true,
+                          onSelect: () => {
+                            openFrom(batch.id);
+                            setDeleting(batch);
                           },
                         },
                       ]}
@@ -941,11 +990,37 @@ export default function WarehouseStockPage() {
             if (!open) setAdjusting(null);
           }}
           onCloseAutoFocus={(event) => {
-            // The menu item that opened the dialog has gone; focus returns to the row's button.
-            const button = actionButtons.current.get(adjusting.id);
-            if (!button?.isConnected) return;
-            event.preventDefault();
-            button.focus();
+            focusRowButton(adjusting.id, event);
+          }}
+        />
+      ) : null}
+
+      {editing ? (
+        <EditBatchDialog
+          key={editing.id}
+          batch={editing}
+          held={batches.data ?? []}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowButton(editing.id, event);
+          }}
+        />
+      ) : null}
+
+      {deleting ? (
+        <DeleteBatchDialog
+          key={deleting.id}
+          batch={deleting}
+          code={code}
+          open
+          onOpenChange={(open) => {
+            if (!open) setDeleting(null);
+          }}
+          onCloseAutoFocus={(event) => {
+            focusRowButton(deleting.id, event);
           }}
         />
       ) : null}

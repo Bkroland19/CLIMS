@@ -29,6 +29,8 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group := router.Group("/inventory", jwt, activeUser)
 	group.Get("/stock", rbac.RequirePermission("inventory:read"), h.stock)
 	group.Get("/batches", rbac.RequirePermission("inventory:read"), h.batches)
+	group.Patch("/batches/:id", rbac.RequirePermission("inventory:manage"), h.editBatch)
+	group.Delete("/batches/:id", rbac.RequirePermission("inventory:manage"), h.deleteBatch)
 	group.Get("/hotspots", rbac.RequirePermission("inventory:read"), h.hotspots)
 	group.Get("/movements", rbac.RequirePermission("inventory:read"), h.movements)
 	group.Post("/movements", rbac.RequirePermission("inventory:manage"), h.record)
@@ -333,12 +335,16 @@ func inventoryError(c fiber.Ctx, err error) error {
 	switch {
 	case errors.Is(err, errForbidden):
 		return response.Error(c, 403, err.Error(), nil)
-	case errors.Is(err, errStoreNotFound):
+	case errors.Is(err, errStoreNotFound), errors.Is(err, errBatchNotFound):
 		return response.Error(c, 404, err.Error(), nil)
 	case errors.Is(err, errBelowReserved), errors.Is(err, stock.ErrBatchShort):
 		return response.Error(c, 409, prefix+cause.Error(), nil)
+	case errors.Is(err, errBatchEmpty), errors.Is(err, errBatchTouched), errors.Is(err, errBatchReserved):
+		return response.Error(c, 409, err.Error(), nil)
 	case errors.Is(err, errBatchExpiry):
 		return response.Error(c, 422, prefix+errBatchExpiry.Error(), nil)
+	case errors.Is(err, errNothingToEdit):
+		return response.Error(c, 422, err.Error(), nil)
 	case errors.As(err, &dbError) && dbError.Code == "23503":
 		return response.Error(c, 422, prefix+"store_id, condom_id or unit_of_measure_id does not exist", nil)
 	}

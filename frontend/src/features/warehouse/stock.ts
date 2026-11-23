@@ -1,5 +1,5 @@
 import type { Band, Movement, MovementReason, StockBatch } from '@/features/inventory/api';
-import { formatNumber } from '@/lib/format';
+import { formatDate, formatNumber } from '@/lib/format';
 import type { StatusTone } from '@/lib/status';
 
 /*
@@ -125,4 +125,83 @@ export function checkAdjustment(
     return { quantity: null, error: `The batch holds only ${formatNumber(onHand)}.` };
   }
   return { quantity: -value, error: null };
+}
+
+/** The edit batch form as typed. */
+export interface BatchEditFields {
+  batchNumber: string;
+  /** YYYY-MM-DD, from a date input. */
+  expiryDate: string;
+  onHand: string;
+  note: string;
+}
+
+export interface BatchEditCheck {
+  /** Why a field is not accepted, by field. */
+  errors: Partial<Record<keyof BatchEditFields, string>>;
+  /** The form still says what the batch already holds. */
+  unchanged: boolean;
+  /** A batch already held with this number and expiry: saving makes the two one batch. */
+  joins: StockBatch | null;
+  /** The change in quantity, or null while the quantity is not a whole number. */
+  delta: number | null;
+  /** The expiry date has passed: the batch will count as expired. */
+  expired: boolean;
+}
+
+const MAX_QUANTITY = 1_000_000_000;
+
+/**
+ * Checks an edit of `batch` against the other batches the store holds (`held`, any product), as
+ * the API will: one batch number has one expiry date at a store, and a batch keeps at least one
+ * unit (deleting removes all of it). `today` is Uganda's date, YYYY-MM-DD.
+ */
+export function checkBatchEdit(
+  fields: BatchEditFields,
+  batch: StockBatch,
+  held: readonly StockBatch[],
+  today: string,
+): BatchEditCheck {
+  const errors: BatchEditCheck['errors'] = {};
+  const number = fields.batchNumber.trim();
+  const expiry = fields.expiryDate;
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(expiry) && !Number.isNaN(Date.parse(expiry));
+  const twins = held.filter(
+    (other) =>
+      other.id !== batch.id &&
+      other.store_id === batch.store_id &&
+      other.condom_id === batch.condom_id &&
+      other.unit_of_measure_id === batch.unit_of_measure_id &&
+      other.batch_number === number,
+  );
+  if (number === '') errors.batchNumber = 'Enter the batch number printed on the cartons.';
+  else if (number.length > 60) errors.batchNumber = 'Use at most 60 characters.';
+  if (!validDate) errors.expiryDate = 'Enter the expiry date printed on the cartons.';
+  const clash = validDate ? twins.find((other) => other.expiry_date !== expiry) : undefined;
+  if (clash && !errors.batchNumber) {
+    errors.batchNumber = `Batch ${number} is already held with expiry ${
+      clash.expiry_date ? formatDate(clash.expiry_date) : 'not recorded'
+    }. Use that date, or check the number.`;
+  }
+
+  const trimmed = fields.onHand.trim();
+  const quantity = /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+  if (quantity === null || !Number.isSafeInteger(quantity)) {
+    errors.onHand = 'Enter the quantity on the shelf, as a whole number.';
+  } else if (quantity < 1) {
+    errors.onHand = 'Enter at least 1. To remove the whole batch, delete it instead.';
+  } else if (quantity > MAX_QUANTITY) {
+    errors.onHand = `Enter at most ${formatNumber(MAX_QUANTITY)}.`;
+  }
+  if (fields.note.trim() === '') errors.note = 'Say why the batch is changing.';
+
+  const delta = errors.onHand || quantity === null ? null : quantity - batch.on_hand;
+  return {
+    errors,
+    unchanged: number === batch.batch_number && expiry === batch.expiry_date && delta === 0,
+    joins:
+      validDate && !clash ? (twins.find((other) => other.expiry_date === expiry) ?? null) : null,
+    delta,
+    expired: validDate && expiry < today,
+  };
 }

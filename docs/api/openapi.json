@@ -1520,6 +1520,132 @@
         }
       }
     },
+    "/api/v1/inventory/batches/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "patch": {
+        "tags": ["Inventory"],
+        "operationId": "editStockBatch",
+        "summary": "Edit a batch",
+        "description": "Requires inventory:manage, at a store the user may manage (their assigned store; orders:all_stores any store). Corrects a batch's number, expiry date and quantity on hand, with a note saying why. One batch number has one expiry date at a store: a number already held under another expiry is refused (422), and one held under the same expiry joins this batch to it, so the batch returned can have another id. A new quantity corrects the registration itself when the batch is untouched and was registered once; otherwise it is an adjustment noted \"Edited: <note>\". A changed expiry date drops the batch's expiry alerts so the new date is announced. Stock may not fall below what open orders have reserved (409). Audited as inventory.batch_edited.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Batch not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The batch holds no stock, or the change would leave less on hand than open orders have reserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Inventory"],
+        "operationId": "deleteStockBatch",
+        "summary": "Delete a batch",
+        "description": "Requires inventory:manage, at a store the user may manage. Erases an untouched batch (see StockBatch.untouched) as if it was never registered: its stock comes off the store's balance, its ledger entries are removed (later entries' on_hand_after move to match), and so are its expiry alerts; a product left with no stock, history or batches at the store goes from its balances. Audited as inventory.batch_deleted. Once stock has left a batch it cannot be deleted (409): write off what is left with an adjustment (POST /api/v1/inventory/movements) instead.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Batch not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stock has left the batch, it holds no stock, or open orders have reserved what it holds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/inventory/hotspots": {
       "get": {
         "tags": ["Inventory"],
@@ -9713,7 +9839,8 @@
           "unit",
           "band",
           "on_hand",
-          "created_at"
+          "created_at",
+          "untouched"
         ],
         "properties": {
           "id": {
@@ -9783,6 +9910,10 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "untouched": {
+            "type": "boolean",
+            "description": "Nothing has left the batch or come into it through an order: its stock is exactly what its own registrations and corrections add up to. Deleting it erases it as if it was never registered; editing the quantity of one registered once corrects that registration."
           }
         }
       },
@@ -9801,6 +9932,48 @@
             "items": {
               "$ref": "#/components/schemas/StockBatch"
             }
+          }
+        }
+      },
+      "StockBatchResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockBatch"
+          }
+        }
+      },
+      "BatchEditRequest": {
+        "type": "object",
+        "required": ["batch_number", "expiry_date", "on_hand", "note"],
+        "properties": {
+          "batch_number": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "description": "A past date is allowed: a correction can find the stock expired."
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "The quantity the batch should hold. Delete the batch to remove all of it."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 900,
+            "description": "Why the batch is changing; kept in the audit log, and on the adjustment when the quantity change is one."
           }
         }
       },
