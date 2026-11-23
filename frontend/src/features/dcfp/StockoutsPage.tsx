@@ -1,31 +1,31 @@
 'use client';
 
 import { PackagePlus, Truck } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { RowActions } from '@/components/data-table/RowActions';
 import { StatusBadge } from '@/components/StatusBadge';
+import { useCan } from '@/features/auth/queries';
+import { useCurrentUser } from '@/features/auth/hooks';
 import { EMPTY_VALUE, formatTimestamp } from '@/lib/format';
 import { useReadOnly } from '@/navigation/useAccess';
 
 import type { StockoutReport } from './api';
-import { contactOf, DCFP_PATHS, placeOf } from './orders';
+import { contactOf, DCFP_PATHS, placeOf, STOCKOUT_STATUS } from './orders';
 import { useStockouts } from './queries';
-import { STOCKOUT_STATUS } from './stockouts';
 
 /**
- * Stockout notifications from the district's hotspots: which hotspot, where, who to call, the
- * hotspot's message and how far fulfilment has got. A report is not an order: the DCFP sends
- * stock from the district store (the report's page), or orders from NMS or JMS when the store
- * is short.
+ * Stockout notifications from the district's hotspots: which hotspot, where, who to call, and
+ * the hotspot's message. The DCFP can dispatch district stock or order from a warehouse.
  */
 export default function StockoutsPage() {
   const reports = useStockouts();
   const router = useRouter();
   const readOnly = useReadOnly();
+  const can = useCan();
+  const storeId = useCurrentUser()?.store_id;
 
   const columns = useMemo<DataTableColumn<StockoutReport>[]>(
     () => [
@@ -35,12 +35,7 @@ export default function StockoutsPage() {
         value: (report) => `${report.hot_spot.name} ${placeOf(report)}`,
         cell: (report) => (
           <div className="min-w-0">
-            <Link
-              href={DCFP_PATHS.stockout(report.id)}
-              className="font-medium underline-offset-4 hover:underline"
-            >
-              {report.hot_spot.name}
-            </Link>
+            <div className="font-medium">{report.hot_spot.name}</div>
             <div className="text-muted-foreground truncate text-xs">
               {placeOf(report) || EMPTY_VALUE}
             </div>
@@ -50,10 +45,11 @@ export default function StockoutsPage() {
       { id: 'product', header: 'Out of', value: (report) => report.product },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
-        value: (report) => STOCKOUT_STATUS[report.status].label,
+        value: (report) => STOCKOUT_STATUS[report.status ?? 'awaiting_supply'].label,
         cell: (report) => {
-          const status = STOCKOUT_STATUS[report.status];
+          const status = STOCKOUT_STATUS[report.status ?? 'awaiting_supply'];
           return <StatusBadge status={status.label} tone={status.tone} />;
         },
       },
@@ -77,6 +73,7 @@ export default function StockoutsPage() {
       { id: 'reporter', header: 'Reported by', value: (report) => report.reported_by },
       {
         id: 'reported',
+        filter: 'date',
         header: 'Reported',
         value: (report) => report.created_at,
         cell: (report) => formatTimestamp(report.created_at),
@@ -88,6 +85,7 @@ export default function StockoutsPage() {
   return (
     <DataTable
       label="Stockout notifications"
+      preferencesKey="dcfp-stockouts"
       columns={columns}
       rows={reports.data}
       getRowId={(report) => report.id}
@@ -105,17 +103,19 @@ export default function StockoutsPage() {
               <RowActions
                 label={`Actions for ${report.hot_spot.name}`}
                 actions={[
-                  ...(report.status === 'fulfilled'
-                    ? []
-                    : [
+                  ...(can('orders:supply_hotspots') &&
+                  report.district_store_id === storeId &&
+                  report.status !== 'fulfilled'
+                    ? [
                         {
-                          label: 'Send stock to the hotspot',
+                          label: 'Dispatch to hotspot',
                           icon: Truck,
                           onSelect: () => {
-                            router.push(DCFP_PATHS.stockout(report.id));
+                            router.push(DCFP_PATHS.dispatchFor(report.id));
                           },
                         },
-                      ]),
+                      ]
+                    : []),
                   {
                     label: 'Order stock from a warehouse',
                     icon: PackagePlus,

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useId } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -71,13 +72,15 @@ export function DistrictFilter({ value, hrefFor }: DistrictFilterProps) {
       {stores.isError ? (
         <p id={errorId} className="text-muted-foreground text-xs">
           Could not load the list of districts.{' '}
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
-            className="text-foreground underline underline-offset-4"
+            className="text-foreground h-auto px-0 text-xs underline"
             onClick={() => void stores.refetch()}
           >
             Try again
-          </button>
+          </Button>
         </p>
       ) : null}
     </div>

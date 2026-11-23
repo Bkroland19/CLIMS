@@ -67,6 +67,14 @@ describe('orderSteps', () => {
       ['Rejected', 'attention'],
     ]);
   });
+
+  it('has only the dispatch and the receipt for stock sent without an order', () => {
+    expect(orderSteps('dispatched', true).map((s) => [s.label, s.state])).toEqual([
+      ['Sent by the warehouse', 'done'],
+      ['Received', 'current'],
+    ]);
+    expect(orderSteps('received', true).map((s) => s.state)).toEqual(['done', 'done']);
+  });
 });
 
 describe('parseCount and receiptErrors', () => {

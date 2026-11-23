@@ -9,8 +9,6 @@ import { readJson, writeJson } from '@/lib/storage/jsonStorage';
 import { useAppStorage } from '@/lib/storage/StorageProvider';
 import { useLocationDistricts } from '@/features/hotspots/queries';
 import { useDistrictStores } from '@/features/moh/queries';
-import { useStores } from '@/features/geography/queries';
-import { useCurrentWarehouse, useStoreOrders } from '@/features/warehouse/orderQueries';
 
 const ALL = 'all';
 const DistrictContext = createContext<{
@@ -29,12 +27,13 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
   const isMoh = pathname === '/moh' || pathname.startsWith('/moh/');
   const isWarehouse = pathname === '/warehouse' || pathname.startsWith('/warehouse/');
   const isMap = pathname === '/moh/hotspot-map';
-  // A warehouse serves the districts whose stores have ordered from it.
-  const { warehouse } = useCurrentWarehouse({ enabled: isWarehouse });
-  const orders = useStoreOrders(warehouse?.id, { enabled: isWarehouse });
-  const allStores = useStores(isWarehouse);
   const stores = useDistrictStores(isMoh && !isMap);
-  const locations = useLocationDistricts(isMoh);
+  /*
+   * NMS and JMS serve the whole country, so the warehouse lists every district
+   * rather than only those that have ordered from it: a district with no order yet
+   * can still be picked, for instance to dispatch to it before it orders.
+   */
+  const locations = useLocationDistricts(isMoh || isWarehouse);
   const storage = useAppStorage();
   const session = useSession();
   const storageKey = `clims.district.${session?.user.id ?? 'anonymous'}`;
@@ -50,15 +49,10 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
     (locations.data ?? []).map((location) => [location.name, location.id]),
   );
   const options = [
-    ...new Set(
-      isWarehouse
-        ? (orders.data ?? []).map(
-            (order) =>
-              allStores.data?.find((candidate) => candidate.id === order.ordered_for_store_id)
-                ?.district_name ?? '',
-          )
-        : [...locationsByName.keys(), ...(stores.data ?? []).map((district) => district.district)],
-    ),
+    ...new Set([
+      ...locationsByName.keys(),
+      ...(isMoh ? (stores.data ?? []).map((district) => district.district) : []),
+    ]),
   ]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
@@ -80,9 +74,9 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
         <FilterSelect
           label="District"
           value={district ?? ALL}
-          disabled={isWarehouse ? orders.isPending : locations.isPending && stores.isPending}
+          disabled={isWarehouse ? locations.isPending : locations.isPending && stores.isPending}
           options={[
-            { value: ALL, label: isWarehouse ? 'All served districts' : 'All districts' },
+            { value: ALL, label: 'All districts' },
             ...options.map((name) => ({ value: name, label: name })),
           ]}
           onValueChange={(value) => {

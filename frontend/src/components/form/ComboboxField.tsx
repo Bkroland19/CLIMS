@@ -1,7 +1,9 @@
 import { CheckIcon, ChevronDownIcon, SearchIcon } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type Ref } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -136,7 +138,8 @@ export function ComboboxField({
       </FieldLabel>
       <Popover open={open} onOpenChange={changeOpen}>
         <PopoverTrigger asChild>
-          <button
+          <Button
+            variant="outline"
             ref={triggerRef}
             id={id}
             type="button"
@@ -149,14 +152,14 @@ export function ComboboxField({
             data-placeholder={selected ? undefined : ''}
             disabled={disabled || isLoading || options.length === 0}
             onBlur={onBlur}
-            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border bg-transparent py-2 pr-2 pl-2.5 text-left text-sm transition-colors outline-none select-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:ring-3"
+            className="border-input bg-card data-placeholder:text-muted-foreground w-full justify-between pr-2 text-left font-normal"
           >
             <span className="min-w-0 truncate">{triggerText}</span>
             <ChevronDownIcon
               className="text-muted-foreground pointer-events-none size-4 shrink-0"
               aria-hidden="true"
             />
-          </button>
+          </Button>
         </PopoverTrigger>
         <PopoverContent
           align="start"
@@ -165,7 +168,7 @@ export function ComboboxField({
         >
           <div className="flex items-center gap-2 border-b px-2.5">
             <SearchIcon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-            <input
+            <Input
               type="text"
               role="combobox"
               aria-label={searchLabel}
@@ -182,7 +185,7 @@ export function ComboboxField({
                 setActive(0);
               }}
               onKeyDown={onSearchKeyDown}
-              className="placeholder:text-muted-foreground h-9 w-full min-w-0 bg-transparent text-sm outline-none"
+              className="placeholder:text-muted-foreground h-10 w-full min-w-0 rounded-none border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
             />
           </div>
           <ul

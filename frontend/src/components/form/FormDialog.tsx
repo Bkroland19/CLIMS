@@ -33,6 +33,8 @@ interface FormDialogProps {
   onSubmit: ComponentProps<'form'>['onSubmit'];
   /** Where focus goes on close, when the element that opened the dialog has gone. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** The submit removes something, e.g. writing off a whole batch. */
+  destructive?: boolean;
   children: ReactNode;
 }
 
@@ -49,6 +51,7 @@ export function FormDialog({
   error,
   onSubmit,
   onCloseAutoFocus,
+  destructive = false,
   children,
 }: FormDialogProps) {
   return (
@@ -68,7 +71,22 @@ export function FormDialog({
           if (isDirty) event.preventDefault();
         }}
       >
-        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form
+          noValidate
+          onSubmit={(event) => {
+            const form = event.currentTarget;
+            onSubmit?.(event);
+            // Let validation render first; the same focus behaviour covers every dialog.
+            requestAnimationFrame(() => {
+              form
+                .querySelector<HTMLElement>(
+                  'input[aria-invalid="true"], textarea[aria-invalid="true"], button[aria-invalid="true"]',
+                )
+                ?.focus();
+            });
+          }}
+          className="flex flex-col gap-4"
+        >
           <DialogHeader>
             <DialogTitle className="wrap-anywhere">{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
@@ -92,7 +110,11 @@ export function FormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button
+              type="submit"
+              variant={destructive ? 'destructive' : 'default'}
+              disabled={isPending}
+            >
               {isPending ? <Spinner data-icon="inline-start" aria-hidden="true" /> : null}
               {isPending ? pendingLabel : submitLabel}
             </Button>

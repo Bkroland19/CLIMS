@@ -2,7 +2,8 @@ import type { CellValue } from '@/lib/table/tableModel';
 
 export interface ExportColumn<Row> {
   header: string;
-  value: (row: Row) => CellValue;
+  /** Columns without a value (a column of buttons or inputs) are left out of the file. */
+  value?: (row: Row) => CellValue;
 }
 
 /** `clims-<name>-YYYY-MM-DD.xlsx`, with the name reduced to filename-safe characters. */
@@ -51,8 +52,12 @@ export async function exportToExcel<Row>(
   rows: readonly Row[],
 ): Promise<void> {
   const { default: writeExcelFile } = await import('write-excel-file/browser');
+  const exported = columns.flatMap((column) => {
+    const { value } = column;
+    return value ? [{ header: column.header, value }] : [];
+  });
   await writeExcelFile([...rows], {
-    columns: columns.map((column) => ({
+    columns: exported.map((column) => ({
       header: { value: column.header, fontWeight: 'bold' as const },
       cell: (row: Row) => toExportCell(column.value(row)),
     })),

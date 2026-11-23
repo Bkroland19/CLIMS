@@ -84,6 +84,7 @@ export default function MohOrdersPage() {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (order) => ORDER_STATUS[order.status].label,
         cell: (order) => (
@@ -123,6 +124,7 @@ export default function MohOrdersPage() {
       </div>
       <DataTable
         label="Hotspot orders"
+        preferencesKey="moh-hotspot-orders"
         columns={columns}
         rows={rows}
         getRowId={(order) => order.id}

@@ -198,14 +198,16 @@ func getProduct(ctx context.Context, q querier, id string) (Product, error) {
 }
 
 func (r *Repository) createProduct(ctx context.Context, fields ProductFields) (Product, error) {
-	if problems := fields.validate(); problems != nil {
-		return Product{}, problems
-	}
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Product{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if problems, err := validateProductFields(ctx, tx, &fields, fields.PiecesPerUnit); err != nil {
+		return Product{}, err
+	} else if len(problems) > 0 {
+		return Product{}, problems
+	}
 	problems := validationError{}
 	for _, reference := range productReferences(fields) {
 		if err = checkReference(ctx, tx, reference.kind, reference.field, reference.id, nil, problems); err != nil {
@@ -257,7 +259,10 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 		nextActive = *patch.Active
 	}
 	if !patch.ProductFields.empty() || (nextActive && !active) {
-		problems := merged.validate()
+		problems, err := validateProductFields(ctx, tx, &merged, patch.PiecesPerUnit)
+		if err != nil {
+			return Product{}, err
+		}
 		if problems == nil {
 			problems = validationError{}
 		}
@@ -288,6 +293,37 @@ func (r *Repository) updateProduct(ctx context.Context, id string, patch Product
 		return Product{}, err
 	}
 	return product, tx.Commit(ctx)
+}
+
+// Piece units need no pack-size input, but retain a conversion of one for stock and reports.
+// suppliedCount distinguishes an explicit count from a previous package's inherited count.
+func validateProductFields(ctx context.Context, q querier, fields *ProductFields, suppliedCount *int32) (validationError, error) {
+	problems := fields.validate()
+	if problems == nil {
+		problems = validationError{}
+	}
+	if _, invalid := problems["unit_id"]; invalid {
+		return problems, nil
+	}
+	var unitName string
+	err := q.QueryRow(ctx, `SELECT name FROM unit_of_measures WHERE id = $1`, fields.UnitID).Scan(&unitName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return problems, nil // Reference validation reports the missing unit.
+	}
+	if err != nil {
+		return nil, err
+	}
+	unitName = strings.ToLower(strings.TrimSpace(unitName))
+	if unitName == "piece" || unitName == "pieces" {
+		if suppliedCount != nil && *suppliedCount != 1 {
+			problems["pieces_per_unit"] = "A piece is one condom. Omit the count or use 1."
+		} else {
+			one := int32(1)
+			fields.PiecesPerUnit = &one
+			delete(problems, "pieces_per_unit")
+		}
+	}
+	return problems, nil
 }
 
 func (r *Repository) deleteProduct(ctx context.Context, id string) error {

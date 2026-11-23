@@ -98,6 +98,8 @@ const REGIONS = [
   { id: placeId(1, 3), name: 'Kampala' },
   { id: placeId(1, 4), name: 'North Central' },
   { id: placeId(1, 5), name: 'South Central' },
+  { id: placeId(1, 6), name: 'Ankole' },
+  { id: placeId(1, 7), name: 'Lango' },
 ];
 
 const DISTRICTS_BY_REGION = [
@@ -108,6 +110,10 @@ const DISTRICTS_BY_REGION = [
   { id: KAMPALA, name: 'Kampala', region_id: placeId(1, 3) },
   { id: placeId(2, 3), name: 'Gulu', region_id: placeId(1, 1) },
   { id: placeId(2, 4), name: 'Jinja', region_id: placeId(1, 2) },
+  // The warehouse requests in `warehouse.mts` also come from these three.
+  { id: placeId(2, 5), name: 'Masaka', region_id: placeId(1, 5) },
+  { id: placeId(2, 6), name: 'Mbarara', region_id: placeId(1, 6) },
+  { id: placeId(2, 7), name: 'Lira', region_id: placeId(1, 7) },
 ];
 
 const DISTRICTS = DISTRICTS_BY_REGION.map(({ id, name }) => ({ id, name }));

@@ -5,7 +5,7 @@ import { useApiQuery, useHttp } from '@/lib/api';
 
 import { getGeography, listStores, syncGeography } from './api';
 
-/* NOT YET IN THE GO API: these read the mock stores and geography (see ./api.ts). */
+/* Stores are live; geography and sync still use the mock contract (see ./api.ts). */
 
 export const storesKeys = {
   stores: ['stores'] as const,

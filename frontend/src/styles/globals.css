@@ -1,7 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './shadcn.css';
-@import '@fontsource-variable/dm-sans';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-400-italic.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-700.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -15,7 +19,7 @@
 }
 
 @theme inline {
-  --font-sans: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-sans);
 
   --color-background: var(--background);
@@ -319,9 +323,24 @@
 
   [data-print-hide],
   [data-slot='sidebar'],
-  [data-slot='button'],
+  [data-slot='button']:not([data-print-text]),
   [data-sonner-toaster],
   a[href='#main'] {
+    display: none !important;
+  }
+
+  /* Sort headers and profile names are text in a printed table. */
+  [data-print-text] {
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: inherit !important;
+    box-shadow: none !important;
+  }
+
+  [data-print-text] svg {
     display: none !important;
   }
 

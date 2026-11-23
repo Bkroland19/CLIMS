@@ -22,7 +22,7 @@ func piecesOf(quantity, unit string) string {
 }
 
 // requestsCTE is every warehouse request the user may see that matches the filter: a district's order
-// to a national warehouse. Parameters: $1 all, $2 store, $3 from, $4 to, $5 warehouse, $6 district,
+// to a national warehouse. Stock a warehouse sent without an order is not a request. Parameters: $1 all, $2 store, $3 from, $4 to, $5 warehouse, $6 district,
 // $7 category.
 var requestsCTE = `WITH q AS (
 	SELECT o.id, o.condom_id, coalesce(o.condom_category, c.category) AS category, o.unit_of_measure_id, o.order_status, o.created_at,
@@ -43,7 +43,7 @@ var requestsCTE = `WITH q AS (
 	JOIN stores fs ON fs.id = o.ordered_from_store_id AND fs.store_type = 'national'
 	JOIN stores ts ON ts.id = o.ordered_for_store_id AND ts.store_type = 'district'
 	LEFT JOIN districts d ON d.id = ts.district_id
-	WHERE o.hot_spot_id IS NULL AND o.order_status NOT IN ('pending', 'fulfilled')
+	WHERE o.hot_spot_id IS NULL AND NOT o.unrequested AND o.order_status NOT IN ('pending', 'fulfilled')
 		AND ($1::boolean OR $2::uuid IN (o.ordered_from_store_id, o.ordered_for_store_id))
 		AND o.created_at >= $3 AND o.created_at < $4
 		AND ($5::uuid IS NULL OR o.ordered_from_store_id = $5) AND ($6::uuid IS NULL OR ts.district_id = $6)

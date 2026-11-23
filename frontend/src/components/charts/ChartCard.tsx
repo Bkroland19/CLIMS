@@ -1,16 +1,9 @@
 import { ChartNoAxesColumn, Table2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import { DataTable } from '@/components/data-table/DataTable';
 import { SampleBadge } from '@/components/SampleData';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -99,30 +92,22 @@ export function ChartCard({
 
       {isTable ? (
         <div className="max-h-72 overflow-auto">
-          <Table aria-label={title}>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{categoryLabel}</TableHead>
-                {series.map((item) => (
-                  <TableHead key={item.key} className="text-right">
-                    {item.label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.label}>
-                  <TableCell>{row.label}</TableCell>
-                  {series.map((item) => (
-                    <TableCell key={item.key} className="text-right tabular-nums">
-                      {formatNumber(row.values[item.key])}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            variant="embedded"
+            label={title}
+            rows={rows}
+            getRowId={(row) => row.label}
+            columns={[
+              { id: 'category', header: categoryLabel, value: (row) => row.label },
+              ...series.map((item) => ({
+                id: item.key,
+                header: item.label,
+                numeric: true,
+                value: (row: ChartRow) => row.values[item.key],
+                cell: (row: ChartRow) => formatNumber(row.values[item.key]),
+              })),
+            ]}
+          />
         </div>
       ) : (
         children

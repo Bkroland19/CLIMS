@@ -7,6 +7,7 @@ import {
   adjustmentNote,
   batchFilterFrom,
   checkAdjustment,
+  checkBatchEdit,
   keepsBatch,
   movementBatch,
   signed,
@@ -47,5 +48,78 @@ describe('ledger words', () => {
     expect(movementBatch(movement({}))).toBe('No batch number');
     expect(movementBatch(movement({ reason: 'dispatch' }))).toBeNull();
     expect(adjustmentNote('damaged', '  Water in bay 4 ')).toBe('Damaged: Water in bay 4');
+  });
+});
+
+describe('checkBatchEdit', () => {
+  const batch = aStockBatch({
+    id: 'mine',
+    batch_number: 'FC2-1',
+    expiry_date: '2028-06-30',
+    on_hand: 500,
+  });
+  const fields = { batchNumber: 'FC2-1', expiryDate: '2028-06-30', onHand: '500', note: 'Typo' };
+  const today = '2026-11-23';
+
+  it('sends nothing until something changes, and says why a field is refused', () => {
+    expect(checkBatchEdit(fields, batch, [batch], today)).toMatchObject({
+      errors: {},
+      unchanged: true,
+      delta: 0,
+    });
+    expect(
+      checkBatchEdit(
+        { batchNumber: ' ', expiryDate: '', onHand: '0', note: '' },
+        batch,
+        [batch],
+        today,
+      ).errors,
+    ).toEqual({
+      batchNumber: 'Enter the batch number printed on the cartons.',
+      expiryDate: 'Enter the expiry date printed on the cartons.',
+      onHand: 'Enter at least 1. To remove the whole batch, delete it instead.',
+      note: 'Say why the batch is changing.',
+    });
+    expect(checkBatchEdit({ ...fields, onHand: '4.5' }, batch, [], today)).toMatchObject({
+      delta: null,
+      errors: { onHand: 'Enter the quantity on the shelf, as a whole number.' },
+    });
+  });
+
+  it('works out the change in quantity, and warns of a date that has passed', () => {
+    const check = checkBatchEdit(
+      { ...fields, onHand: ' 480 ', expiryDate: '2026-11-01' },
+      batch,
+      [],
+      today,
+    );
+    expect(check).toMatchObject({ errors: {}, unchanged: false, delta: -20, expired: true });
+  });
+
+  it('refuses a number the store holds under another expiry, and joins one it holds under this one', () => {
+    const twin = aStockBatch({
+      id: 'twin',
+      batch_number: 'FC2-2',
+      expiry_date: '2027-01-31',
+      on_hand: 40,
+    });
+    const otherProduct = aStockBatch({ id: 'other', batch_number: 'FC2-3', condom_id: 'p2' });
+    expect(
+      checkBatchEdit({ ...fields, batchNumber: 'FC2-2' }, batch, [batch, twin], today).errors
+        .batchNumber,
+    ).toMatch(
+      /^Batch FC2-2 is already held with expiry .*2027\. Use that date, or check the number\.$/,
+    );
+    expect(
+      checkBatchEdit(
+        { ...fields, batchNumber: 'FC2-2', expiryDate: '2027-01-31' },
+        batch,
+        [twin],
+        today,
+      ),
+    ).toMatchObject({ errors: {}, joins: twin });
+    expect(
+      checkBatchEdit({ ...fields, batchNumber: 'FC2-3' }, batch, [otherProduct], today),
+    ).toMatchObject({ errors: {}, joins: null });
   });
 });

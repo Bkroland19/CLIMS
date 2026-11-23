@@ -219,6 +219,54 @@
         }
       }
     },
+    "/api/v1/orders/district-dispatches": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "createDistrictDispatch",
+        "summary": "Send stock to a district store before it orders",
+        "description": "Requires orders:process and an assigned store that is the sending warehouse (`warehouse_store_id`; orders:all_stores may send from either). Sends stock from NMS or JMS to a district store (`district_store_id`) that has not ordered it: one line per product, each with a `quantity` counted in the product's catalogue unit (sending `unit_of_measure_id` returns 400). Each line becomes an order created `dispatched`, marked `unrequested: true`, with `quantity_needed`, `quantity_approved` and `quantity_issued` all equal to the line's quantity. Only free stock goes: on hand less what district orders have reserved and less expired batches; more returns 409. Stock leaves first expiry first out, and a batch with under one month left needs `expiry_exception_reason` (422 with `error.expiry_exception_reason`). The `note` and transport apply to every line. A line that fails leaves the whole dispatch unsent, and the message starts `line N:`. A store that is not a national warehouse returns 422 with `error.warehouse_store_id`; a destination that is not a district store, 422 with `error.district_store_id`. The district's staff with orders:receive are notified (`order.shipment_dispatched`, saying it was sent without an order and quoting the note) and receive each order with `POST /api/v1/orders/{id}/actions/receive`. Such orders cannot be rejected, and the warehouse request report and the store summary's order counts leave them out; their quantity still counts as dispatched stock.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DistrictDispatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/orders/{id}/events": {
       "get": {
         "tags": ["Orders"],
@@ -1108,7 +1156,7 @@
       "put": {
         "tags": ["Users"],
         "operationId": "setUserRoles",
-        "summary": "Replace a user’s roles",
+        "summary": "Replace a user\u2019s roles",
         "description": "Replaces the complete set of role assignments. Duplicate role IDs are ignored. An empty array removes every assignment. Unknown roles return 422. Removing the last active admin is rejected. Requires roles:assign.",
         "responses": {
           "200": {
@@ -1520,6 +1568,132 @@
         }
       }
     },
+    "/api/v1/inventory/batches/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "patch": {
+        "tags": ["Inventory"],
+        "operationId": "editStockBatch",
+        "summary": "Edit a batch",
+        "description": "Requires inventory:manage, at a store the user may manage (their assigned store; orders:all_stores any store). Corrects a batch's number, expiry date and quantity on hand, with a note saying why. One batch number has one expiry date at a store: a number already held under another expiry is refused (422), and one held under the same expiry joins this batch to it, so the batch returned can have another id. A new quantity corrects the registration itself when the batch is untouched and was registered once; otherwise it is an adjustment noted \"Edited: <note>\". A changed expiry date drops the batch's expiry alerts so the new date is announced. Stock may not fall below what open orders have reserved (409). Audited as inventory.batch_edited.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Batch not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The batch holds no stock, or the change would leave less on hand than open orders have reserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Inventory"],
+        "operationId": "deleteStockBatch",
+        "summary": "Delete a batch",
+        "description": "Requires inventory:manage, at a store the user may manage. Erases an untouched batch (see StockBatch.untouched) as if it was never registered: its stock comes off the store's balance, its ledger entries are removed (later entries' on_hand_after move to match), and so are its expiry alerts; a product left with no stock, history or batches at the store goes from its balances. Audited as inventory.batch_deleted. Once stock has left a batch it cannot be deleted (409): write off what is left with an adjustment (POST /api/v1/inventory/movements) instead.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Batch not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stock has left the batch, it holds no stock, or open orders have reserved what it holds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/v1/inventory/hotspots": {
       "get": {
         "tags": ["Inventory"],
@@ -1621,7 +1795,14 @@
             "description": "One kind of movement.",
             "schema": {
               "type": "string",
-              "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+              "enum": [
+                "opening",
+                "receipt",
+                "adjustment",
+                "dispatch",
+                "order_receipt",
+                "hotspot_delivery"
+              ]
             }
           },
           {
@@ -5040,6 +5221,50 @@
           }
         }
       }
+    },
+    "/api/v1/stores": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List stores with assigned-user counts and physical stock",
+        "operationId": "listStoreOverview",
+        "description": "Requires inventory:read. Returns the assigned store, or every store with orders:all_stores, national warehouses first. An unassigned user receives an empty array. Counts all accounts assigned to each store. Physical stock includes reserved and expired quantities, grouped by category and unit; units are never added together. Stores without stock have on_hand: []. National stores have no district or region assignment.",
+        "responses": {
+          "200": {
+            "description": "Store overview list; data is always an array.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "data"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreOverview"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5372,6 +5597,10 @@
             "type": "string",
             "nullable": true,
             "description": "Transport recorded at dispatch, if given."
+          },
+          "unrequested": {
+            "type": "boolean",
+            "description": "True for stock the warehouse sent without an order (POST /api/v1/orders/district-dispatches): created dispatched, received like any shipment, and left out of request statistics."
           }
         }
       },
@@ -6428,7 +6657,14 @@
           },
           "reason": {
             "type": "string",
-            "enum": ["opening", "receipt", "adjustment", "dispatch", "order_receipt"]
+            "enum": [
+              "opening",
+              "receipt",
+              "adjustment",
+              "dispatch",
+              "order_receipt",
+              "hotspot_delivery"
+            ]
           },
           "quantity": {
             "type": "integer",
@@ -7141,7 +7377,7 @@
       },
       "Product": {
         "type": "object",
-        "description": "A condom product. Converted legacy products may have null category, type, brand, unit or pieces_per_unit; every field is required to create a product and before one is activated or edited.",
+        "description": "A condom product. Converted legacy products may have null category, type, brand, unit or pieces_per_unit; A complete product is required on creation, editing or activation. For units named Piece or Pieces (case-insensitive), pieces_per_unit may be omitted and is stored as 1; other units need a pack size.",
         "required": [
           "id",
           "category",
@@ -7251,7 +7487,7 @@
       "CreateProductRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["category", "type_id", "brand_id", "unit_id", "pieces_per_unit"],
+        "required": ["category", "type_id", "brand_id", "unit_id"],
         "properties": {
           "category": {
             "type": "string",
@@ -7273,6 +7509,7 @@
             "description": "An active unit of measure."
           },
           "pieces_per_unit": {
+            "description": "Optional for a unit named Piece or Pieces (case-insensitive): omitted counts become 1 and other counts are rejected. Required for other units on creation; PATCH otherwise preserves an existing count.",
             "type": "integer",
             "minimum": 1,
             "maximum": 100000
@@ -7305,6 +7542,7 @@
             "description": "An active unit of measure."
           },
           "pieces_per_unit": {
+            "description": "Optional for a unit named Piece or Pieces (case-insensitive): omitted counts become 1 and other counts are rejected. Required for other units on creation; PATCH otherwise preserves an existing count.",
             "type": "integer",
             "minimum": 1,
             "maximum": 100000
@@ -7673,6 +7911,99 @@
           "condom_category": "male",
           "quantity": 1,
           "comment": "Two hotspots are out"
+        }
+      },
+      "DistrictDispatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["warehouse_store_id", "district_store_id", "lines"],
+        "properties": {
+          "warehouse_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The sending national store, NMS or JMS: the caller's own store unless they have orders:all_stores."
+          },
+          "district_store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The district store the stock goes to."
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "One line per product; a product may appear on one line only.",
+            "items": {
+              "$ref": "#/components/schemas/DistrictDispatchLine"
+            }
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000,
+            "description": "The warehouse's word to the district, e.g. why the stock is sent. Stored as each order's comment."
+          },
+          "expiry_exception_reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Required when a batch with under one month left would go; recorded as an expiry exception."
+          },
+          "waybill_number": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "description": "Transport, each optional; blank counts as not given."
+          },
+          "vehicle_registration": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Transport, optional."
+          },
+          "driver_name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "Transport, optional."
+          },
+          "driver_phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Transport, optional."
+          }
+        },
+        "example": {
+          "warehouse_store_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "district_store_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+          "lines": [
+            {
+              "condom_id": "0b1c2d3e-4f5a-4b6c-8d7e-8f9a0b1c2d3e",
+              "quantity": 200
+            }
+          ],
+          "note": "Quarterly allocation",
+          "waybill_number": "WB-900"
+        }
+      },
+      "DistrictDispatchLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["condom_id", "quantity"],
+        "properties": {
+          "condom_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "An active product with a catalogue unit."
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 10000000,
+            "description": "How many, in the product's catalogue unit."
+          }
         }
       },
       "StockoutReport": {
@@ -9247,7 +9578,7 @@
           },
           "scope": {
             "type": "string",
-            "example": "National · Kampala"
+            "example": "National \u00b7 Kampala"
           },
           "product": {
             "type": "string"
@@ -9713,7 +10044,8 @@
           "unit",
           "band",
           "on_hand",
-          "created_at"
+          "created_at",
+          "untouched"
         ],
         "properties": {
           "id": {
@@ -9783,6 +10115,10 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "untouched": {
+            "type": "boolean",
+            "description": "Nothing has left the batch or come into it through an order: its stock is exactly what its own registrations and corrections add up to. Deleting it erases it as if it was never registered; editing the quantity of one registered once corrects that registration."
           }
         }
       },
@@ -9801,6 +10137,48 @@
             "items": {
               "$ref": "#/components/schemas/StockBatch"
             }
+          }
+        }
+      },
+      "StockBatchResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StockBatch"
+          }
+        }
+      },
+      "BatchEditRequest": {
+        "type": "object",
+        "required": ["batch_number", "expiry_date", "on_hand", "note"],
+        "properties": {
+          "batch_number": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "description": "A past date is allowed: a correction can find the stock expired."
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "The quantity the batch should hold. Delete the batch to remove all of it."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 900,
+            "description": "Why the batch is changing; kept in the audit log, and on the adjustment when the quantity change is one."
           }
         }
       },
@@ -9935,12 +10313,12 @@
           "received": {
             "type": "integer",
             "format": "int64",
-            "description": "Receipts in the period."
+            "description": "Stock registrations and warehouse order receipts in the period (receipt and order_receipt)."
           },
           "dispatched": {
             "type": "integer",
             "format": "int64",
-            "description": "Dispatched to district stores in the period."
+            "description": "Stock dispatched to district stores or hotspots in the period (dispatch and hotspot_delivery)."
           },
           "written_off": {
             "type": "integer",
@@ -9950,7 +10328,7 @@
           "dispatched_90_days": {
             "type": "integer",
             "format": "int64",
-            "description": "Dispatched in the 90 days to now, whatever the period."
+            "description": "Stock dispatched to district stores or hotspots in the 90 days to now, whatever the selected period."
           }
         }
       },
@@ -10056,6 +10434,68 @@
           },
           "data": {
             "$ref": "#/components/schemas/StoreStockSummary"
+          }
+        }
+      },
+      "StoreOverviewStock": {
+        "type": "object",
+        "required": ["category", "unit_id", "unit", "quantity"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["male", "female", null],
+            "nullable": true
+          },
+          "unit_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "StoreOverview": {
+        "type": "object",
+        "required": ["id", "name", "kind", "region", "district", "code", "user_count", "on_hand"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["national", "district"]
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string"
+          },
+          "user_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "on_hand": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreOverviewStock"
+            }
           }
         }
       }

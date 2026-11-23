@@ -61,6 +61,11 @@ export const orderSchema = z.object({
   vehicle_registration: text.default(null),
   driver_name: text.default(null),
   driver_phone: text.default(null),
+  /**
+   * Stock the warehouse sent without an order: created dispatched, received like any shipment,
+   * and left out of request statistics.
+   */
+  unrequested: z.boolean().default(false),
   /** Set only on alert orders raised before stockouts became reports. */
   hot_spot_id: text,
   created_at: z.string(),
@@ -171,4 +176,31 @@ export interface DispatchInput {
 /** Sends a confirmed order; batches leave first expiry first out, expired ones never. */
 export function dispatchOrder(http: HttpClient, id: string, input: DispatchInput): Promise<Order> {
   return orderAction(http, id, 'dispatch', input);
+}
+
+export interface DistrictDispatchInput {
+  /** The sending warehouse, NMS or JMS. */
+  warehouse_store_id: string;
+  district_store_id: string;
+  /** One per product, each counted in the product's catalogue unit. */
+  lines: { condom_id: string; quantity: number }[];
+  /** The warehouse's word to the district; it is quoted in the district's notification. */
+  note?: string;
+  /** Needed when a batch with under one month left would go. */
+  expiry_exception_reason?: string;
+  waybill_number?: string;
+  vehicle_registration?: string;
+  driver_name?: string;
+  driver_phone?: string;
+}
+
+/**
+ * Sends stock to a district store before it orders any. Each line becomes an order created
+ * dispatched, first expiry first out; the lines go together or not at all.
+ */
+export async function dispatchToDistrict(
+  http: HttpClient,
+  input: DistrictDispatchInput,
+): Promise<Order[]> {
+  return parseList(orderSchema, await http.post('/orders/district-dispatches', input), 'orders');
 }

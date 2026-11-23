@@ -64,6 +64,8 @@ type StockFilter struct {
 	StoreID   *string
 	StoreType string
 	CondomID  *string
+	// BatchID picks one batch; only the batch list reads it.
+	BatchID *string
 }
 
 // stock lists store balances: on hand, reserved for confirmed orders, available, and incoming from
@@ -113,21 +115,26 @@ type StockBatch struct {
 	Band          string    `json:"band"`
 	OnHand        int64     `json:"on_hand"`
 	CreatedAt     time.Time `json:"created_at"`
+	// Untouched is true while nothing has left the batch or come into it through an order: deleting it
+	// erases it as if never registered, and editing the quantity of a batch registered once corrects
+	// that registration.
+	Untouched bool `json:"untouched"`
 }
 
 // batches lists the batches with stock at the stores the user may see, in the order dispatch takes
 // them within each product and unit: earliest expiry first, unknown expiry last.
 func (r *Repository) batches(ctx context.Context, access scope, f StockFilter, now time.Time) ([]StockBatch, error) {
 	rows, err := r.db.Query(ctx, `SELECT x.id, s.id, s.name, s.store_type, x.condom_id, `+productName+`, c.category,
-			x.unit_of_measure_id, um.name, x.batch_number, x.expiry_date, x.on_hand, x.created_at
+			x.unit_of_measure_id, um.name, x.batch_number, x.expiry_date, x.on_hand, x.created_at, `+untouchedBatch+`
 		FROM stock_batches x
 		JOIN stores s ON s.id = x.store_id
 		JOIN condoms c ON c.id = x.condom_id
-		JOIN unit_of_measures um ON um.id = x.unit_of_measure_id
+		JOIN unit_of_measures um ON um.id = x.unit_of_measure_id`+batchLedger+`
 		WHERE x.on_hand > 0 AND ($1::boolean OR x.store_id = $2::uuid)
 			AND ($3::uuid IS NULL OR x.store_id = $3) AND ($4::uuid IS NULL OR x.condom_id = $4)
+			AND ($5::uuid IS NULL OR x.id = $5)
 		ORDER BY s.store_type = 'district', s.name, 6, um.name, x.expiry_date NULLS LAST, x.created_at, x.id`,
-		access.allStores, access.storeID, f.StoreID, f.CondomID)
+		access.allStores, access.storeID, f.StoreID, f.CondomID, f.BatchID)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +143,7 @@ func (r *Repository) batches(ctx context.Context, access scope, f StockFilter, n
 		var b StockBatch
 		var expiry *time.Time
 		if err := row.Scan(&b.ID, &b.StoreID, &b.StoreName, &b.StoreType, &b.CondomID, &b.Product, &b.Category,
-			&b.UnitOfMeasureID, &b.Unit, &b.BatchNumber, &expiry, &b.OnHand, &b.CreatedAt); err != nil {
+			&b.UnitOfMeasureID, &b.Unit, &b.BatchNumber, &expiry, &b.OnHand, &b.CreatedAt, &b.Untouched); err != nil {
 			return b, err
 		}
 		b.Band = stock.Band(expiry, today)

@@ -215,15 +215,17 @@ function ReportEditor({ report }: { report: MonthlyReport }) {
                   <ul className="mt-2 flex flex-col gap-1">
                     {problems.map((problem) => (
                       <li key={`${problem.field}-${problem.check}`}>
-                        <button
+                        <Button
+                          variant="link"
+                          size="sm"
                           type="button"
                           onClick={() => {
                             focusField(problem.field);
                           }}
-                          className="focus-visible:ring-ring rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+                          className="block h-auto rounded-sm p-0 text-left whitespace-normal text-current"
                         >
                           <span className="font-semibold">{problem.where}:</span> {problem.message}
-                        </button>
+                        </Button>
                       </li>
                     ))}
                   </ul>

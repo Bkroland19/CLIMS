@@ -3,6 +3,7 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -56,20 +57,22 @@ export function MapLegend<Key extends string>({
           options={COLOUR_OPTIONS}
           onChange={onColourByChange}
         />
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           aria-expanded={open}
           aria-label={open ? 'Fold the map key' : 'Open the map key'}
           onClick={() => {
             setOpen((current) => !current);
           }}
-          className="hover:bg-muted focus-visible:ring-ring text-muted-foreground grid size-7 place-items-center rounded-md outline-none focus-visible:ring-2"
+          className="text-muted-foreground"
         >
           <ChevronDown
             aria-hidden="true"
             className={cn('size-4 transition-transform', !open && 'rotate-180')}
           />
-        </button>
+        </Button>
       </div>
       {open ? (
         <ul className="flex flex-col gap-px px-1 pb-1">
@@ -80,14 +83,16 @@ export function MapLegend<Key extends string>({
             const on = shown === null || shown.includes(option.key);
             return (
               <li key={option.key}>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   type="button"
                   aria-pressed={on}
                   onClick={() => {
                     onToggle(option.key);
                   }}
                   className={cn(
-                    'hover:bg-muted focus-visible:ring-ring flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs outline-none focus-visible:ring-2',
+                    'w-full justify-start gap-2 px-1.5 text-left text-xs',
                     !on && 'text-muted-foreground',
                   )}
                 >
@@ -105,7 +110,7 @@ export function MapLegend<Key extends string>({
                   <span className="text-muted-foreground tabular-nums">
                     {formatNumber(option.count)}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}

@@ -379,7 +379,7 @@ describe('UsersPage', () => {
     expect(within(dialog).queryByLabelText(/password/i)).not.toBeInTheDocument();
   });
 
-  it("replaces a user's roles", async () => {
+  it("requires a single choice to replace a user's existing multiple roles", async () => {
     const user = userEvent.setup();
     const { requests } = renderApp(<UsersPage />, {
       signedIn: true,
@@ -390,9 +390,18 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for James Okello' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Edit roles' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('checkbox', { name: /^District focal person/ })).toBeChecked();
-    await user.click(within(dialog).getByRole('checkbox', { name: /^District focal person/ }));
-    await user.click(within(dialog).getByRole('button', { name: 'Save roles' }));
+    const group = within(dialog).getByRole('radiogroup', { name: 'Role' });
+    expect(within(group).queryByRole('radio', { checked: true })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Save role' }));
+    expect(await within(dialog).findByText('Choose exactly one role.')).toBeInTheDocument();
+    expect(writes(requests)).toEqual([]);
+
+    await user.click(within(group).getByRole('radio', { name: /^District focal person/ }));
+    await user.click(within(group).getByRole('radio', { name: /^VHT/ }));
+    expect(within(group).getByRole('radio', { name: /^District focal person/ })).not.toBeChecked();
+    expect(within(group).getByRole('radio', { name: /^VHT/ })).toBeChecked();
+    await user.click(within(dialog).getByRole('button', { name: 'Save role' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

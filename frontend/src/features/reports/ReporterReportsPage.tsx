@@ -73,12 +73,14 @@ export default function ReporterReportsPage({
       },
       {
         id: 'sent',
+        filter: 'date',
         header: 'Sent',
         value: (report) => report.submitted_at ?? '',
         cell: (report) => formatTimestamp(report.submitted_at),
       },
       {
         id: 'validation',
+        filter: 'select',
         header: 'Validation',
         value: (report) => validationText(report),
         cell: (report) => (
@@ -89,6 +91,7 @@ export default function ReporterReportsPage({
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (report) => reporterStatus(report).label,
         cell: (report) => {
@@ -153,6 +156,7 @@ export default function ReporterReportsPage({
       <MonthCard report={selected} href={linkTo(REPORT_PATHS.report(workspace, selected.id))} />
       <DataTable
         label="Report history"
+        preferencesKey="report-history"
         columns={columns}
         rows={reports.data}
         getRowId={(report) => report.id}

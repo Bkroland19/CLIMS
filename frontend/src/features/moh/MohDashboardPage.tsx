@@ -269,7 +269,7 @@ function DistrictStores({ district }: { district: string | null }) {
   const stores = useDistrictStores();
   const columns = useMemo<DataTableColumn<DistrictStoreSummary>[]>(
     () => [
-      { id: 'district', header: 'District', value: (store) => store.district },
+      { id: 'district', filter: 'select', header: 'District', value: (store) => store.district },
       {
         id: 'male',
         header: 'Male',
@@ -293,6 +293,7 @@ function DistrictStores({ district }: { district: string | null }) {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Stock status',
         value: (store) => districtStockStatus(store).label,
         cell: (store) => {
@@ -313,6 +314,7 @@ function DistrictStores({ district }: { district: string | null }) {
       <CardContent>
         <DataTable
           label="District stores"
+          preferencesKey="moh-district-stores"
           columns={columns}
           rows={
             district

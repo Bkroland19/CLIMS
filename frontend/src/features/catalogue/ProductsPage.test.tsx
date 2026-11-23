@@ -206,7 +206,9 @@ describe('ProductsPage', () => {
     await openActions(user, /^Actions for Engabu/);
     await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
     const dialog = await screen.findByRole('dialog', { name: /Edit Engabu/ });
-    expect(within(dialog).getByLabelText('Condoms per unit')).toHaveValue('1');
+    expect(within(dialog).queryByLabelText('Condoms per unit')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('combobox', { name: 'Unit of measure' }));
+    await user.click(await screen.findByRole('option', { name: 'Box' }));
     await user.clear(within(dialog).getByLabelText('Condoms per unit'));
     await user.type(within(dialog).getByLabelText('Condoms per unit'), '3');
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
@@ -223,11 +225,59 @@ describe('ProductsPage', () => {
           category: 'male',
           type_id: 't-free',
           brand_id: 'b-engabu',
-          unit_id: 'u-piece',
+          unit_id: 'u-box',
           pieces_per_unit: 3,
         },
       }),
     ]);
+  });
+
+  it('saves a piece product with no pack-size control, including an empty legacy count', async () => {
+    const user = userEvent.setup();
+    const normalApi = api(() => ({ status: 200, body: { success: true, data: engabu } }));
+    const { requests } = renderApp(<ProductsPage />, {
+      signedIn: true,
+      replies: [
+        (request) =>
+          request.method === 'GET' && request.url === '/catalogue/products'
+            ? { status: 200, body: { success: true, data: [{ ...engabu, pieces_per_unit: null }] } }
+            : normalApi(request),
+      ],
+    });
+    await openActions(user, /^Actions for Engabu/);
+    await user.click(await screen.findByRole('menuitem', { name: 'Complete details' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByLabelText('Condoms per unit')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(writes(requests)[0]?.body).toMatchObject({ unit_id: 'u-piece', pieces_per_unit: 1 });
+  });
+
+  it('clears pack-size validation when switching to pieces and still requires a count for boxes', async () => {
+    const user = userEvent.setup();
+    const { requests } = renderApp(<ProductsPage />, {
+      signedIn: true,
+      replies: [api(() => ({ status: 200, body: { success: true, data: engabu } }))],
+    });
+    await openActions(user, /^Actions for FC2/);
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Condoms per unit'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    expect(
+      await within(dialog).findByText('Enter how many condoms one unit holds.'),
+    ).toBeInTheDocument();
+    expect(writes(requests)).toHaveLength(0);
+    await user.click(within(dialog).getByRole('combobox', { name: 'Unit of measure' }));
+    await user.click(await screen.findByRole('option', { name: 'Piece' }));
+    expect(within(dialog).queryByLabelText('Condoms per unit')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(writes(requests)[0]?.body).toMatchObject({ unit_id: 'u-piece', pieces_per_unit: 1 });
   });
 
   it('deactivates a product from its row', async () => {
@@ -260,8 +310,8 @@ describe('ProductsPage', () => {
     await openActions(user, /^Actions for Trust/);
     expect(await screen.findByRole('menuitem', { name: 'Complete details' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Activate' })).not.toBeInTheDocument();
-    // Legacy stock still refers to it, so it cannot be deleted.
-    expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+    // Delete stays discoverable; the API protects linked stock and order records.
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('menuitem', { name: 'Complete details' }));
     const dialog = await screen.findByRole('dialog');
@@ -286,10 +336,10 @@ describe('ProductsPage', () => {
       ],
     });
 
-    await openActions(user, /^Actions for FC2/);
+    await openActions(user, /^Actions for Engabu/);
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const confirm = await screen.findByRole('alertdialog', {
-      name: 'Delete FC2 · Female · Free?',
+      name: 'Delete Engabu · Male · Free?',
     });
     await user.click(within(confirm).getByRole('button', { name: 'Delete product' }));
 
@@ -298,6 +348,47 @@ describe('ProductsPage', () => {
         'This product is used by stock or order records. Deactivate it instead.',
       ),
     ).toBeInTheDocument();
+    expect(writes(requests)).toEqual([
+      expect.objectContaining({ method: 'DELETE', url: '/catalogue/products/p-engabu' }),
+    ]);
+  });
+
+  it('deletes an unused product only after confirmation and refreshes the list', async () => {
+    const user = userEvent.setup();
+    let deleted = false;
+    const normalApi = api();
+    const { requests } = renderApp(<ProductsPage />, {
+      signedIn: true,
+      replies: [
+        (request) => {
+          if (request.method === 'DELETE') {
+            deleted = true;
+            return { status: 200, body: { success: true, data: null } };
+          }
+          if (request.url === '/catalogue/products') {
+            return {
+              status: 200,
+              body: { success: true, data: deleted ? [engabu, legacy] : products },
+            };
+          }
+          return normalApi(request);
+        },
+      ],
+    });
+    await openActions(user, /^Actions for FC2/);
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    let confirm = await screen.findByRole('alertdialog');
+    expect(writes(requests)).toHaveLength(0);
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    expect(writes(requests)).toHaveLength(0);
+    await openActions(user, /^Actions for FC2/);
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    confirm = await screen.findByRole('alertdialog');
+    await user.click(within(confirm).getByRole('button', { name: 'Delete product' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('FC2', { exact: true })).not.toBeInTheDocument();
     expect(writes(requests)).toEqual([
       expect.objectContaining({ method: 'DELETE', url: '/catalogue/products/p-fc2' }),
     ]);

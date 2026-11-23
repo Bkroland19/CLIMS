@@ -47,14 +47,7 @@ export function pastOrPresentDate(noun: string, today: () => Date = () => new Da
   return z
     .string()
     .min(1, `Enter ${noun}.`)
-    .refine((value) => {
-      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-      if (!match) return false;
-      const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-      const date = new Date(year, month - 1, day);
-      // Reject impossible dates that Date would roll over, such as 31 February.
-      return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
-    }, 'Enter a valid date.')
+    .refine(isCalendarDate, 'Enter a valid date.')
     .refine((value) => value <= toDateInputValue(today()), 'The date cannot be in the future.');
 }
 
@@ -65,4 +58,11 @@ export function toDateInputValue(date: Date): string {
     String(date.getMonth() + 1).padStart(2, '0'),
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
+}
+
+/** Strict date-input validation; Date alone rolls impossible dates into another month. */
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }

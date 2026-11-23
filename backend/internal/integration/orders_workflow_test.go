@@ -358,6 +358,8 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	testSettingsAndHMIS(t, pool, request, admin, districtToken, otherToken, warehouse, district)
 	testExportsAndVersions(t, pool, request, admin, districtToken, district)
 	testStoreSummary(t, pool, request, admin, districtToken, warehouse, district, product, unit)
+	testBatchEdit(t, pool, request, admin, districtToken, warehouse, product, unit)
+	testDistrictDispatch(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)
 }
 
 // assertWarehouseGrants checks the default grants migration 31 gives the warehouse and DCFP roles,

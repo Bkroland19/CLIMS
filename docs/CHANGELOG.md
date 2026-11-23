@@ -6,6 +6,24 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **Consistent data table filtering across the web app.** Shared column filters cover text,
+  multi-select categories, numeric and date ranges, and empty values, with removable chips,
+  clear-all, visible page size and honest warnings when refreshing existing rows fails.
+  Shared buttons and form controls have consistent spacing and focus states. ESLint enforces
+  component reuse; `practices.md` now describes CLIMS rather than another project's stack.
+- **Stricter stock receipt inputs.** Impossible calendar dates and quantities above the API limit
+  are rejected before submission. Shared form dialogs focus invalid fields.
+
+- **NMS and JMS send stock to a district before it orders.** `POST /api/v1/orders/district-dispatches`
+  (`orders:process`) takes the sending warehouse, a district store and up to 20 lines (product and
+  quantity, in the product's catalogue unit), with an optional note and transport. Each line becomes an
+  order created `dispatched` with `unrequested: true`, taking free stock (on hand less reserved and
+  expired) first expiry first out; the lines go together or not at all, and a refusal names the line.
+  The district is told the stock comes without an order and receives it as usual. The warehouse request
+  report and the store summary's order counts leave such orders out. Migration 34 adds
+  `orders.unrequested`. Web: **Dispatch to district** on the warehouse stock page, and on each
+  product's row, opens a panel to choose the district and the products; the DCFP's order page says the
+  stock was sent without an order.
 - **The warehouse stock page at a glance.** `GET /api/v1/inventory/store-summary?store_id=&from=&to=`
   reports one store: per product and unit, what is on hand, reserved, expired, expiring within three
   months, usable and next to expire, what was received, dispatched and written off in the period, and
@@ -20,11 +38,41 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   the line. Web: **Register stock** opens a panel on the stock page where the batches are entered one
   under the other (the product carries over to the next) and registered together.
   `/warehouse/stock/receive` redirects to it.
+- **One table everywhere, built for volume.** Every table in the web app is now the shared
+  `DataTable`, with the same search, sorting, paging, View menu (columns, row height, rows per page,
+  remembered per table) and states as Users & access. `ItemsTable` is gone: line items inside a
+  card (a dispatch's batches, a report's figures, a chart's table view) use its `embedded` variant.
+  The audit log and the district store's batches moved onto it too. New in the table: rows that open
+  onto their detail, footer totals over every matching row, "Select all N" once a page is ticked,
+  a header that stays in view on 50- and 100-row pages, search that stays instant over tens of
+  thousands of rows, and "Load more" for lists the API pages.
+- **The warehouse stock page at any size.** A shelf-life overview shows every batch held as one
+  bar per unit of measure, split into the six shelf-life bands, with a legend that opens the batches
+  in each band. "Needs attention" lists what to do (expired batches to write off, batches leaving
+  within a month, stock without an expiry date, products under a month of stock), at most four
+  lines however many batches there are. A product row opens onto its own batches, first expiry
+  first, and shows its free stock with a meter of what is reserved and expired; product and batch
+  lists total on hand per unit. The movements view pages through the whole ledger, 100 at a time
+  (it showed only the newest 100 before), and filters by kind on the server
+  (`GET /inventory/movements?reason=&offset=`). A headline amount in several units shows the
+  largest as the figure and the rest beneath. Mock: `MOCK_DATA=scale` adds a national store's
+  volume at NMS (about 250 products, a thousand batches, two thousand movements).
+- **Batches can be edited and deleted.** `PATCH /api/v1/inventory/batches/{id}` corrects a batch's
+  number, expiry date and quantity with a note; a number already held under the same expiry joins the
+  two. `DELETE /api/v1/inventory/batches/{id}` erases a batch nothing has left yet (`untouched` in the
+  batch list) as if it was never registered; once stock has left a batch it is refused (409). Both are
+  audited and stop at what open orders have reserved. Web: each batch's menu on the stock page has
+  **Edit batch…** and **Delete batch…**; deleting a batch stock has left writes off what is left, with
+  the reason, and keeps its history.
 - Warehouse wording: a new district order's action reads **Manage order** (was "Decide on order"),
   on the requests list, the order page and the dashboard's tasks.
 
 ### Changed
 
+- **NMS and JMS switch the warehouse dashboard and district orders to any district**, as MOH can.
+  The District menu lists every district instead of only those that have ordered from the store, so
+  a district with no order yet can be picked. A district with no orders says so, and the sidebar
+  counts still cover the whole store.
 - **The DCFP orders from the warehouse without choosing a unit.** `POST /api/v1/orders/warehouse-requests`
   takes `warehouse_store_id`, `condom_category`, `quantity` and an optional `comment`; a body with
   `unit_of_measure_id` is refused (400). The order's `unit_of_measure_id` stays null until the

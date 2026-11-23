@@ -47,17 +47,17 @@ test('approves part of an order, dispatches it first expiry first out, and the d
   await page
     .getByRole('textbox', { name: 'Why dispatch stock with under a month left?' })
     .fill('Wakiso is out of stock and will use it within the week');
-  await page.getByRole('textbox', { name: /Waybill number/ }).fill('NMS-WB-26-1300');
+  await expect(page.getByRole('textbox', { name: /Waybill number/ })).toHaveCount(0);
   await page.getByRole('textbox', { name: /Vehicle registration/ }).fill('UBF 112C');
   await page.getByRole('button', { name: 'Dispatch to Wakiso' }).click();
 
   await expectToast(page, 'Dispatched to Wakiso.');
-  await expect(page.getByRole('heading', { name: 'Waybill NMS-WB-26-1300' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dispatch' })).toBeVisible();
   await expect(page.getByText('380 Box on the way to Wakiso')).toBeVisible();
 
   // District: the DCFP counts it in.
   await open(page, `/dcfp/restock/${WAKISO}`, 'Warehouse order');
-  await expect(page.getByText('NMS-WB-26-1300')).toBeVisible();
+  await expect(page.getByText('UBF 112C')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Quantity counted' })).toHaveValue('380');
   await page.getByRole('button', { name: 'Record receipt' }).click();
   await expectToast(page, 'Receipt recorded; the district store is updated');

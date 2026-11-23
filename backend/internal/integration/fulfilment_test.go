@@ -122,6 +122,27 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	if ledgerLines != 2 {
 		t.Fatalf("hotspot delivery ledger lines = %d, want 2", ledgerLines)
 	}
+	// The district stock screen includes hotspot dispatches in both its period and cover totals.
+	stockSummary := request("GET", "/inventory/store-summary?store_id="+district, nil, admin, 200)["data"].(map[string]any)
+	found := 0
+	for _, raw := range stockSummary["products"].([]any) {
+		row := raw.(map[string]any)
+		want := map[string]float64{male: 3, female: 10}[row["condom_id"].(string)]
+		if want == 0 || row["unit_of_measure_id"] != unit {
+			continue
+		}
+		found++
+		if row["dispatched"] != want || row["dispatched_90_days"] != want {
+			t.Fatalf("district dispatch summary: %v, want %v dispatched", row, want)
+		}
+	}
+	if found != 2 {
+		t.Fatalf("expected both dispatched products, got %d", found)
+	}
+	ledger := request("GET", "/inventory/movements?store_id="+district+"&reason=hotspot_delivery", nil, admin, 200)["data"].([]any)
+	if len(ledger) != 2 {
+		t.Fatalf("filtered hotspot delivery ledger: %v", ledger)
+	}
 	lineIDs := map[string]string{}
 	for _, line := range delivered["deliveries"].([]any)[0].(map[string]any)["lines"].([]any) {
 		l := line.(map[string]any)

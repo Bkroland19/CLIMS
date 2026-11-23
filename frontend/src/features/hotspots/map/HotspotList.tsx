@@ -103,7 +103,9 @@ function HotspotRows({
       >
         {shown.map((hotspot) => (
           <li key={hotspot.id}>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={() => {
                 onSelect(hotspot.id);
@@ -117,7 +119,7 @@ function HotspotRows({
               onBlur={() => {
                 onHighlight(null);
               }}
-              className="hover:bg-muted/70 focus-visible:ring-ring flex w-full items-center gap-2.5 px-4 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
+              className="hover:bg-muted/70 focus-visible:ring-ring flex h-auto min-h-7 w-full items-center justify-start gap-2.5 px-4 py-2 text-left whitespace-normal outline-none focus-visible:ring-2 focus-visible:ring-inset"
             >
               <span
                 aria-hidden="true"
@@ -157,7 +159,7 @@ function HotspotRows({
                   className="shrink-0"
                 />
               )}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
