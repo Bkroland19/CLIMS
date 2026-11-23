@@ -143,12 +143,18 @@ export default function DistrictRequestsPage() {
         isRetrying={orders.isRefetching}
         searchPlaceholder="Search by district or product…"
         emptyTitle={
-          filter.value === 'all' ? `No district orders at ${code} yet` : 'No orders in this view'
+          filter.value !== 'all'
+            ? 'No orders in this view'
+            : district
+              ? `No orders from ${district} at ${code} yet`
+              : `No district orders at ${code} yet`
         }
         emptyDescription={
-          filter.value === 'all'
-            ? 'Orders from district stores appear here as soon as a DCFP sends one.'
-            : 'Choose another filter to see the rest of the orders.'
+          filter.value !== 'all'
+            ? 'Choose another filter to see the rest of the orders.'
+            : district
+              ? `Choose All districts in the District menu to see every order at ${code}.`
+              : 'Orders from district stores appear here as soon as a DCFP sends one.'
         }
         rowActions={(order) => (
           <RowActions
