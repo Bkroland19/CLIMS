@@ -142,8 +142,10 @@ describe('toNewUserInput', () => {
 });
 
 describe('userRolesSchema', () => {
-  it('needs at least one role', () => {
+  it('requires exactly one nonempty role', () => {
     expect(userRolesSchema.safeParse({ role_ids: [] }).success).toBe(false);
+    expect(userRolesSchema.safeParse({ role_ids: [''] }).success).toBe(false);
+    expect(userRolesSchema.safeParse({ role_ids: ['role-1', 'role-2'] }).success).toBe(false);
     expect(userRolesSchema.safeParse({ role_ids: ['role-1'] }).success).toBe(true);
   });
 });

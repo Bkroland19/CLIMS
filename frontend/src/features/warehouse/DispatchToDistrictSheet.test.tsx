@@ -99,7 +99,8 @@ describe('Dispatching to a district before it orders', () => {
       'Wakiso uses it within the week',
     );
     await user.type(within(sheet).getByLabelText(/Note to the district/), 'Quarterly allocation');
-    await user.type(within(sheet).getByLabelText(/Waybill number/), 'WB-900');
+    expect(within(sheet).queryByLabelText(/Waybill number/)).not.toBeInTheDocument();
+    await user.type(within(sheet).getByLabelText(/Vehicle registration/), 'UAX 123B');
     expect(within(sheet).getByText('120 box')).toBeInTheDocument();
 
     await user.click(within(sheet).getByRole('button', { name: 'Dispatch to Wakiso' }));
@@ -112,7 +113,7 @@ describe('Dispatching to a district before it orders', () => {
           lines: [{ condom_id: FEMALE.id, quantity: 120 }],
           note: 'Quarterly allocation',
           expiry_exception_reason: 'Wakiso uses it within the week',
-          waybill_number: 'WB-900',
+          vehicle_registration: 'UAX 123B',
         },
       });
     });

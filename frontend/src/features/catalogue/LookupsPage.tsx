@@ -93,6 +93,7 @@ export function LookupsPage({ kind }: LookupsPageProps) {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (lookup) => (lookup.active ? 'Active' : 'Inactive'),
         cell: (lookup) => (

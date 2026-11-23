@@ -6,6 +6,14 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **Consistent data table filtering across the web app.** Shared column filters cover text,
+  multi-select categories, numeric and date ranges, and empty values, with removable chips,
+  clear-all, visible page size and honest warnings when refreshing existing rows fails.
+  Shared buttons and form controls have consistent spacing and focus states. ESLint enforces
+  component reuse; `practices.md` now describes CLIMS rather than another project's stack.
+- **Stricter stock receipt inputs.** Impossible calendar dates and quantities above the API limit
+  are rejected before submission. Shared form dialogs focus invalid fields.
+
 - **NMS and JMS send stock to a district before it orders.** `POST /api/v1/orders/district-dispatches`
   (`orders:process`) takes the sending warehouse, a district store and up to 20 lines (product and
   quantity, in the product's catalogue unit), with an optional note and transport. Each line becomes an

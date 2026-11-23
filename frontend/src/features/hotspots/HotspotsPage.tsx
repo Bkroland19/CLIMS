@@ -74,8 +74,13 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
           hotspotLabel(hotspot)
         ),
     },
-    { id: 'type', header: 'Type', value: (hotspot) => hotspot.type },
-    { id: 'subcounty', header: 'Subcounty', value: (hotspot) => hotspot.subcounty?.name },
+    { id: 'type', filter: 'select', header: 'Type', value: (hotspot) => hotspot.type },
+    {
+      id: 'subcounty',
+      filter: 'select',
+      header: 'Subcounty',
+      value: (hotspot) => hotspot.subcounty?.name,
+    },
     { id: 'village', header: 'Village', value: (hotspot) => hotspot.village },
     {
       id: 'contact',
@@ -90,6 +95,7 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
     { id: 'dispenser', header: 'Dispenser', value: dispenserSummary },
     {
       id: 'status',
+      filter: 'select',
       header: 'Status',
       value: (hotspot) => hotspot.review_status,
       cell: (hotspot) => <StatusBadge status={hotspot.review_status} />,

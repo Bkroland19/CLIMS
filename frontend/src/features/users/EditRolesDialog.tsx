@@ -7,7 +7,7 @@ import { formLevelError } from '@/components/form/serverErrors';
 
 import type { Role, User } from './api';
 import { useSetUserRoles } from './queries';
-import { RoleChecklist } from './RoleChecklist';
+import { RolePicker } from './RolePicker';
 import {
   USER_ROLES_FIELDS,
   userDisplayName,
@@ -63,8 +63,12 @@ export function EditRolesDialog({
         if (!open) onClose();
       }}
       title={`Roles for ${userDisplayName(user)}`}
-      description="Tick every role this person holds. The change applies at their next request."
-      submitLabel="Save roles"
+      description={
+        user.roles.length > 1
+          ? 'This person currently holds multiple roles. Choose one role to replace them. The change applies at their next request.'
+          : 'Choose one role for this person. The change applies at their next request.'
+      }
+      submitLabel="Save role"
       pendingLabel="Saving…"
       isPending={setRoles.isPending}
       isDirty={isDirty}
@@ -76,14 +80,16 @@ export function EditRolesDialog({
         control={control}
         name="role_ids"
         render={({ field, fieldState }) => (
-          <RoleChecklist
+          <RolePicker
             roles={roles}
             isLoading={isLoadingRoles}
             loadError={rolesError}
-            value={field.value}
-            onChange={field.onChange}
+            value={field.value.length === 1 ? (field.value[0] ?? '') : ''}
+            onChange={(roleId) => {
+              field.onChange([roleId]);
+            }}
             onBlur={field.onBlur}
-            firstCheckboxRef={field.ref}
+            inputRef={field.ref}
             error={fieldState.error?.message}
           />
         )}

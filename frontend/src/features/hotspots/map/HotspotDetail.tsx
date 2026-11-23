@@ -244,12 +244,14 @@ export function HotspotDetail({
           <ul className="-mx-2 flex flex-col">
             {neighbours.map(({ hotspot: neighbour, km }) => (
               <li key={neighbour.id}>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   type="button"
                   onClick={() => {
                     onSelect(neighbour.id);
                   }}
-                  className="hover:bg-muted focus-visible:ring-ring flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-2"
+                  className="hover:bg-muted focus-visible:ring-ring flex h-auto min-h-7 w-full items-center justify-start gap-2.5 rounded-md px-2 py-1.5 text-left whitespace-normal outline-none focus-visible:ring-2"
                 >
                   <span
                     aria-hidden="true"
@@ -260,7 +262,7 @@ export function HotspotDetail({
                   <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
                     {formatDistance(km)}
                   </span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

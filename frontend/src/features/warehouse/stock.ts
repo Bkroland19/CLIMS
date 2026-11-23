@@ -36,6 +36,7 @@ export function keepsBatch(filter: BatchFilter, batch: StockBatch): boolean {
 export const MOVEMENT_LABEL: Record<MovementReason, { label: string; tone: StatusTone }> = {
   receipt: { label: 'Stock registered', tone: 'positive' },
   order_receipt: { label: 'Received from warehouse', tone: 'positive' },
+  hotspot_delivery: { label: 'Dispatched to hotspot', tone: 'info' },
   dispatch: { label: 'Dispatched', tone: 'info' },
   adjustment: { label: 'Adjustment', tone: 'neutral' },
   opening: { label: 'Opening balance', tone: 'neutral' },

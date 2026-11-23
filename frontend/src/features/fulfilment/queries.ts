@@ -3,7 +3,7 @@ import { useApiQuery } from '@/lib/api';
 import { getDistrictStore, getOrder, listOrders, listRequests } from './api';
 
 /*
- * The mock fulfilment data the MOH and warehouse screens and the district store page still read
+ * The mock fulfilment data the remaining MOH and warehouse sample screens still read
  * (see ./api.ts). The DCFP's own screens use the Go API through `@/features/dcfp`.
  */
 const ROOT = 'fulfilment';

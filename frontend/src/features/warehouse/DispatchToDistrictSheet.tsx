@@ -51,21 +51,18 @@ import { formatAmounts } from './summary';
 const MAX_LINES = 20;
 
 interface Transport {
-  waybill_number: string;
   vehicle_registration: string;
   driver_name: string;
   driver_phone: string;
 }
 
 const NO_TRANSPORT: Transport = {
-  waybill_number: '',
   vehicle_registration: '',
   driver_name: '',
   driver_phone: '',
 };
 
 const TRANSPORT_FIELDS: { key: keyof Transport; label: string; max: number }[] = [
-  { key: 'waybill_number', label: 'Waybill number', max: 100 },
   { key: 'vehicle_registration', label: 'Vehicle registration', max: 30 },
   { key: 'driver_name', label: 'Driver', max: 200 },
   { key: 'driver_phone', label: "Driver's phone", max: 30 },

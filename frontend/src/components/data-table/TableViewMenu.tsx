@@ -20,6 +20,7 @@ interface TableViewMenuProps {
   /** The columns a viewer may hide, in table order. */
   columns: readonly { id: string; header: string }[];
   preferences: TablePreferences;
+  hasFixedColumns?: boolean;
   onChange: (change: Partial<TablePreferences>) => void;
 }
 
@@ -29,7 +30,13 @@ const DENSITIES: readonly { value: TableDensity; label: string }[] = [
 ];
 
 /** The table's "View" menu: which columns show, how tall rows are, and how many per page. */
-export function TableViewMenu({ label, columns, preferences, onChange }: TableViewMenuProps) {
+export function TableViewMenu({
+  label,
+  columns,
+  preferences,
+  onChange,
+  hasFixedColumns = false,
+}: TableViewMenuProps) {
   const hidden = new Set(preferences.hidden);
   const shown = columns.filter((column) => !hidden.has(column.id)).length;
 
@@ -59,7 +66,7 @@ export function TableViewMenu({ label, columns, preferences, onChange }: TableVi
                   key={column.id}
                   checked={visible}
                   // Keep at least one optional column so the choice can be undone from here.
-                  disabled={visible && shown === 1}
+                  disabled={visible && shown === 1 && !hasFixedColumns}
                   onSelect={(event) => {
                     // Stay open, so several columns can be toggled in one go.
                     event.preventDefault();

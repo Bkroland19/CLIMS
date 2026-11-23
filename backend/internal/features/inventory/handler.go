@@ -160,7 +160,7 @@ func (h *Handler) hotspots(c fiber.Ctx) error {
 	return reply(c, result, err)
 }
 
-var movementReasons = map[string]bool{"opening": true, "receipt": true, "adjustment": true, "dispatch": true, "order_receipt": true}
+var movementReasons = map[string]bool{"opening": true, "receipt": true, "adjustment": true, "dispatch": true, "order_receipt": true, "hotspot_delivery": true}
 
 func (h *Handler) movements(c fiber.Ctx) error {
 	storeID, condomID, err := optionalIDs(c, "store_id", "condom_id")

@@ -93,6 +93,7 @@ export default function MohRequestsPage() {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (request) => REQUEST_STATUS[request.status].label,
         cell: (request) => (

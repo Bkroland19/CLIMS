@@ -4,6 +4,7 @@ import { wholeNumber } from '@/lib/validation';
 
 import {
   PRODUCT_CATEGORIES,
+  type CatalogueRef,
   type Lookup,
   type LookupInput,
   type LookupKind,
@@ -28,6 +29,23 @@ export const productSchema = z.object({
 
 export type ProductFormInput = z.input<typeof productSchema>;
 export type ProductFormOutput = z.output<typeof productSchema>;
+
+export function isPieceUnit(unit: CatalogueRef | null | undefined): boolean {
+  return /^(piece|pieces)$/i.test(unit?.name.trim() ?? '');
+}
+
+/** A piece is already one condom; package sizes still need explicit validation. */
+export function productSchemaForUnits(units: readonly CatalogueRef[]) {
+  return z.preprocess(
+    (values: ProductFormInput) => ({
+      ...values,
+      pieces_per_unit: isPieceUnit(units.find((unit) => unit.id === values.unit_id))
+        ? '1'
+        : values.pieces_per_unit,
+    }),
+    productSchema,
+  );
+}
 
 export const PRODUCT_FIELDS = [
   'category',

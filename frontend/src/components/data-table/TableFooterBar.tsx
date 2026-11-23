@@ -1,3 +1,13 @@
+import { useId } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { PAGE_SIZES } from './useTablePreferences';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { formatNumber } from '@/lib/format';
@@ -17,6 +27,8 @@ interface TableFooterBarProps {
   page: Page<unknown>;
   onPage: (page: number) => void;
   more?: DataTableMore;
+  pageSize: number;
+  onPageSize: (size: number) => void;
 }
 
 /**
@@ -24,10 +36,21 @@ interface TableFooterBarProps {
  * holds more than was loaded, a button to fetch the next batch. The count
  * never pretends the loaded rows are all there are.
  */
-export function TableFooterBar({ label, page, onPage, more }: TableFooterBarProps) {
+export function TableFooterBar({
+  label,
+  page,
+  onPage,
+  more,
+  pageSize,
+  onPageSize,
+}: TableFooterBarProps) {
+  const sizeId = useId();
   const partial = more?.hasMore === true;
   return (
-    <div className="flex flex-col gap-2 border-t px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      data-print-hide
+      className="flex flex-col gap-2 border-t px-4 py-2 sm:flex-row sm:items-center sm:justify-between"
+    >
       <p className="text-muted-foreground text-[0.8125rem] tabular-nums" aria-live="polite">
         {page.total > 0 ? (
           <>
@@ -37,10 +60,32 @@ export function TableFooterBar({ label, page, onPage, more }: TableFooterBarProp
               : formatNumber(page.total)}
           </>
         ) : (
-          `None of the ${more?.noun ?? 'rows'} loaded so far`
+          'No matching records'
         )}
       </p>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor={sizeId} className="text-muted-foreground text-xs">
+            Rows per page
+          </Label>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => {
+              onPageSize(Number(value));
+            }}
+          >
+            <SelectTrigger id={sizeId} size="sm" className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZES.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {page.pageCount > 1 ? (
           <nav aria-label={`${label} pages`} className="flex flex-wrap items-center gap-1">
             <Button

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { orderSchema, orderAction, type Order } from '@/features/orders/api';
-import { parseBody, parseList, type HttpClient } from '@/lib/api';
+import { ApiError, parseBody, parseList, readAllPages, type HttpClient } from '@/lib/api';
 
 /*
  * The DCFP's two flows against the Go API (docs/modules/orders.md):
@@ -39,9 +39,66 @@ const stockoutReportSchema = z.object({
   /** The hotspot's message for the DCFP. */
   comment: text,
   created_at: z.string(),
+  status: z
+    .enum(['awaiting_supply', 'awaiting_acknowledgement', 'partly_received', 'fulfilled'])
+    .optional(),
 });
 
 export type StockoutReport = z.infer<typeof stockoutReportSchema>;
+
+const stockoutDetailSchema = stockoutReportSchema.extend({
+  deliveries: z.array(
+    z.object({
+      id: z.string(),
+      note: text,
+      created_at: z.string(),
+      lines: z.array(
+        z.object({
+          id: z.string(),
+          product: z.string(),
+          category: z.enum(['male', 'female']),
+          quantity: z.number(),
+          pieces: z.number(),
+          acknowledged_pieces: z.number().nullable(),
+          acknowledged_at: text,
+        }),
+      ),
+    }),
+  ),
+});
+
+export type StockoutDetail = z.infer<typeof stockoutDetailSchema>;
+
+export async function getStockout(
+  http: HttpClient,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StockoutDetail> {
+  return parseBody(
+    stockoutDetailSchema,
+    await http.get(`/orders/stockouts/${encodeURIComponent(id)}`, { signal }),
+    'stockout dispatch history',
+  );
+}
+
+export interface HotspotDeliveryInput {
+  lines: { condom_id: string; unit_of_measure_id: string; quantity: number }[];
+  client_reference: string;
+  note?: string;
+  expiry_exception_reason?: string;
+}
+
+export async function deliverStock(
+  http: HttpClient,
+  reportId: string,
+  input: HotspotDeliveryInput,
+): Promise<StockoutReport> {
+  return parseBody(
+    stockoutReportSchema,
+    await http.post(`/orders/stockouts/${encodeURIComponent(reportId)}/deliveries`, input),
+    'hotspot delivery',
+  );
+}
 
 export {
   getOrder,
@@ -57,13 +114,25 @@ export {
 
 /* Reads. */
 
-// shortcut: the 100 newest of each list; page with `offset` when a district has more.
 export async function listStockouts(
   http: HttpClient,
   signal?: AbortSignal,
 ): Promise<StockoutReport[]> {
-  const body = await http.get('/orders/stockouts?limit=100', { signal });
-  return parseList(stockoutReportSchema, body, 'stockout reports');
+  const { items, complete } = await readAllPages(
+    async (offset, limit) =>
+      parseList(
+        stockoutReportSchema,
+        await http.get(`/orders/stockouts?limit=${limit}&offset=${offset}`, { signal }),
+        'stockout reports',
+      ),
+    { pageSize: 100, maxPages: 100 },
+  );
+  if (!complete)
+    throw new ApiError({
+      kind: 'unexpected_response',
+      message: 'Too many stockout reports to load. Contact an administrator.',
+    });
+  return items;
 }
 
 /* Writes. */

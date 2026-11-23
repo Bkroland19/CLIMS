@@ -264,7 +264,6 @@ function transportOf(order: Order): { label: string; value: string }[] {
     .filter(Boolean)
     .join(' ');
   return [
-    { label: 'Waybill', value: order.waybill_number },
     { label: 'Vehicle', value: order.vehicle_registration },
     { label: 'Driver', value: driver || null },
   ].filter((row): row is { label: string; value: string } => row.value !== null);

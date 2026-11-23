@@ -8,8 +8,8 @@ import type { NewUserInput, User } from './api';
  * Mirrors the Go API's `AccountInput` and `CreateUserRequest` rules
  * (`backend/internal/features/users/dto.go`): username 3–50, email required
  * and at most 255, password 8–72 bytes, first and last name at most 20,
- * phone at most 15, and at least one role. A new user starts with exactly one
- * role; more can be added afterwards with Edit roles. The form also asks for
+ * phone at most 15, and at least one role. The forms require exactly one
+ * role when creating a user or editing their roles. The form also asks for
  * both names, as the design does, and checks the phone number is a Ugandan
  * mobile one (sent as `+256XXXXXXXXX`, 13 characters).
  */
@@ -25,10 +25,7 @@ const name = (noun: string) =>
     .min(1, `Enter a ${noun}.`)
     .max(NAME_MAX_LENGTH, `Use at most ${NAME_MAX_LENGTH} characters.`);
 
-const roleIds = z
-  .array(z.string())
-  .min(1, 'Choose at least one role.')
-  .max(100, 'Choose at most 100 roles.');
+const roleIds = z.array(z.string().min(1, 'Choose a role.')).length(1, 'Choose exactly one role.');
 
 export const newUserSchema = z.object({
   firstname: name('first name'),

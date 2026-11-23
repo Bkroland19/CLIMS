@@ -182,16 +182,18 @@ function VersionList({ hrefFor }: { hrefFor: VersionsViewProps['hrefFor'] }) {
         ),
       },
       { id: 'period', header: 'Period', value: (version) => version.period },
-      { id: 'scope', header: 'Scope', value: (version) => version.scope },
+      { id: 'scope', filter: 'select', header: 'Scope', value: (version) => version.scope },
       { id: 'approved_by', header: 'Approved by', value: (version) => version.approved_by },
       {
         id: 'created_at',
+        filter: 'date',
         header: 'Approved',
         value: (version) => version.created_at,
         cell: (version) => formatTimestamp(version.created_at),
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (version) => STATUS[version.status].label,
         cell: (version) => (

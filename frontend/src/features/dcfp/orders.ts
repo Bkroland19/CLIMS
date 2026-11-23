@@ -8,6 +8,9 @@ import type { Order, OrderStatus, StockoutReport, Warehouse } from './api';
 export const DCFP_PATHS = {
   dashboard: '/dcfp',
   stockouts: '/dcfp/stockouts',
+  dispatch: '/dcfp/stockouts/dispatch',
+  dispatchFor: (reportId: string) =>
+    `/dcfp/stockouts/dispatch?report=${encodeURIComponent(reportId)}`,
   orders: '/dcfp/restock',
   store: '/dcfp/restock/store',
   newOrder: '/dcfp/restock/new',
@@ -20,6 +23,16 @@ export const DCFP_PATHS = {
   hotspots: '/dcfp/hotspots',
   hotspot: (id: string) => `/dcfp/hotspots/${encodeURIComponent(id)}`,
 } as const;
+
+export const STOCKOUT_STATUS: Record<
+  NonNullable<StockoutReport['status']>,
+  { label: string; tone: StatusTone }
+> = {
+  awaiting_supply: { label: 'Awaiting supply', tone: 'negative' },
+  awaiting_acknowledgement: { label: 'Awaiting receipt', tone: 'info' },
+  partly_received: { label: 'Partly received', tone: 'caution' },
+  fulfilled: { label: 'Fulfilled', tone: 'positive' },
+};
 
 /** What each status means to the DCFP who placed the order. */
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: StatusTone }> = {

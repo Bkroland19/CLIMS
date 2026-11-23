@@ -118,6 +118,7 @@ export const MOVEMENT_REASONS = [
   'adjustment',
   'dispatch',
   'order_receipt',
+  'hotspot_delivery',
 ] as const;
 export type MovementReason = (typeof MOVEMENT_REASONS)[number];
 

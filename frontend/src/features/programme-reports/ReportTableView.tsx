@@ -111,13 +111,20 @@ export function ReportTableView({
       (table?.columns ?? []).map(({ key, header }) => ({
         id: key,
         header,
+        filter: /(_at|_date)$/.test(key)
+          ? 'date'
+          : ['status', 'category', 'source', 'district', 'unit', 'warehouse'].includes(key)
+            ? 'select'
+            : undefined,
         value: (row) => {
           const value = row[key] ?? null;
           return typeof value === 'number'
             ? value
             : value === null
               ? null
-              : displayCell(key, value);
+              : /(_at|_date)$/.test(key)
+                ? String(value)
+                : displayCell(key, value);
         },
         cell: (row) => displayCell(key, row[key] ?? null),
         numeric: table?.rows.some((row) => typeof row[key] === 'number') ?? false,

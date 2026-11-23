@@ -48,6 +48,7 @@ Add, edit, activate, deactivate and delete appear only for people holding `catal
 - **Active.** Inactive products cannot be ordered: `POST /orders` and `POST /orders/stockouts` answer 422 with `error.condom_id`. Stock movements and orders already in progress carry on. Deactivating a type, brand or unit does not change its products; it only stops it being newly chosen.
 - **References.** A product's type, brand and unit must exist and be active when chosen. One already on the product may stay after it is deactivated, so the full edit form still saves.
 - **In use.** A product is in use when an order, store stock row or stock movement references it, or a legacy `condom_inventories` or `hot_spot_stocks` row references its legacy ID. A type or brand is in use when any product uses it. A unit is in use when a product, order, store stock row, stock movement or legacy inventory row uses it. `DELETE` answers 409 for records in use; deactivate them instead.
+- **Condoms per unit.** Units named `Piece` or `Pieces` (ignoring case and surrounding spaces) represent one condom. Their count input is hidden in the web form; the API accepts an omitted count and stores `1`, including when changing from a packaged unit. An explicit count other than `1` is rejected. Strips, boxes and other packages still require a count so reports and hotspot deliveries can convert their quantities accurately.
 - **Partial updates.** `PATCH` changes only the fields sent. An empty body is a 400. Deactivating alone is always allowed; any other change, or activating, must leave a product complete.
 
 ## Legacy products
@@ -56,7 +57,7 @@ Migration 18 reshapes `condoms` in place, so references keep their UUIDs. It arc
 
 - Category and type are matched ignoring case (`Male`, `Free`, `Public`, `Commercial`, "Socially marketed", "Social marketing"); a recognised type is linked to the product type of that name, which is added back if it was renamed or deleted. Brand text becomes a row in `brands`. The legacy unit reference is matched by legacy ID.
 - A row whose category, type or brand cannot be recognised is deactivated.
-- A row without a unit or pack size stays active but is **incomplete**. Only rows with a `legacy_id` may be incomplete (`condoms_complete_check`); the API requires every field to create a product, to activate one, or to edit one.
+- A row without a unit or pack size stays active but is **incomplete**. Only rows with a `legacy_id` may be incomplete (`condoms_complete_check`); the API requires a complete product on creation, activation or editing, automatically setting the count to one for Piece/Pieces units.
 
 The web app marks incomplete products and offers **Complete details** instead of Activate.
 

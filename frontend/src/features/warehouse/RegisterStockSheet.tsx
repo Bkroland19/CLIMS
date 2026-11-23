@@ -198,6 +198,9 @@ export function RegisterStockSheet({
           <SheetTitle className="text-lg font-semibold">Register stock at {code}</SheetTitle>
           <SheetDescription>
             Enter each batch as printed on the cartons. All the batches are registered together.
+            {warehouse?.store_type === 'district'
+              ? ' For warehouse orders, use Receive warehouse delivery instead so stock is not counted twice.'
+              : null}
           </SheetDescription>
         </SheetHeader>
 

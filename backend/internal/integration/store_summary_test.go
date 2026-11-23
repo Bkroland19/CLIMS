@@ -68,6 +68,13 @@ func testStoreSummary(t *testing.T, pool *pgxpool.Pool,
 		t.Fatalf("the workflow dispatched and rejected orders today: %v", orders)
 	}
 	first := row(before)
+	districtStock := row(summary(district, admin))
+	warehouseReceipts := count(`SELECT coalesce(sum(quantity), 0) FROM inventory_movements
+		WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3
+		AND reason IN ('receipt', 'order_receipt') AND created_at >= $4`, district, product, unit, midnight)
+	if warehouseReceipts == 0 || districtStock["received"] != warehouseReceipts {
+		t.Fatalf("district receipts = %v, want %v including warehouse receipts", districtStock["received"], warehouseReceipts)
+	}
 	onHand := count(`SELECT on_hand FROM order_store_stock WHERE store_id = $1 AND condom_id = $2 AND unit_of_measure_id = $3`,
 		warehouse, product, unit)
 	if first["on_hand"] != onHand || first["dispatched"] == float64(0) {

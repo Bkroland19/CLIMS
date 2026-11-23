@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { parseBody, parseList, type HttpClient } from '@/lib/api';
 
 /*
- * District fulfilment as the MOH and warehouse screens and the district store page see it:
- * hotspot orders, warehouse requests, the district store, riders and the activity feed. The
- * DCFP's stockouts and warehouse orders use the Go API instead, through `@/features/dcfp`.
+ * Legacy fulfilment data for the remaining sample screens: hotspot orders, warehouse
+ * requests, riders and the activity feed. The DCFP's stockouts, warehouse orders and
+ * district inventory use the Go API through `@/features/dcfp` and `@/features/inventory`.
  *
  * NOT YET IN THE GO API. These paths and shapes are the contract the web
  * client is written against and the mock API (`dev/mock/fulfilment.mts`)

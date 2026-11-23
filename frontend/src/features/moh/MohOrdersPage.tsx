@@ -84,6 +84,7 @@ export default function MohOrdersPage() {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (order) => ORDER_STATUS[order.status].label,
         cell: (order) => (

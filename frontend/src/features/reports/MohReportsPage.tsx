@@ -142,6 +142,7 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
     () => [
       {
         id: 'unit',
+        filter: 'select',
         header: 'Reporting unit',
         value: (report) => report.unit.name,
         cell: (report) => (
@@ -162,6 +163,7 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
       },
       {
         id: 'level',
+        filter: 'select',
         header: 'Level',
         value: (report) => LEVEL_LABELS[report.level],
         cell: (report) => (
@@ -178,12 +180,14 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
       { id: 'reporter', header: 'Reported by', value: (report) => report.reporter },
       {
         id: 'sent',
+        filter: 'date',
         header: 'Sent',
         value: (report) => report.submitted_at ?? '',
         cell: (report) => formatTimestamp(report.submitted_at),
       },
       {
         id: 'validation',
+        filter: 'select',
         header: 'Validation',
         value: (report) => progressText(report),
         cell: (report) => (
@@ -194,6 +198,7 @@ function Submissions({ periods, period, type, status }: SubmissionsProps) {
       },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (report) => mohStatus(report).label,
         cell: (report) => {

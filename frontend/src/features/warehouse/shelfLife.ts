@@ -93,6 +93,7 @@ export function stockAttention(
   batches: readonly StockBatch[],
   products: readonly ProductSummary[],
   href: (path: string) => string,
+  stockPath: string = WAREHOUSE_PATHS.stock,
 ): TaskItem[] {
   const held = batches.filter((batch) => batch.on_hand > 0);
   const units = shelfLifeByUnit(held);
@@ -107,7 +108,7 @@ export function stockAttention(
       title: `Write off ${batchCount(expired.length)}`,
       detail: `${formatAmounts(bandAcrossUnits(units, 'expired').amounts)} past expiry can't be dispatched. Dispose of it, then write it off.`,
       action: 'See expired batches',
-      href: href(`${WAREHOUSE_PATHS.stock}?view=batches&band=expired`),
+      href: href(`${stockPath}?view=batches&band=expired`),
     });
   }
 
@@ -124,7 +125,7 @@ export function stockAttention(
         first.expiry_date ? ` on ${formatDate(first.expiry_date)}` : ''
       }. It leaves first, with a documented exception.`,
       action: 'See these batches',
-      href: href(`${WAREHOUSE_PATHS.stock}?view=batches&band=under_1_month`),
+      href: href(`${stockPath}?view=batches&band=under_1_month`),
     });
   }
 
@@ -136,7 +137,7 @@ export function stockAttention(
       title: `Record expiry dates for ${batchCount(undated.length)}`,
       detail: `${formatAmounts(bandAcrossUnits(units, 'unknown').amounts)} has no expiry date, so it can't be dispatched first-expiry-first-out. Count it and record its batches.`,
       action: 'See undated batches',
-      href: href(`${WAREHOUSE_PATHS.stock}?view=batches&band=unknown`),
+      href: href(`${stockPath}?view=batches&band=unknown`),
     });
   }
 
@@ -159,7 +160,7 @@ export function stockAttention(
         lowest.months,
       ).toLowerCase()} at the last 90 days' rate of dispatch.`,
       action: 'See products',
-      href: href(WAREHOUSE_PATHS.stock),
+      href: href(stockPath),
     });
   }
 

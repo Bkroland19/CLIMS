@@ -89,10 +89,10 @@ func (r *Repository) storeSummary(ctx context.Context, storeID string, p period,
 	}
 
 	rows, err := r.db.Query(ctx, `SELECT b.condom_id, `+productName+`, b.unit_of_measure_id, um.name, b.on_hand, b.reserved,
-			COALESCE(sum(m.quantity) FILTER (WHERE m.reason = 'receipt' AND `+inMovementPeriod+`), 0),
-			COALESCE(-sum(m.quantity) FILTER (WHERE m.reason = 'dispatch' AND `+inMovementPeriod+`), 0),
+			COALESCE(sum(m.quantity) FILTER (WHERE m.reason IN ('receipt', 'order_receipt') AND `+inMovementPeriod+`), 0),
+			COALESCE(-sum(m.quantity) FILTER (WHERE m.reason IN ('dispatch', 'hotspot_delivery') AND `+inMovementPeriod+`), 0),
 			COALESCE(-sum(m.quantity) FILTER (WHERE m.reason = 'adjustment' AND m.quantity < 0 AND `+inMovementPeriod+`), 0),
-			COALESCE(-sum(m.quantity) FILTER (WHERE m.reason = 'dispatch' AND m.created_at >= $4), 0)
+			COALESCE(-sum(m.quantity) FILTER (WHERE m.reason IN ('dispatch', 'hotspot_delivery') AND m.created_at >= $4), 0)
 		FROM order_store_stock b
 		JOIN condoms c ON c.id = b.condom_id
 		JOIN unit_of_measures um ON um.id = b.unit_of_measure_id

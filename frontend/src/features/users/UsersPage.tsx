@@ -151,16 +151,19 @@ export default function UsersPage() {
               {initialsOf(userDisplayName(user))}
             </div>
             <div className="min-w-0">
-              <button
+              <Button
+                data-print-text
+                variant="link"
+                size="sm"
                 type="button"
                 onClick={() => {
                   setProfileId(user.id);
                 }}
-                className="focus-visible:ring-ring block max-w-full truncate rounded-sm text-left font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+                className="text-foreground block h-auto max-w-full truncate rounded-sm p-0 text-left"
                 title={userDisplayName(user)}
               >
                 {userDisplayName(user)}
-              </button>
+              </Button>
               <p className="text-muted-foreground truncate text-xs" title={user.email ?? undefined}>
                 {user.email ?? user.username}
               </p>
@@ -170,6 +173,7 @@ export default function UsersPage() {
       },
       {
         id: 'roles',
+        filter: 'select',
         header: 'Roles',
         value: (user) => userRoleLabels(user).join(', '),
         cell: (user) => {
@@ -188,6 +192,7 @@ export default function UsersPage() {
       { id: 'phone', header: 'Phone', value: (user) => user.phone_number, hideable: true },
       {
         id: 'status',
+        filter: 'select',
         header: 'Status',
         value: (user) => userStatusLabel(user.status),
         cell: (user) => (
@@ -199,6 +204,7 @@ export default function UsersPage() {
       },
       {
         id: 'last-sign-in',
+        filter: 'date',
         header: 'Last sign-in',
         // ISO timestamps sort in time order as text; "never" sorts with the missing values.
         value: (user) => user.last_login_at,
@@ -221,6 +227,7 @@ export default function UsersPage() {
       },
       {
         id: 'created',
+        filter: 'date',
         header: 'Created',
         value: (user) => user.created_at,
         cell: (user) => formatDate(user.created_at),
