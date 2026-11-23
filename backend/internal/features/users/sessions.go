@@ -76,23 +76,29 @@ func (r *Repository) CreateSession(ctx context.Context, userID, userAgent, ip st
 	}
 	issued := IssuedSession{UserID: userID, RefreshToken: token}
 	err = pgx.BeginFunc(ctx, r.DB, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `INSERT INTO user_sessions (user_id, user_agent, ip_address, expires_at,
-				refresh_token_hash, last_user_agent, last_ip_address)
-			VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), CURRENT_TIMESTAMP + make_interval(secs => $4), $5,
-				NULLIF($2, ''), NULLIF($3, ''))
-			RETURNING id, expires_at`,
-			userID, userAgent, ip, SessionLifetime.Seconds(), hash).Scan(&issued.ID, &issued.ExpiresAt); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP, login_count = login_count + 1
-			WHERE id = $1`, userID); err != nil {
-			return err
-		}
-		return r.audit.Record(ctx, tx, audit.Entry{Action: "auth.login_succeeded", ActorID: userID,
-			SessionID: issued.ID, Target: &audit.Subject{Type: "user", ID: userID},
-			Related: []audit.Subject{{Type: "session", ID: issued.ID}}})
+		return r.insertSession(ctx, tx, &issued, hash, userAgent, ip)
 	})
 	return issued, err
+}
+
+// insertSession records the session for issued.UserID, counts the login on the account and audits it.
+// Password and portal (OIDC) sign-ins both start their sessions here.
+func (r *Repository) insertSession(ctx context.Context, tx pgx.Tx, issued *IssuedSession, hash []byte, userAgent, ip string) error {
+	if err := tx.QueryRow(ctx, `INSERT INTO user_sessions (user_id, user_agent, ip_address, expires_at,
+			refresh_token_hash, last_user_agent, last_ip_address)
+		VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), CURRENT_TIMESTAMP + make_interval(secs => $4), $5,
+			NULLIF($2, ''), NULLIF($3, ''))
+		RETURNING id, expires_at`,
+		issued.UserID, userAgent, ip, SessionLifetime.Seconds(), hash).Scan(&issued.ID, &issued.ExpiresAt); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP, login_count = login_count + 1
+		WHERE id = $1`, issued.UserID); err != nil {
+		return err
+	}
+	return r.audit.Record(ctx, tx, audit.Entry{Action: "auth.login_succeeded", ActorID: issued.UserID,
+		SessionID: issued.ID, Target: &audit.Subject{Type: "user", ID: issued.UserID},
+		Related: []audit.Subject{{Type: "session", ID: issued.ID}}})
 }
 
 // RefreshSession exchanges a refresh token for a new one on the same session. A token that was already
@@ -203,6 +209,12 @@ func (r *Repository) sessionActive(ctx context.Context, userID, sessionID string
 			WHERE s.id = live.id AND live.last_seen_at < CURRENT_TIMESTAMP - interval '1 minute')
 		SELECT EXISTS (SELECT FROM live)`, sessionID, userID).Scan(&active)
 	return active, err
+}
+
+// SessionActive reports whether the user's session is live: the same check every authenticated
+// request passes through ActiveUser.
+func (r *Repository) SessionActive(ctx context.Context, userID, sessionID string) (bool, error) {
+	return r.sessionActive(ctx, userID, sessionID)
 }
 
 // ListSessions returns the user's unexpired sessions, newest first, marking currentID.
