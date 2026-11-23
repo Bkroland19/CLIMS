@@ -75,17 +75,22 @@ func (r *Repository) CreateSession(ctx context.Context, userID, userAgent, ip st
 	}
 	issued := IssuedSession{UserID: userID, RefreshToken: token}
 	err = pgx.BeginFunc(ctx, r.DB, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `INSERT INTO user_sessions (user_id, user_agent, ip_address, expires_at, refresh_token_hash)
-			VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), CURRENT_TIMESTAMP + make_interval(secs => $4), $5)
-			RETURNING id, expires_at`,
-			userID, userAgent, ip, SessionLifetime.Seconds(), hash).Scan(&issued.ID, &issued.ExpiresAt); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP, login_count = login_count + 1
-			WHERE id = $1`, userID)
-		return err
+		return insertSession(ctx, tx, &issued, hash, userAgent, ip)
 	})
 	return issued, err
+}
+
+// insertSession records the session for issued.UserID and counts the login on the account.
+func insertSession(ctx context.Context, tx pgx.Tx, issued *IssuedSession, hash []byte, userAgent, ip string) error {
+	if err := tx.QueryRow(ctx, `INSERT INTO user_sessions (user_id, user_agent, ip_address, expires_at, refresh_token_hash)
+		VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), CURRENT_TIMESTAMP + make_interval(secs => $4), $5)
+		RETURNING id, expires_at`,
+		issued.UserID, userAgent, ip, SessionLifetime.Seconds(), hash).Scan(&issued.ID, &issued.ExpiresAt); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP, login_count = login_count + 1
+		WHERE id = $1`, issued.UserID)
+	return err
 }
 
 // RefreshSession exchanges a refresh token for a new one on the same session. A token that was already

@@ -69,7 +69,7 @@ When sign-in is refused, the callback redirects to
 
 | Reason        | Cause                                                                                                                              |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `denied`      | No `clims_access` role in the token, or the token was issued to another client                                                     |
+| `denied`      | No `clims_access` role in the token, the token was issued to another client, or access was removed after the token was issued      |
 | `unavailable` | No account link for this Keycloak user, or the linked account is disabled or has no role                                           |
 | `invalid`     | Missing or mismatched state, nonce or ID token. Usually a stale tab or a sign-in that was started somewhere other than the portal. |
 | `failed`      | Keycloak or the database could not be reached                                                                                      |
@@ -99,6 +99,14 @@ other checks gets 403.
 When portal access to CLIMS is removed, the dashboard removes `clims_access` in
 Keycloak, so new sign-ins are refused, and then calls `POST /sessions/revoke`,
 which ends existing sessions immediately.
+
+The revoke also records its time on the account (`users.sessions_revoked_at`).
+The portal callback creates its session under the same account lock and refuses
+an ID token whose `iat` is at or before that time, with `sso_error=denied`. A
+sign-in that was already in progress when access was removed therefore cannot
+leave a live session behind. This relies on the Keycloak and database clocks
+agreeing (NTP); because `iat` has whole seconds, a sign-in in the same second as
+a revoke is refused rather than allowed.
 
 ### Test session probe
 

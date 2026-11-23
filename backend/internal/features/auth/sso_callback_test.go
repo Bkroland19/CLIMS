@@ -165,3 +165,65 @@ func TestPortalSignInRequirements(t *testing.T) {
 		}
 	})
 }
+
+// TestSignInStraddlingRevokeLeavesNoSession: a callback holding an ID token issued before the revoke
+// must not leave a live session, even when the revoke lands between the account lookup and creating
+// the session. Removing access ends sessions immediately, including this one.
+func TestSignInStraddlingRevokeLeavesNoSession(t *testing.T) {
+	h := newSyncHarness(t, true)
+	const origin = "https://clims.example.org"
+	accountID := uuid.NewString()
+	h.repo.add(accountID, "active", "DCFP")
+	h.repo.links["portal-user"] = accountID
+	sso, err := NewSSO(context.Background(), h.idp.issuer, "clims", "client-secret", origin, syncSecret, h.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sso.Register(h.app)
+	h.idp.subject, h.idp.roles, h.idp.redirect = "portal-user", []string{accessRole}, origin+ssoPath+"/callback"
+	// The ID token was issued a moment before the dashboard removed access and revoked.
+	h.idp.editIDToken = func(c jwt.MapClaims) { c["iat"] = time.Now().Add(-2 * time.Second).Unix() }
+
+	revoked := false
+	h.repo.afterFind = func() {
+		if !revoked {
+			revoked = true
+			h.do("POST", "/sessions/revoke", h.token, h.identity("portal-user"), 204)
+		}
+	}
+	start, err := h.app.Test(httptest.NewRequest("GET", origin+ssoPath+"/start", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	loc, err := start.Location()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.idp.nonce, h.idp.challenge = loc.Query().Get("nonce"), loc.Query().Get("code_challenge")
+	req := httptest.NewRequest("GET", origin+ssoPath+"/callback?code=c&state="+url.QueryEscape(loc.Query().Get("state")), nil)
+	for _, c := range start.Cookies() {
+		if c.Name == flowCookie {
+			req.AddCookie(c)
+		}
+	}
+	res, err := h.app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !revoked {
+		t.Fatal("the revoke did not run during the callback")
+	}
+	for _, c := range res.Cookies() {
+		if c.Name == handoffCookie && c.Value != "" {
+			t.Error("the callback handed off a session after the revoke")
+		}
+	}
+	for id, s := range h.repo.sessions {
+		if s.userID == accountID && !s.revoked {
+			t.Errorf("session %s is live after the revoke", id)
+		}
+	}
+	if got := res.Header.Get("Location"); got != origin+"/sign-in?sso_error=denied" {
+		t.Errorf("redirected to %q, want the denied refusal", got)
+	}
+}

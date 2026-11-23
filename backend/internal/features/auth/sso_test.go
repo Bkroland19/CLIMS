@@ -36,7 +36,11 @@ func (f *ssoFixture) FindByOIDCIdentity(_ context.Context, _, subject string) (*
 	return f.user, nil
 }
 
-func (f *ssoFixture) CreateSession(_ context.Context, userID, _, _ string) (users.IssuedSession, error) {
+func (f *ssoFixture) CreateOIDCSession(_ context.Context, _, subject string, _ *time.Time, _, _ string) (users.IssuedSession, error) {
+	if subject != f.subject || !signInEligible(f.user) {
+		return users.IssuedSession{}, users.ErrIdentityAccountIneligible
+	}
+	userID := f.user.ID
 	token := newFlowValue()
 	f.sessions[token] = userID
 	return users.IssuedSession{ID: "session-1", UserID: userID, RefreshToken: token, ExpiresAt: time.Now().Add(time.Hour)}, nil

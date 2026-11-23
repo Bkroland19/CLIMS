@@ -134,11 +134,17 @@ type fakeAccounts struct {
 	users    map[string]*users.User // by ID
 	links    map[string]string      // subject -> user ID, for the configured issuer
 	sessions map[string]*fakeSession
-	failList bool
+	// revokedAt is when identity sync last revoked each account's sessions, by user ID.
+	revokedAt map[string]time.Time
+	failList  bool
+	// afterFind, when set, runs after FindByOIDCIdentity returns, outside the lock: a test uses it to
+	// revoke while a sign-in is between the account lookup and creating its session.
+	afterFind func()
 }
 
 func newFakeAccounts() *fakeAccounts {
-	return &fakeAccounts{users: map[string]*users.User{}, links: map[string]string{}, sessions: map[string]*fakeSession{}}
+	return &fakeAccounts{users: map[string]*users.User{}, links: map[string]string{}, sessions: map[string]*fakeSession{},
+		revokedAt: map[string]time.Time{}}
 }
 
 func (f *fakeAccounts) add(id, status string, roles ...string) *users.User {
@@ -208,6 +214,9 @@ func (f *fakeAccounts) RevokeOIDCSessions(_ context.Context, _, subject string) 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var n int64
+	if userID, ok := f.links[subject]; ok {
+		f.revokedAt[userID] = time.Now()
+	}
 	for _, s := range f.sessions {
 		if userID, ok := f.links[subject]; ok && s.userID == userID && !s.revoked {
 			s.revoked = true
@@ -218,6 +227,9 @@ func (f *fakeAccounts) RevokeOIDCSessions(_ context.Context, _, subject string) 
 }
 
 func (f *fakeAccounts) FindByOIDCIdentity(_ context.Context, _, subject string) (*users.User, error) {
+	if f.afterFind != nil {
+		defer f.afterFind()
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if id, ok := f.links[subject]; ok {
@@ -226,9 +238,22 @@ func (f *fakeAccounts) FindByOIDCIdentity(_ context.Context, _, subject string) 
 	return nil, pgx.ErrNoRows
 }
 
-func (f *fakeAccounts) CreateSession(_ context.Context, userID, _, _ string) (users.IssuedSession, error) {
+// CreateOIDCSession models the repository: the linked account must be eligible, and a token issued at
+// or before the account's last revoke is refused.
+func (f *fakeAccounts) CreateOIDCSession(_ context.Context, _, subject string, issuedAt *time.Time, _, _ string) (users.IssuedSession, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	userID, ok := f.links[subject]
+	if !ok || !f.eligible(f.users[userID]) {
+		return users.IssuedSession{}, users.ErrIdentityAccountIneligible
+	}
+	at := time.Now()
+	if issuedAt != nil {
+		at = *issuedAt
+	}
+	if revoked, ok := f.revokedAt[userID]; ok && !revoked.Before(at) {
+		return users.IssuedSession{}, users.ErrSignInRevoked
+	}
 	id, refresh := uuid.NewString(), newFlowValue()
 	f.sessions[id] = &fakeSession{userID: userID, refresh: refresh}
 	return users.IssuedSession{ID: id, UserID: userID, RefreshToken: refresh, ExpiresAt: time.Now().Add(time.Hour)}, nil

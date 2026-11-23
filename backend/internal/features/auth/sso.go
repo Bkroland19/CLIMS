@@ -38,7 +38,7 @@ const (
 
 type ssoAccounts interface {
 	FindByOIDCIdentity(context.Context, string, string) (*users.User, error)
-	CreateSession(ctx context.Context, userID, userAgent, ip string) (users.IssuedSession, error)
+	CreateOIDCSession(ctx context.Context, issuer, subject string, issuedAt *time.Time, userAgent, ip string) (users.IssuedSession, error)
 	RefreshSession(context.Context, string) (users.IssuedSession, error)
 	GetUserByID(context.Context, string) (*users.User, error)
 }
@@ -163,8 +163,16 @@ func (s *SSO) callback(c fiber.Ctx) error {
 	if !signInEligible(user) {
 		return s.fail(c, "unavailable")
 	}
-	session, err := s.accounts.CreateSession(ctx, user.ID, c.Get(fiber.HeaderUserAgent), c.IP())
-	if err != nil {
+	// Re-checks the link and eligibility under the account lock, and refuses a token issued at or
+	// before the account's last identity-sync revoke, so a sign-in that straddles the revoke does not
+	// leave a live session.
+	session, err := s.accounts.CreateOIDCSession(ctx, s.issuer, id.Subject, &id.IssuedAt, c.Get(fiber.HeaderUserAgent), c.IP())
+	switch {
+	case errors.Is(err, users.ErrSignInRevoked):
+		return s.fail(c, "denied")
+	case errors.Is(err, users.ErrIdentityAccountIneligible):
+		return s.fail(c, "unavailable")
+	case err != nil:
 		return s.fail(c, "failed")
 	}
 	s.cookie(c, handoffCookie, session.RefreshToken, ssoPath+"/exchange", handoffLifetime)

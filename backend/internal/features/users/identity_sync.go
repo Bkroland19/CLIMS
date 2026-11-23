@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,6 +13,9 @@ import (
 var (
 	ErrIdentityAccountIneligible = errors.New("CLIMS account is missing or ineligible")
 	ErrIdentityLinkConflict      = errors.New("CLIMS identity link conflicts with an existing link")
+	// ErrSignInRevoked refuses a portal sign-in whose ID token was issued at or before the account's
+	// last identity-sync revoke.
+	ErrSignInRevoked = errors.New("CLIMS sessions were revoked after this sign-in began")
 )
 
 // IdentitySyncAccount is an eligible account and, when it has one, the subject linked for the
@@ -91,10 +95,65 @@ func (r *Repository) LinkOIDCIdentity(ctx context.Context, id uuid.UUID, issuer,
 // RevokeOIDCSessions ends every session of the account linked to issuer and subject, which also
 // invalidates their refresh tokens. The link and the account's roles stay. It reports how many
 // sessions ended; an unlinked identity ends none and is not an error.
+//
+// In the same transaction it records the revocation time on the account, holding the account's row
+// lock. CreateOIDCSession takes the same lock and refuses an ID token issued at or before that time,
+// so a portal sign-in that straddles the revoke cannot leave a live session: either its session
+// exists before the revoke and is ended here, or it sees the revocation and is refused.
 func (r *Repository) RevokeOIDCSessions(ctx context.Context, issuer, subject string) (int64, error) {
-	tag, err := r.DB.Exec(ctx, `UPDATE user_sessions s SET revoked_at = CURRENT_TIMESTAMP
-		FROM user_oidc_identities identity
-		WHERE identity.issuer = $1 AND identity.subject = $2 AND s.user_id = identity.user_id
-			AND s.revoked_at IS NULL`, issuer, subject)
-	return tag.RowsAffected(), err
+	var ended int64
+	err := pgx.BeginTxFunc(ctx, r.DB, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, func(tx pgx.Tx) error {
+		// clock_timestamp() is read after the row lock is held, not when the transaction began.
+		if _, err := tx.Exec(ctx, `UPDATE users u SET sessions_revoked_at = clock_timestamp()
+			FROM user_oidc_identities identity
+			WHERE identity.issuer = $1 AND identity.subject = $2 AND u.id = identity.user_id`, issuer, subject); err != nil {
+			return err
+		}
+		// A new statement sees sessions committed by a sign-in that held the lock before this revoke.
+		tag, err := tx.Exec(ctx, `UPDATE user_sessions s SET revoked_at = CURRENT_TIMESTAMP
+			FROM user_oidc_identities identity
+			WHERE identity.issuer = $1 AND identity.subject = $2 AND s.user_id = identity.user_id
+				AND s.revoked_at IS NULL`, issuer, subject)
+		ended = tag.RowsAffected()
+		return err
+	})
+	return ended, err
+}
+
+// CreateOIDCSession starts a session for the eligible account linked to issuer and subject, as the
+// portal callback does after a verified sign-in. issuedAt is the ID token's iat. When the account's
+// sessions were revoked at or after issuedAt it returns ErrSignInRevoked and creates nothing. A nil
+// issuedAt means now, for the identity-sync test probe, which has no ID token. A missing link or an
+// ineligible account returns ErrIdentityAccountIneligible.
+//
+// The check and the insert run under the account's row lock, the lock RevokeOIDCSessions takes, so
+// they cannot interleave with a revoke. The comparison relies on Keycloak's and PostgreSQL's clocks
+// agreeing (NTP); iat has whole seconds, which errs towards refusing.
+func (r *Repository) CreateOIDCSession(ctx context.Context, issuer, subject string, issuedAt *time.Time, userAgent, ip string) (IssuedSession, error) {
+	token, hash, err := newRefreshToken()
+	if err != nil {
+		return IssuedSession{}, err
+	}
+	issued := IssuedSession{RefreshToken: token}
+	err = pgx.BeginTxFunc(ctx, r.DB, pgx.TxOptions{IsoLevel: pgx.ReadCommitted}, func(tx pgx.Tx) error {
+		var revoked bool
+		err := tx.QueryRow(ctx, `SELECT u.id::text,
+				u.sessions_revoked_at IS NOT NULL AND u.sessions_revoked_at >= COALESCE($3::timestamptz, clock_timestamp())
+			FROM users u JOIN user_oidc_identities identity ON identity.user_id = u.id
+			WHERE identity.issuer = $1 AND identity.subject = $2 AND `+identitySyncEligible+`
+			FOR UPDATE OF u`, issuer, subject, issuedAt).Scan(&issued.UserID, &revoked)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return ErrIdentityAccountIneligible
+		case err != nil:
+			return err
+		case revoked:
+			return ErrSignInRevoked
+		}
+		return insertSession(ctx, tx, &issued, hash, userAgent, ip)
+	})
+	if err != nil {
+		return IssuedSession{}, err
+	}
+	return issued, nil
 }

@@ -42,7 +42,7 @@ type IdentitySyncAccounts interface {
 
 	// The test session probe uses these to start and inspect real CLIMS sessions.
 	FindByOIDCIdentity(ctx context.Context, issuer, subject string) (*users.User, error)
-	CreateSession(ctx context.Context, userID, userAgent, ip string) (users.IssuedSession, error)
+	CreateOIDCSession(ctx context.Context, issuer, subject string, issuedAt *time.Time, userAgent, ip string) (users.IssuedSession, error)
 	GetUserByID(ctx context.Context, id string) (*users.User, error)
 	SessionActive(ctx context.Context, userID, sessionID string) (bool, error)
 }
@@ -270,8 +270,12 @@ func (s *identitySync) probeCreate(c fiber.Ctx) error {
 	case !signInEligible(user):
 		return syncError(c, fiber.StatusNotFound, "account_ineligible")
 	}
-	session, err := s.repo.CreateSession(c.Context(), user.ID, "identity-sync test probe", c.IP())
-	if err != nil {
+	// The callback's own session path, with "now" in place of an ID token's iat.
+	session, err := s.repo.CreateOIDCSession(c.Context(), s.cfg.Issuer, body.Subject, nil, "identity-sync test probe", c.IP())
+	switch {
+	case errors.Is(err, users.ErrIdentityAccountIneligible), errors.Is(err, users.ErrSignInRevoked):
+		return syncError(c, fiber.StatusNotFound, "account_ineligible")
+	case err != nil:
 		return syncError(c, fiber.StatusServiceUnavailable, "unavailable")
 	}
 	tokens, err := signTokens(s.cfg.JWTSecret, session)

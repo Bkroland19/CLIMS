@@ -140,6 +140,105 @@ func TestIdentitySyncRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("a sign-in that straddles a revoke creates no session", func(t *testing.T) {
+		const subject = "subject-straddle"
+		account := newUser("idsync-straddle", roleID)
+		if err := repo.LinkOIDCIdentity(ctx, uuid.MustParse(account), issuer, subject); err != nil {
+			t.Fatal(err)
+		}
+		live := func() int {
+			t.Helper()
+			var n int
+			if err := pool.QueryRow(ctx, `SELECT count(*) FROM user_sessions WHERE user_id = $1 AND revoked_at IS NULL`,
+				account).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+		// An ID token's iat has whole seconds; this one was issued before the revoke.
+		issued := time.Unix(time.Now().Unix(), 0)
+		if _, err := repo.FindByOIDCIdentity(ctx, issuer, subject); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.RevokeOIDCSessions(ctx, issuer, subject); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.CreateOIDCSession(ctx, issuer, subject, &issued, "ua", ""); !errors.Is(err, users.ErrSignInRevoked) {
+			t.Fatalf("sign-in with a token issued before the revoke: %v", err)
+		}
+		if n := live(); n != 0 {
+			t.Fatalf("%d live sessions after a refused sign-in", n)
+		}
+
+		// A revoke that is in flight when the sign-in takes the account lock still wins: the sign-in
+		// waits for it and then sees the revocation.
+		issued = time.Unix(time.Now().Unix()+2, 0) // newer than the revoke above
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = tx.Exec(ctx, `UPDATE users SET sessions_revoked_at = clock_timestamp() + interval '5 seconds'
+			WHERE id = $1`, account); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() {
+			_, err := repo.CreateOIDCSession(ctx, issuer, subject, &issued, "ua", "")
+			done <- err
+		}()
+		select {
+		case err := <-done:
+			t.Fatalf("sign-in did not wait for the in-flight revoke: %v", err)
+		case <-time.After(300 * time.Millisecond):
+		}
+		if err = tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := <-done; !errors.Is(err, users.ErrSignInRevoked) {
+			t.Fatalf("sign-in racing a revoke: %v", err)
+		}
+		if n := live(); n != 0 {
+			t.Fatalf("%d live sessions after the racing sign-in", n)
+		}
+
+		// A token issued after the last revoke signs in, and so does the probe (no token, "now").
+		if _, err := pool.Exec(ctx, `UPDATE users SET sessions_revoked_at = clock_timestamp() - interval '1 minute'
+			WHERE id = $1`, account); err != nil {
+			t.Fatal(err)
+		}
+		issued = time.Unix(time.Now().Unix(), 0)
+		session, err := repo.CreateOIDCSession(ctx, issuer, subject, &issued, "ua", "")
+		if err != nil || session.UserID != account || session.RefreshToken == "" {
+			t.Fatalf("sign-in after the revoke: %+v %v", session, err)
+		}
+		if _, err := repo.CreateOIDCSession(ctx, issuer, subject, nil, "probe", ""); err != nil {
+			t.Fatalf("probe session: %v", err)
+		}
+		if n := live(); n != 2 {
+			t.Fatalf("%d live sessions, want 2", n)
+		}
+		// The marker is per account: another account's sign-in is unaffected, and an unlinked or
+		// ineligible identity is refused as ineligible.
+		if _, err := repo.CreateOIDCSession(ctx, issuer, "subject-bystander", &issued, "ua", ""); err != nil {
+			t.Fatalf("bystander sign-in: %v", err)
+		}
+		disabled := newUser("idsync-straddle-disabled", roleID)
+		if err := repo.LinkOIDCIdentity(ctx, uuid.MustParse(disabled), issuer, "subject-disabled"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE users SET status = 'inactive' WHERE id = $1`, disabled); err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range []string{"never-linked", "subject-disabled"} {
+			if _, err := repo.CreateOIDCSession(ctx, issuer, s, &issued, "ua", ""); !errors.Is(err, users.ErrIdentityAccountIneligible) {
+				t.Fatalf("sign-in for %q: %v", s, err)
+			}
+		}
+		if _, err := repo.CreateOIDCSession(ctx, otherIssuer, subject, &issued, "ua", ""); !errors.Is(err, users.ErrIdentityAccountIneligible) {
+			t.Fatalf("sign-in for another issuer: %v", err)
+		}
+	})
+
 	t.Run("revoke ends every session of the linked account at once", func(t *testing.T) {
 		app := fiber.New()
 		app.Get("/me", middleware.NewJWTMiddleware("test-secret"), users.ActiveUser(repo), func(c fiber.Ctx) error {
