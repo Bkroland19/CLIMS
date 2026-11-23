@@ -80,11 +80,11 @@ describe('AuditLogPage', () => {
 
     expect(await screen.findByText('Order ORD-1042')).toBeInTheDocument();
     expect(screen.getByText('User Grace Nakato')).toBeInTheDocument();
-    expect(screen.getByText('2 entries')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1–2 of 2')).toBeInTheDocument();
     expect(screen.getByText('Sample data')).toBeInTheDocument();
     expect(requests[0]?.url).toBe('/audit-log');
 
-    await user.click(screen.getByText('Order ORD-1042'));
+    await user.click(screen.getByRole('button', { name: 'Show what changed on order ORD-1042' }));
     const changes = screen.getByRole('table', { name: 'What changed on order ORD-1042' });
     expect(within(changes).getByText('confirmed')).toBeInTheDocument();
   });

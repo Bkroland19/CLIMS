@@ -1,15 +1,19 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 
 import {
   getStoreSummary,
   listMovements,
+  MOVEMENTS_PAGE_SIZE,
   recordMovement,
   recordReceipt,
+  type Movement,
   type MovementInput,
+  type MovementReason,
   type ReceiptInput,
 } from '@/features/inventory/api';
-import { useApiQuery, useHttp } from '@/lib/api';
+import { useApiQuery, useHttp, type ApiError } from '@/lib/api';
 
 import { warehouseOrderKeys } from './orderQueries';
 
@@ -50,6 +54,61 @@ export function useStoreMovements(
     (http, signal) => listMovements(http, { storeId, limit: 100 }, signal),
     { enabled: (options.enabled ?? true) && storeId !== undefined },
   );
+}
+
+/**
+ * The store's whole ledger, newest first, a page of 100 at a time: `loadMore` fetches the next
+ * page, and `hasMore` says whether the API holds older entries. A warehouse records thousands of
+ * movements a year, so the list never pretends the first page is all of them. `reason` narrows it
+ * on the server, so finding the adjustments among thousands of dispatches needs no paging.
+ */
+export function useMovementLedger(
+  storeId: string | undefined,
+  reason: MovementReason | null,
+  options: { enabled?: boolean } = {},
+) {
+  const http = useHttp();
+  // `http` is the one client for the provider's lifetime, so it is not part of the key.
+  // eslint-disable-next-line @tanstack/query/exhaustive-deps
+  const query = useInfiniteQuery<Movement[], ApiError>({
+    queryKey: [...warehouseStockKeys.movements(storeId ?? ''), 'ledger', reason ?? 'all'],
+    queryFn: ({ pageParam, signal }) =>
+      listMovements(
+        http,
+        {
+          storeId,
+          reason: reason ?? undefined,
+          limit: MOVEMENTS_PAGE_SIZE,
+          offset: Number(pageParam),
+        },
+        signal,
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) =>
+      last.length < MOVEMENTS_PAGE_SIZE ? undefined : pages.length * MOVEMENTS_PAGE_SIZE,
+    enabled: (options.enabled ?? true) && storeId !== undefined,
+  });
+  const { data } = query;
+  const rows = useMemo(() => {
+    if (!data) return undefined;
+    // Entries recorded while paging shift the offsets, so a page can repeat the last one's tail.
+    const seen = new Set<string>();
+    return data.pages.flat().filter((movement) => {
+      if (seen.has(movement.id)) return false;
+      seen.add(movement.id);
+      return true;
+    });
+  }, [data]);
+  return {
+    rows,
+    isPending: query.isPending,
+    error: query.error,
+    refetch: query.refetch,
+    isRefetching: query.isRefetching && !query.isFetchingNextPage,
+    hasMore: query.hasNextPage,
+    isLoadingMore: query.isFetchingNextPage,
+    loadMore: () => void query.fetchNextPage(),
+  };
 }
 
 async function refetchStock(queryClient: ReturnType<typeof useQueryClient>) {

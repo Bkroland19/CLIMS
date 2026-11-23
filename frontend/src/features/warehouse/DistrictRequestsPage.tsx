@@ -130,6 +130,7 @@ export default function DistrictRequestsPage() {
       />
       <DataTable
         label={`District orders at ${code}`}
+        preferencesKey="warehouse-district-orders"
         columns={columns}
         rows={rows}
         getRowId={(order) => order.id}

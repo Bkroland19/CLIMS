@@ -5,8 +5,9 @@
  *
  * - `GET /inventory/stock?store_id=&condom_id=`: balances, with reserved and available.
  * - `GET /inventory/batches?store_id=&condom_id=`: batches with stock, first expiry first out.
- * - `GET /inventory/movements?store_id=` and `POST /inventory/movements`: the ledger, and a
- *   delivery (`receipt`) into a batch or an `adjustment` of one, with a note.
+ * - `GET /inventory/movements?store_id=&reason=&limit=&offset=` and `POST /inventory/movements`:
+ *   the ledger, newest first and paged like the API (at most 100 at a time), and a delivery
+ *   (`receipt`) into a batch or an `adjustment` of one, with a note.
  * - `POST /inventory/receipts`: a whole delivery, every batch or none.
  * - `GET /inventory/store-summary?store_id=&from=&to=`: one store at a glance, its orders read
  *   from the order mock (`dcfp.mts`) through the router.
@@ -14,6 +15,10 @@
  * The order mock (`dcfp.mts`) reserves, dispatches and receives through the functions exported
  * here, so a dispatch takes stock from the warehouse's batches and the district's receipt adds
  * it to batches there. Dates are relative to today, so the shelf-life bands stay meaningful.
+ *
+ * `MOCK_DATA=scale` adds a warehouse's worth of volume at NMS on top of the demo: about 250
+ * products in three units, around a thousand batches across every shelf-life band, and a year of
+ * movements, so the stock screens can be checked at the size a national store reaches.
  */
 import { mockProductId, mockUnitId } from './admin.mts';
 import { MOCK_STORES, mockDistrictStoreId } from './hotspots.mts';
@@ -156,6 +161,7 @@ export function seedInventory(dataset: string): void {
     );
     entry.on_hand_after = running.get(key) ?? b.on_hand;
   }
+  if (dataset === 'scale') seedVolume();
   if (dataset === 'worst') {
     state.batches.push(
       batch(
@@ -169,6 +175,107 @@ export function seedInventory(dataset: string): void {
       ),
     );
   }
+}
+
+/** A repeatable sequence of numbers in [0, 1), so the volume data is the same on every start. */
+function sequence(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 1_664_525 + 1_013_904_223) % 4_294_967_296;
+    return state / 4_294_967_296;
+  };
+}
+
+const VOLUME_BRANDS = ['Engabu', 'Lifeguard', 'Protector', 'Trust', 'Panther', 'Kinga', 'Salama'];
+const VOLUME_KINDS = ['Free', 'Studded', 'Ribbed', 'Ultra thin', 'Large', 'Flavoured'];
+
+/** NMS at national scale: many products, about a thousand batches, a year of movements. */
+function seedVolume(): void {
+  const random = sequence(20_261_123);
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)] as T;
+  // Every band, weighted the way a real store's shelf looks: mostly healthy, some at risk.
+  const expiries = [
+    () => day(-Math.ceil(random() * 90)),
+    () => day(Math.ceil(random() * 28)),
+    () => day(30 + Math.ceil(random() * 55)),
+    () => day(92 + Math.ceil(random() * 85)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => day(185 + Math.ceil(random() * 900)),
+    () => null,
+  ];
+  let n = 1000;
+  for (let product = 0; product < 250; product += 1) {
+    const index = 1000 + product;
+    const category = product % 3 === 2 ? 'female' : 'male';
+    PRODUCTS[mockProductId(index)] = {
+      name: `${VOLUME_BRANDS[product % VOLUME_BRANDS.length] ?? 'Engabu'} ${
+        VOLUME_KINDS[Math.floor(product / VOLUME_BRANDS.length) % VOLUME_KINDS.length] ?? 'Free'
+      } ${category === 'female' ? 'Female' : 'Male'} ${String(product + 1).padStart(3, '0')}`,
+      category,
+    };
+    const unit = 1 + (product % 3);
+    const size = unit === 1 ? 5_000 : unit === 2 ? 400 : 20;
+    const batches = 1 + Math.floor(random() * 7);
+    for (let k = 0; k < batches; k += 1) {
+      n += 1;
+      const expiry = pick(expiries)();
+      const quantity = Math.ceil(random() * 40) * size;
+      const held = batch(
+        n,
+        NMS,
+        index,
+        unit,
+        expiry === null && random() < 0.5
+          ? null
+          : `V${String(index)}-${String(k + 1).padStart(2, '0')}`,
+        expiry,
+        quantity,
+      );
+      held.created_at = new Date(Date.now() - Math.ceil(random() * 360) * DAY).toISOString();
+      state.batches.push(held);
+      log(
+        NMS,
+        held.condom_id,
+        held.unit_of_measure_id,
+        'receipt',
+        quantity,
+        {
+          note: 'Delivery from the supplier',
+          batch: held,
+        },
+        held.created_at,
+      );
+      // Some of each batch has already gone out to districts.
+      const dispatches = Math.floor(random() * 3);
+      for (let d = 0; d < dispatches; d += 1) {
+        // Never in the future: a batch registered last week has had at most a week of dispatches.
+        const at = new Date(
+          Math.min(
+            new Date(held.created_at).getTime() + Math.ceil(random() * 20) * DAY,
+            Date.now() - (d + 1) * 3_600_000,
+          ),
+        ).toISOString();
+        const out = Math.min(size * Math.ceil(random() * 4), held.on_hand - size);
+        if (out <= 0) continue;
+        held.on_hand -= out;
+        log(
+          NMS,
+          held.condom_id,
+          held.unit_of_measure_id,
+          'dispatch',
+          -out,
+          {
+            note: 'Dispatched to a district store',
+            batch: held,
+          },
+          at,
+        );
+      }
+    }
+  }
+  state.movements.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 function onHandOf(storeId: string, condomId: string, unitId: string): number {
@@ -660,11 +767,13 @@ export function handleInventory(
     if (method === 'POST') return record(body);
     if (method === 'GET') {
       const storeId = query.get('store_id');
+      const reason = query.get('reason');
       const limit = Math.min(Number(query.get('limit') ?? 50) || 50, 100);
+      const offset = Math.max(Number(query.get('offset') ?? 0) || 0, 0);
       return ok(
         state.movements
-          .filter((m) => !storeId || m.store_id === storeId)
-          .slice(0, limit)
+          .filter((m) => (!storeId || m.store_id === storeId) && (!reason || m.reason === reason))
+          .slice(offset, offset + limit)
           .map(presentMovement),
       );
     }

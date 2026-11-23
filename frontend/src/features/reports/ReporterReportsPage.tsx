@@ -153,6 +153,7 @@ export default function ReporterReportsPage({
       <MonthCard report={selected} href={linkTo(REPORT_PATHS.report(workspace, selected.id))} />
       <DataTable
         label="Report history"
+        preferencesKey="report-history"
         columns={columns}
         rows={reports.data}
         getRowId={(report) => report.id}

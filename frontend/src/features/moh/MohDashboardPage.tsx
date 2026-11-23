@@ -313,6 +313,7 @@ function DistrictStores({ district }: { district: string | null }) {
       <CardContent>
         <DataTable
           label="District stores"
+          preferencesKey="moh-district-stores"
           columns={columns}
           rows={
             district

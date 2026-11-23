@@ -187,8 +187,11 @@ describe('Warehouse stock', () => {
     });
   }
 
+  /** A headline figure, found by its label among the figures (the shelf-life legend repeats some). */
   const card = (label: string | RegExp) =>
-    screen.getByText(label, { selector: 'span' }).closest('a') as HTMLElement;
+    within(screen.getByRole('region', { name: /stock at a glance/ }))
+      .getByText(label, { selector: 'span' })
+      .closest('a') as HTMLElement;
 
   it('shows what is held, what went out and what is waiting, each figure linking to its list', async () => {
     renderStock('/warehouse/stock?store=NMS');
@@ -214,6 +217,86 @@ describe('Warehouse stock', () => {
     // 570 free over 100 a month dispatched in the last 90 days.
     expect(row).toHaveTextContent('570');
     expect(row).toHaveTextContent('5.7 months');
+  });
+
+  it('opens a product to show its batches, first expiry first', async () => {
+    const user = userEvent.setup();
+    renderStock('/warehouse/stock?store=NMS');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Show batches of Engabu Free Female, box' }),
+    );
+
+    const own = screen.getByRole('table', { name: 'Batches of Engabu Free Female, box' });
+    const numbers = within(own)
+      .getAllByRole('row')
+      .slice(1, -1)
+      .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+    expect(numbers).toEqual([
+      'FC2-2311-090',
+      'FC2-2405-002',
+      'FC2-2502-118',
+      'No batch numberCount it and record its batches',
+    ]);
+    expect(within(own).getAllByRole('row').at(-1)).toHaveTextContent('910 box');
+  });
+
+  it('shows the shelf life of everything held and what needs doing about it', async () => {
+    renderStock('/warehouse/stock?store=NMS');
+
+    const bands = await screen.findByRole('list', { name: 'Shelf-life bands' });
+    expect(within(bands).getByRole('link', { name: /Expired40 box · 1 batch/ })).toHaveAttribute(
+      'href',
+      '/warehouse/stock?view=batches&band=expired&store=NMS',
+    );
+    expect(within(bands).queryByRole('link', { name: /Under 3 months/ })).not.toBeInTheDocument();
+
+    const tasks = await screen.findByRole('list', { name: 'Needs attention at NMS' });
+    expect(
+      within(tasks)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining('Write off 1 batch'),
+      expect.stringContaining('1 batch expires within a month'),
+      expect.stringContaining('Record expiry dates for 1 batch'),
+    ]);
+  });
+
+  it('pages through the whole ledger instead of stopping at the newest hundred', async () => {
+    const user = userEvent.setup();
+    const ledger = Array.from({ length: 130 }, (_, index) =>
+      aMovement({ id: `m${String(index)}`, note: `Entry ${String(index)}` }),
+    );
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=movements', {
+      movements: ledger,
+    });
+
+    expect(
+      await screen.findByText('Showing 1–25 of the 100 movements loaded so far'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more movements' }));
+
+    expect(await screen.findByText('Showing 1–25 of 130')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more movements' })).not.toBeInTheDocument();
+    expect(
+      requests
+        .filter((request: RecordedRequest) => request.url.startsWith('/inventory/movements'))
+        .map((request: RecordedRequest) => request.url),
+    ).toEqual([
+      `/inventory/movements?store_id=${NMS.id}&limit=100`,
+      `/inventory/movements?store_id=${NMS.id}&limit=100&offset=100`,
+    ]);
+  });
+
+  it('asks the server for one kind of movement', async () => {
+    const { requests } = renderStock('/warehouse/stock?store=NMS&view=movements&reason=adjustment');
+
+    expect(await screen.findByText('No adjustment entries')).toBeInTheDocument();
+    expect(
+      requests.find((request: RecordedRequest) => request.url.startsWith('/inventory/movements'))
+        ?.url,
+    ).toBe(`/inventory/movements?store_id=${NMS.id}&reason=adjustment&limit=100`);
   });
 
   it('asks the server for the period chosen', async () => {

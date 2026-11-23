@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
-import { ItemsTable } from '@/components/ItemsTable';
 import { SampleDataNotice } from '@/components/SampleData';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { formatDate, formatNumber, formatTimestamp } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -137,52 +136,62 @@ function StoreView({ store }: { store: DistrictStore }) {
         ))}
       </div>
 
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle>Batches in store</CardTitle>
-          <CardDescription>
+      <section aria-labelledby="batches-heading" className="flex min-w-0 flex-col gap-3">
+        <div>
+          <h2 id="batches-heading" className="text-base font-semibold">
+            Batches in store
+          </h2>
+          <p className="text-muted-foreground text-sm">
             {lastIn ? `${lastIn} ` : null}Issued first-expiry-first-out; near expiry is under{' '}
             {NEAR_EXPIRY_MONTHS} months.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          <ItemsTable<BatchLine>
-            label="Batches in store"
-            rows={batches}
-            getRowId={(batch) => `${batch.product}:${batch.batch}`}
-            emptyText="No stock in the district store."
-            columns={[
-              {
-                id: 'product',
-                header: 'Product',
-                cell: (batch) => <ProductCell product={batch.product} />,
-              },
-              { id: 'batch', header: 'Batch', cell: (batch) => batch.batch },
-              {
-                id: 'manufactured',
-                header: 'Manufactured',
-                cell: (batch) => formatDate(batch.manufactured_on),
-              },
-              {
-                id: 'expires',
-                header: 'Expires',
-                cell: (batch) => <ExpiryCell expiresOn={batch.expires_on} now={now} />,
-              },
-              {
-                id: 'pieces',
-                header: 'Pieces',
-                numeric: true,
-                cell: (batch) => formatNumber(batch.quantity),
-              },
-              {
-                id: 'status',
-                header: 'Status',
-                cell: (batch) => <BatchStatusBadge expiresOn={batch.expires_on} now={now} />,
-              },
-            ]}
-          />
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <DataTable<BatchLine>
+          label="Batches in store"
+          rows={batches}
+          getRowId={(batch) => `${batch.product}:${batch.batch}`}
+          preferencesKey="district-store-batches"
+          searchPlaceholder="Search batches…"
+          emptyTitle="No stock in the district store"
+          emptyDescription="Batches appear here when a warehouse delivery is received."
+          columns={[
+            {
+              id: 'product',
+              header: 'Product',
+              value: (batch) => PRODUCTS.find((product) => product.key === batch.product)?.name,
+              cell: (batch) => <ProductCell product={batch.product} />,
+            },
+            { id: 'batch', header: 'Batch', value: (batch) => batch.batch },
+            {
+              id: 'manufactured',
+              header: 'Manufactured',
+              value: (batch) => batch.manufactured_on,
+              cell: (batch) => formatDate(batch.manufactured_on),
+              hideable: true,
+            },
+            {
+              id: 'expires',
+              header: 'Expires',
+              value: (batch) => batch.expires_on,
+              cell: (batch) => <ExpiryCell expiresOn={batch.expires_on} now={now} />,
+            },
+            {
+              id: 'pieces',
+              header: 'Pieces',
+              numeric: true,
+              value: (batch) => batch.quantity,
+              cell: (batch) => formatNumber(batch.quantity),
+              total: (rows) => formatNumber(rows.reduce((sum, batch) => sum + batch.quantity, 0)),
+            },
+            {
+              id: 'status',
+              header: 'Status',
+              sortable: false,
+              cell: (batch) => <BatchStatusBadge expiresOn={batch.expires_on} now={now} />,
+            },
+          ]}
+        />
+      </section>
 
       <section aria-labelledby="movements-heading" className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -203,6 +212,7 @@ function StoreView({ store }: { store: DistrictStore }) {
         </div>
         <DataTable
           label="Stock movements"
+          preferencesKey="district-store-movements"
           columns={movementColumns}
           rows={store.movements}
           getRowId={(movement) => `${movement.at}:${movement.reference}:${movement.description}`}

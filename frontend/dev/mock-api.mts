@@ -4,6 +4,7 @@
  *   npm run mock-api                 # realistic demo data
  *   MOCK_DATA=worst npm run mock-api # the awkward data real systems contain
  *   MOCK_DATA=empty npm run mock-api # nothing recorded yet
+ *   MOCK_DATA=scale npm run mock-api # the demo plus a national store's volume of stock
  *
  * Then, in another terminal:
  *   BACKEND_URL=http://127.0.0.1:8787 npm run dev
@@ -56,9 +57,11 @@ const organizationUnits = [
 
 /**
  * `demo` is realistic data; `worst` puts the values that break layouts first
- * (missing fields, zero coordinates, long text); `empty` has nothing recorded.
+ * (missing fields, zero coordinates, long text); `empty` has nothing recorded;
+ * `scale` is the demo with a national store's volume of stock (hundreds of
+ * products, a thousand batches, a year of movements) at NMS.
  */
-const datasets = ['demo', 'worst', 'empty'] as const;
+const datasets = ['demo', 'worst', 'empty', 'scale'] as const;
 
 function isDatasetName(name: string): name is (typeof datasets)[number] {
   return (datasets as readonly string[]).includes(name);

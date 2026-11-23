@@ -149,6 +149,7 @@ export default function HotspotsPage({ workspace }: { workspace: Workspace }) {
       <DataTable
         key={filter}
         label="Hotspots"
+        preferencesKey="hotspots"
         columns={columns}
         rows={rows}
         getRowId={(hotspot) => hotspot.id}

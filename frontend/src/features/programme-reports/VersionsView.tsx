@@ -209,6 +209,7 @@ function VersionList({ hrefFor }: { hrefFor: VersionsViewProps['hrefFor'] }) {
   return (
     <DataTable
       label="Approved report versions"
+      preferencesKey="report-versions"
       columns={columns}
       rows={versions.data}
       getRowId={(version) => version.id}

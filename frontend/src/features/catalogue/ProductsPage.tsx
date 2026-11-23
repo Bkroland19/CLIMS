@@ -221,6 +221,7 @@ export default function ProductsPage() {
       />
       <DataTable
         label="Products"
+        preferencesKey="catalogue-products"
         columns={columns}
         rows={rows}
         getRowId={(product) => product.id}

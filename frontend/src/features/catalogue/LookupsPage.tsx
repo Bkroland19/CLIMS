@@ -174,6 +174,7 @@ export function LookupsPage({ kind }: LookupsPageProps) {
       />
       <DataTable
         label={text.title}
+        preferencesKey={`catalogue-${kind}`}
         columns={columns}
         rows={rows}
         getRowId={(lookup) => lookup.id}
