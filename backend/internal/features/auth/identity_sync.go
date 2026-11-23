@@ -210,11 +210,15 @@ func (s *identitySync) identityBody(c fiber.Ctx) (syncLink, bool) {
 }
 
 func (s *identitySync) link(c fiber.Ctx) error {
+	body, valid := s.identityBody(c)
+	if !valid {
+		return syncError(c, fiber.StatusBadRequest, "invalid_request")
+	}
+	// CLIMS account IDs are canonical lowercase UUIDs. Any other ID names no account: 404.
 	raw := c.Params("id")
 	id, err := uuid.Parse(raw)
-	body, valid := s.identityBody(c)
-	if err != nil || id == uuid.Nil || id.String() != raw || !valid {
-		return syncError(c, fiber.StatusBadRequest, "invalid_request")
+	if err != nil || id == uuid.Nil || id.String() != raw {
+		return syncError(c, fiber.StatusNotFound, "account_ineligible")
 	}
 	err = s.repo.LinkOIDCIdentity(c.Context(), id, s.cfg.Issuer, body.Subject)
 	switch {

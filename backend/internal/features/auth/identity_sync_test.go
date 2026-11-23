@@ -480,7 +480,11 @@ func TestIdentitySyncLink(t *testing.T) {
 	} {
 		t.Run(name+" is 400", func(t *testing.T) { h.do("PUT", "/accounts/"+b+"/identity", h.token, body, 400) })
 	}
-	h.do("PUT", "/accounts/not-a-uuid/identity", h.token, h.identity("s"), 400)
+	// The body is validated first; then an ID that cannot name an account is a missing account.
+	for _, id := range []string{"not-a-uuid", "00000000-0000-0000-0000-000000000000", strings.ToUpper(b), "123"} {
+		h.do("PUT", "/accounts/"+id+"/identity", h.token, h.identity("s"), 404)
+		h.do("PUT", "/accounts/"+id+"/identity", h.token, h.identity(""), 400)
+	}
 	if h.repo.links["subject-a"] != a || len(h.repo.links) != 1 {
 		t.Fatalf("links changed: %v", h.repo.links)
 	}
