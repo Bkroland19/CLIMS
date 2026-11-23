@@ -1,8 +1,7 @@
 'use client';
 
-import { Copy, History, UserRound, X } from 'lucide-react';
+import { Copy, History, UserRound } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useId } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { RowActions, type RowActionItem } from '@/components/data-table/RowActions';
@@ -10,8 +9,6 @@ import { FilterSelect } from '@/components/FilterSelect';
 import { FilterTabs } from '@/components/FilterTabs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { describeDevice } from '@/features/auth/deviceSessions';
 import { roleLabel } from '@/features/users/access';
 import { copyText } from '@/lib/copyText';
@@ -33,6 +30,7 @@ import {
   type AuditFilters,
   type AuditSubject,
 } from './api';
+import { DateFilter, FilterChip } from './FilterControls';
 import { auditFiltersFrom, auditHref } from './links';
 import { useAuditLog } from './queries';
 
@@ -194,51 +192,6 @@ export default function AuditLogPage() {
         rowActions={(entry) => <EntryActions entry={entry} go={go} />}
       />
     </div>
-  );
-}
-
-function DateFilter({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: string | null;
-  min?: string | null;
-  max?: string | null;
-  onChange: (value: string | null) => void;
-}) {
-  const id = useId();
-  return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor={id} className="text-muted-foreground shrink-0 text-sm font-normal">
-        {label}
-      </Label>
-      <Input
-        id={id}
-        type="date"
-        className="bg-card h-8 w-36"
-        value={value ?? ''}
-        min={min ?? undefined}
-        max={max ?? undefined}
-        onChange={(event) => {
-          onChange(event.target.value || null);
-        }}
-      />
-    </div>
-  );
-}
-
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
-  return (
-    <span className="bg-secondary inline-flex items-center gap-1 rounded-full py-0.5 pr-1 pl-3 text-sm">
-      {label}
-      <Button variant="ghost" size="icon-xs" aria-label={`Clear: ${label}`} onClick={onClear}>
-        <X />
-      </Button>
-    </span>
   );
 }
 
