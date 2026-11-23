@@ -31,6 +31,11 @@ export interface SessionUser {
   role: AppRole;
   /** Hotspot managers: the hotspot assigned to them (`hot_spot_id`), which their alerts are for. */
   hotspotId?: string | null;
+  hotspot?: ApiUser["hot_spot"];
+  location?: ApiUser["location"];
+  organisationUnit?: ApiUser["organisation_unit"];
+  subcounty?: ApiUser["subcounty"];
+  store?: ApiUser["store"];
   demo?: boolean;
 }
 
@@ -83,6 +88,11 @@ function toSessionUser(u: ApiUser, role: AppRole): SessionUser {
   return {
     id: u.id,
     hotspotId: u.hot_spot_id ?? null,
+    hotspot: u.hot_spot,
+    location: u.location,
+    organisationUnit: u.organisation_unit,
+    subcounty: u.subcounty,
+    store: u.store,
     name,
     username: u.username,
     email: u.email,

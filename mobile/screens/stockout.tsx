@@ -20,10 +20,11 @@ import { isNetworkError, listHotspotsPage, toLocalHotspot } from "@/lib/hotspots
 import { useNav } from "@/lib/nav";
 import {
   CATEGORY_LABEL,
-  COMMENT_MAX,
+  STOCKOUT_MESSAGE_MAX_BYTES,
   reportStockout,
   stockoutComment,
   stockoutErrorMessage,
+  stockoutMessageFits,
   toLocalOrder,
   type Category,
 } from "@/lib/orders";
@@ -44,7 +45,8 @@ export function StockoutForm({
 }: {
   hotspotId?: string;
   /** A hotspot manager's own hotspot: no picker, and no hotspot list to load. */
-  fixed?: { id: string; name: string };
+  fixed?: Pick<Hotspot, "id" | "name"> &
+    Partial<Pick<Hotspot, "village" | "subcounty" | "district">>;
 }) {
   const nav = useNav();
   const me = useMe();
@@ -117,19 +119,20 @@ export function StockoutForm({
   const hotspot:
     Pick<Hotspot, "id" | "name" | "village" | "subcounty" | "district" | "contact"> | undefined =
     fixed
-      ? { ...fixed, village: "", subcounty: "", district: "", contact: me.name }
+      ? { village: "", subcounty: "", district: "", ...fixed, contact: me.name }
       : (sel ?? (hotspots.length === 1 ? hotspots[0] : undefined));
-  const tooLong = comment.trim().length > COMMENT_MAX;
+  const message = stockoutComment(reason, comment);
+  const tooLong = !stockoutMessageFits(message);
   const ready = !!hotspot && !!category && !tooLong && !busy;
   const what = category ? CATEGORY_LABEL[category].toLowerCase() : "condoms";
 
   const submit = async () => {
-    if (!hotspot || !category) return;
+    if (!hotspot || !category || tooLong || busy) return;
     setRefused("");
     const request = {
       hot_spot_id: hotspot.id,
       condom_category: category,
-      message: stockoutComment(reason, comment),
+      message,
     };
     const names = { hotspot: hotspot.name, product: CATEGORY_LABEL[category] };
     const label = `Stock request · ${hotspot.name}`;
@@ -235,12 +238,12 @@ export function StockoutForm({
         />
         <Input
           label="Comment (optional)"
-          max={COMMENT_MAX}
+          max={STOCKOUT_MESSAGE_MAX_BYTES}
           value={comment}
           onChangeText={setComment}
           ph="e.g. Busy weekend coming"
           multiline
-          err={tooLong ? `Use at most ${COMMENT_MAX} characters.` : ""}
+          err={tooLong ? "Shorten your comment so the stock request can be sent." : ""}
         />
       </Fields>
       <Btns>

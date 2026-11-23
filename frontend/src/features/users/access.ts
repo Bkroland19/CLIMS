@@ -98,6 +98,7 @@ const PERMISSION_LABELS: Readonly<Record<string, string>> = {
   'hotspots:activate': 'Verify and activate hotspots in their district',
   'hotspots:all_districts': 'Use their hotspot permissions in every district',
   'orders:supply_hotspots': 'Deliver stock to hotspots in their district',
+  'orders:deliver': 'Carry hotspot deliveries named for them, and see those deliveries',
   'reports:read': 'View programme reports and download them',
   'reports:configure': "Set their store's review cycle, receipt deadline and on-time target",
   'reports:approve': 'Approve report versions and record corrections',

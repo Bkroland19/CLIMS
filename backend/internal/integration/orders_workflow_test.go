@@ -57,6 +57,10 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	var otherStore string
 	scalar(&otherStore, `SELECT s.id FROM stores s WHERE s.store_type = 'district' AND s.id <> $1 LIMIT 1`, district)
 	_, otherToken := account("dfcp", "workflow-other-district", &otherStore, nil, "orders:replenish", "orders:receive")
+	// Delivery agents work at a district store: one in the hotspot's district, one elsewhere.
+	rider, riderToken := account("delivery agent", "workflow-rider", &district, nil, "orders:deliver")
+	awayRider, awayRiderToken := account("delivery agent", "workflow-rider-away", &otherStore, nil, "orders:deliver")
+	riders := deliveryAgents{id: rider, token: riderToken, awayID: awayRider, awayToken: awayRiderToken}
 
 	// inbox returns the central-inbox notification of this type about the resource, if any.
 	inbox := func(token, resourceType, resourceID, typeName string) map[string]any {
@@ -350,7 +354,8 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	balance(district, 55)
 	balance(warehouse, 50)
 	testInventoryReports(t, pool, request, admin, districtToken, warehouse, district, hotSpot)
-	testNotificationFulfilment(t, pool, request, admin, hotspotToken, districtToken, otherToken, district, hotSpot, unit, reportID)
+	testNotificationFulfilment(t, pool, request, admin, hotspotToken, districtToken, otherToken, district, hotSpot, unit,
+		reportID, riders)
 	testSupplyReports(t, pool, request, admin, districtToken, warehouseToken, otherToken, warehouse, district, product, unit)
 	testRejection()
 	testBatchExpiry(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)

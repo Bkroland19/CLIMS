@@ -1,3 +1,5 @@
+import type { RiderDelivery } from "./deliveries";
+
 /**
  * Domain model for the field app (VHT, hotspot manager, rider).
  *
@@ -114,6 +116,14 @@ export interface AppEvent {
   text: string;
   /** Roles this notification is for. */
   to: AppRole[];
+  /** Set on notifications from the API (GET /notifications): the notification's UUID. */
+  serverId?: string;
+  /** The API notification's message under its title. */
+  body?: string;
+  /** When the API notification was read; null while unread. Local events use `read` instead. */
+  readAt?: number | null;
+  /** Who it is from, in words, when the role alone does not say (API notifications). */
+  org?: string;
 }
 
 export interface OutboxItem {
@@ -135,4 +145,8 @@ export interface DomainState {
   outbox: OutboxItem[];
   read: Partial<Record<AppRole, number>>;
   seq: number;
+  /** The signed-in user's notifications from the API, newest first; kept for offline use. */
+  notices?: AppEvent[];
+  /** A signed-in delivery agent's deliveries from the API, newest first; kept for offline use. */
+  riderDeliveries?: RiderDelivery[];
 }

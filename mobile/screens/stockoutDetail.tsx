@@ -44,7 +44,8 @@ const EVENT_TEXT: Record<StockoutEvent["action"], (e: StockoutEvent) => string> 
   acknowledged: () => "Hotspot manager confirmed what arrived",
 };
 
-function steps(d: StockoutDetail, you: boolean): StepItem[] {
+/** The request's progress, for its page and the hotspot manager's home. */
+export function stockoutSteps(d: StockoutDetail, you: boolean): StepItem[] {
   const delivered = d.deliveries.length > 0;
   const firstDelivery = d.deliveries.map((x) => Date.parse(x.created_at)).sort()[0];
   return [
@@ -69,7 +70,8 @@ function steps(d: StockoutDetail, you: boolean): StepItem[] {
   ];
 }
 
-function message(d: StockoutDetail, you: boolean, waiting: number): string {
+/** What the request is waiting for, in a sentence. */
+export function stockoutMessage(d: StockoutDetail, you: boolean, waiting: number): string {
   switch (d.status) {
     case "awaiting_supply":
       return "The district focal person has the notification and decides what to send.";
@@ -281,8 +283,8 @@ export function StockoutScreen({ id }: { id: string }) {
         title={stockoutProduct(d)}
         sub={`${d.hot_spot?.name ?? ""} · sent ${ago(Date.parse(d.created_at))}`}
         chip={orderChip(status)}
-        steps={steps(d, you)}
-        msg={message(d, you, waiting.length)}
+        steps={stockoutSteps(d, you)}
+        msg={stockoutMessage(d, you, waiting.length)}
       />
       {canConfirm ? (
         <AcknowledgeForm

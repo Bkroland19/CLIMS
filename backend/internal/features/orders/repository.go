@@ -57,6 +57,8 @@ type scope struct {
 	allStores bool
 	// stockoutDistrict lets the user raise alerts for active hotspots in the district they work in.
 	stockoutDistrict bool
+	// carrier lets a delivery agent (orders:deliver) acknowledge the deliveries named for them.
+	carrier bool
 }
 
 type Repository struct {

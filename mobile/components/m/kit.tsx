@@ -845,6 +845,7 @@ function FieldBox({
   row,
   focused,
   aside,
+  outlined,
 }: {
   label: string;
   sub?: string;
@@ -856,14 +857,15 @@ function FieldBox({
   focused?: boolean;
   /** Shown at the end of the hint row, e.g. a character counter. */
   aside?: React.ReactNode;
+  outlined?: boolean;
 }) {
   const T = useT();
   const note = err || hint;
   return (
     <View
       style={{
-        paddingVertical: T.ios ? 8 : 2,
-        paddingHorizontal: T.ios ? 16 : 0,
+        paddingVertical: outlined ? 0 : T.ios ? 8 : 2,
+        paddingHorizontal: T.ios && !outlined ? 16 : 0,
         gap: T.ios ? 2 : 4,
       }}
     >
@@ -873,7 +875,8 @@ function FieldBox({
             style={{
               ...TYPE.footnote,
               color: err ? T.danger : focused ? T.tint : T.fg2,
-              fontWeight: "500",
+              fontWeight: outlined ? "600" : "500",
+              marginBottom: outlined ? 6 : 0,
             }}
           >
             {label}
@@ -944,6 +947,12 @@ export function Input({
   autoComplete,
   inputRef,
   onFocus,
+  outlined,
+  leadingIcon,
+  autoCorrect,
+  returnKeyType,
+  onSubmitEditing,
+  submitBehavior,
 }: {
   label: string;
   value: string;
@@ -962,6 +971,12 @@ export function Input({
   autoComplete?: any;
   inputRef?: React.Ref<TextInputInstance>;
   onFocus?: () => void;
+  outlined?: boolean;
+  leadingIcon?: IconName;
+  autoCorrect?: boolean;
+  returnKeyType?: React.ComponentProps<typeof TextInput>["returnKeyType"];
+  onSubmitEditing?: () => void;
+  submitBehavior?: React.ComponentProps<typeof TextInput>["submitBehavior"];
 }) {
   const T = useT();
   const font = useInputFont();
@@ -994,6 +1009,10 @@ export function Input({
       maxLength={max}
       autoCapitalize={autoCapitalize}
       autoComplete={autoComplete}
+      autoCorrect={autoCorrect}
+      returnKeyType={returnKeyType}
+      onSubmitEditing={onSubmitEditing}
+      submitBehavior={submitBehavior}
       onFocus={() => {
         setFocused(true);
         onFocus?.();
@@ -1004,32 +1023,62 @@ export function Input({
       cursorColor={T.tint}
       style={[
         inputStyle(T, err, multiline, focused, rows),
+        outlined
+          ? {
+              minHeight: 56,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              borderRadius: 14,
+              borderWidth: 1.5,
+              borderColor: err ? T.danger : focused ? T.tint : T.sep,
+              backgroundColor: T.cardBg,
+            }
+          : null,
         font,
-        secure ? { paddingRight: 48 } : null,
+        leadingIcon ? { paddingStart: 44 } : null,
+        secure ? (outlined ? { paddingEnd: 54 } : { paddingRight: 48 }) : null,
       ]}
     />
   );
   return (
-    <FieldBox label={label} hint={hint} err={err} focused={focused} aside={counter}>
-      {secure ? (
+    <FieldBox
+      label={label}
+      hint={hint}
+      err={err}
+      focused={focused}
+      aside={counter}
+      outlined={outlined}
+    >
+      {secure || leadingIcon ? (
         <View style={{ justifyContent: "center" }}>
           {field}
-          <Pressable
-            onPress={() => setHidden((h) => !h)}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={hidden ? "Show password" : "Hide password"}
-            style={{
-              position: "absolute",
-              right: T.ios ? 0 : 4,
-              height: "100%",
-              width: 44,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon name={hidden ? "eye" : "eyeOff"} size={20} color={T.fg2} />
-          </Pressable>
+          {leadingIcon ? (
+            <View
+              pointerEvents="none"
+              accessible={false}
+              style={{ position: "absolute", start: 14 }}
+            >
+              <Icon name={leadingIcon} size={19} color={focused ? T.tint : T.fg2} />
+            </View>
+          ) : null}
+          {secure ? (
+            <Pressable
+              onPress={() => setHidden((h) => !h)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={hidden ? "Show password" : "Hide password"}
+              style={{
+                position: "absolute",
+                ...(outlined ? { end: 6 } : { right: T.ios ? 0 : 4 }),
+                height: "100%",
+                width: 44,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name={hidden ? "eye" : "eyeOff"} size={20} color={T.fg2} />
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         field

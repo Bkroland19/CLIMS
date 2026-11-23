@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import { AppState } from "react-native";
 import { items as fmtItems } from "./format";
 import { isAxiosError } from "axios";
 import {
@@ -27,6 +28,14 @@ import {
   stockoutErrorMessage,
   toLocalOrder,
 } from "./orders";
+import { listMyDeliveries } from "./deliveries";
+import {
+  isUnread,
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  toInboxEvent,
+} from "./notifications";
 import { createSeed, DEFAULT_PERSONAS, HM_HOTSPOT } from "./seed";
 import { useMe } from "./session";
 import type {
@@ -72,7 +81,17 @@ interface StoreCtx {
   syncApiOrders: (orders: DomainState["orders"]) => void;
   /** Save an action to the outbox even when online, e.g. after a request failed on the network. */
   queue: (type: ActionType, payload: any, label: string) => void;
+  /** Mark every notification read: local ones up to now, and the API's on the server. */
   markRead: (role: AppRole) => void;
+  /** Mark one API notification read, e.g. when it is opened. */
+  readNotice: (e: AppEvent) => void;
+  /** Reload the signed-in user's notifications from the API; resolves false when it could not. */
+  refreshNotices: () => Promise<boolean>;
+  /**
+   * Reload a signed-in delivery agent's deliveries (GET /orders/deliveries). Resolves "ok", or why
+   * the phone's copy is still shown; other roles and demo sign-ins resolve "ok" with nothing to do.
+   */
+  refreshDeliveries: () => Promise<RefreshResult>;
   reset: () => void;
 }
 
@@ -92,6 +111,9 @@ const failure = (err: unknown): PageResult => ({
 });
 
 const Ctx = createContext<StoreCtx | null>(null);
+
+/** How often the inbox checks the API for new notifications while the app is open. */
+const NOTICE_POLL_MS = 60_000;
 
 const roleOfEvent: Record<string, EventRole> = {
   VHT: "VHT",
@@ -497,13 +519,83 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [offline, commit, queue, me.role, me.name],
   );
 
+  /** API notifications are the signed-in user's own; sample sign-ins have none. */
+  const liveNotices = !me.demo;
+
+  const refreshNotices = useCallback(async (): Promise<boolean> => {
+    if (!liveNotices) return true;
+    try {
+      const list = await listNotifications();
+      const cur = ref.current;
+      commit({ ...cur, notices: list.map((n) => toInboxEvent(n, me.role)) });
+      return true;
+    } catch {
+      // Offline or refused: keep the phone's copy.
+      return false;
+    }
+  }, [liveNotices, commit, me.role]);
+
+  const liveDeliveries = liveNotices && me.role === "rider";
+
+  const refreshDeliveries = useCallback(async (): Promise<RefreshResult> => {
+    if (!liveDeliveries) return "ok";
+    try {
+      const list = await listMyDeliveries();
+      commit({ ...ref.current, riderDeliveries: list });
+      return "ok";
+    } catch (err) {
+      return failure(err).status;
+    }
+  }, [liveDeliveries, commit]);
+
   const markRead = useCallback(
     (role: AppRole) => {
       const cur = ref.current;
-      commit({ ...cur, read: { ...cur.read, [role]: Date.now() } });
+      const now = Date.now();
+      const unread = (cur.notices ?? []).some((e) => !e.readAt);
+      commit({
+        ...cur,
+        read: { ...cur.read, [role]: now },
+        notices: cur.notices?.map((e) => (e.readAt ? e : { ...e, readAt: now })),
+      });
+      // Offline, the next refresh brings back the server's view, and the inbox marks them again.
+      if (unread && liveNotices) markAllNotificationsRead().catch(() => {});
     },
-    [commit],
+    [commit, liveNotices],
   );
+
+  const readNotice = useCallback(
+    (e: AppEvent) => {
+      if (!e.serverId || e.readAt) return;
+      const cur = ref.current;
+      const now = Date.now();
+      commit({
+        ...cur,
+        notices: cur.notices?.map((x) => (x.serverId === e.serverId ? { ...x, readAt: now } : x)),
+      });
+      if (liveNotices) markNotificationRead(e.serverId).catch(() => {});
+    },
+    [commit, liveNotices],
+  );
+
+  // New notifications (and a delivery agent's deliveries, for the tab badge) arrive while the app is
+  // open (every minute) and whenever it comes back to the front, as well as right after sign-in.
+  useEffect(() => {
+    if (!ready || offline || !liveNotices) return;
+    const refresh = () => {
+      refreshNotices();
+      refreshDeliveries();
+    };
+    refresh();
+    const timer = setInterval(refresh, NOTICE_POLL_MS);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refresh();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [ready, offline, liveNotices, refreshNotices, refreshDeliveries]);
 
   /** Store one page of API hotspots: the API's copy wins, keeping what only the phone knows. */
   const storePage = useCallback(
@@ -583,6 +675,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       loadMoreHotspots,
       syncApiOrders,
       markRead,
+      readNotice,
+      refreshNotices,
+      refreshDeliveries,
       reset,
     }),
     [
@@ -595,6 +690,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       loadMoreHotspots,
       syncApiOrders,
       markRead,
+      readNotice,
+      refreshNotices,
+      refreshDeliveries,
       reset,
     ],
   );
@@ -607,26 +705,29 @@ export function useStore() {
   return c;
 }
 
-/** Notifications for the signed-in role, newest first. */
+/** Notifications for the signed-in role, newest first: the API's, and the app's own. */
 export function useNotes() {
   const { s } = useStore();
   const me = useMe();
   return useMemo(() => {
     // Signed-in VHTs and hotspot managers only hear about their own hotspots and orders (and the app's own alerts),
     // not the sample data the phone starts with.
-    const ownOnly = (me.role === "vht" || me.role === "hm") && !me.demo;
+    // Every real sign-in, riders too: the seed's sample events are for demo accounts only.
+    const ownOnly = !me.demo;
     const hotspots = new Set(s.hotspots.filter((h) => h.source === "api").map((h) => h.id));
     const refs = new Set([
       ...hotspots,
       ...s.orders.filter((o) => o.source === "api" || hotspots.has(o.hotspotId)).map((o) => o.id),
     ]);
-    return s.events
+    const local = s.events
       .filter((e) => e.to.includes(me.role) && e.actor !== me.name)
       .filter(
         (e) => !ownOnly || refs.has(e.ref) || e.ref.startsWith("MAP-") || e.ref.startsWith("REQ-"),
-      )
-      .sort((a, b) => b.t - a.t);
-  }, [s.events, s.hotspots, s.orders, me.role, me.name, me.demo]);
+      );
+    // API notifications are already the signed-in user's own.
+    const server = me.demo ? [] : (s.notices ?? []);
+    return [...server, ...local].sort((a, b) => b.t - a.t);
+  }, [s.events, s.notices, s.hotspots, s.orders, me.role, me.name, me.demo]);
 }
 
 /** Unread notifications for the signed-in role. */
@@ -635,7 +736,7 @@ export function useUnread() {
   const me = useMe();
   const notes = useNotes();
   const read = s.read[me.role] ?? 0;
-  return notes.filter((e) => e.t > read).length;
+  return notes.filter((e) => isUnread(e, read)).length;
 }
 
 /** The outbox entry still waiting for this record, if any. */

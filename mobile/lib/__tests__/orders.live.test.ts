@@ -7,10 +7,9 @@
  *   CLIMS_LIVE_HM_LOGIN=<hotspot manager login> CLIMS_LIVE_HM_PASSWORD=<password> \
  *   npx jest lib/__tests__/orders.live --watchAll=false
  *
- * Today the API accepts alerts only from a hotspot's assigned manager, so a VHT's attempt is refused and
- * the test checks the message; if the backend accepts it (district rule, or orders:all_stores), the test
- * checks the notification instead. A hotspot with an open notification has the message counted
- * against it (200), so a repeated run is accepted too.
+ * The API accepts alerts from the assigned manager and from a VHT with orders:stockout and
+ * orders:stockout_district for an active hotspot in their district. The VHT test checks the
+ * refusal message when the account lacks access. An open notification absorbs repeats (200).
  */
 import { isAxiosError } from "axios";
 import { api, login, setTokens, toStoredTokens, tokenClient } from "../api";

@@ -98,13 +98,34 @@ const userSelect = `SELECT u.id,u.username,COALESCE(u.email,''),u.password,u.fir
 			WHERE rp.role_id = r.id ORDER BY p.name
 		)) ORDER BY r.id)
 		FROM role_user ru JOIN roles r ON r.id = ru.role_id WHERE ru.user_id = u.id
-	), '[]'::jsonb) FROM users u `
+	), '[]'::jsonb),
+	CASE WHEN ou.id IS NOT NULL THEN jsonb_build_object(
+		'id', ou.id, 'uid', ou.uid, 'name', ou.name, 'short_name', ou.shortname,
+		'subcounty', ou.subcounty, 'district', ou.district, 'region', ou.region) END,
+	CASE WHEN h.id IS NOT NULL THEN jsonb_build_object(
+		'id', h.id, 'name', h.name, 'type', h.type, 'status', h.status, 'village', h.village,
+		'subcounty', hs.name, 'district', hd.name, 'latitude', h.latitude, 'longitude', h.longitude) END,
+	CASE WHEN sc.id IS NOT NULL THEN jsonb_build_object(
+		'id', sc.id, 'name', sc.name, 'district_id', sc.district_id, 'district_name', sd.name) END,
+	CASE WHEN st.id IS NOT NULL THEN jsonb_build_object(
+		'id', st.id, 'code', st.code, 'name', st.name, 'store_type', st.store_type,
+		'district_id', st.district_id, 'district_name', td.name) END
+	FROM users u
+	LEFT JOIN organization_units ou ON ou.id = u.organisation_unit_id
+	LEFT JOIN hot_spots h ON h.id = u.hot_spot_id
+	LEFT JOIN subcounties hs ON hs.id = h.subcounty_id
+	LEFT JOIN districts hd ON hd.id = h.district_id
+	LEFT JOIN subcounties sc ON sc.id = u.subcounty_id
+	LEFT JOIN districts sd ON sd.id = sc.district_id
+	LEFT JOIN stores st ON st.id = u.store_id
+	LEFT JOIN districts td ON td.id = st.district_id `
 
 func scanUser(row pgx.Row) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Phone, &u.Status,
 		&u.Location, &u.OrganisationUnitID, &u.HotSpotID, &u.SubcountyID, &u.StoreID,
-		&u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt, &u.LoginCount, &u.ActiveSessions, &u.Roles)
+		&u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt, &u.LoginCount, &u.ActiveSessions, &u.Roles,
+		&u.OrganisationUnit, &u.HotSpot, &u.Subcounty, &u.Store)
 	if err != nil {
 		return nil, err
 	}

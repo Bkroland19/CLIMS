@@ -20,6 +20,92 @@ const stock = [aProductSummary({ usable: 5 }), aProductSummary({ condom_id: male
 const api = warehouseOrderApi({ products: [FEMALE, male] });
 
 describe('Dispatch to hotspot', () => {
+  it('names a delivery agent from the hotspot’s district, and shows a refusal beside the picker', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    let posts = 0;
+    const { requests } = renderApp(
+      <DeliverStockDialog storeId={storeId} stock={stock} onClose={onClose} />,
+      {
+        signedIn: true,
+        replies: [
+          (request) => {
+            if (request.url.endsWith('/riders'))
+              return {
+                status: 200,
+                body: {
+                  success: true,
+                  data: [{ id: 'u-moses', name: 'Moses Kato', phone: '0772000111' }],
+                },
+              };
+            if (!request.url.startsWith('/orders/stockouts')) return api(request);
+            if (request.method === 'GET')
+              return { status: 200, body: { success: true, data: [report] } };
+            posts += 1;
+            return posts === 1
+              ? {
+                  status: 422,
+                  body: {
+                    success: false,
+                    message: 'the delivery agent must work in the hotspot’s district',
+                    error: { rider_id: 'The delivery agent must work in the hotspot’s district.' },
+                  },
+                }
+              : { status: 201, body: { success: true, data: report } };
+          },
+        ],
+      },
+    );
+    await user.click(await screen.findByRole('combobox', { name: /Hotspot stockout/ }));
+    await user.click(await screen.findByRole('option', { name: /Kisenyi Landing/ }));
+    await user.type(await screen.findByRole('spinbutton', { name: /Female/ }), '2');
+
+    await user.click(screen.getByRole('combobox', { name: /Delivery agent/ }));
+    await user.click(await screen.findByRole('option', { name: 'Moses Kato · 0772000111' }));
+    await user.click(screen.getByRole('button', { name: 'Record dispatch' }));
+    expect(
+      await screen.findAllByText('The delivery agent must work in the hotspot’s district.'),
+    ).not.toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Record dispatch' }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+    const sent = requests.filter((r) => r.method === 'POST');
+    expect(sent.at(-1)?.body).toMatchObject({ rider_id: 'u-moses' });
+  });
+
+  it('sends no delivery agent unless one is chosen', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const { requests } = renderApp(
+      <DeliverStockDialog storeId={storeId} stock={stock} onClose={onClose} />,
+      {
+        signedIn: true,
+        replies: [
+          (request) => {
+            if (request.url.endsWith('/riders'))
+              return { status: 200, body: { success: true, data: [] } };
+            if (!request.url.startsWith('/orders/stockouts')) return api(request);
+            return {
+              status: 200,
+              body: { success: true, data: request.method === 'GET' ? [report] : report },
+            };
+          },
+        ],
+      },
+    );
+    await user.click(await screen.findByRole('combobox', { name: /Hotspot stockout/ }));
+    await user.click(await screen.findByRole('option', { name: /Kisenyi Landing/ }));
+    expect(await screen.findByText(/No delivery agents work in Kampala yet/)).toBeInTheDocument();
+    await user.type(await screen.findByRole('spinbutton', { name: /Female/ }), '2');
+    await user.click(screen.getByRole('button', { name: 'Record dispatch' }));
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+    expect(requests.find((r) => r.method === 'POST')?.body).not.toHaveProperty('rider_id');
+  });
+
   it('rejects quantities above available stock, then sends both categories in one dispatch', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

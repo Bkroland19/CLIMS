@@ -12,9 +12,16 @@ import (
 // testNotificationFulfilment follows a hotspot notification from one type, repeated as Both, through two
 // district deliveries and the manager's acknowledgements to fulfilment, checking the reports at each
 // step (reporting requirements RF02-RF08). openReport is the hotspot's open Male or Female notification.
+// deliveryAgents are two users with orders:deliver: one working in the hotspot's district, one in
+// another district, who may not be named for its deliveries.
+type deliveryAgents struct {
+	id, token, awayID, awayToken string
+}
+
 func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	request func(string, string, any, string, int) map[string]any,
 	admin, managerToken, districtToken, otherDistrictToken, district, hotSpot, unit, openReport string,
+	riders deliveryAgents,
 ) {
 	t.Helper()
 	ctx := context.Background()
@@ -109,8 +116,46 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	request("POST", deliveries, firstDelivery, otherDistrictToken, 404) // another district's notification
 	request("POST", deliveries, map[string]any{"lines": []map[string]any{{"condom_id": male, "quantity": 1000}}}, districtToken, 409)
 	request("POST", deliveries, map[string]any{"lines": []map[string]any{}}, districtToken, 422)
+
+	// A delivery agent may be named; only those working in the hotspot's district are offered or
+	// accepted, and naming another takes no stock.
+	ridersPath := "/orders/stockouts/" + openReport + "/riders"
+	request("GET", ridersPath, nil, managerToken, 403)
+	request("GET", ridersPath, nil, otherDistrictToken, 404)
+	offered := request("GET", ridersPath, nil, districtToken, 200)["data"].([]any)
+	if len(offered) != 1 || offered[0].(map[string]any)["id"] != riders.id {
+		t.Fatalf("delivery agents offered: %v, want only %s", offered, riders.id)
+	}
+	firstDelivery["rider_id"] = riders.awayID
+	request("POST", deliveries, firstDelivery, districtToken, 422)
+	firstDelivery["rider_id"] = "not-a-uuid"
+	request("POST", deliveries, firstDelivery, districtToken, 422)
+	firstDelivery["rider_id"] = riders.id
+
 	delivered := request("POST", deliveries, firstDelivery, districtToken, 201)["data"].(map[string]any)
 	expect("after delivery", delivered, map[string]any{"status": "awaiting_acknowledgement"})
+	if carrier, _ := delivered["deliveries"].([]any)[0].(map[string]any)["rider"].(map[string]any); carrier["id"] != riders.id ||
+		carrier["name"] != "workflow-rider" {
+		t.Fatalf("the delivery's agent: %v", carrier)
+	}
+	// The agent sees the delivery named for them, with where it goes; nobody else does.
+	request("GET", "/orders/deliveries", nil, managerToken, 403)
+	if away := request("GET", "/orders/deliveries", nil, riders.awayToken, 200)["data"].([]any); len(away) != 0 {
+		t.Fatalf("another agent sees deliveries not named for them: %v", away)
+	}
+	mine := request("GET", "/orders/deliveries", nil, riders.token, 200)["data"].([]any)
+	if len(mine) != 1 {
+		t.Fatalf("the agent's deliveries: %v", mine)
+	}
+	assignment := mine[0].(map[string]any)
+	if assignment["stockout_report_id"] != openReport || assignment["hot_spot_id"] != hotSpot ||
+		assignment["acknowledged"] != false || len(assignment["lines"].([]any)) != 2 ||
+		assignment["hot_spot"].(map[string]any)["contact_phone"] != "0700123456" {
+		t.Fatalf("the agent's delivery: %v", assignment)
+	}
+	if !hasNotification(t, request, riders.token, "order.delivery_assigned", "Peter Okello") {
+		t.Fatal("the delivery agent was not notified")
+	}
 	// A retried send with the same reference records nothing twice.
 	if again := request("POST", deliveries, firstDelivery, districtToken, 200)["data"].(map[string]any); len(again["deliveries"].([]any)) != 1 {
 		t.Fatalf("a retried delivery was recorded twice: %v", again["deliveries"])
@@ -156,7 +201,8 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 		t.Fatal("the hotspot manager was not told what is on the way")
 	}
 
-	// RF04: only the manager acknowledges, per line, in pieces actually received.
+	// RF04: the manager acknowledges, per line, in pieces actually received; so may the delivery agent
+	// named for the delivery, and only for that delivery.
 	acknowledgements := "/orders/stockouts/" + openReport + "/acknowledgements"
 	ack := func(token string, lines map[string]int, code int) map[string]any {
 		t.Helper()
@@ -173,10 +219,18 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	ack(districtToken, map[string]int{"male": 300}, 403)
 	ack(admin, map[string]int{"male": 300}, 403)
 	expect("male acknowledged", ack(managerToken, map[string]int{"male": 290}, 200), map[string]any{"status": "partly_received", "fulfilled_at": nil})
-	ack(managerToken, map[string]int{"male": 290}, 200) // a repeated send is counted once
-	ack(managerToken, map[string]int{"male": 280}, 409) // a different count is a correction, not a resend
-	// Nothing female arrived: a zero count keeps the notification partly received.
-	expect("female missing", ack(managerToken, map[string]int{"female": 0}, 200), map[string]any{"status": "partly_received"})
+	ack(managerToken, map[string]int{"male": 290}, 200)     // a repeated send is counted once
+	ack(managerToken, map[string]int{"male": 280}, 409)     // a different count is a correction, not a resend
+	ack(riders.awayToken, map[string]int{"female": 0}, 403) // not the agent named for it
+	// Nothing female arrived: the delivery agent records the zero count, which keeps the notification
+	// partly received.
+	expect("female missing", ack(riders.token, map[string]int{"female": 0}, 200), map[string]any{"status": "partly_received"})
+	if mine := request("GET", "/orders/deliveries", nil, riders.token, 200)["data"].([]any); mine[0].(map[string]any)["acknowledged"] != true {
+		t.Fatalf("the agent's delivery should read as confirmed: %v", mine[0])
+	}
+	if !hasNotification(t, request, districtToken, "order.delivery_acknowledged", "as confirmed by the delivery agent") {
+		t.Fatal("the district was not told the delivery agent confirmed receipt")
+	}
 	partly := summary(admin, "&category=female")
 	expect("summary partly received", partly, map[string]any{"partly_received": float64(1), "notifications_fulfilled": float64(0)})
 	expect("female component", partly["component"].(map[string]any), map[string]any{"notifications": float64(1), "fulfilled": float64(0)})
@@ -186,6 +240,9 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	second := request("POST", deliveries, map[string]any{"lines": []map[string]any{{"condom_id": female, "quantity": 10}}},
 		districtToken, 201)["data"].(map[string]any)
 	secondLine := second["deliveries"].([]any)[1].(map[string]any)["lines"].([]any)[0].(map[string]any)["id"].(string)
+	// No agent was named for it, so the agent of the first delivery may not acknowledge it.
+	request("POST", acknowledgements, map[string]any{"lines": []map[string]any{{"line_id": secondLine, "pieces": 100}}},
+		riders.token, 403)
 	done := request("POST", acknowledgements, map[string]any{"lines": []map[string]any{{"line_id": secondLine, "pieces": 100}}},
 		managerToken, 200)["data"].(map[string]any)
 	if done["status"] != "fulfilled" || done["fulfilled_at"] == nil {

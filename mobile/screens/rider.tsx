@@ -20,9 +20,11 @@ import { MapCard, PhotoField, SignaturePad } from "@/components/m/media";
 import { ago, chip, type ChipDef, items, lineRows, num, PRODUCTS, toInt } from "@/lib/format";
 import { useNav } from "@/lib/nav";
 import { RIDER } from "@/lib/seed";
+import { useMe } from "@/lib/session";
 import { usePending, useStore } from "@/lib/store";
 import type { Order, OrderStatus, Qty } from "@/lib/types";
 import { call } from "./common";
+import { RiderDeliveriesLive, RiderHistoryLive } from "./riderLive";
 
 const RC: Partial<Record<OrderStatus, ChipDef>> = {
   dispatched: chip("To collect", "info"),
@@ -31,6 +33,15 @@ const RC: Partial<Record<OrderStatus, ChipDef>> = {
   received: chip("Confirmed", "neutral"),
 };
 
+/** A signed-in delivery agent sees the deliveries the API names for them; demo sign-ins, samples. */
+export function RiderDeliveries() {
+  return useMe().demo ? <RiderDeliveriesSample /> : <RiderDeliveriesLive />;
+}
+
+export function RiderHistory() {
+  return useMe().demo ? <RiderHistorySample /> : <RiderHistoryLive />;
+}
+
 function useRider() {
   const { s } = useStore();
   const mine = s.orders.filter((o) => o.delivery?.riderId === RIDER.id);
@@ -38,7 +49,7 @@ function useRider() {
   return { mine, H };
 }
 
-export function RiderDeliveries() {
+function RiderDeliveriesSample() {
   const nav = useNav();
   const { mine, H } = useRider();
   const actv = mine
@@ -92,7 +103,7 @@ export function RiderDeliveries() {
   );
 }
 
-export function RiderHistory() {
+function RiderHistorySample() {
   const nav = useNav();
   const { mine } = useRider();
   const done = mine

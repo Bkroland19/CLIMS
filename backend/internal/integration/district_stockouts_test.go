@@ -137,10 +137,18 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 	}
 	alert(inactive, 403)
 	alert(elsewhere, 403)
+	// The VHT follows the request they sent without orders:read, but lists nothing.
+	reportPath := "/orders/stockouts/" + raised["id"].(string)
+	if seen := request("GET", reportPath, nil, vht, 200)["data"].(map[string]any); seen["id"] != raised["id"] {
+		t.Fatalf("the VHT's own report: %v", seen)
+	}
+	request("GET", "/orders/stockouts", nil, vht, 403)
 
 	// orders:stockout alone still means the assigned hotspot only.
 	request("PUT", "/roles/"+roleID("healthy facility")+"/permissions",
 		map[string]any{"permissions": []string{"orders:stockout"}}, admin, 200)
 	facility := account("healthy facility", "district-facility")
 	request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": active, "condom_category": "male"}, facility, 403)
+	// Reporting stockouts opens only one's own reports, not another reporter's.
+	request("GET", reportPath, nil, facility, 404)
 }

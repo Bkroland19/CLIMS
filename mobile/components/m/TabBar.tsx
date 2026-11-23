@@ -28,11 +28,14 @@ function useBadges(): Partial<Record<TabKey, number>> {
     orders: me.demo
       ? s.orders.filter((o) => o.hotspotId === HM_HOTSPOT && o.status === "delivered").length
       : 0,
-    deliveries: s.orders.filter(
-      (o) =>
-        o.delivery?.riderId === RIDER.id &&
-        (o.status === "dispatched" || o.status === "in_transit"),
-    ).length,
+    // Signed-in delivery agents: their API deliveries the hotspot has not confirmed yet.
+    deliveries: me.demo
+      ? s.orders.filter(
+          (o) =>
+            o.delivery?.riderId === RIDER.id &&
+            (o.status === "dispatched" || o.status === "in_transit"),
+        ).length
+      : (s.riderDeliveries ?? []).filter((d) => !d.acknowledged).length,
   };
 }
 

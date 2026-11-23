@@ -331,9 +331,9 @@ export function VhtRequests() {
                 : `${items(o.items)} · ${ago(o.createdAt)}`
             }
             chip={orderChip(o.status)}
-            // A VHT has no orders:read, so the API won't show them a notification's details.
-            chev={o.source !== "api"}
-            onPress={o.source === "api" ? undefined : () => nav.go(`order/${o.id}`)}
+            chev
+            // A request sent to the API opens its notification: what was sent and what arrived.
+            onPress={() => nav.go(o.source === "api" ? `stockout/${o.id}` : `order/${o.id}`)}
           />
         ))}
       </List>

@@ -1,15 +1,19 @@
-import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, ScrollView, View } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+  Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  View,
+  type TextInputInstance,
+} from "react-native";
 import { router, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme";
-import { Banner, Btn, Btns, Fields, Input, List, Note, Row, Sheet, Txt } from "@/components/m/kit";
+import { Banner, Btn, Btns, Input, List, Row, Sheet, Txt } from "@/components/m/kit";
 import { loginErrorMessage } from "@/lib/api";
 import { ROOT } from "@/lib/nav";
-import { DCFP } from "@/lib/seed";
 import { ROLE_LABEL, useSession } from "@/lib/session";
 import type { AppRole } from "@/lib/types";
-import { call } from "@/screens/common";
 import { MAX_FORM_WIDTH, useColumn, useResponsive } from "@/hooks/useResponsive";
 import { useKeyboardScroll } from "@/hooks/useKeyboardScroll";
 import { TYPE } from "@/lib/fonts";
@@ -20,8 +24,7 @@ export default function SignIn() {
   const { signIn, signInDemo } = useSession();
   const col = useColumn(MAX_FORM_WIDTH);
   const { isShort, isCompact } = useResponsive();
-  // The Ministry of Health seal, the same as the web app's, sized like the EMS app's crest.
-  const seal = isShort ? 80 : isCompact ? 104 : 120;
+  const seal = isShort ? 56 : isCompact ? 80 : 96;
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,8 +32,11 @@ export default function SignIn() {
   const [forgot, setForgot] = useState(false);
   const [demo, setDemo] = useState(false);
   const setScroll = useKeyboardScroll();
+  const passwordInput = useRef<TextInputInstance>(null);
+  const canSignIn = !busy && !!id.trim() && !!pw;
 
   const enter = async () => {
+    if (!canSignIn) return;
     setErr("");
     setBusy(true);
     try {
@@ -61,8 +67,8 @@ export default function SignIn() {
           {
             flexGrow: 1,
             justifyContent: "center",
-            paddingTop: insets.top + (isShort ? 16 : 40),
-            paddingBottom: insets.bottom + 24,
+            paddingTop: insets.top + (isShort ? 12 : 32),
+            paddingBottom: insets.bottom + 16,
           },
         ]}
       >
@@ -70,7 +76,7 @@ export default function SignIn() {
           style={{
             alignItems: "center",
             paddingHorizontal: isCompact ? 16 : 24,
-            marginBottom: isShort ? 20 : 32,
+            marginBottom: isShort ? 12 : 24,
             gap: isShort ? 4 : 6,
           }}
         >
@@ -84,7 +90,6 @@ export default function SignIn() {
             resizeMode="contain"
           />
           <Txt
-            accessibilityRole="header"
             style={{
               fontSize: isShort || isCompact ? 28 : 32,
               fontWeight: "700",
@@ -97,9 +102,8 @@ export default function SignIn() {
           </Txt>
         </View>
 
-        {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
-
         <Txt
+          accessibilityRole="header"
           style={{
             ...TYPE.title,
             fontWeight: "700",
@@ -109,39 +113,49 @@ export default function SignIn() {
         >
           Sign in
         </Txt>
-        <Fields>
+        {err ? <Banner tone="danger" title="Couldn't sign in" body={err} /> : null}
+        <View style={{ marginHorizontal: 16, marginBottom: 18, gap: 14 }}>
           <Input
             label="Email, username or phone"
+            outlined
+            leadingIcon="user"
             value={id}
-            onChangeText={setId}
+            onChangeText={(value) => {
+              setId(value);
+              setErr("");
+            }}
             autoCapitalize="none"
+            autoCorrect={false}
             autoComplete="username"
-            ph="name@example.org or 0772 123456"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordInput.current?.focus()}
           />
           <Input
             label="Password"
+            outlined
+            leadingIcon="shield"
             value={pw}
-            onChangeText={setPw}
+            onChangeText={(value) => {
+              setPw(value);
+              setErr("");
+            }}
             secure
             autoCapitalize="none"
+            autoCorrect={false}
             autoComplete="password"
+            inputRef={passwordInput}
+            returnKeyType="go"
+            onSubmitEditing={enter}
           />
-        </Fields>
+        </View>
         <Btns>
-          <Btn
-            label={busy ? "Signing in…" : "Sign in"}
-            onPress={enter}
-            dis={busy || !id.trim() || !pw}
-          />
+          <Btn label={busy ? "Signing in…" : "Sign in"} onPress={enter} dis={!canSignIn} />
           <Btn label="Forgot password?" kind="text" onPress={() => setForgot(true)} />
           {__DEV__ ? (
-            <Btn label="Try with sample data" kind="secondary" onPress={() => setDemo(true)} />
+            <Btn label="Try with sample data" kind="text" onPress={() => setDemo(true)} />
           ) : null}
         </Btns>
-        <Note
-          center
-          text="You stay signed in on this phone. CLIMS keeps working when there is no network."
-        />
       </ScrollView>
 
       <Sheet
@@ -160,25 +174,15 @@ export default function SignIn() {
             color: T.fg,
           }}
         >
-          {`Only your district focal person can reset your password. Call ${DCFP.name} to get a new one by SMS.`}
+          Contact your district focal person or CLIMS administrator to reset your password.
         </Txt>
         <Btns>
-          <Btn
-            label={`Call ${DCFP.name.split(" ")[0]}`}
-            icon="phone"
-            onPress={() => {
-              setForgot(false);
-              call(DCFP.phone);
-            }}
-          />
+          <Btn label="Done" onPress={() => setForgot(false)} />
         </Btns>
       </Sheet>
 
       <Sheet visible={demo} title="Sample data" icon="user" onClose={() => setDemo(false)}>
-        <List
-          h="Sign in as"
-          f="Development builds only. Sample Wakiso data is kept on this phone; the API has no hotspot or order endpoints yet."
-        >
+        <List h="Sign in as" f="Development builds only. Sample Wakiso data is kept on this phone.">
           {(["vht", "hm", "rider"] as AppRole[]).map((r) => (
             <Row
               key={r}

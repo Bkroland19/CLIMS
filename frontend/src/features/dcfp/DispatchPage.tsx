@@ -1,6 +1,16 @@
 'use client';
 
-import { CheckCheck, Clock, MapPin, Package, Store, Truck } from 'lucide-react';
+import {
+  ArrowDownRight,
+  ChartPie,
+  Check,
+  CheckCheck,
+  CircleAlert,
+  MapPin,
+  Package,
+  Store,
+  Truck,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -8,7 +18,6 @@ import { useMemo, useState } from 'react';
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
 import { FilterTabs } from '@/components/FilterTabs';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
-import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/states/EmptyState';
 import { ErrorState } from '@/components/states/ErrorState';
 import { Button } from '@/components/ui/button';
@@ -19,6 +28,7 @@ import { ugandaToday } from '@/features/warehouse/receiving';
 import { useStoreSummary } from '@/features/warehouse/stockQueries';
 import { formatAmounts, periodRange, totalsByUnit } from '@/features/warehouse/summary';
 import { formatNumber, formatTimestamp } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { useReadOnly } from '@/navigation/useAccess';
 
 import type { StockoutReport } from './api';
@@ -34,6 +44,41 @@ const filters = [
   { value: 'fulfilled', label: 'Fulfilled' },
   { value: 'all', label: 'All' },
 ] as const;
+
+const dispatchStatusStyles = {
+  awaiting_supply: {
+    icon: Package,
+    color: 'border-warning/30 bg-warning/10 text-warning',
+  },
+  awaiting_acknowledgement: {
+    icon: Truck,
+    color: 'border-info/30 bg-info/10 text-info',
+  },
+  partly_received: {
+    icon: ChartPie,
+    color:
+      'border-violet-600/25 bg-violet-50 text-violet-800 dark:border-violet-400/35 dark:bg-violet-950/60 dark:text-violet-200',
+  },
+  fulfilled: {
+    icon: CheckCheck,
+    color: 'border-success/30 bg-success/10 text-success',
+  },
+};
+
+function DispatchStatus({ status }: { status: keyof typeof dispatchStatusStyles }) {
+  const { icon: Icon, color } = dispatchStatusStyles[status];
+  return (
+    <span
+      className={cn(
+        'inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs leading-none font-semibold whitespace-nowrap',
+        color,
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      {STOCKOUT_STATUS[status].label}
+    </span>
+  );
+}
 
 const columns: DataTableColumn<StockoutReport>[] = [
   {
@@ -53,10 +98,7 @@ const columns: DataTableColumn<StockoutReport>[] = [
     filter: 'select',
     header: 'Status',
     value: (report) => STOCKOUT_STATUS[report.status ?? 'awaiting_supply'].label,
-    cell: (report) => {
-      const status = STOCKOUT_STATUS[report.status ?? 'awaiting_supply'];
-      return <StatusBadge status={status.label} tone={status.tone} />;
-    },
+    cell: (report) => <DispatchStatus status={report.status ?? 'awaiting_supply'} />,
   },
   {
     id: 'reported',
@@ -121,8 +163,8 @@ export default function DispatchPage() {
           <StatCard
             label="Partly received"
             value={formatNumber(scoped?.filter((r) => r.status === 'partly_received').length ?? 0)}
-            icon={Clock}
-            accent="caution"
+            icon={ChartPie}
+            accent="violet"
             isLoading={reports.isPending}
             detail="Check receipts before sending more"
           />
@@ -136,7 +178,20 @@ export default function DispatchPage() {
           />
         </StatCardGrid>
       ) : null}
-      <FilterTabs label="Filter hotspot requests" tabs={filters} value={filter} hrefFor={pathFor} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="font-heading text-base font-semibold">Hotspot requests</h2>
+          <p className="text-muted-foreground text-sm">
+            Select a hotspot to review its request and dispatch history.
+          </p>
+        </div>
+        <FilterTabs
+          label="Filter hotspot requests"
+          tabs={filters}
+          value={filter}
+          hrefFor={pathFor}
+        />
+      </div>
       <DataTable
         label="Hotspot dispatch requests"
         preferencesKey="dcfp-dispatch"
@@ -154,27 +209,31 @@ export default function DispatchPage() {
         rowActions={(report) => (
           <Button variant={selected?.id === report.id ? 'secondary' : 'outline'} size="sm" asChild>
             <Link
-              href={`${DCFP_PATHS.dispatchFor(report.id)}&status=${filter}`}
+              href={`${DCFP_PATHS.dispatchFor(report.id)}&status=${filter}#dispatch-request`}
               aria-label={`Select ${report.hot_spot.name}`}
               aria-current={selected?.id === report.id ? 'true' : undefined}
             >
-              {selected?.id === report.id ? 'Selected' : 'Select hotspot'}
+              {selected?.id === report.id ? (
+                <>
+                  <Check aria-hidden="true" /> Selected
+                </>
+              ) : (
+                <>
+                  Review request <ArrowDownRight aria-hidden="true" />
+                </>
+              )}
             </Link>
           </Button>
         )}
       />
       {selected ? (
         <DispatchRequest key={selected.id} report={selected} storeId={storeId} />
-      ) : !reports.error && !reports.isPending ? (
+      ) : params.get('report') && !reports.error && !reports.isPending ? (
         <Card>
           <EmptyState
             icon={MapPin}
-            title={
-              params.get('report')
-                ? 'That request is not available in your district'
-                : 'Choose a hotspot to dispatch to'
-            }
-            description="Select a request above to review its message, previous dispatches and available stock. Record each hotspot’s quantities separately."
+            title="That request is not available in your district"
+            description="Select another hotspot request from the list."
           />
         </Card>
       ) : null}
@@ -195,14 +254,23 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
   const available = stock ? formatAmounts(totalsByUnit(stock, (product) => product.usable)) : '—';
 
   return (
-    <div className="gap-section grid items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+    <section
+      id="dispatch-request"
+      aria-labelledby="dispatch-request-title"
+      className="gap-section grid scroll-mt-20 items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]"
+    >
       <Card>
-        <CardHeader>
-          <CardTitle>{report.hot_spot.name}</CardTitle>
-          <CardDescription>{placeOf(report)}</CardDescription>
+        <CardHeader className="border-b">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <CardTitle id="dispatch-request-title">{report.hot_spot.name}</CardTitle>
+            <DispatchStatus status={status} />
+          </div>
+          <CardDescription className="flex items-center gap-1.5">
+            <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+            {placeOf(report)}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <StatusBadge status={STOCKOUT_STATUS[status].label} tone={STOCKOUT_STATUS[status].tone} />
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-muted-foreground">Requested</dt>
@@ -218,7 +286,7 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
             </div>
           </dl>
           {can('inventory:read') ? (
-            <div className="bg-secondary rounded-md p-3 text-sm">
+            <div className="bg-secondary/60 space-y-1 rounded-lg border p-3 text-sm">
               <p className="text-muted-foreground">Available in district store · all products</p>
               <p className="font-semibold">
                 {summary.isPending
@@ -240,13 +308,17 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
             />
           ) : null}
           {status === 'awaiting_acknowledgement' || status === 'partly_received' ? (
-            <p className="text-muted-foreground text-sm">
-              Stock has already been dispatched. Review the quantities and receipt confirmations
-              before sending more.
-            </p>
+            <div className="border-warning/25 bg-warning/10 flex items-start gap-2 rounded-lg border p-3 text-sm">
+              <CircleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <p>
+                Stock has already been dispatched. Review the quantities and receipt confirmations
+                before sending more.
+              </p>
+            </div>
           ) : null}
           {manage && status !== 'fulfilled' ? (
             <Button
+              className="h-auto min-h-9 w-full max-w-full justify-center sm:w-auto"
               disabled={
                 !detail.isSuccess ||
                 Boolean(detail.error) ||
@@ -258,7 +330,7 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
               }}
             >
               <Truck aria-hidden="true" />
-              Dispatch to {report.hot_spot.name}
+              <span className="min-w-0 whitespace-normal">Dispatch to {report.hot_spot.name}</span>
             </Button>
           ) : null}
           {manage && !can('inventory:read') ? (
@@ -301,12 +373,18 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
             detail.data.deliveries.map((delivery) => (
               <section
                 key={delivery.id}
-                className="space-y-2 rounded-md border p-3"
+                className="space-y-2 rounded-lg border p-3"
                 aria-label={`Dispatch ${formatTimestamp(delivery.created_at)}`}
               >
                 <h3 className="text-sm font-medium">
                   Dispatched {formatTimestamp(delivery.created_at)}
                 </h3>
+                {delivery.rider ? (
+                  <p className="text-sm">
+                    Carried by {delivery.rider.name}
+                    {delivery.rider.phone ? ` · ${delivery.rider.phone}` : ''}
+                  </p>
+                ) : null}
                 {delivery.note ? (
                   <p className="text-muted-foreground text-sm">{delivery.note}</p>
                 ) : null}
@@ -316,11 +394,13 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
                       <p className="font-medium">{line.product}</p>
                       <div className="flex flex-wrap justify-between gap-2">
                         <span>{formatNumber(line.pieces)} pieces sent</span>
-                        <span className="text-muted-foreground">
-                          {line.acknowledged_at === null
-                            ? 'Awaiting receipt'
-                            : `${formatNumber(line.acknowledged_pieces ?? 0)} pieces received`}
-                        </span>
+                        {line.acknowledged_at === null ? (
+                          <DispatchStatus status="awaiting_acknowledgement" />
+                        ) : (
+                          <span className="text-success font-medium">
+                            {formatNumber(line.acknowledged_pieces ?? 0)} pieces received
+                          </span>
+                        )}
                       </div>
                       {line.acknowledged_at ? (
                         <p className="text-muted-foreground text-xs">
@@ -345,6 +425,6 @@ function DispatchRequest({ report, storeId }: { report: StockoutReport; storeId:
           }}
         />
       ) : null}
-    </div>
+    </section>
   );
 }

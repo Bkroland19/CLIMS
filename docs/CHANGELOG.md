@@ -6,6 +6,15 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- **Delivery agents for hotspot deliveries.** A DCFP may name the delivery agent who carries a
+  delivery to a hotspot (`rider_id` on `POST /api/v1/orders/stockouts/{id}/deliveries`); only active
+  users with `orders:deliver` working in the hotspot's district qualify, listed by
+  `GET /api/v1/orders/stockouts/{id}/riders`. The agent is notified (`order.delivery_assigned`) and
+  lists their deliveries with `GET /api/v1/orders/deliveries`. Migration 35 adds
+  `hotspot_deliveries.rider_id`. Web: an optional delivery agent in the dispatch dialog. Mobile: a
+  signed-in delivery agent's Deliveries and History tabs show the deliveries named for them. The agent may
+  also acknowledge what arrived for those deliveries when the hotspot's manager cannot; the district is
+  told the agent confirmed.
 - **Consistent data table filtering across the web app.** Shared column filters cover text,
   multi-select categories, numeric and date ranges, and empty values, with removable chips,
   clear-all, visible page size and honest warnings when refreshing existing rows fails.
