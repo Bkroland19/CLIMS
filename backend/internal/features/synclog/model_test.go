@@ -8,7 +8,6 @@ import (
 
 var now = time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)
 
-
 func validUpload() Upload {
 	return Upload{
 		Device: Device{Platform: "android", OSVersion: "14", AppVersion: "2.2.0"},

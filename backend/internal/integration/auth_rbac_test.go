@@ -140,6 +140,13 @@ func TestAuthRBACIntegration(t *testing.T) {
 		roleIDs[name] = roleID
 	}
 	adminRole, mohRole, hotspotRole := roleIDs["admin"], roleIDs["moh"], roleIDs["hotspot manager"]
+	// Before any test changes them: MOH reads the field app's sync log from the start (migration 38).
+	var mohReadsSyncLog bool
+	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
+		JOIN permissions p ON p.id = rp.permission_id WHERE r.name = 'moh' AND p.name = 'sync_logs:read')`).
+		Scan(&mohReadsSyncLog); err != nil || !mohReadsSyncLog {
+		t.Fatalf("moh should hold sync_logs:read: %v %v", mohReadsSyncLog, err)
+	}
 	unknownID := uuid.NewString()
 	hash, err := bcrypt.GenerateFromPassword([]byte("test-password-123"), bcrypt.MinCost)
 	if err != nil {
@@ -447,6 +454,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
 	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testAudit(t, pool, repo, service, auditor, adminToken)
+	testSyncLog(t, pool, repo, service, auditor, adminToken)
 	testOrderWorkflow(t, pool, request, login, adminToken, sourceID, destinationID, condomID, unitID)
 	testCatalogue(t, pool, request, adminToken, userToken, sourceID, destinationID)
 	testStoreAssignment(t, pool, request, adminToken, userToken)
@@ -535,6 +543,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	// inventory and (DCFP) report defaults, migration 35 gives delivery agents orders:deliver, and
 	// migration 39 gives moh every read permission and the warehouses reports:read. Every other non-admin
 	// grant is the custom one, which survives even though migration 39 makes moh read-only by default.
+	// Migration 40 gives moh sync_logs:read.
 	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
@@ -543,7 +552,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 			AND NOT (r.name IN ('dfcp', 'nms', 'jms') AND p.name = 'reports:read')
 			AND NOT (r.name = 'moh' AND p.name IN ('audit:read', 'hotspots:all_districts', 'hotspots:read',
 				'hotspots:read_district', 'inventory:read', 'orders:all_stores', 'orders:read', 'reports:read',
-				'roles:read', 'users:read'))
+				'roles:read', 'sync_logs:read', 'users:read'))
 			AND NOT (r.name = 'delivery agent' AND p.name = 'orders:deliver')),
 		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
