@@ -4,7 +4,7 @@
 
 The notifications module is the shared way to notify one person or a group. Any feature sends through it, and every user reads their notifications in one inbox. Delivery is in-app for now; email and SMS follow once a provider is funded, without changes to the features that send.
 
-[Hotspots](hotspots.md#notifications) and [orders](orders.md#notifications) send their workflow notifications through it.
+[Hotspots](hotspots.md#notifications) and [orders](orders.md#notifications) send their workflow notifications through it, and [inventory](inventory.md#expiry-alerts) its batch expiry alerts.
 
 ## Sending from a feature
 

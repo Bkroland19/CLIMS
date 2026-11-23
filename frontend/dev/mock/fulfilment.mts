@@ -1145,13 +1145,12 @@ export function handleFulfilment(
 }
 
 /*
- * Shared with the warehouse mock (`warehouse.mts`): the district's warehouse
- * requests are the same records NMS and JMS act on, so a request the
- * warehouse dispatches can be received here. Read live, after any reseed.
+ * Shared with the national mock (`moh.mts`): MOH sees the district's warehouse
+ * requests and activity. Read live, after any reseed.
  */
 export type { Activity, Lot, Quantities, WarehouseRequest };
 
-/** The district's warehouse requests, live: the warehouse mock changes them in place. */
+/** The district's warehouse requests, live. */
 export function fulfilmentRequests(): WarehouseRequest[] {
   return state.requests;
 }
@@ -1159,16 +1158,6 @@ export function fulfilmentRequests(): WarehouseRequest[] {
 /** The district's activity feed, for the warehouse's history of these requests. */
 export function fulfilmentActivity(): readonly Activity[] {
   return state.activity;
-}
-
-/** Records something a warehouse user did to one of the district's requests. */
-export function recordWarehouseActivity(
-  actor: string,
-  warehouse: string,
-  text: string,
-  reference: string,
-): void {
-  record(actor, 'warehouse', warehouse, text, reference);
 }
 
 /*

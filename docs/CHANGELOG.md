@@ -4,8 +4,34 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- **The warehouse stock page at a glance.** `GET /api/v1/inventory/store-summary?store_id=&from=&to=`
+  reports one store: per product and unit, what is on hand, reserved, expired, expiring within three
+  months, usable and next to expire, what was received, dispatched and written off in the period, and
+  what went out in the last 90 days; and how many district orders wait at each step, with those
+  dispatched, rejected, dispatched in full and received short in the period, the districts supplied and
+  the median days to dispatch. Web: the warehouse stock page leads with on hand, dispatched, expired,
+  expiring, pending district orders and the success rate (dispatched of those dispatched or rejected),
+  for the last 30 or 90 days or 12 months, each linking to the list behind it; then products (with
+  stock cover in months), batches and movements as three views of one section.
+- **Stock is registered in one save.** `POST /api/v1/inventory/receipts` records every batch being
+  registered, each with a batch number and a future expiry date, in one transaction; a refusal names
+  the line. Web: **Register stock** opens a panel on the stock page where the batches are entered one
+  under the other (the product carries over to the next) and registered together.
+  `/warehouse/stock/receive` redirects to it.
+- Warehouse wording: a new district order's action reads **Manage order** (was "Decide on order"),
+  on the requests list, the order page and the dashboard's tasks.
+
 ### Changed
 
+- **The DCFP orders from the warehouse without choosing a unit.** `POST /api/v1/orders/warehouse-requests`
+  takes `warehouse_store_id`, `condom_category`, `quantity` and an optional `comment`; a body with
+  `unit_of_measure_id` is refused (400). The order's `unit_of_measure_id` stays null until the
+  warehouse chooses the product at `review`, which gives the order that product's catalogue unit (422
+  on `error.condom_id` when the product has none). Migration 33 lets an order lack a unit until it has
+  a product. Web: the new warehouse order form no longer asks for a unit, and the warehouse's approval
+  reads each product's stock in its own unit.
 - **Stockouts notify the DCFP; the DCFP orders from NMS or JMS.** `POST /api/v1/orders/stockouts` now
   records a stockout report and notifies the hotspot's district DCFPs (`orders:replenish`) with the
   hotspot's details, its contact and the message. It creates no order and returns a `StockoutReport`.
@@ -24,6 +50,15 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Removed
 
+- The warehouse screens' mock-only `/warehouses/{code}/…` contract and its sample requests, stock and
+  dispatch picker; the warehouse now reads orders, stock and batches from the Go API.
+
+- **Generic store-to-store orders and the orders-only inbox.** `POST /api/v1/orders`,
+  `PATCH /api/v1/orders/{id}/fulfill` and `GET /api/v1/orders/notifications` had no client: the web
+  and mobile apps use warehouse orders and the central inbox. Migration 32 deletes `orders:create`,
+  `orders:fulfill` and the unused `orders:deliver` with their grants, and the inbox's routing
+  columns on `order_events`. Orders already recorded that way stay readable.
+
 - The web DCFP screens for hotspot orders: the order queue, held orders, order review and rider
   dispatch (`/dcfp/orders…`, `/dcfp/dispatch…`).
 - The hotspot alert actions `request-replenishment`, `deliver` and the DCFP's rider `dispatch`, with
@@ -40,6 +75,57 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   product until the warehouse chooses one.
 
 ### Added
+
+- **Documentation site at `/handbook/`.** `docs/` is published as a Docusaurus site, with search,
+  served from the production server by a new `docs` release image (`DOCS_IMAGE` in `images.env`).
+  It updates with each stable release. Preview it with `make docs-serve`. See
+  [ADR 0004](adr/0004-documentation-site.md).
+- **Warehouse stock on the Go API.** The stock page shows, per product, what is free to reserve,
+  what is reserved, expired and expiring within 3 months, and the next expiry; every batch with its
+  shelf-life band (filtered by band from the address); and the stock ledger with each entry's batch.
+  A batch can be adjusted after a count or written off as damaged, expired or lost, with a note.
+  **Record a delivery** (`/warehouse/stock/receive`) records a delivery batch by batch, with its
+  number, expiry date and quantity. The dashboard lists orders to decide, reserve, dispatch or
+  recheck and batches to write off or send first, on live data; batch expiry alerts in the bell open
+  the stock page.
+- Inventory movements name the batch a receipt or adjustment changed (`batch_number`,
+  `expiry_date`).
+
+- **Warehouse district requests on the Go API.** NMS and JMS list the orders districts placed with
+  them and open one to decide: choose the product to send from the category requested (each with
+  what it can reserve), approve all or part, and the stock is reserved at once or the order waits
+  for stock; a held order is checked again or approved again for less or another product. A
+  reserved order is dispatched first expiry first out: the page shows the batches that will go,
+  asks for a reason when one has under a month left, and records the transport. Any order can be
+  rejected with a reason before dispatch. The sidebar badge counts orders to decide or dispatch,
+  and the bell opens warehouse order notifications on these screens.
+- `GET /api/v1/inventory/batches` lists a store's batches with their shelf-life band and days left,
+  for `inventory:read`, in the order dispatch takes them.
+
+- **Batch expiry alerts.** Every hour the server tells the people who manage a store's stock
+  (`inventory:manage` at the store), at NMS, JMS and district stores alike, once when a batch with
+  stock comes within 3 months of its expiry date (`inventory.batch_expiring`) and once when it
+  expires (`inventory.batch_expired`).
+
+- **NMS and JMS can reject a district's order.** `POST /api/v1/orders/{id}/actions/reject` with a
+  required `reason`, at any step before dispatch. The order becomes `rejected`, keeps
+  `rejection_reason` and releases anything `check-stock` reserved (migration 31).
+- **The DCFP hears what the warehouse decided.** Review sends `order.replenishment_approved` with the
+  product chosen and the approved quantity (saying when it is less than ordered); rejection sends
+  `order.replenishment_rejected` quoting the reason. A receipt now also notifies the warehouse, with
+  any discrepancy note.
+- Dispatch can record the transport (waybill, vehicle, driver and phone, each optional), which the
+  district's dispatch notification includes.
+- Migration 31 grants the `nms` and `jms` roles `orders:read`, `orders:process`, `inventory:read` and
+  `inventory:manage`, and the `dfcp` role `orders:read`, `orders:replenish`, `orders:receive`,
+  `inventory:read` and `inventory:manage`, by default. Administrators can change them in Users &
+  access.
+- The warehouse requests report counts `rejected` requests, which are no longer counted as pending
+  or approved.
+- **Web Restock shows the warehouse's decision.** A rejected order says why, with a link to place a
+  new one; an approval of less than ordered says so; a dispatched order shows its waybill, vehicle and
+  driver. The bell opens approval and rejection notifications on the order. Reviewed orders read
+  "Approved".
 
 - **VHT stockout alerts for their district.** A VHT with the new `orders:stockout_district` permission can
   raise a stockout alert for any active hotspot in the district they work in (assigned store's district,

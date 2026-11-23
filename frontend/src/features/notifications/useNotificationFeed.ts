@@ -4,7 +4,7 @@ import type { AppNotification, NotificationActions } from '@/components/layout/N
 import { formatTimestamp } from '@/lib/format';
 
 import type { InboxNotification } from './api';
-import { toAppNotification } from './feed';
+import { toAppNotification, type Opens } from './feed';
 import { useInbox, useMarkAllRead, useMarkRead } from './queries';
 
 export interface NotificationFeed {
@@ -17,9 +17,9 @@ export interface NotificationFeed {
 
 /**
  * The signed-in user's inbox for the top bar's bell. Opening an unread notification marks it
- * read. `canOpenDcfp` decides whether DCFP notifications link to their screens.
+ * read. `opens` decides which workspaces' screens notifications link to.
  */
-export function useNotificationFeed(canOpenDcfp: boolean): NotificationFeed {
+export function useNotificationFeed(opens: Opens): NotificationFeed {
   const inbox = useInbox();
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
@@ -29,9 +29,11 @@ export function useNotificationFeed(canOpenDcfp: boolean): NotificationFeed {
   const notifications = useMemo(
     () =>
       inbox.data?.map((notification) =>
-        toAppNotification(notification, canOpenDcfp, (iso) => formatTimestamp(iso)),
+        toAppNotification(notification, opens, (iso) => formatTimestamp(iso)),
       ),
-    [inbox.data, canOpenDcfp],
+    // The two flags, not the object, so a new object each render keeps the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inbox.data, opens.dcfp, opens.warehouse],
   );
   const actions = useMemo<NotificationActions>(
     () => ({

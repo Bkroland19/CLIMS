@@ -25,9 +25,11 @@ export const DCFP_PATHS = {
 /** What each status means to the DCFP who placed the order. */
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: StatusTone }> = {
   queued: { label: 'Sent', tone: 'info' },
-  reviewed: { label: 'Under review', tone: 'info' },
+  // The warehouse's review approves the order, all or part, for the product it chose.
+  reviewed: { label: 'Approved', tone: 'info' },
   on_hold: { label: 'Waiting for stock', tone: 'caution' },
   confirmed: { label: 'Stock reserved', tone: 'info' },
+  rejected: { label: 'Rejected', tone: 'negative' },
   dispatched: { label: 'On the way', tone: 'caution' },
   received: { label: 'Received', tone: 'positive' },
   // Not used by warehouse orders; listed so every API status has a label.
@@ -91,13 +93,20 @@ const STEPS_DONE: Partial<Record<OrderStatus, number>> = {
 
 /**
  * The order's progress for the step tracker. A held order is marked for attention on the
- * stock check, since it waits there until the warehouse has the stock.
+ * stock check, since it waits there until the warehouse has the stock. A rejected order stops
+ * at the warehouse's decision, marked for attention, since it goes no further.
  */
 export function orderSteps(status: OrderStatus): Step[] {
+  if (status === 'rejected') {
+    return [
+      { id: 'sent', label: 'Sent to warehouse', state: 'done' },
+      { id: 'reviewed', label: 'Rejected', state: 'attention' },
+    ];
+  }
   const reached = STEPS_DONE[status] ?? -1;
   const steps = [
     { id: 'sent', label: 'Sent to warehouse' },
-    { id: 'reviewed', label: 'Reviewed' },
+    { id: 'reviewed', label: 'Approved' },
     {
       id: 'stock',
       label: status === 'on_hold' ? 'Waiting for stock' : 'Stock reserved',
@@ -120,7 +129,9 @@ export function eventLabel(action: string, status: OrderStatus): string {
     case 'replenishment_requested':
       return 'Order sent to the warehouse';
     case 'review':
-      return 'Reviewed by the warehouse';
+      return 'Approved by the warehouse';
+    case 'reject':
+      return 'Rejected by the warehouse';
     case 'check-stock':
       return status === 'on_hold'
         ? 'Stock checked: waiting for stock'

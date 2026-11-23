@@ -112,7 +112,7 @@ describe('RolesPage', () => {
   });
 
   it('labels every permission the API defines in words, grouped by area', async () => {
-    const all = ['hotspots:activate', 'inventory:manage', 'orders:fulfill', 'users:read'];
+    const all = ['hotspots:activate', 'inventory:manage', 'orders:receive', 'users:read'];
     renderApp(<RolesPage />, {
       route: '/moh/users/roles?role=role-dcfp',
       signedIn: true,
@@ -128,7 +128,7 @@ describe('RolesPage', () => {
       await screen.findByRole('switch', { name: /Verify and activate hotspots in their district/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('switch', { name: /Record quantities their store issued/ }),
+      screen.getByRole('switch', { name: /Check and record stock their store received/ }),
     ).toBeInTheDocument();
     for (const area of ['Hotspots', 'Inventory', 'Orders', 'Users']) {
       expect(screen.getByRole('region', { name: area })).toBeInTheDocument();

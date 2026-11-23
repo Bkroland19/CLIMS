@@ -54,7 +54,7 @@ func testSupplyReports(t *testing.T, pool *pgxpool.Pool,
 
 	// RF06: the warehouse approves less than requested; the original request is kept.
 	created := request("POST", "/orders/warehouse-requests", map[string]any{"warehouse_store_id": warehouse,
-		"condom_category": categoryOf(t, pool, product), "unit_of_measure_id": unit, "quantity": 40}, districtToken, 201)["data"].(map[string]any)
+		"condom_category": categoryOf(t, pool, product), "quantity": 40}, districtToken, 201)["data"].(map[string]any)
 	orderPath := "/orders/" + created["id"].(string)
 	act := func(action string, body any, code int) map[string]any {
 		t.Helper()

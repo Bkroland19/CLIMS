@@ -4,13 +4,16 @@
 
 The inventory API reports stock across the supply chain: the national warehouse, district stores and hotspots. It also records stock that arrives outside the order workflow.
 
-| Method | Route                         | Permission         |
-| ------ | ----------------------------- | ------------------ |
-| GET    | `/api/v1/inventory/stock`     | `inventory:read`   |
-| GET    | `/api/v1/inventory/hotspots`  | `inventory:read`   |
-| GET    | `/api/v1/inventory/movements` | `inventory:read`   |
-| POST   | `/api/v1/inventory/movements` | `inventory:manage` |
-| GET    | `/api/v1/inventory/summary`   | `inventory:read`   |
+| Method | Route                             | Permission         |
+| ------ | --------------------------------- | ------------------ |
+| GET    | `/api/v1/inventory/stock`         | `inventory:read`   |
+| GET    | `/api/v1/inventory/batches`       | `inventory:read`   |
+| GET    | `/api/v1/inventory/hotspots`      | `inventory:read`   |
+| GET    | `/api/v1/inventory/movements`     | `inventory:read`   |
+| POST   | `/api/v1/inventory/movements`     | `inventory:manage` |
+| POST   | `/api/v1/inventory/receipts`      | `inventory:manage` |
+| GET    | `/api/v1/inventory/summary`       | `inventory:read`   |
+| GET    | `/api/v1/inventory/store-summary` | `inventory:read`   |
 
 ## Reports
 
@@ -19,7 +22,9 @@ The inventory API reports stock across the supply chain: the national warehouse,
 - **Movements** is the ledger behind the balances: every change to a store's on-hand stock, newest first, with `on_hand_after`. Reasons are `opening`, `receipt`, `adjustment`, `dispatch` and `order_receipt`; the last two are written by the [order workflow](orders.md) and link the order. Filter by `store_id`, `condom_id` or `reason`, and page with `limit` and `offset`.
 - **Summary** totals each product nationally: warehouse and district stock on hand and available, stock in transit, and, from alert orders raised before migration 22, quantity delivered to hotspots in the period and open hotspot requests. Held counts include held warehouse orders.
 
-Hotspot, movement and summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
+- **Store summary** (`GET /api/v1/inventory/store-summary?store_id=`) is one store at a glance, for the warehouse stock screen. Per product and unit, as of now: `on_hand`, `reserved`, `expired` (in batches past their expiry date), `expiring` (under three months left), `no_expiry`, `usable` (on hand less reserved and expired, what check-stock can still reserve) and `next_expiry`; in the period, `received`, `dispatched` and `written_off` (stock taken away by adjustments); and `dispatched_90_days`, whatever the period, from which the screen works out stock cover. For the orders district stores placed with the store, open now: `to_decide` (queued), `waiting_for_stock` (reviewed or on hold), `to_dispatch` (confirmed) and `in_transit` (dispatched, not yet received); and, counting workflow steps taken in the period, `dispatched`, `rejected`, `dispatched_in_full` (at least the quantity ordered), `districts_supplied`, `received_short` (the district counted less than was sent) and `median_days_to_dispatch`. The screen's success rate is dispatched over dispatched plus rejected. Users see their assigned store; `orders:all_stores` any store (404 for one that does not exist).
+
+Hotspot, movement, summary and store summary reports accept a period as `from` and `to` dates (`YYYY-MM-DD`, both days included). Hotspot deliveries are dated by the order's last update, which is the delivery.
 
 ## Recording stock
 
@@ -30,11 +35,26 @@ Hotspot, movement and summary reports accept a period as `from` and `to` dates (
 
 Stock cannot fall below what open orders have reserved; such an adjustment returns 409. Order dispatch and receipt continue to move stock themselves and record their own entries.
 
+`POST /api/v1/inventory/receipts` records a whole delivery: a `store_id`, an optional `note` (where it came from) and 1 to 50 `lines`, each a product, unit, `batch_number`, `expiry_date` and positive `quantity`. Every line becomes a `receipt` in one transaction, so the delivery is saved in full or not at all. A delivery is filed and dispatched by its batches, so each line needs a batch number and an expiry date after today (Uganda's date). The same batch may come on several lines with the same expiry date; a batch number given two expiry dates in one delivery, or already held at the store under another one, is refused. A refusal about one line starts with its number (`line 2: …`, 422, or 409 for a batch short of stock), so a client can show it on that line.
+
 ## Batches and expiry
 
 A store's stock of a product in a unit is held in batches (`stock_batches`), each with an optional `batch_number` and `expiry_date`, adding up to the store total. A receipt or positive adjustment adds to the batch it names; a negative adjustment comes out of it (409 when the batch holds less). Without batch details the stock is in the unknown-expiry batch, which reports do not count as usable until reviewed. Migration 26 put each existing balance in an unknown-expiry batch.
 
 Stock leaves a store first expiry first out: warehouse dispatch and district deliveries to hotspots take the earliest-expiring batch first and unknown expiry last. Expired batches never leave, and a batch with under one calendar month left leaves only with an `expiry_exception_reason`, recorded with who authorised it and the rule version. What left is recorded per batch (`shipment_batches`), and a district's receipt puts the counted quantity into the batches the warehouse shipped: a shortfall comes off the latest-expiring batch, and a surplus goes to an unknown-expiry batch. Warehouse check-stock does not count expired stock as available. See [reports](reports.md#batches-and-expiry).
+
+`GET /api/v1/inventory/batches` lists the batches with stock at the stores the user may see, optionally for one `store_id` and `condom_id`, in the order dispatch takes them: earliest expiry first, unknown expiry last. Each has its `band` (`expired`, `under_1_month`, `under_3_months`, `under_6_months`, `ok`, or `unknown` without an expiry date) and `days_remaining`. It needs `inventory:read`, so warehouse and district staff can see their batches without report access.
+
+### Expiry alerts
+
+The server checks batches every hour (`inventory.ExpiryAlerts`, started from `cmd/server/main.go`). The people who manage a store's stock (`inventory:manage` at the store), at NMS, JMS and district stores alike, are told once when a batch with stock comes within 3 months of its expiry date (`inventory.batch_expiring`, the `under_3_months` band and below) and once more when it expires (`inventory.batch_expired`). The batch ID is the idempotency key, so a restart or a second server never repeats one. A batch with nothing left, or with no expiry date, is not announced. A store with nobody to tell stores nothing, so its batches are announced once someone there manages its stock.
+
+| Type                       | Sent to                         | Resource      |
+| -------------------------- | ------------------------------- | ------------- |
+| `inventory.batch_expiring` | `inventory:manage` at the store | `stock_batch` |
+| `inventory.batch_expired`  | `inventory:manage` at the store | `stock_batch` |
+
+Their `data` has `store`, `store_id`, `product`, `unit`, `quantity` (on hand when announced), `batch` (the number, or empty), `batch_label` ("batch TGL24155" or "a batch with no number"), `expiry` ("31 Mar 2027") and `expiry_date` (`YYYY-MM-DD`).
 
 ## Access
 

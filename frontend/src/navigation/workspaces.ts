@@ -419,7 +419,7 @@ export const workspaces: readonly Workspace[] = [
           dashboard(
             '/warehouse',
             'Warehouse dashboard',
-            'District requests waiting on this warehouse, and stock against its minimum levels.',
+            'District orders waiting on this warehouse, and batches to dispatch first or write off.',
           ),
         ],
       },
@@ -436,7 +436,7 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Requests',
                 title: 'District requests',
                 description:
-                  'Stock orders from district stores. Review, check stock, then dispatch or hold.',
+                  'Stock orders from district stores. Approve or reject each one, then dispatch it.',
                 layout: 'table',
               },
             ],
@@ -458,7 +458,8 @@ export const workspaces: readonly Workspace[] = [
                 path: '/warehouse/stock',
                 tab: 'Stock',
                 title: 'Warehouse stock',
-                description: 'Condom stock held at this warehouse, by batch, and every movement.',
+                description:
+                  'What the warehouse holds, what went out and what is waiting; register stock here.',
                 layout: 'table',
               },
             ],

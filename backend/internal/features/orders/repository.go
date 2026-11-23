@@ -38,6 +38,13 @@ type Order struct {
 	Comment            *string   `json:"comment"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+	// RejectionReason says why the warehouse rejected the order; it is set only on rejected orders.
+	RejectionReason *string `json:"rejection_reason"`
+	// The transport the warehouse recorded at dispatch; each is optional.
+	WaybillNumber       *string `json:"waybill_number"`
+	VehicleRegistration *string `json:"vehicle_registration"`
+	DriverName          *string `json:"driver_name"`
+	DriverPhone         *string `json:"driver_phone"`
 }
 
 type scope struct {
@@ -64,7 +71,7 @@ const columns = `id, condom_id, quantity_needed, quantity_issued, order_status,
 to_char(order_date, 'YYYY-MM-DD'), ordered_by_id, handled_by_id, ordered_for_store_id,
 ordered_from_store_id, unit_of_measure_id, comment, created_at, updated_at,
 hot_spot_id, parent_order_id, rider_id, quantity_received, discrepancy_note, delivery_note, quantity_approved,
-condom_category`
+condom_category, rejection_reason, waybill_number, vehicle_registration, driver_name, driver_phone`
 
 func scanOrder(row pgx.Row) (Order, error) {
 	var order Order
@@ -73,7 +80,8 @@ func scanOrder(row pgx.Row) (Order, error) {
 		&order.OrderedForStoreID, &order.OrderedFromStoreID, &order.UnitOfMeasureID,
 		&order.Comment, &order.CreatedAt, &order.UpdatedAt, &order.HotSpotID,
 		&order.ParentOrderID, &order.RiderID, &order.QuantityReceived, &order.DiscrepancyNote, &order.DeliveryNote,
-		&order.QuantityApproved, &order.CondomCategory)
+		&order.QuantityApproved, &order.CondomCategory, &order.RejectionReason, &order.WaybillNumber,
+		&order.VehicleRegistration, &order.DriverName, &order.DriverPhone)
 	return order, err
 }
 
@@ -118,54 +126,12 @@ func checkOrderable(ctx context.Context, q interface {
 	return nil
 }
 
-func (r *Repository) create(ctx context.Context, actorID string, input createRequest) (Order, error) {
-	var order Order
-	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		if err := checkOrderable(ctx, tx, input.CondomID); err != nil {
-			return err
-		}
-		var err error
-		order, err = scanOrder(tx.QueryRow(ctx, `
-			INSERT INTO orders (condom_id, quantity_needed, order_date, ordered_by_id,
-				ordered_for_store_id, ordered_from_store_id, unit_of_measure_id, comment, condom_category)
-			VALUES ($1, $2, COALESCE($3::text::date, CURRENT_DATE), $4, $5, $6, $7, $8,
-				(SELECT category FROM condoms WHERE id = $1 AND category IN ('male', 'female')))
-			RETURNING `+columns, input.CondomID, input.QuantityNeeded, input.Date, actorID,
-			input.OrderedForStoreID, input.OrderedFromStoreID, input.UnitOfMeasureID, input.Comment))
-		if err != nil {
-			return err
-		}
-		return r.recordAudit(ctx, tx, "order.created", nil, order)
-	})
-	return order, err
-}
-
-func (r *Repository) fulfill(ctx context.Context, access scope, id, actorID string, quantity int32) (Order, error) {
-	var order Order
-	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
-		before, err := scanOrder(tx.QueryRow(ctx, `SELECT `+columns+` FROM orders
-			WHERE ($1::boolean OR ordered_from_store_id = $2::uuid) AND id = $3 AND order_status = 'pending'
-			FOR UPDATE`, access.allStores, access.storeID, id))
-		if err != nil {
-			return err
-		}
-		order, err = scanOrder(tx.QueryRow(ctx, `
-			UPDATE orders SET quantity_issued = $2, order_status = 'fulfilled',
-				handled_by_id = $3, updated_at = CURRENT_TIMESTAMP
-			WHERE id = $1 RETURNING `+columns, id, quantity, actorID))
-		if err != nil {
-			return err
-		}
-		return r.recordAudit(ctx, tx, "order.fulfilled", &before, order)
-	})
-	return order, err
-}
-
 // auditActions names each workflow step in the audit log.
 var auditActions = map[string]string{
 	"replenishment_requested": "order.requested",
 	"review":                  "order.reviewed",
 	"check-stock":             "order.stock_checked",
+	"reject":                  "order.rejected",
 	"dispatch":                "order.dispatched",
 	"receive":                 "order.received",
 }

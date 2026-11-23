@@ -38,6 +38,10 @@ func NearExpiry(expiry, today time.Time) bool {
 	return expiry.Before(today.AddDate(0, 1, 0))
 }
 
+// ExpiringMonths is when a batch starts to count as expiring: under this many calendar months left. The
+// store's stock managers are told once (inventory.ExpiryAlerts).
+const ExpiringMonths = 3
+
 // Band classifies a batch by shelf life left, in calendar months: expired, under_1_month (red, needs an
 // exception to leave), under_3_months, under_6_months, ok, or unknown when the expiry is not recorded.
 func Band(expiry *time.Time, today time.Time) string {
@@ -48,7 +52,7 @@ func Band(expiry *time.Time, today time.Time) string {
 		return "expired"
 	case NearExpiry(*expiry, today):
 		return "under_1_month"
-	case expiry.Before(today.AddDate(0, 3, 0)):
+	case expiry.Before(today.AddDate(0, ExpiringMonths, 0)):
 		return "under_3_months"
 	case expiry.Before(today.AddDate(0, 6, 0)):
 		return "under_6_months"
