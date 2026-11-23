@@ -37,6 +37,35 @@ export interface ApiUser {
   subcounty_id?: string | null;
   store_id?: string | null;
   location?: string | null;
+  organisation_unit?: {
+    id: string;
+    uid: string;
+    name: string;
+    short_name: string;
+    subcounty: string;
+    district: string;
+    region: string;
+  } | null;
+  hot_spot?: {
+    id: string;
+    name: string | null;
+    type: string | null;
+    status: string;
+    village: string | null;
+    subcounty: string | null;
+    district: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
+  subcounty?: { id: string; name: string; district_id: string; district_name: string } | null;
+  store?: {
+    id: string;
+    code: string;
+    name: string;
+    store_type: "national" | "district";
+    district_id: string | null;
+    district_name: string | null;
+  } | null;
 }
 
 /** `TokenPair` in docs/api/openapi.json. */

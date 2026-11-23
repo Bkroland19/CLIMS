@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   Pressable,
   ScrollView,
-  StyleSheet,
   View,
   type ScrollViewInstance,
 } from "react-native";
@@ -81,9 +80,8 @@ export default function Screen({
       useNativeDriver: true,
     }).start();
   };
-  // The header takes the tab bar's surface, so the top and bottom bars frame the page alike; a
-  // hairline separates each from the content, and the status bar icons follow the theme.
-  const hdrBg = T.tabBg;
+  // The header extends the page background behind the status bar.
+  const hdrBg = T.bg;
   const hdrFg = T.fg;
   const { isCompact, isShort, width } = useResponsive();
   const col = useColumn();
@@ -140,8 +138,6 @@ export default function Screen({
       style={{
         paddingTop: insets.top,
         backgroundColor: hdrBg,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: T.cardBd,
       }}
     >
       <View
@@ -237,8 +233,6 @@ export default function Screen({
       style={{
         paddingTop: insets.top,
         backgroundColor: hdrBg,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: T.cardBd,
       }}
     >
       <View

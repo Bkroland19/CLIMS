@@ -11,6 +11,7 @@ import {
   reportStockout,
   stockoutComment,
   stockoutErrorMessage,
+  stockoutMessageFits,
   stockoutProduct,
   toLocalOrder,
   type StockoutDetail,
@@ -231,6 +232,15 @@ describe("currentStockoutRequest", () => {
 });
 
 describe("stockoutComment", () => {
+  it("counts the reason and multibyte characters toward the API limit", () => {
+    const reason = "Out of stock";
+    const fits = (comment: string) => stockoutMessageFits(stockoutComment(reason, comment));
+    expect(fits("a".repeat(3986))).toBe(true);
+    expect(fits("a".repeat(3987))).toBe(false);
+    expect(fits("é".repeat(1993))).toBe(true);
+    expect(fits("é".repeat(1992) + "🙂")).toBe(false);
+  });
+
   it("leads with what's happening", () => {
     expect(stockoutComment("Running low", "  Busy weekend ")).toBe("Running low. Busy weekend");
     expect(stockoutComment("Out of stock", "")).toBe("Out of stock");

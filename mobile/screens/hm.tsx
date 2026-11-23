@@ -4,15 +4,23 @@ import { useFocusEffect } from "expo-router";
 import Screen from "@/components/m/Screen";
 import { Banner, Btn, Hero, List, Row, SkeletonList } from "@/components/m/kit";
 import { isNetworkError } from "@/lib/hotspots";
-import { listStockouts, toLocalOrder } from "@/lib/orders";
+import {
+  getStockout,
+  listStockouts,
+  savedStockout,
+  toLocalOrder,
+  unacknowledged,
+  type StockoutDetail,
+} from "@/lib/orders";
 import { useT } from "@/lib/theme";
-import { ago, chip, items, orderChip } from "@/lib/format";
+import { ago, chip, items, num, orderChip } from "@/lib/format";
 import { useNav } from "@/lib/nav";
 import { HM_HOTSPOT } from "@/lib/seed";
 import { useMe } from "@/lib/session";
 import { useStore } from "@/lib/store";
 import { stockStats } from "./common";
 import { orderMsg, orderSteps } from "./order";
+import { stockoutMessage, stockoutSteps } from "./stockoutDetail";
 
 /** Hotspot manager home: sample data for demo sign-ins, the API for signed-in managers. */
 export function HmHome() {
@@ -193,12 +201,67 @@ function LoadBanner({ load, any }: { load: Load; any: boolean }) {
   return null;
 }
 
+/**
+ * The newest requests' details (deliveries and confirmations), reloaded whenever the home screen is
+ * shown; offline, the copies saved on this phone.
+ */
+function useRecentDetails(ids: string[]) {
+  const [details, setDetails] = useState<Record<string, StockoutDetail>>({});
+  const key = ids.join(",");
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      for (const id of key ? key.split(",") : []) {
+        getStockout(id)
+          .catch(() => savedStockout(id))
+          .then((d) => {
+            if (live && d) setDetails((cur) => ({ ...cur, [id]: d }));
+          })
+          .catch(() => {});
+      }
+      return () => {
+        live = false;
+      };
+    }, [key]),
+  );
+  return details;
+}
+
+/** Male and female pieces the hotspot confirmed receiving for a request, and when it last did. */
+function received(d: StockoutDetail) {
+  const pieces = { male: 0, female: 0 };
+  let at = 0;
+  for (const delivery of d.deliveries)
+    for (const line of delivery.lines) {
+      if (line.acknowledged_pieces === null) continue;
+      pieces[line.category] += line.acknowledged_pieces;
+      at = Math.max(at, Date.parse(line.acknowledged_at ?? "") || 0);
+    }
+  return { pieces, at };
+}
+
+/**
+ * As the sample home: the hotspot with its most recent received order and the quantities that
+ * arrived, then the current order while one is not yet confirmed.
+ */
 function HmHomeLive() {
   const nav = useNav();
   const me = useMe();
   const { orders, queued, load } = useApiOrders();
   // A delivered notification stays open until the manager acknowledges what arrived.
   const open = orders.find((o) => o.status !== "received");
+  const lastReceived = orders.find((o) => o.status === "received");
+  const details = useRecentDetails(
+    [open?.id, lastReceived?.id].filter((id): id is string => Boolean(id)),
+  );
+  const current = open ? details[open.id] : undefined;
+  const done = lastReceived ? details[lastReceived.id] : undefined;
+  const got = done ? received(done) : null;
+  const hotspot = (done ?? current)?.hot_spot;
+  const place = [hotspot?.village, hotspot?.subcounty, hotspot?.district]
+    .filter((part) => part?.trim())
+    .join(", ");
+
   if (!me.hotspotId)
     return (
       <Screen title="Home" root>
@@ -209,19 +272,31 @@ function HmHomeLive() {
         />
       </Screen>
     );
+  const waiting = current ? unacknowledged(current).length : 0;
   return (
     <Screen title="Home" root>
       <LoadBanner load={load} any={orders.length > 0} />
       <Hero
-        title="Your hotspot"
-        sub="Report a stockout and the district focal person sends stock."
+        title={hotspot?.name ?? (open ?? lastReceived)?.hotspot ?? "Your hotspot"}
+        sub={place || "Your hotspot"}
+        chip={chip("Active", "success")}
+        stats={
+          got
+            ? [
+                { label: "Male condoms", value: num(got.pieces.male), note: "received" },
+                { label: "Female condoms", value: num(got.pieces.female), note: "received" },
+              ]
+            : undefined
+        }
         msg={
-          open
-            ? `Latest request: ${open.product ?? "condoms"}, ${orderChip(open.status).label.toLowerCase()} · ${ago(open.createdAt)}`
-            : "No open requests."
+          lastReceived
+            ? `Last received ${ago(got?.at || lastReceived.createdAt)} · ${lastReceived.product ?? "condoms"}`
+            : "No order received yet"
         }
       >
-        <Btn label="Report stockout" icon="megaphone" onPress={() => nav.go("request")} />
+        {!open ? (
+          <Btn label="Report stockout" icon="megaphone" onPress={() => nav.go("request")} />
+        ) : null}
       </Hero>
       {queued.length ? (
         <Banner
@@ -231,21 +306,27 @@ function HmHomeLive() {
         />
       ) : null}
       {load === "loading" && !orders.length ? (
-        <SkeletonList h="Recent requests" rows={3} />
-      ) : (
-        <List h="Recent requests" empty="No requests yet.">
-          {orders.slice(0, 3).map((o) => (
-            <Row
-              key={o.id}
-              t={o.product ?? "Condoms"}
-              s={`Sent ${ago(o.createdAt)}`}
-              chip={orderChip(o.status)}
-              chev
-              onPress={() => nav.go(`stockout/${o.id}`)}
+        <SkeletonList h="Current order" rows={3} />
+      ) : open ? (
+        <Hero
+          h="Current order"
+          title={open.product ?? "Condoms"}
+          sub={`Sent ${ago(open.createdAt)}`}
+          chip={orderChip(open.status)}
+          steps={current ? stockoutSteps(current, true) : undefined}
+          msg={current ? stockoutMessage(current, true, waiting) : undefined}
+        >
+          {waiting > 0 ? (
+            <Btn label="Confirm receipt" onPress={() => nav.go(`stockout/${open.id}`)} />
+          ) : (
+            <Btn
+              label="View order"
+              kind="secondary"
+              onPress={() => nav.go(`stockout/${open.id}`)}
             />
-          ))}
-        </List>
-      )}
+          )}
+        </Hero>
+      ) : null}
     </Screen>
   );
 }

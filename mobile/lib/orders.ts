@@ -36,7 +36,12 @@ export type StockoutStatus =
 export interface StockoutReport {
   id: string;
   hot_spot_id: string;
-  hot_spot: { name: string; district: string | null };
+  hot_spot: {
+    name: string;
+    district: string | null;
+    village?: string | null;
+    subcounty?: string | null;
+  };
   /** Set only for notifications sent by product (older clients). */
   condom_id: string | null;
   product: string;
@@ -89,7 +94,7 @@ export interface AcknowledgementRequest {
   lines: { line_id: string; pieces: number }[];
 }
 
-export const COMMENT_MAX = 4000;
+export const STOCKOUT_MESSAGE_MAX_BYTES = 4000;
 
 /**
  * POST /orders/stockouts. `repeated` is true when the hotspot already had an open notification and
@@ -146,7 +151,7 @@ export function acknowledgeErrorMessage(err: unknown): string {
   if (isAxiosError(err)) {
     const s = err.response?.status;
     if (s === 403)
-      return "Only the hotspot's manager can confirm what arrived. If that's you, call your district focal person to link your account to this hotspot.";
+      return "Only the hotspot's manager, or the delivery agent named for this delivery, can confirm what arrived. If that's you, call your district focal person.";
     if (s === 409)
       return "CLIMS already has a different count for this delivery, and counts can't be changed from the phone. Call your district focal person to correct it.";
     if (s === 404) return "This request isn't in CLIMS any more. Go back and refresh.";
@@ -220,6 +225,16 @@ export function toLocalOrder(r: StockoutReport, by: string, byRole = "VHT"): Ord
 export function stockoutComment(reason: string, comment: string): string {
   const c = comment.trim();
   return c ? `${reason}. ${c}` : reason;
+}
+
+/** The API limits the full message by its UTF-8 byte length. */
+export function stockoutMessageFits(message: string): boolean {
+  let bytes = 0;
+  for (const character of message) {
+    const point = character.codePointAt(0)!;
+    bytes += point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
+  }
+  return bytes <= STOCKOUT_MESSAGE_MAX_BYTES;
 }
 
 /** Shapes older versions of the app saved in the outbox before alerts named a condom_category. */

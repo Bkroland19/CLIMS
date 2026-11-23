@@ -7,6 +7,7 @@ import { useMe } from "@/lib/session";
 import { useStore } from "@/lib/store";
 import { OrderScreen } from "./order";
 import { RiderDelivery, RiderReceipt } from "./rider";
+import { RiderAssignment } from "./riderLive";
 import { Help, Inbox } from "./shared";
 import { StockoutForm } from "./stockout";
 import { StockoutScreen } from "./stockoutDetail";
@@ -47,7 +48,15 @@ export default function Detail() {
         );
       if (me.role === "hm")
         return me.hotspotId ? (
-          <StockoutForm fixed={{ id: me.hotspotId, name: "Your hotspot" }} />
+          <StockoutForm
+            fixed={{
+              id: me.hotspotId,
+              name: me.hotspot?.name || "Your hotspot",
+              village: me.hotspot?.village ?? "",
+              subcounty: me.hotspot?.subcounty ?? "",
+              district: me.hotspot?.district ?? "",
+            }}
+          />
         ) : (
           <Screen title="Report stockout">
             <Banner
@@ -60,6 +69,8 @@ export default function Detail() {
       return <StockoutForm hotspotId={id} />;
     case "map":
       return id ? <VhtMapDone id={id} /> : <VhtMap />;
+    case "assignment":
+      return id ? <RiderAssignment id={id} /> : null;
     case "delivery":
       return id ? <RiderDelivery id={id} /> : null;
     case "receipt":
