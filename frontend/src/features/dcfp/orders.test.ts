@@ -9,6 +9,8 @@ import {
   DCFP_PATHS,
   isStockoutClosed,
   matchesStockoutFilter,
+  offeredQuantity,
+  offerShortfall,
   orderSteps,
   parseCount,
   placeOf,
@@ -202,5 +204,62 @@ describe('rejected stockout requests', () => {
     const names = { product: () => 'Engabu Free Female', warehouse: () => 'NMS' };
     const reported = rejected.created_at;
     expect(dcfpTasks([rejected], [], names, new Date(reported), (iso) => iso)).toHaveLength(0);
+  });
+});
+
+describe('what the warehouse offered against an order', () => {
+  it('is nothing yet while the order waits for the warehouse', () => {
+    const queued = anOrder({ order_status: 'queued' });
+    expect(offeredQuantity(queued)).toBeNull();
+    expect(offerShortfall(queued)).toBeNull();
+  });
+
+  it('is the approved quantity until dispatch, with how far it falls short', () => {
+    const part = anOrder({
+      order_status: 'confirmed',
+      quantity_needed: 500,
+      quantity_approved: 300,
+    });
+    expect(offeredQuantity(part)).toBe(300);
+    expect(offerShortfall(part)).toBe(200);
+    const full = anOrder({
+      order_status: 'reviewed',
+      quantity_needed: 500,
+      quantity_approved: 500,
+    });
+    expect(offerShortfall(full)).toBeNull();
+    // Approved before approvals were recorded: everything ordered.
+    expect(offeredQuantity(anOrder({ order_status: 'on_hold', quantity_approved: null }))).toBe(
+      500,
+    );
+  });
+
+  it('is what was sent once dispatched, even below the approval', () => {
+    const sent = anOrder({
+      order_status: 'received',
+      quantity_needed: 500,
+      quantity_approved: 500,
+      quantity_issued: 450,
+    });
+    expect(offeredQuantity(sent)).toBe(450);
+    expect(offerShortfall(sent)).toBe(50);
+  });
+
+  it('is none for a rejected order, without a shortfall since the status says it', () => {
+    const rejected = anOrder({ order_status: 'rejected' });
+    expect(offeredQuantity(rejected)).toBe(0);
+    expect(offerShortfall(rejected)).toBeNull();
+  });
+
+  it('is never short for stock sent without an order', () => {
+    const unrequested = anOrder({
+      order_status: 'dispatched',
+      unrequested: true,
+      quantity_needed: 3000,
+      quantity_approved: 3000,
+      quantity_issued: 3000,
+    });
+    expect(offeredQuantity(unrequested)).toBe(3000);
+    expect(offerShortfall(unrequested)).toBeNull();
   });
 });

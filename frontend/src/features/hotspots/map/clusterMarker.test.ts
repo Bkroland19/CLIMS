@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { clusterLabel, clusterSize, compactCount, createClusterElement } from './clusterMarker';
+import {
+  clusterLabel,
+  clusterSize,
+  clusterSummary,
+  compactCount,
+  createClusterElement,
+} from './clusterMarker';
 import { REVIEW_CATEGORIES } from './palette';
 
 const [active, submitted, rejected] = REVIEW_CATEGORIES;
@@ -19,6 +25,13 @@ describe('cluster rings', () => {
     [18_001, '18k'],
   ])('shortens %s to %s', (count, expected) => {
     expect(compactCount(count)).toBe(expected);
+  });
+
+  it('sums itself up for the hover label, leaving out empty categories', () => {
+    expect(clusterSummary(312, slices)).toEqual({
+      title: '312 hotspots',
+      detail: '280 active · 32 submitted',
+    });
   });
 
   it('grows by order of magnitude', () => {

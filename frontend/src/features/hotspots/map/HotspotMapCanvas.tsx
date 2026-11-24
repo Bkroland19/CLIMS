@@ -17,15 +17,33 @@ import {
   type GeoJSONSource,
   type IControl,
   type MapGeoJSONFeature,
+  type Offset,
+  type PositionAnchor,
   type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Position } from 'geojson';
-import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 import type { Basemap } from '@/config/env';
+import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-import { createClusterElement, type ClusterSlice } from './clusterMarker';
+import {
+  clusterSize,
+  clusterSummary,
+  createClusterElement,
+  type ClusterSlice,
+} from './clusterMarker';
 import type { Bounds, ColourBy, MapView } from './filters';
 import {
   DISPENSER_CATEGORIES,
@@ -94,7 +112,21 @@ interface HotspotMapCanvasProps {
   onTilesFailing: () => void;
   /** The map has loaded and can be moved. */
   onReady?: () => void;
+  /**
+   * What to show when a click lands on several hotspots at once (pins on one
+   * position, or overlapping): a list to choose from, drawn beside the pin.
+   */
+  renderStack?: (stack: HotspotStack) => ReactNode;
   className?: string;
+}
+
+export interface HotspotStack {
+  /** Every hotspot under the click, topmost first. */
+  ids: readonly string[];
+  /** All recorded at exactly the same position, so zooming in will not part them. */
+  samePlace: boolean;
+  /** Closes the list. Focus goes back to the map unless `restoreFocus` is false. */
+  close: (restoreFocus?: boolean) => void;
 }
 
 const SOURCE = 'hotspots';
@@ -348,12 +380,40 @@ class UgandaControl implements IControl {
   }
 }
 
-function prefersCoarsePointer(): boolean {
-  return window.matchMedia('(pointer: coarse)').matches;
-}
-
 /** Room left around a framed area, clear of the style card, the controls and the key. */
 const FRAME_PADDING = { top: 96, right: 56, bottom: 170, left: 40 };
+
+/**
+ * How far a popup stands off a point so it clears what is drawn there, for
+ * whichever side MapLibre puts it on: `above` px over the point (a pin's head),
+ * `beside` px to either side and `below` px under it.
+ */
+function clearOf(above: number, beside: number, below: number): Offset {
+  const offsets: Record<PositionAnchor, [number, number]> = {
+    center: [0, 0],
+    top: [0, below],
+    'top-left': [beside, below],
+    'top-right': [-beside, below],
+    bottom: [0, -above],
+    'bottom-left': [beside, -above],
+    'bottom-right': [-beside, -above],
+    left: [beside, -above / 2],
+    right: [-beside, -above / 2],
+  };
+  return offsets;
+}
+const CLEAR_OF_PIN = clearOf(38, 16, 6);
+const CLEAR_OF_DOT = clearOf(10, 10, 10);
+
+/** Each hotspot once, in the order the map returned them (topmost first). */
+function distinctIds(features: readonly MapGeoJSONFeature[]): string[] {
+  const ids = new Set<string>();
+  for (const feature of features) {
+    const id: unknown = feature.properties.id;
+    if (typeof id === 'string') ids.add(id);
+  }
+  return [...ids];
+}
 
 export default function HotspotMapCanvas({
   handleRef,
@@ -372,11 +432,16 @@ export default function HotspotMapCanvas({
   onFailure,
   onTilesFailing,
   onReady,
+  renderStack,
   className,
 }: HotspotMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibre | null>(null);
   const [ready, setReady] = useState(false);
+  // The list for a click on several hotspots, drawn into a MapLibre popup.
+  const [stack, setStack] = useState<(HotspotStack & { container: HTMLElement }) | null>(null);
+  const closeStack = useRef<(restoreFocus?: boolean) => void>(() => undefined);
+  const stackPopupRef = useRef<Popup | null>(null);
   // Cluster rings are DOM elements, rebuilt when the data or colours change.
   const clusters = useRef({
     generation: 0,
@@ -467,18 +532,16 @@ export default function HotspotMapCanvas({
         touchPitch: false,
         renderWorldCopies: false,
         fadeDuration: 150,
-        locale: {
-          'CooperativeGesturesHandler.MobileHelpText': 'Use two fingers to move the map',
-        },
       });
     } catch (error) {
       failed(error);
       return;
     }
     mapRef.current = map;
+    // One finger pans and two pinch to zoom, on touch screens as with a mouse.
+    // Rotation stays off: north is always up on this map.
     map.touchZoomRotate.disableRotation();
     map.keyboard.disableRotation();
-    if (prefersCoarsePointer()) map.cooperativeGestures.enable();
 
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(
@@ -641,35 +704,72 @@ export default function HotspotMapCanvas({
       });
     });
 
-    // Hover: the hotspot's name and status, written as text (names are user input).
-    // It sits above the pin, whose tip is on the position.
+    // Hover: a hotspot's or a ring's words, written as text (names are user input),
+    // above what is pointed at.
     const hover = new Popup({
       closeButton: false,
       closeOnClick: false,
       anchor: 'bottom',
-      offset: [0, -34],
       className: 'hotspot-hover',
       maxWidth: '260px',
     });
+    // Several hotspots under one click: the list to choose from (see `renderStack`).
+    const stackPopup = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      focusAfterOpen: false,
+      className: 'hotspot-stack',
+      maxWidth: '18rem',
+    });
+    stackPopup.on('close', () => {
+      setStack(null);
+    });
+    stackPopupRef.current = stackPopup;
+    const closeList = (restoreFocus = true) => {
+      if (!stackPopup.isOpen()) return;
+      const hadFocus = stackPopup.getElement().contains(document.activeElement);
+      stackPopup.remove();
+      if (hadFocus && restoreFocus) map.getCanvas().focus({ preventScroll: true });
+    };
+    closeStack.current = closeList;
+
+    const showTip = (
+      at: [number, number],
+      offset: Offset,
+      words: { title: string; detail: string; more?: string },
+    ) => {
+      if (stackPopup.isOpen()) return;
+      const body = document.createElement('div');
+      const lines: [string, string | undefined][] = [
+        ['hotspot-hover__title', words.title],
+        ['hotspot-hover__detail', words.detail],
+        ['hotspot-hover__more', words.more],
+      ];
+      for (const [className, text] of lines) {
+        if (!text) continue;
+        const line = document.createElement('p');
+        line.className = className;
+        line.textContent = text;
+        body.append(line);
+      }
+      hover.setOffset(offset).setLngLat(at).setDOMContent(body).addTo(map);
+    };
     const showHover = (event: {
       features?: MapGeoJSONFeature[];
       lngLat: { lng: number; lat: number };
     }) => {
-      const feature = event.features?.[0];
+      const features = event.features ?? [];
+      const [feature] = features;
       const id: unknown = feature?.properties.id;
       const words = typeof id === 'string' ? label(id) : null;
       if (!words || feature?.geometry.type !== 'Point') return;
       map.getCanvas().style.cursor = 'pointer';
-      const body = document.createElement('div');
-      const title = document.createElement('p');
-      title.className = 'hotspot-hover__title';
-      title.textContent = words.title;
-      const detail = document.createElement('p');
-      detail.className = 'hotspot-hover__detail';
-      detail.textContent = words.detail;
-      body.append(title, detail);
+      const others = distinctIds(features).length - 1;
       const [lng = event.lngLat.lng, lat = event.lngLat.lat] = feature.geometry.coordinates;
-      hover.setLngLat([lng, lat]).setDOMContent(body).addTo(map);
+      showTip([lng, lat], feature.layer.id === LAYERS.flatDots ? [0, -8] : [0, -34], {
+        ...words,
+        more: others > 0 ? `${formatNumber(others)} more here. Click to choose.` : undefined,
+      });
     };
     const hideHover = () => {
       map.getCanvas().style.cursor = '';
@@ -678,16 +778,48 @@ export default function HotspotMapCanvas({
     for (const layer of POINT_LAYERS) {
       map.on('mousemove', layer, showHover);
       map.on('mouseleave', layer, hideHover);
-      map.on('click', layer, (event) => {
-        const id: unknown = event.features?.[0]?.properties.id;
-        if (typeof id === 'string') select(id);
-      });
     }
+    // A ring can vanish under the pointer as the map moves, without a mouseleave.
+    map.on('movestart', hideHover);
+
+    const openStack = (features: readonly MapGeoJSONFeature[], ids: readonly string[]) => {
+      const [top] = features;
+      if (top?.geometry.type !== 'Point') return;
+      const [lng = 0, lat = 0] = top.geometry.coordinates;
+      const samePlace = features.every(
+        ({ geometry }) =>
+          geometry.type === 'Point' &&
+          geometry.coordinates[0] === lng &&
+          geometry.coordinates[1] === lat,
+      );
+      hideHover();
+      const container = document.createElement('div');
+      stackPopup
+        .setOffset(top.layer.id === LAYERS.flatDots ? CLEAR_OF_DOT : CLEAR_OF_PIN)
+        .setLngLat([lng, lat])
+        .setDOMContent(container)
+        .addTo(map);
+      setStack({ ids, samePlace, container, close: closeList });
+    };
+
+    // A click on one hotspot selects it; on several, lists them to choose from;
+    // on the map, clears the selection (or only closes the list, if one is open).
     map.on('click', (event) => {
+      const listOpen = stackPopup.isOpen();
+      closeStack.current(false);
       const target = event.originalEvent.target;
       if (target instanceof Element && target.closest('.hotspot-cluster')) return;
       const visible = POINT_LAYERS.filter((layer) => map.getLayer(layer));
-      if (map.queryRenderedFeatures(event.point, { layers: visible }).length === 0) select(null);
+      const features = map.queryRenderedFeatures(event.point, { layers: visible });
+      const ids = distinctIds(features);
+      const [first] = ids;
+      if (!first) {
+        if (!listOpen) select(null);
+      } else if (ids.length === 1) {
+        select(first);
+      } else {
+        openStack(features, ids);
+      }
     });
 
     // Cluster rings follow the clustered source as it re-tiles on every frame.
@@ -707,19 +839,31 @@ export default function HotspotMapCanvas({
           let marker = state.cache.get(key);
           if (!marker && feature.geometry.type === 'Point') {
             const [lng = 0, lat = 0] = feature.geometry.coordinates;
-            const element = createClusterElement(
-              total,
-              sliceCounts(properties, currentColour, currentPalette),
-              currentPalette,
-            );
+            const slices = sliceCounts(properties, currentColour, currentPalette);
+            const element = createClusterElement(total, slices, currentPalette);
+            // Pointed at or reached by Tab, a ring says what it holds.
+            const words = clusterSummary(total, slices);
+            const showRing = () => {
+              showTip([lng, lat], [0, -(clusterSize(total) / 2 + 6)], words);
+            };
+            element.addEventListener('mouseenter', showRing);
+            element.addEventListener('focus', showRing);
+            element.addEventListener('mouseleave', hideHover);
+            element.addEventListener('blur', hideHover);
             element.addEventListener('click', (click) => {
               click.stopPropagation();
+              hideHover();
               const source = map.getSource<GeoJSONSource>(SOURCE);
               void source?.getClusterExpansionZoom(clusterId).then((zoom) => {
                 map.easeTo({ center: [lng, lat], zoom: Math.min(zoom, CLUSTER_MAX_ZOOM + 1) });
               });
             });
-            marker = new Marker({ element }).setLngLat([lng, lat]);
+            // MapLibre places a marker by setting its element's `position` and
+            // `transform`. The ring has its own (a hover scale, a transition), so
+            // it goes inside a bare wrapper that MapLibre is free to move.
+            const anchor = document.createElement('div');
+            anchor.append(element);
+            marker = new Marker({ element: anchor }).setLngLat([lng, lat]);
             state.cache.set(key, marker);
           }
           if (!marker) continue;
@@ -739,6 +883,9 @@ export default function HotspotMapCanvas({
       state.cache.clear();
       state.onScreen.clear();
       hover.remove();
+      stackPopup.remove();
+      stackPopupRef.current = null;
+      closeStack.current = () => undefined;
       map.remove();
       mapRef.current = null;
       setReady(false);
@@ -754,6 +901,33 @@ export default function HotspotMapCanvas({
     state.generation += 1;
     mapRef.current?.triggerRepaint();
   });
+
+  // A list of stacked hotspots goes stale when the filters or the style change.
+  useEffect(() => {
+    closeStack.current();
+  }, [hotspots, view]);
+
+  // The popup opened empty, so MapLibre chose its side without knowing its size.
+  // Once the list is drawn: place it again, on the side with room, and move the
+  // map just enough that all of it is in view.
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+    const popup = stackPopupRef.current;
+    if (!stack || !map || !popup?.isOpen()) return;
+    popup.setLngLat(popup.getLngLat());
+    const box = popup.getElement().getBoundingClientRect();
+    const frame = map.getContainer().getBoundingClientRect();
+    const gap = 12;
+    const overflow = (start: number, end: number, frameStart: number, frameEnd: number) =>
+      end > frameEnd - gap
+        ? end - frameEnd + gap
+        : start < frameStart + gap
+          ? start - frameStart - gap
+          : 0;
+    const dx = overflow(box.left, box.right, frame.left, frame.right);
+    const dy = overflow(box.top, box.bottom, frame.top, frame.bottom);
+    if (dx !== 0 || dy !== 0) map.panBy([dx, dy], { duration: 250 });
+  }, [stack]);
 
   // Only the source the current style draws from is fed; the other catches up
   // when the style changes. Each feed re-tiles in the worker.
@@ -879,11 +1053,19 @@ export default function HotspotMapCanvas({
   }, [ready, selected, highlightedId, hotspots]);
 
   return (
-    <div
-      ref={containerRef}
-      role="region"
-      aria-label="Hotspot map of Uganda. Use the list beside it to browse hotspots by keyboard."
-      className={cn('hotspot-map size-full', className)}
-    />
+    <>
+      <div
+        ref={containerRef}
+        role="region"
+        aria-label="Hotspot map of Uganda. Use the list beside it to browse hotspots by keyboard."
+        className={cn('hotspot-map size-full', className)}
+      />
+      {stack && renderStack
+        ? createPortal(
+            renderStack({ ids: stack.ids, samePlace: stack.samePlace, close: stack.close }),
+            stack.container,
+          )
+        : null}
+    </>
   );
 }

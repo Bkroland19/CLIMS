@@ -269,7 +269,14 @@ The hotspot map (`features/hotspots/map`) is the one map. Extend it rather than 
   the tokens and reads them again when the theme changes. Never write a hex value for a marker.
   Across the whole country the points style uses small dots; pins take over at town level.
 - **Clusters are rings** split by the same categories, with the count inside. Each is a real
-  button whose name says what it holds in words.
+  button whose name says what it holds in words; pointing at it or tabbing to it shows the same
+  words as a label.
+- **No hotspot hides under another.** A click that lands on several pins (recorded at one
+  position, as many legacy rows are, or overlapping at the current zoom) opens a list beside the
+  pin to choose from (`map/StackChooser`), with the side list's rows. Map popovers sit above the
+  page's overlays on the map, so the key never covers what is being chosen.
+- **Touch works as a mouse does.** One finger pans and two pinch to zoom; north stays up (no
+  rotation or tilt).
 - **The key is a filter.** Its tabs choose what colour means; each entry switches its hotspots on
   and off.
 - **The list beside the map is the accessible route.** Everything on the map is reachable from it
