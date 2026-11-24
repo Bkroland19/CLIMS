@@ -11,7 +11,7 @@ test.beforeEach(async ({ request }) => {
   await resetMock(request);
 });
 
-test('signs in and lands on the MOH dashboard', async ({ page }) => {
+test('signs in and lands on MOH Analytics', async ({ page }) => {
   await page.goto('/sign-in');
   await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
 
@@ -20,7 +20,9 @@ test('signs in and lands on the MOH dashboard', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page).toHaveURL(/\/moh$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'MOH dashboard' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Reports and analytics' }),
+  ).toBeVisible();
 });
 
 test('a wrong password keeps the visitor on sign-in with the entries intact', async ({ page }) => {
@@ -49,7 +51,7 @@ test.describe('signed in', () => {
   test.use({ storageState: AUTH_FILE });
 
   test('signs out from the account menu', async ({ page }) => {
-    await open(page, '/moh', 'MOH dashboard');
+    await open(page, '/moh', 'Reports and analytics');
     await page.getByRole('button', { name: /account menu/i }).click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
 
@@ -94,7 +96,7 @@ test.describe('signed in', () => {
   });
 
   test('signs another device out from the account menu', async ({ page }) => {
-    await open(page, '/moh', 'MOH dashboard');
+    await open(page, '/moh', 'Reports and analytics');
     await page.getByRole('button', { name: /account menu/i }).click();
     await page.getByRole('menuitem', { name: 'Signed-in devices' }).click();
 

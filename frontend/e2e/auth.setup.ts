@@ -12,6 +12,8 @@ setup('sign in as an administrator', async ({ page, request }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page).toHaveURL(/\/moh$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'MOH dashboard' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Reports and analytics' }),
+  ).toBeVisible();
   await page.context().storageState({ path: AUTH_FILE });
 });

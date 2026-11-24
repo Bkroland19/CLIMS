@@ -1,8 +1,8 @@
-import MohDashboardPage from '@/features/moh/MohDashboardPage';
+import ProgrammeReportsPage from '@/features/programme-reports/ProgrammeReportsPage';
 import { pageMetadata } from '@/navigation/pageMetadata';
 
 export const metadata = pageMetadata('/moh');
 
 export default function Page() {
-  return <MohDashboardPage />;
+  return <ProgrammeReportsPage workspace="moh" />;
 }

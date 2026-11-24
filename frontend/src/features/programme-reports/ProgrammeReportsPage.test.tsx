@@ -87,7 +87,7 @@ const api = routes(own, analyticsApi());
 describe('ProgrammeReportsPage', () => {
   it("shows the server's rows with its filters, a genuine zero apart from blank data", async () => {
     const { requests } = renderApp(<ProgrammeReportsPage workspace="moh" />, {
-      route: '/moh/programme-reports?view=notifications&category=male',
+      route: '/moh?view=notifications&category=male',
       session: sessionWith(['reports:read', 'reports:approve']),
       replies: [api],
     });
@@ -112,7 +112,7 @@ describe('ProgrammeReportsPage', () => {
 
   it('offers approval only with reports:approve', async () => {
     renderApp(<ProgrammeReportsPage workspace="moh" />, {
-      route: '/moh/programme-reports?view=notifications',
+      route: '/moh?view=notifications',
       session: sessionWith(['reports:read']),
       replies: [api],
     });
@@ -123,7 +123,7 @@ describe('ProgrammeReportsPage', () => {
   it('lists approved versions and opens one, kept as approved after a correction', async () => {
     const user = userEvent.setup();
     renderApp(<ProgrammeReportsPage workspace="moh" />, {
-      route: '/moh/programme-reports?view=versions',
+      route: '/moh?view=versions',
       session: sessionWith(['reports:read', 'reports:approve']),
       replies: [api],
     });
@@ -134,7 +134,7 @@ describe('ProgrammeReportsPage', () => {
 
   it('opens on the overview, with figures, charts and a PDF download', async () => {
     renderApp(<ProgrammeReportsPage workspace="moh" />, {
-      route: '/moh/programme-reports',
+      route: '/moh',
       session: sessionWith(['reports:read']),
       replies: [api],
     });
@@ -150,7 +150,7 @@ describe('ProgrammeReportsPage', () => {
   it('shows active filters as chips, and removing one clears it from the address', async () => {
     const user = userEvent.setup();
     renderApp(<ProgrammeReportsPage workspace="moh" />, {
-      route: '/moh/programme-reports?view=overview&category=female&period=last-month',
+      route: '/moh?view=overview&category=female&period=last-month',
       session: sessionWith(['reports:read']),
       replies: [api],
     });

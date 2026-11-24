@@ -1,74 +1,29 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
-import { useRef } from 'react';
-
-import { PageActions } from '@/components/PageActions';
-import { PdfButton } from '@/components/reports/PdfButton';
 import { TaskList, type TaskItem } from '@/components/TaskList';
 import { hoursLabel } from '@/components/charts/format';
-import { Button } from '@/components/ui/button';
-import { FilterBar } from '@/features/analytics/FilterBar';
-import { apiParams, filterQuery, type FilterField } from '@/features/analytics/filters';
+import { apiParams, filterQuery } from '@/features/analytics/filters';
 import {
   useBatchReport,
   useNotificationReport,
   useStockReport,
   useSupplyReport,
 } from '@/features/analytics/queries';
-import { useReportFilters, type ReportFilters } from '@/features/analytics/useReportFilters';
-import { OverviewView } from '@/features/analytics/views/OverviewView';
+import type { ReportFilters } from '@/features/analytics/useReportFilters';
 import { MIN_MONTHS } from '@/features/analytics/views/shared';
 import { formatNumber } from '@/lib/format';
 
-const FIELDS: readonly FilterField[] = ['period', 'interval', 'region', 'district', 'category'];
-const REPORTS = '/moh/programme-reports';
+import { MOH_PATHS } from './filters';
+
+const REPORTS = MOH_PATHS.analytics;
 
 /**
- * The national view for the Ministry of Health, which oversees the whole
- * programme and changes nothing: what needs watching, then the programme at a
- * glance (requests, warehouse orders, stock, expiry and hotspots) for the period
- * and place chosen, with a PDF of it all.
- */
-export default function MohDashboardPage() {
-  const filters = useReportFilters();
-  const queryClient = useQueryClient();
-  const contentRef = useRef<HTMLDivElement>(null);
-  const fetching = queryClient.isFetching({ queryKey: ['analytics'] }) > 0;
-
-  return (
-    <div className="gap-section flex flex-col">
-      <PageActions>
-        <Button
-          variant="ghost"
-          onClick={() => void queryClient.invalidateQueries({ queryKey: ['analytics'] })}
-          disabled={fetching}
-        >
-          <RefreshCw data-icon="inline-start" className={fetching ? 'animate-spin' : undefined} />
-          Refresh
-        </Button>
-        <PdfButton
-          title="MOH dashboard"
-          subtitle="National view of condom stock, hotspot stockout requests, warehouse orders and deliveries."
-          targetRef={contentRef}
-        />
-      </PageActions>
-      <FilterBar filters={filters} fields={FIELDS} />
-      <div ref={contentRef} className="gap-section flex flex-col">
-        <WatchList filters={filters} />
-        <OverviewView filters={filters} workspace="moh" />
-      </div>
-    </div>
-  );
-}
-
-/**
- * What MOH should look into, from the same reports: requests past their
+ * What MOH should look into, shown above the national overview on the Analytics
+ * page's Overview tab, from the same reports: requests past their
  * deadline, deliveries nobody acknowledged, stock that is expiring or short,
  * and ledgers that do not add up. Each opens the report behind it.
  */
-function WatchList({ filters }: { filters: ReportFilters }) {
+export function MohWatchList({ filters }: { filters: ReportFilters }) {
   const { state } = filters;
   const notifications = useNotificationReport(
     apiParams(state, ['from', 'to', 'district_id', 'category']),

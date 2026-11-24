@@ -45,6 +45,8 @@ const nextConfig: NextConfig = {
     // workspace (HOME_PATH in src/navigation/paths.ts; a test keeps them equal).
     return [
       { source: '/', destination: '/moh', permanent: false },
+      // MOH's Analytics became its home page; old report links (`?view=` and filters) keep working.
+      { source: '/moh/programme-reports', destination: '/moh', permanent: false },
       // Registering stock moved into a panel on the stock page; the query (`?store=`) is kept.
       {
         source: '/warehouse/stock/receive',

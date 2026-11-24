@@ -55,7 +55,9 @@ describe('route guard', () => {
 
   it('does not follow a return address that leaves the app', async () => {
     renderApp(routes, { route: '/sign-in?from=%2F%2Fevil.example', signedIn: true });
-    expect(await screen.findByRole('heading', { name: 'MOH dashboard' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Reports and analytics' }),
+    ).toBeInTheDocument();
     expect(testRouter.location).toBe('/moh');
   });
 
@@ -66,7 +68,9 @@ describe('route guard', () => {
 
   it('sends a signed-in user away from the sign-in page', async () => {
     renderApp(routes, { route: '/sign-in', signedIn: true });
-    expect(await screen.findByRole('heading', { name: 'MOH dashboard' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Reports and analytics' }),
+    ).toBeInTheDocument();
   });
 
   it('returns to sign-in the moment the session ends', async () => {
