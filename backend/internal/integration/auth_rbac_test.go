@@ -113,6 +113,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 	// Importing after migrations resolves the backup's shared usernames and phone numbers.
 	assertUniqueIdentifiers(t, pool)
 	assertWarehouseGrants(t, pool)
+	assertReportAccess(t, pool)
 	auditor := audit.NewService(pool)
 	repo := users.NewRepository(pool, auditor)
 	var legacyAdminID string
@@ -523,28 +524,33 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	if _, err = upgrade.Exec(ctx, `UPDATE schema_migrations SET version=3;
 		INSERT INTO role_permission(role_id, permission_id)
-		SELECT r.rbac_id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name='moh' AND p.name='roles:read'`); err != nil {
+		SELECT r.rbac_id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name='moh' AND p.name='users:create'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = database.RunMigrations(u.String()); err != nil {
 		t.Fatal(err)
 	}
-	// Migrations 18 and 23 deliberately grant catalogue:manage to moh, nms and jms, migrations 31 and
-	// 38 give the warehouse and DCFP roles their order, inventory and (DCFP) report defaults, and
-	// migration 35 gives delivery agents orders:deliver; every other non-admin grant is the custom one.
+	// Migrations 18 and 23 grant catalogue:manage to moh, nms and jms, and migration 39 takes it back from
+	// moh, which becomes read-only. Migrations 31 and 38 give the warehouse and DCFP roles their order,
+	// inventory and (DCFP) report defaults, migration 35 gives delivery agents orders:deliver, and
+	// migration 39 gives moh every read permission and the warehouses reports:read. Every other non-admin
+	// grant is the custom one, which survives even though migration 39 makes moh read-only by default.
 	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name<>'catalogue:manage'
 			AND NOT (r.name IN ('nms', 'jms', 'dfcp') AND (p.name LIKE 'orders:%' OR p.name LIKE 'inventory:%'))
-			AND NOT (r.name = 'dfcp' AND p.name = 'reports:read')
+			AND NOT (r.name IN ('dfcp', 'nms', 'jms') AND p.name = 'reports:read')
+			AND NOT (r.name = 'moh' AND p.name IN ('audit:read', 'hotspots:all_districts', 'hotspots:read',
+				'hotspots:read_district', 'inventory:read', 'orders:all_stores', 'orders:read', 'reports:read',
+				'roles:read', 'users:read'))
 			AND NOT (r.name = 'delivery agent' AND p.name = 'orders:deliver')),
 		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
 		&userCount, &roleCount, &catalogueManagers); err != nil {
 		t.Fatal(err)
 	}
-	if userCount != 455 || roleCount != 1 || catalogueManagers != "jms,moh,nms" {
+	if userCount != 455 || roleCount != 1 || catalogueManagers != "jms,nms" {
 		t.Fatalf("upgrade changed user count, lost custom permission grants or granted the catalogue to %q", catalogueManagers)
 	}
 	assertWarehouseGrants(t, upgrade)
