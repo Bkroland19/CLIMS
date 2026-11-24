@@ -1139,6 +1139,126 @@ function inbox(method: string, parts: string[], query: URLSearchParams): Reply {
   return fail(404, 'Not found');
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const STOCKOUT_STATUSES = new Set<string>([
+  'awaiting_supply',
+  'awaiting_acknowledgement',
+  'partly_received',
+  'fulfilled',
+  'rejected',
+]);
+const ORDER_STATUSES = new Set<string>([
+  'pending',
+  'fulfilled',
+  'queued',
+  'reviewed',
+  'on_hold',
+  'confirmed',
+  'rejected',
+  'dispatched',
+  'received',
+  'delivered',
+]);
+
+/** The district a store is in, as `GET /locations/stores` gives it; null for a national warehouse. */
+const districtOfStore = (storeId: string): string | null =>
+  MOCK_STORES.find((store) => store.id === storeId)?.district_id ?? null;
+
+/** The search in `q`, lower-cased ("" for none), or null when longer than the API allows. */
+function searchParam(query: URLSearchParams): string | null {
+  const search = (query.get('q') ?? '').trim();
+  return search.length > 100 ? null : search.toLowerCase();
+}
+
+/** Reads a UUID filter, `undefined` when absent and `null` when malformed. */
+function uuidParam(query: URLSearchParams, name: string): string | null | undefined {
+  const raw = query.get(name);
+  if (!raw) return undefined;
+  return UUID.test(raw) ? raw : null;
+}
+
+/**
+ * `GET /orders/stockouts`: as the Go API, filtered by `hot_spot_id`, `district_id` (the hotspot's
+ * district) and `status`, each report with its district and the pieces delivered and acknowledged.
+ */
+function listStockouts(query: URLSearchParams, page: <T>(items: T[]) => T[]): Reply {
+  const hotSpot = uuidParam(query, 'hot_spot_id');
+  const district = uuidParam(query, 'district_id');
+  if (hotSpot === null) return fail(400, 'hot_spot_id must be a UUID');
+  if (district === null) return fail(400, 'district_id must be a UUID');
+  const statuses = query.get('status')?.split(',') ?? [];
+  if (statuses.some((status) => !STOCKOUT_STATUSES.has(status))) {
+    return fail(
+      400,
+      'status must be awaiting_supply, awaiting_acknowledgement, partly_received, fulfilled or rejected, separated by commas',
+    );
+  }
+  const search = searchParam(query);
+  if (search === null) return fail(400, 'q must be at most 100 characters');
+  const rows = state.reports
+    .map((r) => {
+      const lines = (state.deliveries.get(r.id) ?? []).flatMap((delivery) => delivery.lines);
+      const sum = (category: 'male' | 'female', acknowledged: boolean) =>
+        lines
+          .filter((line) => line.category === category)
+          .reduce(
+            (total, line) => total + (acknowledged ? (line.acknowledged_pieces ?? 0) : line.pieces),
+            0,
+          );
+      return {
+        ...r,
+        district_id: districtOfStore(r.district_store_id),
+        delivered_male_pieces: sum('male', false),
+        delivered_female_pieces: sum('female', false),
+        received_male_pieces: sum('male', true),
+        received_female_pieces: sum('female', true),
+      };
+    })
+    .filter(
+      (r) =>
+        (!hotSpot || r.hot_spot_id === hotSpot) &&
+        (!district || r.district_id === district) &&
+        (statuses.length === 0 || statuses.includes(r.status)) &&
+        (!search ||
+          [r.hot_spot.name, r.hot_spot.village, r.hot_spot.subcounty, r.hot_spot.district].some(
+            (text) => text?.toLowerCase().includes(search),
+          )),
+    );
+  return ok(page(rows));
+}
+
+/**
+ * `GET /orders`: as the Go API, filtered by several `status`es separated by commas, `type`
+ * (`warehouse_request`: a district's orders to NMS or JMS), `district_id` (the district of the store
+ * ordering) and `warehouse_store_id`.
+ */
+function listOrders(query: URLSearchParams, page: <T>(items: T[]) => T[]): Reply {
+  const type = query.get('type');
+  if (type && type !== 'warehouse_request') return fail(400, 'type must be warehouse_request');
+  const statuses = query.get('status')?.split(',') ?? [];
+  if (statuses.some((status) => !ORDER_STATUSES.has(status))) {
+    return fail(400, 'status must be order statuses separated by commas, such as queued,reviewed');
+  }
+  const district = uuidParam(query, 'district_id');
+  const warehouse = uuidParam(query, 'warehouse_store_id');
+  if (district === null) return fail(400, 'district_id must be a UUID');
+  if (warehouse === null) return fail(400, 'warehouse_store_id must be a UUID');
+  const search = searchParam(query);
+  if (search === null) return fail(400, 'q must be at most 100 characters');
+  const storeName = (id: string) =>
+    MOCK_STORES.find((store) => store.id === id)?.name.toLowerCase() ?? '';
+  const rows = state.orders.filter(
+    (order) =>
+      (statuses.length === 0 || statuses.includes(order.order_status)) &&
+      // The mock holds warehouse orders only: none for a hotspot, pending or fulfilled.
+      (!type || NATIONAL.has(order.ordered_from_store_id)) &&
+      (!district || districtOfStore(order.ordered_for_store_id) === district) &&
+      (!warehouse || order.ordered_from_store_id === warehouse) &&
+      (!search || storeName(order.ordered_for_store_id).includes(search)),
+  );
+  return ok(page(rows));
+}
+
 /** Answers `/orders…` and `/notifications…`, or returns null for any other path. */
 export function handleDcfp(
   method: string,
@@ -1156,10 +1276,10 @@ export function handleDcfp(
     return items.slice(offset, offset + limit);
   };
   if (target === undefined)
-    return method === 'GET' ? ok(page(state.orders)) : fail(405, 'Method not allowed');
+    return method === 'GET' ? listOrders(query, page) : fail(405, 'Method not allowed');
   if (target === 'stockouts') {
     if (segment === undefined) {
-      if (method === 'GET') return ok(page(state.reports));
+      if (method === 'GET') return listStockouts(query, page);
       if (method === 'POST') return reportStockout(body);
       return fail(405, 'Method not allowed');
     }
