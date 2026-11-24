@@ -14,6 +14,7 @@ import (
 	"clims-backend/internal/pkg/response"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Handler struct {
@@ -115,6 +116,10 @@ func (h *Handler) saveSettings(c fiber.Ctx) error {
 		return response.Error(c, 403, errSettingsScope.Error(), nil)
 	}
 	saved, err := h.repo.saveSettings(c.Context(), in, effective, user.ID)
+	var dbError *pgconn.PgError
+	if errors.As(err, &dbError) && dbError.Code == "23503" {
+		return response.Error(c, 422, "store_id does not name a store", nil)
+	}
 	if err != nil {
 		slog.Error("saving settings failed", "error", err)
 		return response.Error(c, 500, "the settings could not be saved", nil)
@@ -184,7 +189,7 @@ var bands = map[string]bool{"": true, "expired": true, "under_1_month": true, "u
 func (h *Handler) batches(c fiber.Ctx) error {
 	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	band := c.Query("band")
 	if !bands[band] {
@@ -201,7 +206,7 @@ func (h *Handler) batches(c fiber.Ctx) error {
 func (h *Handler) expiryExceptions(c fiber.Ctx) error {
 	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	if f.Limit, f.Offset, err = page(params(c.Queries())); err != nil {
 		return response.Error(c, 400, err.Error(), nil)
@@ -234,13 +239,33 @@ func (h *Handler) supplyFilter(ctx context.Context, user *users.User, p params) 
 		}
 	}
 	s, err := h.repo.scopeFor(ctx, user)
-	return f, s, err
+	if err != nil {
+		return SupplyFilter{}, scope{}, errInternal{err}
+	}
+	return f, s, nil
+}
+
+// errInternal marks a failure on our side while reading a report's filters (the user's scope, a
+// district's store, the saved settings), so it is logged and answered 500 rather than shown as a 400.
+type errInternal struct{ error }
+
+func (e errInternal) Unwrap() error { return e.error }
+
+// filterError answers a filter that could not be read: 400 with the reason when the request was wrong,
+// 500 when the database failed.
+func filterError(c fiber.Ctx, err error) error {
+	var internal errInternal
+	if errors.As(err, &internal) {
+		slog.Error("report filters could not be read", "error", err)
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	return response.Error(c, 400, err.Error(), nil)
 }
 
 func (h *Handler) supply(c fiber.Ctx) error {
 	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	report, err := h.repo.supplyReport(c.Context(), s, f, h.now())
 	if err != nil {
@@ -253,7 +278,7 @@ func (h *Handler) supply(c fiber.Ctx) error {
 func (h *Handler) supplyRecords(c fiber.Ctx) error {
 	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	if f.Limit, f.Offset, err = page(params(c.Queries())); err != nil {
 		return response.Error(c, 400, err.Error(), nil)
@@ -269,7 +294,7 @@ func (h *Handler) supplyRecords(c fiber.Ctx) error {
 func (h *Handler) stock(c fiber.Ctx) error {
 	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	report, err := h.repo.stockReport(c.Context(), s, f, h.now())
 	if err != nil {
@@ -292,7 +317,7 @@ func page(p params) (int32, int32, error) {
 func (h *Handler) notificationSummary(c fiber.Ctx) error {
 	f, s, settings, err := h.filter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	summary, err := h.repo.notificationSummary(c.Context(), s, f, h.now())
 	if err != nil {
@@ -306,7 +331,7 @@ func (h *Handler) notificationSummary(c fiber.Ctx) error {
 func (h *Handler) notificationRecords(c fiber.Ctx) error {
 	f, s, _, err := h.filter(c.Context(), users.CurrentUser(c), params(c.Queries()))
 	if err != nil {
-		return response.Error(c, 400, err.Error(), nil)
+		return filterError(c, err)
 	}
 	f.Status = c.Query("status")
 	switch f.Status {
@@ -345,21 +370,26 @@ func (h *Handler) filter(ctx context.Context, user *users.User, p params) (Filte
 	}
 	s, err := h.repo.scopeFor(ctx, user)
 	if err != nil {
-		return fail(err)
+		return fail(errInternal{err})
 	}
 	store := s.storeID
 	if ids["district_id"] != nil {
 		if store, err = h.repo.districtStore(ctx, *ids["district_id"]); err != nil {
-			return fail(err)
+			return fail(errInternal{err})
 		}
 	}
 	settings, err := h.repo.effectiveSettings(ctx, store, h.today())
 	if err != nil {
-		return fail(err)
+		return fail(errInternal{err})
 	}
 	from, to := p.get("from"), p.get("to")
-	if from == "" && to == "" {
-		from = CycleStart(settings.ReviewCycle, h.now()).Format(time.DateOnly)
+	if from == "" {
+		// The review cycle to date, or the cycle that holds `to`; a bad `to` fails in ParseFilter.
+		anchor := h.now()
+		if day, err := time.ParseInLocation(time.DateOnly, to, Kampala); err == nil {
+			anchor = day
+		}
+		from = CycleStart(settings.ReviewCycle, anchor).Format(time.DateOnly)
 	}
 	f, err := ParseFilter(from, to, p.get("category"), p.get("deadline_days", strconv.Itoa(settings.DeadlineDays)),
 		p.get("target_percent", strconv.Itoa(settings.TargetPercent)), h.now())
@@ -371,7 +401,8 @@ func (h *Handler) filter(ctx context.Context, user *users.User, p params) (Filte
 }
 
 // ParseFilter reads a report period as Kampala calendar days, both included, defaulting to the
-// current month to date, with the product filter and the deadline settings.
+// current month to date (or, given only `to`, its month up to `to`), with the product filter and the
+// deadline settings.
 func ParseFilter(from, to, category, deadlineDays, target string, now time.Time) (Filter, error) {
 	today := now.In(Kampala)
 	day := func(raw string, fallback time.Time) (time.Time, error) {
@@ -385,11 +416,11 @@ func ParseFilter(from, to, category, deadlineDays, target string, now time.Time)
 		return parsed, nil
 	}
 	var f Filter
-	start, err := day(from, time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, Kampala))
+	end, err := day(to, time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, Kampala))
 	if err != nil {
 		return Filter{}, err
 	}
-	end, err := day(to, time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, Kampala))
+	start, err := day(from, time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, Kampala))
 	if err != nil {
 		return Filter{}, err
 	}

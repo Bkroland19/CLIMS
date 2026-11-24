@@ -332,6 +332,9 @@ func TestAuthRBACIntegration(t *testing.T) {
 	request("GET", "/users", nil, userToken, 403)
 	request("PUT", fmt.Sprintf("/users/%s/roles", adminID), map[string]any{"role_ids": []string{mohRole, hotspotRole}}, adminToken, 409)
 	request("PUT", "/roles/"+adminRole+"/permissions", map[string]any{"permissions": []string{}}, adminToken, 409)
+	// Anyone can sign up into the registered user role, so it holds nothing.
+	request("PUT", "/roles/"+rbac.RegisteredUserRoleID+"/permissions", map[string]any{"permissions": []string{"orders:read"}}, adminToken, 409)
+	request("PUT", "/roles/"+rbac.RegisteredUserRoleID+"/permissions", map[string]any{"permissions": []string{}}, adminToken, 200)
 	request("PATCH", fmt.Sprintf("/users/%s/status", id), map[string]any{"status": "disabled"}, adminToken, 200)
 	request("GET", "/auth/me", nil, userToken, 403)
 	login("newuser@example.test", "test-password-123", 403)
@@ -343,6 +346,30 @@ func TestAuthRBACIntegration(t *testing.T) {
 	testSessions(t, pool, request, login, adminToken, id, "newuser@example.test")
 	testLoginIdentifiers(t, request, adminToken, mohRole)
 	userToken = login("newuser@example.test", "test-password-123", 200)
+
+	// A role given users:update, users:create and roles:assign manages accounts, but only administrators
+	// can hand out the administrator role or change an administrator's account.
+	var mohPermissions, userRoles []string
+	if err := pool.QueryRow(context.Background(), `SELECT coalesce(array_agg(p.name), '{}') FROM role_permission rp
+		JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = $1`, mohRole).Scan(&mohPermissions); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(context.Background(), `SELECT coalesce(array_agg(role_id::text), '{}') FROM role_user
+		WHERE user_id = $1`, id).Scan(&userRoles); err != nil {
+		t.Fatal(err)
+	}
+	request("PUT", "/roles/"+mohRole+"/permissions", map[string]any{"permissions": []string{"users:read", "users:create", "users:update", "roles:assign"}}, adminToken, 200)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{mohRole}}, adminToken, 200)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{mohRole, adminRole}}, userToken, 403)
+	request("PATCH", fmt.Sprintf("/users/%s/role", id), map[string]any{"role_id": adminRole}, userToken, 403)
+	request("POST", "/users", map[string]any{"username": "made-admin", "email": "made-admin@example.test",
+		"password": "test-password-123", "role_ids": []string{adminRole}}, userToken, 403)
+	request("PATCH", fmt.Sprintf("/users/%s/status", adminID), map[string]any{"status": "disabled"}, userToken, 403)
+	request("PATCH", fmt.Sprintf("/users/%s/store", adminID), map[string]any{"store_id": nil}, userToken, 403)
+	request("DELETE", fmt.Sprintf("/users/%s/sessions", adminID), nil, userToken, 403)
+	request("PUT", rolePath, map[string]any{"role_ids": []string{mohRole, hotspotRole}}, userToken, 200)
+	request("PUT", rolePath, map[string]any{"role_ids": userRoles}, adminToken, 200)
+	request("PUT", "/roles/"+mohRole+"/permissions", map[string]any{"permissions": mohPermissions}, adminToken, 200)
 	request("GET", "/users?limit=101", nil, adminToken, 400)
 	request("GET", "/users?offset=-1", nil, adminToken, 400)
 	request("GET", "/users/not-a-number", nil, adminToken, 400)

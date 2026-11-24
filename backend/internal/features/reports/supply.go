@@ -23,7 +23,7 @@ func piecesOf(quantity, unit string) string {
 
 // requestsCTE is every warehouse request the user may see that matches the filter: a district's order
 // to a national warehouse. Stock a warehouse sent without an order is not a request. Parameters: $1 all, $2 store, $3 from, $4 to, $5 warehouse, $6 district,
-// $7 category.
+// $7 category, $8 store_id (either side of the request).
 var requestsCTE = `WITH q AS (
 	SELECT o.id, o.condom_id, coalesce(o.condom_category, c.category) AS category, o.unit_of_measure_id, o.order_status, o.created_at,
 		o.ordered_from_store_id AS warehouse_id, fs.name AS warehouse, o.ordered_for_store_id AS district_store_id,
@@ -47,10 +47,13 @@ var requestsCTE = `WITH q AS (
 		AND ($1::boolean OR $2::uuid IN (o.ordered_from_store_id, o.ordered_for_store_id))
 		AND o.created_at >= $3 AND o.created_at < $4
 		AND ($5::uuid IS NULL OR o.ordered_from_store_id = $5) AND ($6::uuid IS NULL OR ts.district_id = $6)
-		AND ($7 = '' OR coalesce(o.condom_category, c.category) = $7))`
+		AND ($7 = '' OR coalesce(o.condom_category, c.category) = $7)
+		AND ($8::uuid IS NULL OR $8 IN (o.ordered_from_store_id, o.ordered_for_store_id)))`
 
 func (f SupplyFilter) requestArgs(s scope) []any {
-	return []any{s.all, s.storeID, f.From, f.To, f.WarehouseID, f.DistrictID, f.Category}
+	// orders.created_at is a timestamp without time zone holding UTC. pgx sends a time to such a column
+	// as its wall clock, dropping the zone, so Kampala midnight must go as UTC or the period is cut 3 hours late.
+	return []any{s.all, s.storeID, f.From.UTC(), f.To.UTC(), f.WarehouseID, f.DistrictID, f.Category, f.StoreID}
 }
 
 // RequestTotals are the RF06 quantities for a group of warehouse requests. Pieces count only requests
@@ -179,7 +182,7 @@ func (r *Repository) requestRecords(ctx context.Context, s scope, f SupplyFilter
 			district_store_id, district_store, district_id, district, requested, approved, issued, received,
 			requested_pieces, approved_pieces, issued_pieces, received_pieces, received_at,
 			extract(epoch FROM received_at - created_at) / 3600
-		FROM q ORDER BY created_at DESC, id DESC LIMIT $8 OFFSET $9`, append(f.requestArgs(s), f.Limit, f.Offset)...)
+		FROM q ORDER BY created_at DESC, id DESC LIMIT $9 OFFSET $10`, append(f.requestArgs(s), f.Limit, f.Offset)...)
 	if err != nil {
 		return nil, err
 	}

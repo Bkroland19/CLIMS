@@ -107,6 +107,13 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
 
 ### Removed
 
+- **Web access for field roles.** VHTs, hotspot managers and delivery agents use only the mobile app.
+  Web sign-in, by password or from the portal, refuses an account whose roles open no web workspace
+  and work in the field app: it ends the session the API just opened and points the person to the
+  mobile app. A session kept from before opens no page either. The VHT web workspace (`/vht`, My
+  hotspots) and the web's Submit hotspot form are gone; VHTs submit hotspots in the mobile app, and
+  the API is unchanged.
+
 - The warehouse screens' mock-only `/warehouses/{code}/…` contract and its sample requests, stock and
   dispatch picker; the warehouse now reads orders, stock and batches from the Go API.
 
