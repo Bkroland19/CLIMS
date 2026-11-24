@@ -85,6 +85,10 @@ A hotspot stockout notification names Male, Female or Both and no quantity. The 
 
 National users see every hotspot. Others see the hotspots of the district they work in, their own hotspot and the ones they submitted, and `district_id` only narrows that.
 
+## Map
+
+Reports reuse the hotspot map (RF12): `GET /api/v1/hotspots` gives each hotspot's open notification status and filters by it, and shows the village, coordinates and contact only to those allowed to see them. See [hotspots](hotspots.md#map).
+
 ## Store stock
 
 `GET /api/v1/reports/stock` is a current, dated view of stock at warehouses and district stores, separate from any reporting period (`stock_date`). Each line is a store, product and unit:

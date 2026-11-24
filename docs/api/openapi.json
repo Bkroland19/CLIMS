@@ -2255,7 +2255,7 @@
         "tags": ["Hotspots"],
         "operationId": "listHotspots",
         "summary": "List hotspots",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally. `notification_status` finds hotspots by their open stockout notification, for the map (none for no open notification). Village, coordinates and contact are shown only where location_precision is exact.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2306,6 +2306,15 @@
               "format": "uuid"
             },
             "description": "Only hotspots in this district."
+          },
+          {
+            "name": "notification_status",
+            "in": "query",
+            "description": "The hotspot's open stockout notification: none, awaiting_supply, awaiting_acknowledgement or partly_received.",
+            "schema": {
+              "type": "string",
+              "enum": ["none", "awaiting_supply", "awaiting_acknowledgement", "partly_received"]
+            }
           },
           {
             "name": "limit",
@@ -2416,7 +2425,7 @@
         "tags": ["Hotspots"],
         "operationId": "getHotspot",
         "summary": "Get a hotspot",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread. Village, coordinates and contact are shown only where location_precision is exact.",
         "responses": {
           "200": {
             "description": "Success",
@@ -7786,7 +7795,9 @@
           "submitted_by_id",
           "contact_person",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "location_precision",
+          "notification_status"
         ],
         "properties": {
           "id": {
@@ -7877,6 +7888,16 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "location_precision": {
+            "type": "string",
+            "enum": ["exact", "subcounty"],
+            "description": "exact for national users (hotspots:all_districts), the DCFPs of its district, the VHT who submitted it and its manager. Others who may see it, such as VHTs choosing a district hotspot, get subcounty: village, latitude, longitude and contact_person are then null."
+          },
+          "notification_status": {
+            "type": "string",
+            "enum": ["none", "awaiting_supply", "awaiting_acknowledgement", "partly_received"],
+            "description": "none, or the status of the hotspot's open stockout notification."
           }
         }
       },

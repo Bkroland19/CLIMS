@@ -7,6 +7,7 @@ import (
 
 	"clims-backend/internal/features/audit"
 	"clims-backend/internal/features/notifications"
+	"clims-backend/internal/features/orders"
 	"clims-backend/internal/features/users"
 
 	"github.com/jackc/pgx/v5"
@@ -92,17 +93,32 @@ func visibleArgs(access scope, args ...any) []any {
 	return append([]any{access.userID, access.submit, access.districtMode(), access.allDistricts}, args...)
 }
 
+// preciseLocation decides who sees a hotspot's coordinates, village and contact (reporting
+// requirements RF12, "protect precise coordinates and contacts"): national users, the DCFPs of its
+// district, the VHT who submitted it and its manager. Others who may see it, such as VHTs choosing a
+// hotspot in their district, see where it is to the subcounty. It uses the parameters of visibleHotSpots,
+// and an unknown comparison (no submitter, no assigned hotspot) counts as not precise.
+const preciseLocation = `coalesce($4::boolean OR h.submitted_by_id = $1::uuid
+	OR h.id = (SELECT pu.hot_spot_id FROM users pu WHERE pu.id = $1::uuid)
+	OR ($3::int = 1 AND h.district_id = ` + assignedDistrict + `), false)`
+
+// notificationStatus is the status of the hotspot's open stockout notification, or none.
+const notificationStatus = `coalesce(ns.status, 'none')`
+
 const hotSpotColumns = `h.id, h.name, h.type, h.village,
 	r.id, r.name, d.id, d.name, sc.id, sc.name,
 	h.latitude::float8, h.longitude::float8, h.has_condom_dispenser, h.dispenser_condition,
-	h.status, h.review_status, h.submitted_by_id, cp.id, cp.name, cp.phone_number, h.created_at, h.updated_at`
+	h.status, h.review_status, h.submitted_by_id, cp.id, cp.name, cp.phone_number, h.created_at, h.updated_at,
+	` + preciseLocation + `, ` + notificationStatus
 
 const hotSpotTables = ` FROM hot_spots h
 	LEFT JOIN districts d ON d.id = h.district_id
 	LEFT JOIN regions r ON r.id = d.region_id
 	LEFT JOIN subcounties sc ON sc.id = h.subcounty_id
 	LEFT JOIN LATERAL (SELECT id, name, phone_number FROM contact_persons
-		WHERE hot_spot_id = h.id ORDER BY created_at DESC, id DESC LIMIT 1) cp ON true`
+		WHERE hot_spot_id = h.id ORDER BY created_at DESC, id DESC LIMIT 1) cp ON true
+	LEFT JOIN LATERAL (SELECT ` + orders.NotificationStatus + ` AS status FROM stockout_reports r` + orders.NotificationFacts + `
+		WHERE r.hot_spot_id = h.id AND r.fulfilled_at IS NULL ORDER BY r.created_at DESC, r.id DESC LIMIT 1) ns ON true`
 
 func place(id, name *string) *Place {
 	if id == nil || name == nil {
@@ -115,12 +131,19 @@ func scanHotSpot(row pgx.Row) (HotSpot, error) {
 	var h HotSpot
 	var regionID, regionName, districtID, districtName, subcountyID, subcountyName *string
 	var contactID, contactName, contactPhone *string
+	var precise bool
 	if err := row.Scan(&h.ID, &h.Name, &h.Type, &h.Village,
 		&regionID, &regionName, &districtID, &districtName, &subcountyID, &subcountyName,
 		&h.Latitude, &h.Longitude, &h.HasCondomDispenser, &h.DispenserCondition,
 		&h.Status, &h.ReviewStatus, &h.SubmittedByID, &contactID, &contactName, &contactPhone,
-		&h.CreatedAt, &h.UpdatedAt); err != nil {
+		&h.CreatedAt, &h.UpdatedAt, &precise, &h.NotificationStatus); err != nil {
 		return HotSpot{}, err
+	}
+	h.LocationPrecision = PrecisionExact
+	if !precise {
+		h.LocationPrecision = PrecisionSubcounty
+		h.Village, h.Latitude, h.Longitude = nil, nil, nil
+		contactID = nil
 	}
 	h.Region = place(regionID, regionName)
 	h.District = place(districtID, districtName)
@@ -137,6 +160,8 @@ type Filter struct {
 	ReviewStatus  string
 	SubmittedByID *string
 	DistrictID    *string
+	// NotificationStatus is none, or the status of the hotspot's open stockout notification.
+	NotificationStatus string
 }
 
 // list returns visible hotspots, most recently updated first.
@@ -144,8 +169,9 @@ func (r *Repository) list(ctx context.Context, access scope, f Filter, limit, of
 	rows, err := r.db.Query(ctx, `SELECT `+hotSpotColumns+hotSpotTables+
 		` WHERE `+visibleHotSpots+` AND ($5 = '' OR h.status = $5) AND ($6 = '' OR h.review_status = $6)
 			AND ($7::uuid IS NULL OR h.submitted_by_id = $7) AND ($8::uuid IS NULL OR h.district_id = $8)
-		ORDER BY h.updated_at DESC, h.id DESC LIMIT $9 OFFSET $10`,
-		visibleArgs(access, f.Status, f.ReviewStatus, f.SubmittedByID, f.DistrictID, limit, offset)...)
+			AND ($9 = '' OR `+notificationStatus+` = $9)
+		ORDER BY h.updated_at DESC, h.id DESC LIMIT $10 OFFSET $11`,
+		visibleArgs(access, f.Status, f.ReviewStatus, f.SubmittedByID, f.DistrictID, f.NotificationStatus, limit, offset)...)
 	if err != nil {
 		return nil, err
 	}
