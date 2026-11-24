@@ -80,6 +80,7 @@ import {
   isPlaced,
   type MapHotspot,
 } from './map/records';
+import { StackChooser } from './map/StackChooser';
 import { UGANDA_BOUNDS } from './map/uganda';
 import { useMapHotspots, type MapScope } from './map/useMapHotspots';
 import { VENUE_ICONS } from './map/venueIcons';
@@ -611,7 +612,9 @@ export default function HotspotMapPage({
 
         <div
           className={cn(
-            'bg-card rounded-card grid min-h-0 overflow-hidden border lg:grid-cols-[minmax(0,1fr)_22rem]',
+            // One column below lg is held to the card's width: an unbroken value in the
+            // details below the map would otherwise widen the map past the card.
+            'bg-card rounded-card grid min-h-0 grid-cols-1 overflow-hidden border lg:grid-cols-[minmax(0,1fr)_22rem]',
             expanded ? 'flex-1 grid-rows-[minmax(0,1fr)_minmax(0,40%)] lg:grid-rows-1' : '',
           )}
         >
@@ -659,6 +662,21 @@ export default function HotspotMapPage({
                 onReady={() => {
                   setMapReady(true);
                 }}
+                renderStack={({ ids, samePlace, close }) => (
+                  <StackChooser
+                    hotspots={ids.flatMap((id) => byId.get(id) ?? [])}
+                    samePlace={samePlace}
+                    colourBy={state.colourBy}
+                    colourOf={colourFor}
+                    onSelect={(id, byKeyboard) => {
+                      // Focus follows a keyboard choice to the details; a click leaves it on the map.
+                      close(!byKeyboard);
+                      select(id, { focus: byKeyboard });
+                    }}
+                    onHighlight={setHighlightedId}
+                    onClose={close}
+                  />
+                )}
               />
             )}
 

@@ -45,6 +45,93 @@ export function hotspotName(hotspot: Pick<MapHotspot, 'name'>): string {
   return hotspot.name ?? 'Unnamed hotspot';
 }
 
+interface HotspotRowProps {
+  hotspot: MapHotspot;
+  colourBy: ColourBy;
+  colourOf: (hotspot: MapHotspot) => string;
+  showPosition?: boolean;
+  onSelect: (id: string) => void;
+  onHighlight: (id: string | null) => void;
+  className?: string;
+}
+
+/**
+ * One hotspot as a button: its colour, name, where it is, and a chip for any
+ * state but the usual one. Pointing at it raises its pin on the map.
+ */
+export function HotspotRow({
+  hotspot,
+  colourBy,
+  colourOf,
+  showPosition = false,
+  onSelect,
+  onHighlight,
+  className,
+}: HotspotRowProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      type="button"
+      onClick={() => {
+        onSelect(hotspot.id);
+      }}
+      onMouseEnter={() => {
+        onHighlight(hotspot.id);
+      }}
+      onFocus={() => {
+        onHighlight(hotspot.id);
+      }}
+      onBlur={() => {
+        onHighlight(null);
+      }}
+      className={cn(
+        'hover:bg-muted/70 focus-visible:ring-ring flex h-auto min-h-7 w-full items-center justify-start gap-2.5 px-4 py-2 text-left whitespace-normal outline-none focus-visible:ring-2 focus-visible:ring-inset',
+        className,
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className="ring-card size-2.5 shrink-0 rounded-full ring-2"
+        style={{ backgroundColor: colourOf(hotspot) }}
+      />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span
+          className={cn(
+            'truncate text-sm font-medium',
+            hotspot.name === null && 'text-muted-foreground italic',
+          )}
+        >
+          {hotspotName(hotspot)}
+        </span>
+        <span className="text-muted-foreground truncate text-xs">
+          {showPosition ? recordedPosition(hotspot) : placeLine(hotspot)}
+        </span>
+      </span>
+      {showPosition ? (
+        <StatusBadge
+          status={POSITION_LABELS[hotspot.position]}
+          tone={hotspot.position === 'missing' ? 'neutral' : 'caution'}
+          className="shrink-0"
+        />
+      ) : colourBy === 'review' ? (
+        // Most hotspots are active; only the exceptions carry a chip, so they stand out.
+        hotspot.review === 'active' ? (
+          <span className="sr-only">Active</span>
+        ) : (
+          <StatusBadge status={REVIEW_LABELS[hotspot.review]} className="shrink-0" />
+        )
+      ) : (
+        <StatusBadge
+          status={DISPENSER_SHORT_LABELS[hotspot.dispenser]}
+          tone={DISPENSER_TONES[hotspot.dispenser]}
+          className="shrink-0"
+        />
+      )}
+    </Button>
+  );
+}
+
 interface HotspotListProps {
   hotspots: readonly MapHotspot[];
   colourBy: ColourBy;
@@ -103,63 +190,14 @@ function HotspotRows({
       >
         {shown.map((hotspot) => (
           <li key={hotspot.id}>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={() => {
-                onSelect(hotspot.id);
-              }}
-              onMouseEnter={() => {
-                onHighlight(hotspot.id);
-              }}
-              onFocus={() => {
-                onHighlight(hotspot.id);
-              }}
-              onBlur={() => {
-                onHighlight(null);
-              }}
-              className="hover:bg-muted/70 focus-visible:ring-ring flex h-auto min-h-7 w-full items-center justify-start gap-2.5 px-4 py-2 text-left whitespace-normal outline-none focus-visible:ring-2 focus-visible:ring-inset"
-            >
-              <span
-                aria-hidden="true"
-                className="ring-card size-2.5 shrink-0 rounded-full ring-2"
-                style={{ backgroundColor: colourOf(hotspot) }}
-              />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span
-                  className={cn(
-                    'truncate text-sm font-medium',
-                    hotspot.name === null && 'text-muted-foreground italic',
-                  )}
-                >
-                  {hotspotName(hotspot)}
-                </span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {showPosition ? recordedPosition(hotspot) : placeLine(hotspot)}
-                </span>
-              </span>
-              {showPosition ? (
-                <StatusBadge
-                  status={POSITION_LABELS[hotspot.position]}
-                  tone={hotspot.position === 'missing' ? 'neutral' : 'caution'}
-                  className="shrink-0"
-                />
-              ) : colourBy === 'review' ? (
-                // Most hotspots are active; only the exceptions carry a chip, so they stand out.
-                hotspot.review === 'active' ? (
-                  <span className="sr-only">Active</span>
-                ) : (
-                  <StatusBadge status={REVIEW_LABELS[hotspot.review]} className="shrink-0" />
-                )
-              ) : (
-                <StatusBadge
-                  status={DISPENSER_SHORT_LABELS[hotspot.dispenser]}
-                  tone={DISPENSER_TONES[hotspot.dispenser]}
-                  className="shrink-0"
-                />
-              )}
-            </Button>
+            <HotspotRow
+              hotspot={hotspot}
+              colourBy={colourBy}
+              colourOf={colourOf}
+              showPosition={showPosition}
+              onSelect={onSelect}
+              onHighlight={onHighlight}
+            />
           </li>
         ))}
       </ul>

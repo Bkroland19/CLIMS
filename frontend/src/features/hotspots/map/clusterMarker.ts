@@ -37,6 +37,20 @@ export function clusterLabel(total: number, slices: readonly ClusterSlice[]): st
   return `${formatNumber(total)} hotspots: ${parts.join(', ')}. Zoom in to see them.`;
 }
 
+/** The words shown when the pointer rests on a ring: "312 hotspots" over "280 active · 32 deactivated". */
+export function clusterSummary(
+  total: number,
+  slices: readonly ClusterSlice[],
+): { title: string; detail: string } {
+  return {
+    title: `${formatNumber(total)} hotspots`,
+    detail: slices
+      .filter((slice) => slice.count > 0)
+      .map((slice) => `${formatNumber(slice.count)} ${slice.category.label.toLowerCase()}`)
+      .join(' · '),
+  };
+}
+
 const SVG = 'http://www.w3.org/2000/svg';
 
 export function createClusterElement(
