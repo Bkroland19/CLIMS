@@ -1479,6 +1479,10 @@ export function Search({
         height: T.srH,
         borderRadius: T.srR,
         backgroundColor: T.srBg,
+        // Android's search field is white like the sheets and screens it sits on; the outline keeps
+        // it visible there. iOS fills it grey instead.
+        borderWidth: T.ios ? 0 : 1,
+        borderColor: T.outline,
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: T.ios ? 10 : 18,
@@ -1583,6 +1587,7 @@ export function Sheet({
   icon,
   tone = "success",
   onClose,
+  header,
   children,
 }: {
   visible: boolean;
@@ -1593,6 +1598,8 @@ export function Sheet({
   icon?: IconName;
   tone?: Tone;
   onClose: () => void;
+  /** Stays above the scrolling content, e.g. a search field for a long list. */
+  header?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   const T = useT();
@@ -1707,9 +1714,10 @@ export function Sheet({
             </Pressable>
           </View>
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: T.sep }} />
+          {header ? <View style={{ paddingTop: 12 }}>{header}</View> : null}
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingTop: 12 }}
+            contentContainerStyle={{ paddingTop: header ? 0 : 12 }}
           >
             {children}
           </ScrollView>

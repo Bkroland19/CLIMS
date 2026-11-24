@@ -485,6 +485,10 @@ describe('signing out', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    // The page they left is not carried over to whoever signs in next.
+    await waitFor(() => {
+      expect(testRouter.location).toBe('/sign-in');
+    });
     expect(store.getState().auth.session).toBeNull();
     expect(storage.getItem('clims.session')).toBeNull();
     // The server session ends too, using the token from before sign-out.
