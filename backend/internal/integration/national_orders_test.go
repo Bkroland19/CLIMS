@@ -97,6 +97,13 @@ func testNationalOrderLists(t *testing.T, pool *pgxpool.Pool,
 		t.Fatal("% should match a literal percent sign, not everything")
 	}
 	request("GET", "/orders/stockouts?q="+strings.Repeat("a", 101), nil, moh, 400)
+	// Several statuses, as the web's "Open" tab asks: the fulfilled request is not among them.
+	for _, row := range list("/orders/stockouts?limit=100&status=awaiting_supply,awaiting_acknowledgement,partly_received") {
+		if row["id"] == openReport || row["status"] == "fulfilled" || row["status"] == "rejected" {
+			t.Fatalf("open statuses returned a closed request: %v", row)
+		}
+	}
+	request("GET", "/orders/stockouts?status=fulfilled,closed", nil, moh, 400)
 	request("GET", "/orders/stockouts?status=closed", nil, moh, 400)
 	request("GET", "/orders/stockouts?district_id=nope", nil, moh, 400)
 

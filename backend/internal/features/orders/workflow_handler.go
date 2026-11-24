@@ -215,13 +215,18 @@ func (h *Handler) stockouts(c fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, 400, pageError, nil)
 	}
-	filter := StockoutFilter{Status: c.Query("status")}
+	filter := StockoutFilter{}
+	if raw := c.Query("status"); raw != "" {
+		for _, status := range strings.Split(raw, ",") {
+			if !slices.Contains(StockoutStatuses, status) {
+				return response.Error(c, 400, "status must be awaiting_supply, awaiting_acknowledgement, partly_received, fulfilled or rejected, separated by commas", nil)
+			}
+			filter.Statuses = append(filter.Statuses, status)
+		}
+	}
 	filter.Search = strings.TrimSpace(c.Query("q"))
 	if len(filter.Search) > MaxSearch {
 		return response.Error(c, 400, "q must be at most 100 characters", nil)
-	}
-	if filter.Status != "" && !slices.Contains(StockoutStatuses, filter.Status) {
-		return response.Error(c, 400, "status must be awaiting_supply, awaiting_acknowledgement, partly_received, fulfilled or rejected", nil)
 	}
 	for name, target := range map[string]**string{"hot_spot_id": &filter.HotSpotID, "district_id": &filter.DistrictID} {
 		if raw := c.Query(name); raw != "" {

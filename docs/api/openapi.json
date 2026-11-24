@@ -110,16 +110,10 @@
           {
             "name": "status",
             "in": "query",
-            "description": "One status.",
+            "description": "One or more statuses separated by commas, such as awaiting_supply,awaiting_acknowledgement,partly_received for the open requests.",
             "schema": {
               "type": "string",
-              "enum": [
-                "awaiting_supply",
-                "awaiting_acknowledgement",
-                "partly_received",
-                "fulfilled",
-                "rejected"
-              ]
+              "pattern": "^(awaiting_supply|awaiting_acknowledgement|partly_received|fulfilled|rejected)(,(awaiting_supply|awaiting_acknowledgement|partly_received|fulfilled|rejected))*$"
             }
           },
           {
