@@ -386,14 +386,15 @@ func testOrderWorkflow(t *testing.T, pool *pgxpool.Pool,
 	testDistrictDispatch(t, pool, request, admin, districtToken, warehouseToken, warehouse, district, product, unit)
 }
 
-// assertWarehouseGrants checks the default grants migration 31 gives the warehouse and DCFP roles,
-// before any test changes a role's permissions.
+// assertWarehouseGrants checks the default grants migrations 31 and 38 give the warehouse and DCFP
+// roles, before any test changes a role's permissions.
 func assertWarehouseGrants(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	want := map[string][]string{
-		"nms":  {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
-		"jms":  {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
-		"dfcp": {"inventory:manage", "inventory:read", "orders:read", "orders:receive", "orders:replenish"},
+		"nms": {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
+		"jms": {"inventory:manage", "inventory:read", "orders:process", "orders:read"},
+		"dfcp": {"inventory:manage", "inventory:read", "orders:read", "orders:receive", "orders:replenish",
+			"orders:supply_hotspots"},
 	}
 	for role, permissions := range want {
 		var granted []string

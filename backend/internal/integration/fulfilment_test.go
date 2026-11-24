@@ -92,6 +92,10 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	repeated := stockout(map[string]any{"condom_category": other, "message": "Still out"}, 200)["data"].(map[string]any)
 	expect("repeat", repeated, map[string]any{"id": openReport, "selection": "both", "repeat_count": float64(2),
 		"status": "awaiting_supply"})
+	// The DCFP hears the repeat in its own words, not the first report's message again.
+	if !hasNotification(t, request, districtToken, "order.stockout_reported", `Message: "Still out"`) {
+		t.Fatal("the DCFP was not told the repeated report's message")
+	}
 	stockout(map[string]any{"condom_category": "both"}, 200)
 	report := detail(managerToken)
 	var actions []string
@@ -284,8 +288,87 @@ func testNotificationFulfilment(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/reports/notifications?from=2026-11-05&to=2026-11-01", nil, admin, 400)
 
 	// A fulfilled notification is closed: the next stockout opens a new one.
-	if next := stockout(map[string]any{"condom_category": "male"}, 201)["data"].(map[string]any); next["id"] == openReport {
+	next := stockout(map[string]any{"condom_category": "male", "message": "Out again"}, 201)["data"].(map[string]any)
+	if next["id"] == openReport {
 		t.Fatal("a stockout after fulfilment reopened the old notification")
+	}
+	testStockoutRejection(t, pool, request, admin, managerToken, districtToken, otherDistrictToken, hotSpot, male,
+		next["id"].(string), stockout, summary, expect)
+}
+
+// testStockoutRejection covers a DCFP rejecting a request it will not supply: only before any stock
+// goes, with a reason the hotspot is told. A rejected request is closed, so nothing more can be sent
+// against it and the hotspot's next report opens a new one. Reports count it as neither fulfilled nor
+// pending. reportID is the hotspot's open Male request, with nothing sent yet.
+func testStockoutRejection(t *testing.T, pool *pgxpool.Pool, request func(string, string, any, string, int) map[string]any,
+	admin, managerToken, districtToken, otherDistrictToken, hotSpot, male, reportID string,
+	stockout func(map[string]any, int) map[string]any,
+	summary func(string, string) map[string]any,
+	expect func(string, map[string]any, map[string]any),
+) {
+	t.Helper()
+	rejection := "/orders/stockouts/" + reportID + "/rejection"
+	reason := map[string]any{"reason": "  The district store has no male condoms until NMS delivers  "}
+	request("POST", rejection, reason, managerToken, 403)       // no orders:supply_hotspots
+	request("POST", rejection, reason, otherDistrictToken, 404) // another district's request
+	request("POST", "/orders/stockouts/not-a-uuid/rejection", reason, districtToken, 400)
+	request("POST", rejection, map[string]any{}, districtToken, 422)
+	request("POST", rejection, map[string]any{"reason": "   "}, districtToken, 422)
+	request("POST", rejection, map[string]any{"reason": strings.Repeat("x", 1001)}, districtToken, 422)
+
+	rejected := request("POST", rejection, reason, districtToken, 200)["data"].(map[string]any)
+	expect("rejected", rejected, map[string]any{"id": reportID, "status": "rejected", "fulfilled_at": nil,
+		"rejection_reason": "The district store has no male condoms until NMS delivers"})
+	if rejected["rejected_at"] == nil || rejected["rejected_by"] == nil {
+		t.Fatalf("a rejection says when and by whom: %v", rejected)
+	}
+	events := rejected["events"].([]any)
+	last := events[len(events)-1].(map[string]any)
+	if last["action"] != "rejected" || last["data"].(map[string]any)["reason"] != rejected["rejection_reason"] {
+		t.Fatalf("the rejection is in the request's history: %v", last)
+	}
+	// Sending the rejection again changes nothing, whatever the reason says.
+	again := request("POST", rejection, map[string]any{"reason": "Something else"}, districtToken, 200)["data"].(map[string]any)
+	if again["rejection_reason"] != rejected["rejection_reason"] || len(again["events"].([]any)) != len(events) {
+		t.Fatalf("a repeated rejection changed the request: %v", again)
+	}
+	if !hasNotification(t, request, managerToken, "order.stockout_rejected", "no male condoms until NMS delivers") {
+		t.Fatal("the hotspot manager was not told why the request was rejected")
+	}
+	// The hotspot manager reads the rejection on the request's own page.
+	expect("manager's view", request("GET", "/orders/stockouts/"+reportID, nil, managerToken, 200)["data"].(map[string]any),
+		map[string]any{"status": "rejected", "rejection_reason": rejected["rejection_reason"]})
+	request("POST", "/orders/stockouts/"+reportID+"/deliveries",
+		map[string]any{"lines": []map[string]any{{"condom_id": male, "quantity": 1}}}, districtToken, 409)
+
+	// Rejected is neither fulfilled nor pending, and the records can be filtered to it.
+	withRejection := summary(admin, "")
+	expect("summary with a rejection", withRejection, map[string]any{"notifications_raised": float64(2),
+		"notifications_fulfilled": float64(1), "notifications_rejected": float64(1), "awaiting_supply": float64(0),
+		"fulfilment_rate": float64(50)})
+	expect("pending", withRejection["response"].(map[string]any), map[string]any{"pending": float64(0), "oldest_pending_hours": nil})
+	expect("late", withRejection["deadline"].(map[string]any), map[string]any{"late_pending": float64(0)})
+	records := request("GET", "/reports/notifications/records?status=rejected&hot_spot_id="+hotSpot, nil, districtToken, 200)["data"].([]any)
+	if len(records) != 1 || records[0].(map[string]any)["id"] != reportID {
+		t.Fatalf("rejected records: %v", records)
+	}
+
+	// The next report opens a new request; once stock has gone to it, it can no longer be rejected.
+	third := stockout(map[string]any{"condom_category": "male"}, 201)["data"].(map[string]any)
+	if third["id"] == reportID || third["status"] != "awaiting_supply" {
+		t.Fatalf("a stockout after a rejection should open a new request: %v", third)
+	}
+	// A delivery without lines stands for stock on its way, and leaves the stock and the HMIS totals
+	// that later checks count as they are.
+	ctx := context.Background()
+	var sent string
+	if err := pool.QueryRow(ctx, `INSERT INTO hotspot_deliveries (stockout_report_id, district_store_id, delivered_by_id)
+		SELECT $1, district_store_id, delivered_by_id FROM hotspot_deliveries LIMIT 1 RETURNING id`, third["id"]).Scan(&sent); err != nil {
+		t.Fatal(err)
+	}
+	request("POST", "/orders/stockouts/"+third["id"].(string)+"/rejection", map[string]any{"reason": "Too late"}, districtToken, 409)
+	if _, err := pool.Exec(ctx, `DELETE FROM hotspot_deliveries WHERE id = $1`, sent); err != nil {
+		t.Fatal(err)
 	}
 }
 

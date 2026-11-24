@@ -3928,7 +3928,7 @@
         "tags": ["Orders"],
         "operationId": "recordHotspotDelivery",
         "summary": "Record a district delivery to the hotspot",
-        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Each line is a product of a selected type in its catalogue unit, converted to pieces; it comes out of the store's available stock (409 when too little) and is written to the inventory ledger as a hotspot_delivery. The hotspot's manager accounts are notified. A fulfilled notification refuses deliveries (409). Lines are taken first expiry first out; expired batches are never delivered, and a batch with under one month left needs expiry_exception_reason. Name a delivery agent with rider_id to have them carry it; they see it in GET /orders/deliveries.",
+        "description": "Requires orders:supply_hotspots and the notification's district store as your assigned store, or orders:all_stores. Each line is a product of a selected type in its catalogue unit, converted to pieces; it comes out of the store's available stock (409 when too little) and is written to the inventory ledger as a hotspot_delivery. The hotspot's manager accounts are notified. A fulfilled or rejected notification refuses deliveries (409). Lines are taken first expiry first out; expired batches are never delivered, and a batch with under one month left needs expiry_exception_reason. Name a delivery agent with rider_id to have them carry it; they see it in GET /orders/deliveries.",
         "parameters": [
           {
             "name": "id",
@@ -3963,6 +3963,68 @@
           },
           "200": {
             "description": "A retried send matched an existing delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockoutDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/orders/stockouts/{id}/rejection": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "rejectStockoutRequest",
+        "summary": "Reject a hotspot's stockout request",
+        "description": "Requires orders:supply_hotspots and the request's district store as your assigned store, or orders:all_stores. Closes a request the district will not supply, with a reason, before any stock has gone to it: once a delivery is recorded the request can no longer be rejected (409), and a fulfilled request refuses it too (409). The hotspot's manager accounts and whoever sent the report are notified (order.stockout_rejected) with the reason. A rejected request takes no deliveries (409), and the hotspot's next stockout report opens a new request. Rejecting a rejected request again changes nothing and returns it (200).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockoutRejectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request, rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -4238,6 +4300,7 @@
               "type": "string",
               "enum": [
                 "fulfilled",
+                "rejected",
                 "partly_received",
                 "awaiting_acknowledgement",
                 "awaiting_supply"
@@ -8340,7 +8403,10 @@
           "repeat_count",
           "last_reported_at",
           "status",
-          "fulfilled_at"
+          "fulfilled_at",
+          "rejected_at",
+          "rejected_by",
+          "rejection_reason"
         ],
         "properties": {
           "id": {
@@ -8434,13 +8500,36 @@
           },
           "status": {
             "type": "string",
-            "enum": ["fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply"]
+            "enum": [
+              "fulfilled",
+              "rejected",
+              "partly_received",
+              "awaiting_acknowledgement",
+              "awaiting_supply"
+            ]
           },
           "fulfilled_at": {
             "type": "string",
             "format": "date-time",
             "nullable": true,
             "description": "When the last acknowledgement needed for every selected type was recorded."
+          },
+          "rejected_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the district rejected the request instead of supplying it. A rejected request is closed."
+          },
+          "rejected_by": {
+            "type": "string",
+            "nullable": true,
+            "description": "The name of the person who rejected it."
+          },
+          "rejection_reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000,
+            "description": "Why the district rejected the request; the hotspot reads it."
           }
         }
       },
@@ -8779,6 +8868,11 @@
             "type": "integer",
             "format": "int64"
           },
+          "notifications_rejected": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Requests in the period the district rejected: closed without stock, neither fulfilled nor pending."
+          },
           "fulfilment_rate": {
             "type": "number",
             "nullable": true,
@@ -8943,7 +9037,13 @@
           },
           "status": {
             "type": "string",
-            "enum": ["fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply"]
+            "enum": [
+              "fulfilled",
+              "rejected",
+              "partly_received",
+              "awaiting_acknowledgement",
+              "awaiting_supply"
+            ]
           },
           "raised_at": {
             "type": "string",
@@ -11014,6 +11114,20 @@
             "items": {
               "$ref": "#/components/schemas/RiderDelivery"
             }
+          }
+        }
+      },
+      "StockoutRejectionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reason"],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Why the district will not supply the request. Trimmed; the hotspot reads it.",
+            "example": "The district store has no male condoms until NMS delivers."
           }
         }
       }

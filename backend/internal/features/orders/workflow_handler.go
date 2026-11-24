@@ -151,6 +151,37 @@ func validDelivery(in *DeliveryInput) string {
 	return ""
 }
 
+// rejection closes a request the district will not supply, with a reason the hotspot reads.
+func (h *Handler) rejection(c fiber.Ctx) error {
+	id, err := request.UUIDParam(c)
+	if err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	var input RejectionInput
+	if err = request.DecodeJSON(c, &input); err != nil {
+		return response.Error(c, 400, "invalid request body", nil)
+	}
+	reason := ""
+	if input.Reason != nil {
+		reason = strings.TrimSpace(*input.Reason)
+	}
+	if reason == "" {
+		return workflowError(c, errStockoutReason)
+	}
+	if utf8.RuneCountInString(reason) > 1000 {
+		const message = "reason must be at most 1000 characters"
+		return response.Error(c, 422, message, map[string]string{"reason": message})
+	}
+	detail, changed, err := h.repo.rejectStockout(c.Context(), scopeFor(users.CurrentUser(c)), id, reason)
+	if err != nil {
+		return workflowError(c, err)
+	}
+	if !changed {
+		return response.Success(c, 200, "this request was already rejected", detail)
+	}
+	return response.Success(c, 200, "request rejected; the hotspot is told why", detail)
+}
+
 // acknowledgement records the hotspot manager's count of what arrived.
 func (h *Handler) acknowledgement(c fiber.Ctx) error {
 	id, err := request.UUIDParam(c)
@@ -349,7 +380,8 @@ func workflowError(c fiber.Ctx, err error) error {
 	case errors.Is(err, errWorkflowForbidden), errors.Is(err, errNotDistrictStore), errors.Is(err, errNotManager):
 		return response.Error(c, 403, err.Error(), nil)
 	case errors.Is(err, errWorkflowConflict), errors.Is(err, errNotEnoughStock), errors.Is(err, errAlreadyFulfilled),
-		errors.Is(err, errAckChanged), errors.Is(err, errExpiredStock):
+		errors.Is(err, errAckChanged), errors.Is(err, errExpiredStock), errors.Is(err, errRequestRejected),
+		errors.Is(err, errRejectAfterSend):
 		return response.Error(c, 409, err.Error(), nil)
 	case errors.Is(err, errWorkflowInput), errors.Is(err, errHotSpotRoute), errors.Is(err, errUnknownProduct),
 		errors.Is(err, errNotSelected), errors.Is(err, errDeliveryUnit):
@@ -358,7 +390,7 @@ func workflowError(c fiber.Ctx, err error) error {
 		return response.Error(c, 422, err.Error(), map[string]string{"expiry_exception_reason": err.Error()})
 	case errors.Is(err, errRiderNotEligible):
 		return response.Error(c, 422, err.Error(), map[string]string{"rider_id": err.Error()})
-	case errors.Is(err, errRejectReason):
+	case errors.Is(err, errRejectReason), errors.Is(err, errStockoutReason):
 		return response.Error(c, 422, err.Error(), map[string]string{"reason": err.Error()})
 	case errors.Is(err, errNotWarehouse):
 		return response.Error(c, 422, err.Error(), map[string]string{"warehouse_store_id": err.Error()})

@@ -61,11 +61,12 @@ Each notification has its `type`, `title`, `body`, the related `resource_type` a
 
 Field app users get some notifications as phone pushes through Firebase Cloud Messaging (FCM), as well as in their inbox:
 
-| Type                                                                                | Who has the app          |
-| ----------------------------------------------------------------------------------- | ------------------------ |
-| `order.delivery_assigned`                                                           | The delivery agent named |
-| `order.hotspot_delivery`                                                            | The hotspot's managers   |
-| `hotspot.activated`, `hotspot.deactivated`, `hotspot.rejected`, `hotspot.commented` | The VHT who submitted it |
+| Type                                                                                | Who has the app                                     |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `order.delivery_assigned`                                                           | The delivery agent named                            |
+| `order.hotspot_delivery`                                                            | The hotspot's managers                              |
+| `order.stockout_rejected`                                                           | The hotspot's managers, and the VHT who reported it |
+| `hotspot.activated`, `hotspot.deactivated`, `hotspot.rejected`, `hotspot.commented` | The VHT who submitted it                            |
 
 A type opts in by listing `push` among its channels. `PushBody`, when set, replaces the body in the push: a push shows on the lock screen and passes through Google, so `order.delivery_assigned` leaves out the contact's phone number, which the inbox keeps.
 

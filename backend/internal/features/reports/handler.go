@@ -310,9 +310,9 @@ func (h *Handler) notificationRecords(c fiber.Ctx) error {
 	}
 	f.Status = c.Query("status")
 	switch f.Status {
-	case "", "fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply":
+	case "", "fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply", "rejected":
 	default:
-		return response.Error(c, 400, "status must be fulfilled, partly_received, awaiting_acknowledgement or awaiting_supply", nil)
+		return response.Error(c, 400, "status must be fulfilled, partly_received, awaiting_acknowledgement, awaiting_supply or rejected", nil)
 	}
 	if f.Limit, f.Offset, err = page(params(c.Queries())); err != nil {
 		return response.Error(c, 400, err.Error(), nil)
