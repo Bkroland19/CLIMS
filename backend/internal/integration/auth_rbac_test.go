@@ -140,7 +140,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 		roleIDs[name] = roleID
 	}
 	adminRole, mohRole, hotspotRole := roleIDs["admin"], roleIDs["moh"], roleIDs["hotspot manager"]
-	// Before any test changes them: MOH reads the field app's sync log from the start (migration 38).
+	// Before any test changes them: MOH reads the field app's sync log from the start (migration 40).
 	var mohReadsSyncLog bool
 	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 		JOIN permissions p ON p.id = rp.permission_id WHERE r.name = 'moh' AND p.name = 'sync_logs:read')`).

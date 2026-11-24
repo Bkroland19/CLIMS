@@ -57,7 +57,7 @@ An entry is re-sent whenever it changes. Versions are compared by `changed_at`, 
 arriving after a newer one (a retried upload) changes nothing. Phone clocks drift, so times up to a
 day ahead of the server are accepted.
 
-Migration 38 grants `sync_logs:read` to `moh` and `admin`. Change who holds it on the web app's
+Migration 40 grants `sync_logs:read` to `moh` and `admin`. Change who holds it on the web app's
 **Roles & permissions** page. The web app shows the log on the **Sync log** tab of **Audit** in the
 MOH workspace.
 

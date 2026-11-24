@@ -118,7 +118,7 @@ const hotSpotTables = ` FROM hot_spots h
 	LEFT JOIN LATERAL (SELECT id, name, phone_number FROM contact_persons
 		WHERE hot_spot_id = h.id ORDER BY created_at DESC, id DESC LIMIT 1) cp ON true
 	LEFT JOIN LATERAL (SELECT ` + orders.NotificationStatus + ` AS status FROM stockout_reports r` + orders.NotificationFacts + `
-		WHERE r.hot_spot_id = h.id AND r.fulfilled_at IS NULL ORDER BY r.created_at DESC, r.id DESC LIMIT 1) ns ON true`
+		WHERE r.hot_spot_id = h.id AND r.fulfilled_at IS NULL AND r.rejected_at IS NULL ORDER BY r.created_at DESC, r.id DESC LIMIT 1) ns ON true`
 
 func place(id, name *string) *Place {
 	if id == nil || name == nil {
