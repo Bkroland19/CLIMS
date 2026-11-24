@@ -35,6 +35,8 @@ func RegisterRoutes(router fiber.Router, repo *Repository, jwt, activeUser fiber
 	group.Get("/settings", h.settings)
 	group.Post("/settings", rbac.RequirePermission("reports:configure"), h.saveSettings)
 	group.Get("/hmis-105", h.hmis)
+	group.Get("/trends", h.trends)
+	group.Get("/hotspots", h.hotspots)
 	group.Get("/export/:report", h.export)
 	group.Get("/versions", h.listVersions)
 	group.Post("/versions", rbac.RequirePermission("reports:approve"), h.createVersion)
@@ -299,6 +301,75 @@ func (h *Handler) stock(c fiber.Ctx) error {
 	report, err := h.repo.stockReport(c.Context(), s, f, h.now())
 	if err != nil {
 		slog.Error("stock report failed", "error", err)
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	return response.Success(c, 200, "", report)
+}
+
+// trends returns each measure per day, week or month over a period (default the last six months to
+// date), with the warehouse request filters.
+func (h *Handler) trends(c fiber.Ctx) error {
+	p := params(c.Queries())
+	if p.get("from") == "" {
+		// Six calendar months to date, ending on `to` when it is given.
+		end := h.today()
+		if day, err := time.ParseInLocation(time.DateOnly, p.get("to"), Kampala); err == nil {
+			end = day
+		}
+		p["from"] = time.Date(end.Year(), end.Month()-5, 1, 0, 0, 0, 0, Kampala).Format(time.DateOnly)
+	}
+	f, s, err := h.supplyFilter(c.Context(), users.CurrentUser(c), p)
+	if err != nil {
+		return filterError(c, err)
+	}
+	if raw := p.get("hot_spot_id"); raw != "" {
+		id, err := request.ParseUUID(raw)
+		if err != nil {
+			return response.Error(c, 400, "hot_spot_id must be a UUID", nil)
+		}
+		f.HotSpotID = &id
+	}
+	interval := p.get("interval", DefaultInterval(f.From, f.To))
+	if _, err := TrendBuckets(f.From, f.To, interval); err != nil {
+		return response.Error(c, 400, err.Error(), nil)
+	}
+	report, err := h.repo.trendReport(c.Context(), s, f, interval, h.now())
+	if err != nil {
+		slog.Error("trend report failed", "error", err)
+		return response.Error(c, 500, "the report could not be calculated", nil)
+	}
+	return response.Success(c, 200, "", report)
+}
+
+// hotspots reports hotspot coverage: every hotspot for national users (orders:all_stores or
+// hotspots:all_districts), else the district the user works in. region_id and district_id narrow it.
+func (h *Handler) hotspots(c fiber.Ctx) error {
+	user := users.CurrentUser(c)
+	var f HotspotFilter
+	for name, dst := range map[string]**string{"region_id": &f.RegionID, "district_id": &f.DistrictID} {
+		if raw := c.Query(name); raw != "" {
+			id, err := request.ParseUUID(raw)
+			if err != nil {
+				return response.Error(c, 400, name+" must be a UUID", nil)
+			}
+			*dst = &id
+		}
+	}
+	all := user.HasPermission("orders:all_stores") || user.HasPermission("hotspots:all_districts")
+	var district *string
+	if !all {
+		var err error
+		if district, err = h.repo.userDistrict(c.Context(), user.ID); err != nil {
+			slog.Error("hotspot report scope failed", "error", err)
+			return response.Error(c, 500, "the report could not be calculated", nil)
+		}
+		if district == nil {
+			return response.Error(c, 403, "the hotspot report covers the district you work in, and your account has none; ask an administrator to assign your store", nil)
+		}
+	}
+	report, err := h.repo.hotspotReport(c.Context(), all, district, f, h.now())
+	if err != nil {
+		slog.Error("hotspot report failed", "error", err)
 		return response.Error(c, 500, "the report could not be calculated", nil)
 	}
 	return response.Success(c, 200, "", report)

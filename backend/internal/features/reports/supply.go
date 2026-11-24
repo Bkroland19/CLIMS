@@ -2,6 +2,7 @@ package reports
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -70,8 +71,14 @@ type RequestTotals struct {
 	// Pending requests are still open: neither received nor rejected.
 	Pending int64 `json:"pending"`
 	// Rejected requests were closed by the warehouse; they still count as requested.
-	Rejected    int64 `json:"rejected"`
+	Rejected int64 `json:"rejected"`
+	// Unconverted requests name a product but are in another unit than its catalogue unit, or the
+	// product has no pieces per unit: a data quality issue.
 	Unconverted int64 `json:"unconverted"`
+	// AwaitingUnit requests name only a category and a number; the warehouse picks the product, and
+	// with it the unit, at review. They are left out of the piece totals until then, and are not a
+	// quality issue.
+	AwaitingUnit int64 `json:"awaiting_unit"`
 }
 
 // totalsSQL aggregates q into RequestTotals' columns, in order.
@@ -81,11 +88,12 @@ const totalsSQL = `count(*), coalesce(sum(requested_pieces), 0), coalesce(sum(ap
 	count(*) FILTER (WHERE received IS NOT NULL AND received < requested),
 	count(*) FILTER (WHERE received IS NULL AND order_status <> 'rejected'),
 	count(*) FILTER (WHERE order_status = 'rejected'),
-	count(*) FILTER (WHERE requested_pieces IS NULL)`
+	count(*) FILTER (WHERE requested_pieces IS NULL AND condom_id IS NOT NULL),
+	count(*) FILTER (WHERE condom_id IS NULL)`
 
 func scanTotals(row pgx.Row, t *RequestTotals, extra ...any) error {
 	dest := append(extra, &t.Requests, &t.RequestedPieces, &t.ApprovedPieces, &t.IssuedPieces, &t.AcknowledgedPieces,
-		&t.FullyReceived, &t.PartlyReceived, &t.Pending, &t.Rejected, &t.Unconverted)
+		&t.FullyReceived, &t.PartlyReceived, &t.Pending, &t.Rejected, &t.Unconverted, &t.AwaitingUnit)
 	if err := row.Scan(dest...); err != nil {
 		return err
 	}
@@ -109,7 +117,28 @@ type SupplyReport struct {
 	ByWarehouse   []RequestGroup   `json:"by_warehouse"`
 	ByDistrict    []RequestGroup   `json:"by_district"`
 	Response      ResponseDuration `json:"response"`
+	// WithoutRequest is the stock warehouses sent to districts in the period without a request
+	// (district dispatches). It is not part of the request totals or the fulfilment rate.
+	WithoutRequest UnrequestedDispatches `json:"dispatches_without_request"`
 }
+
+// UnrequestedDispatches are warehouse dispatches to districts that no district asked for, in pieces.
+type UnrequestedDispatches struct {
+	Dispatches     int64 `json:"dispatches"`
+	IssuedPieces   int64 `json:"issued_pieces"`
+	ReceivedPieces int64 `json:"received_pieces"`
+	// AwaitingReceipt is dispatches the district has not received yet.
+	AwaitingReceipt int64 `json:"awaiting_receipt"`
+}
+
+// unrequestedCTE selects district dispatches with the same scope and filters as requestsCTE.
+var unrequestedCTE = func() string {
+	out := strings.Replace(requestsCTE, "AND NOT o.unrequested AND", "AND o.unrequested AND", 1)
+	if out == requestsCTE {
+		panic("reports: requestsCTE no longer filters unrequested orders")
+	}
+	return out
+}()
 
 func (r *Repository) supplyReport(ctx context.Context, s scope, f SupplyFilter, now time.Time) (SupplyReport, error) {
 	args := f.requestArgs(s)
@@ -140,7 +169,14 @@ func (r *Repository) supplyReport(ctx context.Context, s scope, f SupplyFilter, 
 		})
 	}
 	var err error
-	if out.ByType, err = groups("category", "category"); err != nil {
+	if err = r.db.QueryRow(ctx, unrequestedCTE+`
+		SELECT count(*), coalesce(sum(issued_pieces), 0), coalesce(sum(received_pieces), 0),
+			count(*) FILTER (WHERE received IS NULL AND order_status <> 'rejected')
+		FROM q`, args...).Scan(&out.WithoutRequest.Dispatches, &out.WithoutRequest.IssuedPieces,
+		&out.WithoutRequest.ReceivedPieces, &out.WithoutRequest.AwaitingReceipt); err != nil {
+		return SupplyReport{}, err
+	}
+	if out.ByType, err = groups("category", "initcap(category)"); err != nil {
 		return SupplyReport{}, err
 	}
 	if out.ByWarehouse, err = groups("warehouse_id::text", "warehouse"); err != nil {
