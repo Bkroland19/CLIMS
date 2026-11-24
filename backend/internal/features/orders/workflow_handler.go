@@ -2,6 +2,7 @@ package orders
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -214,15 +215,20 @@ func (h *Handler) stockouts(c fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, 400, pageError, nil)
 	}
-	var hotSpotID *string
-	if raw := c.Query("hot_spot_id"); raw != "" {
-		id, err := request.ParseUUID(raw)
-		if err != nil {
-			return response.Error(c, 400, "hot_spot_id must be a UUID", nil)
-		}
-		hotSpotID = &id
+	filter := StockoutFilter{Status: c.Query("status")}
+	if filter.Status != "" && !slices.Contains(StockoutStatuses, filter.Status) {
+		return response.Error(c, 400, "status must be awaiting_supply, awaiting_acknowledgement, partly_received, fulfilled or rejected", nil)
 	}
-	reports, err := h.repo.listStockouts(c.Context(), scopeFor(users.CurrentUser(c)), hotSpotID, limit, offset)
+	for name, target := range map[string]**string{"hot_spot_id": &filter.HotSpotID, "district_id": &filter.DistrictID} {
+		if raw := c.Query(name); raw != "" {
+			id, err := request.ParseUUID(raw)
+			if err != nil {
+				return response.Error(c, 400, name+" must be a UUID", nil)
+			}
+			*target = &id
+		}
+	}
+	reports, err := h.repo.listStockouts(c.Context(), scopeFor(users.CurrentUser(c)), filter, limit, offset)
 	if err != nil {
 		return workflowError(c, err)
 	}

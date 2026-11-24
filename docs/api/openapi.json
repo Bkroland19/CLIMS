@@ -64,7 +64,7 @@
         "tags": ["Orders"],
         "operationId": "listStockoutReports",
         "summary": "List stockout reports",
-        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot.",
+        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot. Filter by hot_spot_id, district_id (the hotspot's district) and status; filters only narrow what you can already see.",
         "responses": {
           "200": {
             "description": "Success",
@@ -96,6 +96,30 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "The hotspot's district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "One status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "awaiting_supply",
+                "awaiting_acknowledgement",
+                "partly_received",
+                "fulfilled",
+                "rejected"
+              ]
             }
           },
           {
@@ -409,7 +433,7 @@
         "tags": ["Orders"],
         "operationId": "listOrders",
         "summary": "List orders",
-        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access.",
+        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access. Filter by status, type, district_id and warehouse_store_id; filters only narrow what you can already see.",
         "responses": {
           "200": {
             "description": "Success",
@@ -439,9 +463,37 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^(pending|fulfilled|queued|reviewed|on_hold|confirmed|rejected|dispatched|received|delivered)(,(pending|fulfilled|queued|reviewed|on_hold|confirmed|rejected|dispatched|received|delivered))*$"
             },
-            "description": "Filter by order_status, e.g. on_hold or rejected."
+            "description": "One or more order statuses separated by commas, such as queued,reviewed,on_hold,confirmed."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "warehouse_request: a district's orders to a national warehouse (NMS or JMS), including stock sent without an order; not hotspot orders, nor alert orders from before stockouts became reports.",
+            "schema": {
+              "type": "string",
+              "enum": ["warehouse_request"]
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "The district of the store the order is for.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "warehouse_store_id",
+            "in": "query",
+            "description": "The store the order is placed with.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           {
             "name": "limit",
@@ -8914,7 +8966,12 @@
           "fulfilled_at",
           "rejected_at",
           "rejected_by",
-          "rejection_reason"
+          "rejection_reason",
+          "district_id",
+          "delivered_male_pieces",
+          "delivered_female_pieces",
+          "received_male_pieces",
+          "received_female_pieces"
         ],
         "properties": {
           "id": {
@@ -9038,6 +9095,28 @@
             "nullable": true,
             "maxLength": 1000,
             "description": "Why the district rejected the request; the hotspot reads it."
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The hotspot's district."
+          },
+          "delivered_male_pieces": {
+            "type": "integer",
+            "description": "Male pieces delivered against the notification."
+          },
+          "delivered_female_pieces": {
+            "type": "integer",
+            "description": "Female pieces delivered."
+          },
+          "received_male_pieces": {
+            "type": "integer",
+            "description": "Male pieces the hotspot's manager acknowledged."
+          },
+          "received_female_pieces": {
+            "type": "integer",
+            "description": "Female pieces acknowledged."
           }
         }
       },

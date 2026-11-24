@@ -3,7 +3,9 @@ package orders
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
+	"strings"
 
 	"clims-backend/internal/features/rbac"
 	"clims-backend/internal/features/users"
@@ -54,7 +56,28 @@ func (h *Handler) list(c fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, 400, pageError, nil)
 	}
-	orders, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), limit, offset, c.Query("status"))
+	filter := OrderFilter{Type: c.Query("type")}
+	if filter.Type != "" && filter.Type != TypeWarehouseRequest {
+		return response.Error(c, 400, "type must be warehouse_request", nil)
+	}
+	if raw := c.Query("status"); raw != "" {
+		for _, status := range strings.Split(raw, ",") {
+			if !slices.Contains(OrderStatuses, status) {
+				return response.Error(c, 400, "status must be order statuses separated by commas, such as queued,reviewed", nil)
+			}
+			filter.Statuses = append(filter.Statuses, status)
+		}
+	}
+	for name, target := range map[string]**string{"district_id": &filter.DistrictID, "warehouse_store_id": &filter.WarehouseID} {
+		if raw := c.Query(name); raw != "" {
+			id, err := request.ParseUUID(raw)
+			if err != nil {
+				return response.Error(c, 400, name+" must be a UUID", nil)
+			}
+			*target = &id
+		}
+	}
+	orders, err := h.repo.list(c.Context(), scopeFor(users.CurrentUser(c)), filter, limit, offset)
 	if err != nil {
 		return orderError(c, err)
 	}

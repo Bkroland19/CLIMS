@@ -24,6 +24,15 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   permission (it held only `catalogue:manage`, so MOH accounts could open almost nothing), and NMS and
   JMS `reports:read`. The web app opens every workspace read-only for MOH, whose Orders tabs now show
   every district's real hotspot requests and district orders.
+- **Order lists filter on the server.** `GET /api/v1/orders/stockouts` takes `district_id` and
+  `status`, and each report carries its district and the pieces delivered and acknowledged per type.
+  `GET /api/v1/orders` takes `type=warehouse_request`, `district_id`, `warehouse_store_id` and
+  several statuses separated by commas, so national lists page on the server instead of loading every
+  order.
+- **MOH reads every district.** Migration 40 gives the `moh` role national read access: every
+  stockout notification and warehouse request (`orders:read`, `orders:all_stores`), programme reports,
+  every hotspot, stock at every store and the audit log. It gains no write permission, and users and
+  roles stay with administrators; see [RBAC](modules/rbac.md).
 - **Sync log of what field phones send.** The field app records each action it saves (mapping a
   hotspot, requesting stock, counting a delivery and the rest): every try to send it and whether it
   was sent, refused, is retrying after a network failure or changed only the phone because the API
