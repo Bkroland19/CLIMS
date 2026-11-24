@@ -107,10 +107,56 @@ describe('WarehouseOrdersPage', () => {
     });
 
     const table = await screen.findByRole('table', { name: 'Warehouse orders' });
-    expect(await within(table).findAllByText('500 box')).toHaveLength(2);
+    // Ordered on both rows, and offered on the dispatched one.
+    expect(await within(table).findAllByText('500 box')).toHaveLength(3);
     expect(within(table).getByText('NMS')).toBeInTheDocument();
     expect(within(table).getByText('On the way')).toBeInTheDocument();
     expect(within(table).getAllByRole('row')).toHaveLength(3); // header and two orders
+  });
+
+  it('shows what the warehouse offered beside what was ordered', async () => {
+    renderApp(<WarehouseOrdersPage />, {
+      route: '/dcfp/restock',
+      signedIn: true,
+      replies: [
+        dcfpApi({
+          orders: [
+            anOrder({ id: 'waiting' }),
+            anOrder({
+              id: 'part',
+              order_status: 'confirmed',
+              quantity_needed: 500,
+              quantity_approved: 300,
+              created_at: '2026-11-20T08:00:00Z',
+            }),
+            anOrder({
+              id: 'unasked',
+              order_status: 'dispatched',
+              unrequested: true,
+              quantity_needed: 200,
+              quantity_approved: 200,
+              quantity_issued: 200,
+              created_at: '2026-11-19T08:00:00Z',
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const table = await screen.findByRole('table', { name: 'Warehouse orders' });
+    expect(
+      within(table).getByRole('columnheader', { name: /Quantity offered/ }),
+    ).toBeInTheDocument();
+    const [, waiting, part, unasked] = await waitFor(() => {
+      const rows = within(table).getAllByRole('row');
+      expect(rows).toHaveLength(4);
+      return rows;
+    });
+    expect(within(waiting!).getByText('Not decided yet')).toBeInTheDocument();
+    expect(within(part!).getByText('300 box')).toBeInTheDocument();
+    expect(within(part!).getByText(/200 short/)).toBeInTheDocument();
+    expect(within(unasked!).getByText('Not ordered')).toBeInTheDocument();
+    expect(within(unasked!).getByText('200 box')).toBeInTheDocument();
   });
 
   it('opens on the consignments to receive from ?status=dispatched, and can show them all', async () => {

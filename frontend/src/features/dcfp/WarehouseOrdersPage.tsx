@@ -16,7 +16,15 @@ import { useStores } from '@/features/geography/queries';
 import { EMPTY_VALUE, formatNumber, formatTimestamp } from '@/lib/format';
 
 import type { Order, OrderStatus } from './api';
-import { orderLinks, DCFP_PATHS, ORDER_STATUS, warehouseOrders, type OrderScope } from './orders';
+import {
+  DCFP_PATHS,
+  offeredQuantity,
+  offerShortfall,
+  orderLinks,
+  ORDER_STATUS,
+  warehouseOrders,
+  type OrderScope,
+} from './orders';
 import { useOrders } from './queries';
 import { UNIT_PENDING, useOrderNames } from './useOrderNames';
 
@@ -91,9 +99,12 @@ export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: Or
         id: 'quantity',
         header: 'Quantity ordered',
         numeric: true,
-        value: (order) => order.quantity_needed,
+        // Stock sent without an order carries the sent quantity here; nobody ordered it.
+        value: (order) => (order.unrequested ? null : order.quantity_needed),
         cell: (order) =>
-          order.unit_of_measure_id === null && order.quantity_needed !== null ? (
+          order.unrequested ? (
+            <span className="text-muted-foreground">Not ordered</span>
+          ) : order.unit_of_measure_id === null && order.quantity_needed !== null ? (
             <>
               {formatNumber(order.quantity_needed)}{' '}
               <span className="text-muted-foreground">· {UNIT_PENDING}</span>
@@ -101,6 +112,30 @@ export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: Or
           ) : (
             names.quantity(order.quantity_needed, order.unit_of_measure_id)
           ),
+      },
+      {
+        id: 'offered',
+        header: 'Quantity offered',
+        numeric: true,
+        value: offeredQuantity,
+        cell: (order) => {
+          const offered = offeredQuantity(order);
+          if (offered === null) {
+            return <span className="text-muted-foreground">Not decided yet</span>;
+          }
+          if (order.order_status === 'rejected') {
+            return <span className="text-muted-foreground">None</span>;
+          }
+          const short = offerShortfall(order);
+          return (
+            <>
+              {names.quantity(offered, order.unit_of_measure_id)}
+              {short === null ? null : (
+                <span className="text-warning"> · {formatNumber(short)} short</span>
+              )}
+            </>
+          );
+        },
       },
       {
         id: 'warehouse',

@@ -158,6 +158,45 @@ export function isWithWarehouse(order: Order): boolean {
   return WITH_WAREHOUSE.has(order.order_status);
 }
 
+/**
+ * What the warehouse is giving the district against an order. Once it has dispatched, that is
+ * what it sent, which can be less than it approved. Before that, it is what it approved. A rejected
+ * order gets nothing, and null means the warehouse has not decided yet.
+ */
+export function offeredQuantity(order: Order): number | null {
+  switch (order.order_status) {
+    case 'queued':
+      return null;
+    case 'rejected':
+      return 0;
+    case 'dispatched':
+    case 'received':
+      return order.quantity_issued ?? order.quantity_approved ?? order.quantity_needed;
+    default:
+      // Orders approved before approvals were recorded got everything they asked for.
+      return order.quantity_approved ?? order.quantity_needed;
+  }
+}
+
+/**
+ * How much less the warehouse is giving than the district ordered, or null when it is giving all
+ * of it. Null too when it has not decided, when it rejected the order (the status says so), and for
+ * stock it sent without an order.
+ */
+export function offerShortfall(order: Order): number | null {
+  const offered = offeredQuantity(order);
+  if (
+    order.unrequested ||
+    order.order_status === 'rejected' ||
+    offered === null ||
+    order.quantity_needed === null
+  ) {
+    return null;
+  }
+  const short = order.quantity_needed - offered;
+  return short > 0 ? short : null;
+}
+
 /** "Male condoms" or "Female condoms", for an order whose product the warehouse has not chosen. */
 export function categoryLabel(category: string | null): string | null {
   if (category === 'male') return 'Male condoms';
