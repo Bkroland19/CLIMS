@@ -13,7 +13,12 @@ interface DataBarProps {
  * A table cell's number with a data bar behind it, as in a Power BI matrix
  * with conditional formatting: the column reads as a chart and stays a table.
  */
-export function DataBar({ value, max, format = formatNumber, color = 'var(--chart-1)' }: DataBarProps) {
+export function DataBar({
+  value,
+  max,
+  format = formatNumber,
+  color = 'var(--chart-1)',
+}: DataBarProps) {
   if (value === null) return <span className="text-muted-foreground">—</span>;
   const width = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
   return (

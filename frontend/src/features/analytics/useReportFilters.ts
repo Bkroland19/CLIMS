@@ -55,7 +55,8 @@ export function useReportFilters(): ReportFilters {
       if (changes.preset && changes.preset !== 'custom') Object.assign(next, { from: '', to: '' });
       if (changes.from !== undefined || changes.to !== undefined) next.preset = 'custom';
       // A district outside the chosen region would leave the reports empty.
-      if (changes.regionId !== undefined && changes.regionId !== state.regionId) next.districtId = '';
+      if (changes.regionId !== undefined && changes.regionId !== state.regionId)
+        next.districtId = '';
       write(next);
     },
     [state, write],

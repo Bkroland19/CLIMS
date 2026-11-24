@@ -47,11 +47,12 @@ export async function inLightTheme<T>(capture: () => Promise<T>): Promise<T> {
 
 /** PNG pictures of `elements`, in order, at twice their CSS size for print sharpness. */
 export async function snapshotElements(elements: readonly HTMLElement[]): Promise<Snapshot[]> {
-  if (elements.length === 0) return [];
+  const [first] = elements;
+  if (!first) return [];
   const { toPng, getFontEmbedCSS } = await import('html-to-image');
   return inLightTheme(async () => {
     // Fonts are embedded once and reused for every picture.
-    const fontEmbedCSS = await getFontEmbedCSS(elements[0] as HTMLElement).catch(() => '');
+    const fontEmbedCSS = await getFontEmbedCSS(first).catch(() => '');
     const out: Snapshot[] = [];
     for (const element of elements) {
       const { width, height } = element.getBoundingClientRect();

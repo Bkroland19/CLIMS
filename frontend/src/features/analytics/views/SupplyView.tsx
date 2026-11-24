@@ -24,6 +24,7 @@ import {
   trendRows,
   VisualGrid,
   type AnalyticsWorkspace,
+  piecesValue,
 } from './shared';
 
 interface SupplyViewProps {
@@ -41,7 +42,14 @@ export function SupplyView({ filters, workspace, storeId }: SupplyViewProps) {
     ...own,
   });
   const trend = useTrends({
-    ...apiParams(filters.state, ['from', 'to', 'interval', 'district_id', 'category', 'warehouse_store_id']),
+    ...apiParams(filters.state, [
+      'from',
+      'to',
+      'interval',
+      'district_id',
+      'category',
+      'warehouse_store_id',
+    ]),
     ...own,
   });
   const data = report.data;
@@ -65,13 +73,26 @@ export function SupplyView({ filters, workspace, storeId }: SupplyViewProps) {
           icon={Warehouse}
           accent="info"
           isLoading={loading}
-          detail={total ? `${formatNumber(total.pending)} open · ${formatNumber(total.rejected)} rejected` : undefined}
-          trend={trend.data && trend.data.buckets.length > 1 ? { series: series(trend.data, (b) => b.requests.requests), caption } : undefined}
+          detail={
+            total
+              ? `${formatNumber(total.pending)} open · ${formatNumber(total.rejected)} rejected`
+              : undefined
+          }
+          trend={
+            trend.data && trend.data.buckets.length > 1
+              ? { series: series(trend.data, (b) => b.requests.requests), caption }
+              : undefined
+          }
         />
-        <StatCard label="Requested" value={total ? `${formatNumber(total.requested_pieces)} pcs` : ''} icon={Package} isLoading={loading} />
+        <StatCard
+          label="Requested"
+          value={total ? piecesValue(total.requested_pieces) : ''}
+          icon={Package}
+          isLoading={loading}
+        />
         <StatCard
           label="Issued by warehouses"
-          value={total ? `${formatNumber(total.issued_pieces)} pcs` : ''}
+          value={total ? piecesValue(total.issued_pieces) : ''}
           icon={Send}
           accent="violet"
           isLoading={loading}
@@ -79,18 +100,32 @@ export function SupplyView({ filters, workspace, storeId }: SupplyViewProps) {
         />
         <StatCard
           label="Received by districts"
-          value={total ? `${formatNumber(total.acknowledged_pieces)} pcs` : ''}
+          value={total ? piecesValue(total.acknowledged_pieces) : ''}
           icon={PackageCheck}
           accent="positive"
           isLoading={loading}
-          detail={total ? `${percentOrNa(total.quantity_fulfilment_rate)} of the pieces requested` : undefined}
+          detail={
+            total
+              ? `${percentOrNa(total.quantity_fulfilment_rate)} of the pieces requested`
+              : undefined
+          }
         />
         <StatCard
           label="Median time to receive"
-          value={data ? (data.response.median_hours === null ? 'Not applicable' : hoursLabel(data.response.median_hours)) : ''}
+          value={
+            data
+              ? data.response.median_hours === null
+                ? 'Not applicable'
+                : hoursLabel(data.response.median_hours)
+              : ''
+          }
           icon={Timer}
           isLoading={loading}
-          detail={data && data.response.oldest_pending_hours !== null ? `Oldest open: ${hoursLabel(data.response.oldest_pending_hours)}` : 'From the order to the district counting it in'}
+          detail={
+            data && data.response.oldest_pending_hours !== null
+              ? `Oldest open: ${hoursLabel(data.response.oldest_pending_hours)}`
+              : 'From the order to the district counting it in'
+          }
         />
         <StatCard
           label="Fully received"
@@ -106,17 +141,24 @@ export function SupplyView({ filters, workspace, storeId }: SupplyViewProps) {
         <Alert variant="info">
           <Truck aria-hidden="true" />
           <AlertTitle>
-            {formatNumber(unrequested.dispatches)} dispatch{unrequested.dispatches === 1 ? '' : 'es'} sent without a district order
+            {formatNumber(unrequested.dispatches)} dispatch
+            {unrequested.dispatches === 1 ? '' : 'es'} sent without a district order
           </AlertTitle>
           <AlertDescription>
-            {formatNumber(unrequested.issued_pieces)} pcs sent, {formatNumber(unrequested.received_pieces)} pcs received so far
-            {unrequested.awaiting_receipt > 0 ? `, ${formatNumber(unrequested.awaiting_receipt)} still in transit` : ''}. They are
-            not part of the order totals or the fulfilment rate.
+            {formatNumber(unrequested.issued_pieces)} pcs sent,{' '}
+            {formatNumber(unrequested.received_pieces)} pcs received so far
+            {unrequested.awaiting_receipt > 0
+              ? `, ${formatNumber(unrequested.awaiting_receipt)} still in transit`
+              : ''}
+            . They are not part of the order totals or the fulfilment rate.
           </AlertDescription>
         </Alert>
       ) : null}
 
-      <ReportSection title="Pipeline" description="Orders raised in the period, from request to receipt.">
+      <ReportSection
+        title="Pipeline"
+        description="Orders raised in the period, from request to receipt."
+      >
         <VisualGrid columns={3}>
           <FunnelChart
             title="From request to receipt"
@@ -144,10 +186,33 @@ export function SupplyView({ filters, workspace, storeId }: SupplyViewProps) {
             segments={
               total && total.requests > 0
                 ? [
-                    { key: 'full', label: 'Fully received', value: total.fully_received, color: 'var(--success)', ink: 'surface' },
-                    { key: 'partly', label: 'Partly received', value: total.partly_received, color: 'var(--info)', ink: 'surface' },
-                    { key: 'pending', label: 'Open', value: total.pending, color: 'var(--warning)', ink: 'surface' },
-                    { key: 'rejected', label: 'Rejected', value: total.rejected, color: 'var(--role-system)' },
+                    {
+                      key: 'full',
+                      label: 'Fully received',
+                      value: total.fully_received,
+                      color: 'var(--success)',
+                      ink: 'surface',
+                    },
+                    {
+                      key: 'partly',
+                      label: 'Partly received',
+                      value: total.partly_received,
+                      color: 'var(--info)',
+                      ink: 'surface',
+                    },
+                    {
+                      key: 'pending',
+                      label: 'Open',
+                      value: total.pending,
+                      color: 'var(--warning)',
+                      ink: 'surface',
+                    },
+                    {
+                      key: 'rejected',
+                      label: 'Rejected',
+                      value: total.rejected,
+                      color: 'var(--role-system)',
+                    },
                   ]
                 : []
             }
@@ -251,7 +316,10 @@ export function SupplyView({ filters, workspace, storeId }: SupplyViewProps) {
             series={{ key: 'rate', label: 'Received of requested', color: 'var(--chart-2)' }}
             rows={(data?.by_district ?? [])
               .filter((group) => group.quantity_fulfilment_rate !== null)
-              .map((group) => ({ label: group.name ?? 'Not recorded', values: { rate: group.quantity_fulfilment_rate } }))}
+              .map((group) => ({
+                label: group.name ?? 'Not recorded',
+                values: { rate: group.quantity_fulfilment_rate },
+              }))}
             valueFormat={percentLabel}
             xMax={100}
             isLoading={loading}

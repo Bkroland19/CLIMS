@@ -7,7 +7,9 @@ import { workspaces } from '../../src/navigation/workspaces';
  */
 
 const SAMPLE_PATHS: Readonly<Record<string, string>> = {
-  '/moh/orders/[id]': '/moh/orders/ORD-0141',
+  // MOH reads the DCFP's records nationally: Kisenyi's stockout request and Wakiso's NMS order.
+  '/moh/orders/[id]': '/moh/orders/00000000-0000-4000-8302-000000000001',
+  '/moh/orders/warehouse/[id]': '/moh/orders/warehouse/00000000-0000-4000-8301-000000000003',
   '/moh/reports/[id]': '/moh/reports/RPT-2610-HS0198',
   '/dcfp/restock/new': '/dcfp/restock/new',
   // The seeded order NMS has dispatched to Wakiso (dev/mock/dcfp.mts).

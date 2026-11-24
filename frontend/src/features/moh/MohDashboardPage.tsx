@@ -70,7 +70,9 @@ export default function MohDashboardPage() {
  */
 function WatchList({ filters }: { filters: ReportFilters }) {
   const { state } = filters;
-  const notifications = useNotificationReport(apiParams(state, ['from', 'to', 'district_id', 'category']));
+  const notifications = useNotificationReport(
+    apiParams(state, ['from', 'to', 'district_id', 'category']),
+  );
   const supply = useSupplyReport(apiParams(state, ['from', 'to', 'district_id', 'category']));
   const stockParams = apiParams(state, ['district_id', 'category']);
   const stock = useStockReport(stockParams);
@@ -99,7 +101,8 @@ function WatchList({ filters }: { filters: ReportFilters }) {
         id: 'ack',
         status: { label: 'Quality issue', tone: 'caution' },
         title: `${formatNumber(n.acknowledgement_overdue)} deliver${n.acknowledgement_overdue === 1 ? 'y' : 'ies'} not acknowledged in time`,
-        detail: 'The hotspot manager has not confirmed what arrived; they do not count as fulfilled.',
+        detail:
+          'The hotspot manager has not confirmed what arrived; they do not count as fulfilled.',
         action: 'See requests',
         href: link('notifications', { status: 'awaiting_acknowledgement' }),
       });
@@ -144,7 +147,9 @@ function WatchList({ filters }: { filters: ReportFilters }) {
         action: 'See batches',
         href: link('batches', { band: 'under_1_month' }),
       });
-    const low = stock.data.lines.filter((line) => line.months_of_stock !== null && line.months_of_stock < MIN_MONTHS);
+    const low = stock.data.lines.filter(
+      (line) => line.months_of_stock !== null && line.months_of_stock < MIN_MONTHS,
+    );
     if (low.length > 0)
       tasks.push({
         id: 'low',
@@ -154,7 +159,9 @@ function WatchList({ filters }: { filters: ReportFilters }) {
         action: 'See stock',
         href: link('stock'),
       });
-    const unreconciled = stock.data.lines.filter((line) => !line.reconciled || !line.batches_reconciled);
+    const unreconciled = stock.data.lines.filter(
+      (line) => !line.reconciled || !line.batches_reconciled,
+    );
     if (unreconciled.length > 0)
       tasks.push({
         id: 'reconcile',
@@ -179,7 +186,8 @@ function WatchList({ filters }: { filters: ReportFilters }) {
       loadingLabel="Checking the programme's figures…"
       empty={{
         title: 'Nothing needs watching',
-        description: 'No overdue requests, expiring or short stock, or ledgers out of balance for these filters.',
+        description:
+          'No overdue requests, expiring or short stock, or ledgers out of balance for these filters.',
       }}
     />
   );

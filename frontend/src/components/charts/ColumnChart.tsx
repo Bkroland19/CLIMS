@@ -20,7 +20,7 @@ import {
   type ChartSeries,
 } from './ChartCard';
 import { axisNumber } from './format';
-import { TooltipValue, type ChartReference } from './TrendChart';
+import { entryColor, seriesName, TooltipValue, type ChartReference } from './TrendChart';
 
 interface ColumnChartProps extends Omit<ChartCardProps, 'children' | 'legendShape' | 'series'> {
   /** One series (the card title names it, so there is no legend) or several, clustered or stacked. */
@@ -55,7 +55,11 @@ export function ColumnChart({
   const last = series.length - 1;
 
   const plot = (mode: ChartMode) => (
-    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: PLOT_HEIGHT[mode] }}>
+    <ChartContainer
+      config={config}
+      className="aspect-auto w-full"
+      style={{ height: PLOT_HEIGHT[mode] }}
+    >
       <BarChart
         accessibilityLayer
         data={data}
@@ -70,7 +74,9 @@ export function ColumnChart({
           axisLine={false}
           tickMargin={8}
           minTickGap={8}
-          interval="preserveStartEnd"
+          // A handful of categories each keep their name; a long series of periods thins out.
+          interval={rows.length <= 8 ? 0 : 'preserveStartEnd'}
+          tickFormatter={(value: string) => (value.length > 18 ? `${value.slice(0, 17)}…` : value)}
         />
         <YAxis
           width="auto"
@@ -88,8 +94,8 @@ export function ColumnChart({
               hideIndicator
               formatter={(value, name, item) => (
                 <TooltipValue
-                  color={String(item.color ?? item.payload?.fill ?? '')}
-                  label={String(config[String(name)]?.label ?? name)}
+                  color={entryColor(item)}
+                  label={seriesName(config, name)}
                   value={typeof value === 'number' ? valueFormat(value) : '—'}
                 />
               )}
@@ -128,7 +134,7 @@ export function ColumnChart({
                 dataKey={item.key}
                 position="top"
                 offset={6}
-                className="fill-muted-foreground"
+                fill="var(--muted-foreground)"
                 fontSize={11}
                 formatter={(value: unknown) => (typeof value === 'number' ? axisNumber(value) : '')}
               />

@@ -19,8 +19,10 @@ export interface Segment {
   ink?: 'dark' | 'surface';
 }
 
-interface SegmentedBarProps
-  extends Omit<ChartCardProps, 'children' | 'legendShape' | 'series' | 'rows' | 'categoryLabel'> {
+interface SegmentedBarProps extends Omit<
+  ChartCardProps,
+  'children' | 'legendShape' | 'series' | 'rows' | 'categoryLabel'
+> {
   segments: readonly Segment[];
   /** What the total counts, e.g. "Requests". */
   totalLabel: string;
@@ -44,7 +46,10 @@ export function SegmentedBar({
   const shown = segments.filter((segment) => segment.value > 0);
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   const shares = toPercentages(segments.map((segment) => segment.value));
-  const rows = total > 0 ? segments.map((segment) => ({ label: segment.label, values: { value: segment.value } })) : [];
+  const rows =
+    total > 0
+      ? segments.map((segment) => ({ label: segment.label, values: { value: segment.value } }))
+      : [];
 
   const plot = (mode: ChartMode) => (
     <div className="flex flex-col gap-3">
@@ -57,7 +62,10 @@ export function SegmentedBar({
         style={{ height: mode === 'focus' ? 40 : 28 }}
         role="img"
         aria-label={segments
-          .map((segment, index) => `${segment.label} ${valueFormat(segment.value)} (${shares[index] ?? 0}%)`)
+          .map(
+            (segment, index) =>
+              `${segment.label} ${valueFormat(segment.value)} (${shares[index] ?? 0}%)`,
+          )
           .join(', ')}
       >
         {shown.map((segment) => {

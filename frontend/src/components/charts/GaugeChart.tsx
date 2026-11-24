@@ -7,8 +7,10 @@ import { cn } from '@/lib/utils';
 import { ChartCard, type ChartCardProps, type ChartMode } from './ChartCard';
 import { percentLabel } from './format';
 
-interface GaugeChartProps
-  extends Omit<ChartCardProps, 'children' | 'legendShape' | 'series' | 'rows' | 'categoryLabel'> {
+interface GaugeChartProps extends Omit<
+  ChartCardProps,
+  'children' | 'legendShape' | 'series' | 'rows' | 'categoryLabel'
+> {
   /** The measured percentage, or null when it does not apply (nothing to measure). */
   value: number | null;
   /** The target percentage, marked on the arc. */
@@ -86,10 +88,22 @@ export function GaugeChart({ value, target, measure, caption, ...card }: GaugeCh
         >
           {value === null ? 'n/a' : percentLabel(value)}
         </text>
-        <text x={100 - RADIUS} y={111} textAnchor="middle" className="fill-muted-foreground" fontSize={10}>
+        <text
+          x={100 - RADIUS}
+          y={111}
+          textAnchor="middle"
+          className="fill-muted-foreground"
+          fontSize={10}
+        >
           0%
         </text>
-        <text x={100 + RADIUS} y={111} textAnchor="middle" className="fill-muted-foreground" fontSize={10}>
+        <text
+          x={100 + RADIUS}
+          y={111}
+          textAnchor="middle"
+          className="fill-muted-foreground"
+          fontSize={10}
+        >
           100%
         </text>
       </svg>

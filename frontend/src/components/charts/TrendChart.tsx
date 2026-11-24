@@ -1,6 +1,15 @@
 'use client';
 
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from 'recharts';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import {
   ChartContainer,
@@ -82,8 +91,8 @@ export function TrendChart({
               indicator="line"
               formatter={(value, name, item) => (
                 <TooltipValue
-                  color={String(item.color ?? '')}
-                  label={String(config[String(name)]?.label ?? name)}
+                  color={entryColor(item)}
+                  label={seriesName(config, name)}
                   value={typeof value === 'number' ? valueFormat(value) : '—'}
                 />
               )}
@@ -158,6 +167,27 @@ export function TrendChart({
       {plot}
     </ChartCard>
   );
+}
+
+/** A series' name from the chart config, for a tooltip row. */
+export function seriesName(config: ChartConfig, name: unknown): string {
+  const key = typeof name === 'string' || typeof name === 'number' ? String(name) : '';
+  const label = config[key]?.label;
+  return typeof label === 'string' ? label : key;
+}
+
+/** The colour of a tooltip entry: the series colour, else the mark's fill. */
+export function entryColor(item: { color?: string | undefined; payload?: unknown }): string {
+  if (item.color) return item.color;
+  const payload: unknown = item.payload;
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'fill' in payload &&
+    typeof payload.fill === 'string'
+  )
+    return payload.fill;
+  return '';
 }
 
 /** One tooltip row: the series key, its name and its value, in text colours. */

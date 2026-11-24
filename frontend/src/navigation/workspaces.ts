@@ -158,7 +158,8 @@ export const workspaces: readonly Workspace[] = [
                 path: '/moh/orders/warehouse',
                 tab: 'District orders',
                 title: 'Orders',
-                description: 'District store orders to NMS and JMS, from request to receipt. Read-only.',
+                description:
+                  'District store orders to NMS and JMS, from request to receipt. Read-only.',
                 layout: 'table',
                 permission: 'orders:read',
               },

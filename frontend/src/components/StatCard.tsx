@@ -145,7 +145,12 @@ export function StatCard({
   // PDF reports read the headline figures from these.
   const kpi = isLoading
     ? {}
-    : { 'data-kpi': '', 'data-kpi-label': label, 'data-kpi-value': extra ? `${value} (${extra})` : value, 'data-kpi-detail': detail };
+    : {
+        'data-kpi': '',
+        'data-kpi-label': label,
+        'data-kpi-value': extra ? `${value} (${extra})` : value,
+        'data-kpi-detail': detail,
+      };
   if (href) {
     return (
       <Link

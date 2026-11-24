@@ -57,7 +57,10 @@ export default function StockoutRequestPage({ scope = 'district' }: { scope?: Or
       query={report}
       layout="stockout"
       noun="stockout request"
-      back={{ href: links.list, label: links.national ? 'Back to hotspot requests' : 'Back to stockouts' }}
+      back={{
+        href: links.list,
+        label: links.national ? 'Back to hotspot requests' : 'Back to stockouts',
+      }}
     >
       {(data) => (
         <RequestDetail

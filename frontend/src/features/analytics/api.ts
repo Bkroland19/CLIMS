@@ -68,7 +68,11 @@ export async function getTrends(
   params: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<TrendReport> {
-  return parseBody(trendSchema, await http.get(`/reports/trends${query(params)}`, { signal }), 'trends');
+  return parseBody(
+    trendSchema,
+    await http.get(`/reports/trends${query(params)}`, { signal }),
+    'trends',
+  );
 }
 
 // Notifications ------------------------------------------------------------
@@ -234,7 +238,11 @@ export async function getStockReport(
   params: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<StockReport> {
-  return parseBody(stockReportSchema, await http.get(`/reports/stock${query(params)}`, { signal }), 'stock report');
+  return parseBody(
+    stockReportSchema,
+    await http.get(`/reports/stock${query(params)}`, { signal }),
+    'stock report',
+  );
 }
 
 // Batches -----------------------------------------------------------------
@@ -274,7 +282,11 @@ export async function getBatchReport(
   params: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<BatchReport> {
-  return parseBody(batchReportSchema, await http.get(`/reports/batches${query(params)}`, { signal }), 'batch report');
+  return parseBody(
+    batchReportSchema,
+    await http.get(`/reports/batches${query(params)}`, { signal }),
+    'batch report',
+  );
 }
 
 const expiryExceptionSchema = z.object({
@@ -330,7 +342,11 @@ export async function getHmisReport(
   params: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<HmisReport> {
-  return parseBody(hmisReportSchema, await http.get(`/reports/hmis-105${query(params)}`, { signal }), 'HMIS 105 report');
+  return parseBody(
+    hmisReportSchema,
+    await http.get(`/reports/hmis-105${query(params)}`, { signal }),
+    'HMIS 105 report',
+  );
 }
 
 // Hotspots ------------------------------------------------------------------

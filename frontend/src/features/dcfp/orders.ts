@@ -369,7 +369,11 @@ export type OrderScope = 'district' | 'national';
 /** Where hotspot stockout requests link to, by scope. */
 export function stockoutLinks(scope: OrderScope = 'district'): OrderLinks {
   return scope === 'national'
-    ? { list: '/moh/orders', detail: (id) => `/moh/orders/${encodeURIComponent(id)}`, national: true }
+    ? {
+        list: '/moh/orders',
+        detail: (id) => `/moh/orders/${encodeURIComponent(id)}`,
+        national: true,
+      }
     : { list: DCFP_PATHS.stockouts, detail: DCFP_PATHS.stockout };
 }
 

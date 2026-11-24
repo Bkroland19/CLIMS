@@ -144,16 +144,17 @@ export function FilterBar({
           >
             <span className="text-muted-foreground">{chip.label}:</span>
             <span className="max-w-48 truncate font-medium">{chip.value}</span>
-            <button
-              type="button"
-              className="hover:bg-background focus-visible:ring-ring ml-0.5 inline-flex size-5 items-center justify-center rounded-full outline-none focus-visible:ring-2"
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="hover:bg-background ml-0.5 size-5 rounded-full"
               aria-label={`Remove filter ${chip.label}: ${chip.value}`}
               onClick={() => {
                 filters.update(chip.clear);
               }}
             >
               <X className="size-3" aria-hidden="true" />
-            </button>
+            </Button>
           </span>
         ))}
         {chips.length > 0 ? (
@@ -229,7 +230,8 @@ function useFilterOptions(needStores: boolean, needRegions: boolean): FilterOpti
     const seen = new Set<string>();
     const districts: Option[] = [];
     for (const store of list) {
-      if (store.store_type !== 'district' || !store.district_id || seen.has(store.district_id)) continue;
+      if (store.store_type !== 'district' || !store.district_id || seen.has(store.district_id))
+        continue;
       seen.add(store.district_id);
       districts.push({ value: store.district_id, label: store.district_name ?? store.name });
     }
@@ -277,21 +279,61 @@ export function activeChips(
     });
   }
   if (has('interval') && state.interval !== 'auto')
-    chips.push({ key: 'interval', label: 'Interval', value: INTERVAL_LABELS[state.interval], clear: { interval: 'auto' } });
+    chips.push({
+      key: 'interval',
+      label: 'Interval',
+      value: INTERVAL_LABELS[state.interval],
+      clear: { interval: 'auto' },
+    });
   if (has('region') && state.regionId)
-    chips.push({ key: 'region', label: 'Region', value: labelOf(options.regions, state.regionId), clear: { regionId: '' } });
+    chips.push({
+      key: 'region',
+      label: 'Region',
+      value: labelOf(options.regions, state.regionId),
+      clear: { regionId: '' },
+    });
   if (has('district') && state.districtId)
-    chips.push({ key: 'district', label: 'District', value: labelOf(options.districts, state.districtId), clear: { districtId: '' } });
+    chips.push({
+      key: 'district',
+      label: 'District',
+      value: labelOf(options.districts, state.districtId),
+      clear: { districtId: '' },
+    });
   if (has('warehouse') && state.warehouseId)
-    chips.push({ key: 'warehouse', label: 'Warehouse', value: labelOf(options.warehouses, state.warehouseId), clear: { warehouseId: '' } });
+    chips.push({
+      key: 'warehouse',
+      label: 'Warehouse',
+      value: labelOf(options.warehouses, state.warehouseId),
+      clear: { warehouseId: '' },
+    });
   if (has('storeType') && state.storeType)
-    chips.push({ key: 'storeType', label: 'Stores', value: labelOf(STORE_TYPE_OPTIONS, state.storeType), clear: { storeType: '' } });
+    chips.push({
+      key: 'storeType',
+      label: 'Stores',
+      value: labelOf(STORE_TYPE_OPTIONS, state.storeType),
+      clear: { storeType: '' },
+    });
   if (has('category') && state.category)
-    chips.push({ key: 'category', label: 'Type', value: labelOf(CATEGORY_OPTIONS, state.category), clear: { category: '' } });
+    chips.push({
+      key: 'category',
+      label: 'Type',
+      value: labelOf(CATEGORY_OPTIONS, state.category),
+      clear: { category: '' },
+    });
   if (has('status') && state.status)
-    chips.push({ key: 'status', label: 'Status', value: labelOf(STATUS_OPTIONS, state.status), clear: { status: '' } });
+    chips.push({
+      key: 'status',
+      label: 'Status',
+      value: labelOf(STATUS_OPTIONS, state.status),
+      clear: { status: '' },
+    });
   if (has('band') && state.band)
-    chips.push({ key: 'band', label: 'Expiry', value: labelOf(BAND_OPTIONS, state.band), clear: { band: '' } });
+    chips.push({
+      key: 'band',
+      label: 'Expiry',
+      value: labelOf(BAND_OPTIONS, state.band),
+      clear: { band: '' },
+    });
   if (has('month') && state.month)
     chips.push({ key: 'month', label: 'Month', value: state.month, clear: { month: '' } });
   return chips;
@@ -370,7 +412,10 @@ function FieldControl({ field, filters, options, compact = false }: FieldControl
           noun="district"
           isLoading={options.isLoading}
           loadError={options.error}
-          className={cn(compact ? 'w-56' : 'w-full', '[&_label]:text-muted-foreground [&_label]:text-xs [&_label]:font-normal')}
+          className={cn(
+            compact ? 'w-56' : 'w-full',
+            '[&_label]:text-muted-foreground [&_label]:text-xs [&_label]:font-normal',
+          )}
         />
       );
     case 'region':

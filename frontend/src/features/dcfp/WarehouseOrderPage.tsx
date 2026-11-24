@@ -246,16 +246,16 @@ function DecisionNotice({
           {national ? (
             <p>Nothing will be dispatched.</p>
           ) : (
-          <p>
-            Nothing will be dispatched.{' '}
-            <Link
-              href={DCFP_PATHS.newOrderFor(order.condom_category)}
-              className="font-medium underline underline-offset-4"
-            >
-              Place a new order
-            </Link>{' '}
-            if you still need this stock.
-          </p>
+            <p>
+              Nothing will be dispatched.{' '}
+              <Link
+                href={DCFP_PATHS.newOrderFor(order.condom_category)}
+                className="font-medium underline underline-offset-4"
+              >
+                Place a new order
+              </Link>{' '}
+              if you still need this stock.
+            </p>
           )}
         </AlertDescription>
       </Alert>

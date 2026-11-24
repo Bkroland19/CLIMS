@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart as RechartsBarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   ReferenceLine,
   XAxis,
@@ -27,7 +28,7 @@ import {
   type ChartSeries,
 } from './ChartCard';
 import { axisNumber } from './format';
-import { TooltipValue, type ChartReference } from './TrendChart';
+import { entryColor, seriesName, TooltipValue, type ChartReference } from './TrendChart';
 
 interface BarChartProps extends Omit<ChartCardProps, 'children' | 'legendShape' | 'series'> {
   /** One series, or several stacked in one bar per category. */
@@ -35,8 +36,13 @@ interface BarChartProps extends Omit<ChartCardProps, 'children' | 'legendShape' 
   rows: readonly ChartRow[];
   /** Bars shown in the card; focus mode and the table show them all. Default 10. */
   limit?: number;
-  /** Sort by the total, largest first (default), or keep the order given. */
-  sort?: 'total' | 'none';
+  /** Sort by the total, largest first (default), smallest first, or keep the order given. */
+  sort?: 'total' | 'ascending' | 'none';
+  /**
+   * Conditional formatting, as in Power BI: a colour for a bar that needs attention (e.g. under a
+   * guideline), else undefined for the series colour. One series only; say what it means in `footer`.
+   */
+  highlight?: (row: ChartRow) => string | undefined;
   /** A vertical guide such as a target. */
   reference?: ChartReference;
   /** Fixes the scale's end, e.g. 100 for a percentage. */
@@ -62,6 +68,7 @@ export function BarChart({
   sort = 'total',
   reference,
   xMax,
+  highlight,
   valueFormat = formatNumber,
   description,
   ...card
@@ -73,13 +80,24 @@ export function BarChart({
     series.map((item) => [item.key, { label: item.label, color: item.color }]),
   );
   const ordered =
-    sort === 'total' ? [...rows].sort((a, b) => total(b, series) - total(a, series)) : [...rows];
+    sort === 'total'
+      ? [...rows].sort((a, b) => total(b, series) - total(a, series))
+      : sort === 'ascending'
+        ? [...rows].sort((a, b) => total(a, series) - total(b, series))
+        : [...rows];
   const last = series.length - 1;
   const hidden = Math.max(0, ordered.length - limit);
 
   const plot = (mode: ChartMode) => {
     const shown = mode === 'focus' ? ordered : ordered.slice(0, limit);
-    const data = shown.map((row) => ({ label: row.label, ...row.values, __total: total(row, series) }));
+    const data = shown.map((row) => ({
+      label: row.label,
+      ...row.values,
+      __total: total(row, series),
+    }));
+    // Room at the bar ends for the longest value printed there (about 6.5px a character at 11px).
+    const longest = Math.max(1, ...data.map((row) => valueFormat(row.__total).length));
+    const right = Math.max(32, Math.ceil(longest * 6.5) + 12);
     return (
       <ChartContainer
         config={config}
@@ -90,7 +108,7 @@ export function BarChart({
           accessibilityLayer
           layout="vertical"
           data={data}
-          margin={{ top: 4, right: 48, bottom: 0, left: 0 }}
+          margin={{ top: reference ? 20 : 4, right, bottom: 0, left: 8 }}
           barCategoryGap={6}
         >
           <CartesianGrid horizontal={false} strokeDasharray="0" />
@@ -122,8 +140,8 @@ export function BarChart({
                 hideIndicator
                 formatter={(value, name, item) => (
                   <TooltipValue
-                    color={String(item.color ?? item.payload?.fill ?? '')}
-                    label={String(config[String(name)]?.label ?? name)}
+                    color={entryColor(item)}
+                    label={seriesName(config, name)}
                     value={typeof value === 'number' ? valueFormat(value) : '—'}
                   />
                 )}
@@ -137,7 +155,7 @@ export function BarChart({
               strokeWidth={1}
               label={{
                 value: reference.label,
-                position: 'insideTopRight',
+                position: 'top',
                 fill: 'var(--muted-foreground)',
                 fontSize: 11,
               }}
@@ -157,14 +175,21 @@ export function BarChart({
               // A zero still shows as a sliver with its value, so "0%" is not mistaken for "no data".
               minPointSize={index === last ? 2 : 0}
             >
+              {highlight && !stacked
+                ? shown.map((row) => (
+                    <Cell key={row.label} fill={highlight(row) ?? `var(--color-${item.key})`} />
+                  ))
+                : null}
               {index === last ? (
                 <LabelList
                   dataKey={stacked ? '__total' : item.key}
                   position="right"
                   offset={6}
-                  className="fill-foreground"
+                  fill="var(--foreground)"
                   fontSize={11}
-                  formatter={(value: unknown) => (typeof value === 'number' ? valueFormat(value) : '')}
+                  formatter={(value: unknown) =>
+                    typeof value === 'number' ? valueFormat(value) : ''
+                  }
                 />
               ) : null}
             </Bar>
@@ -180,7 +205,9 @@ export function BarChart({
       rows={ordered}
       valueFormat={valueFormat}
       legendShape="square"
-      description={hidden > 0 ? `${description} Top ${limit} of ${formatNumber(ordered.length)}.` : description}
+      description={
+        hidden > 0 ? `${description} Top ${limit} of ${formatNumber(ordered.length)}.` : description
+      }
       {...card}
     >
       {plot}

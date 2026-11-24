@@ -10,8 +10,10 @@ export interface FunnelStage {
   value: number;
 }
 
-interface FunnelChartProps
-  extends Omit<ChartCardProps, 'children' | 'legendShape' | 'series' | 'rows' | 'categoryLabel'> {
+interface FunnelChartProps extends Omit<
+  ChartCardProps,
+  'children' | 'legendShape' | 'series' | 'rows' | 'categoryLabel'
+> {
   stages: readonly FunnelStage[];
   /** What the values count, e.g. "Pieces". */
   unit: string;
@@ -54,7 +56,7 @@ export function FunnelChart({
             </div>
             <div className="flex justify-center">
               <div
-                className="flex items-center justify-center rounded-[4px] px-2 text-xs font-semibold text-primary-foreground tabular-nums transition-[width] duration-300 ease-out motion-reduce:transition-none"
+                className="text-primary-foreground flex items-center justify-center rounded-[4px] px-2 text-xs font-semibold tabular-nums transition-[width] duration-300 ease-out motion-reduce:transition-none"
                 style={{
                   width: `${width}%`,
                   minWidth: '4.5rem',

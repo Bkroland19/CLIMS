@@ -48,17 +48,25 @@ export function useSupplyReport(params: Params, enabled = true) {
 }
 
 export function useStockReport(params: Params, enabled = true) {
-  return useApiQuery([ROOT, 'stock', params], (http, signal) => getStockReport(http, params, signal), {
-    ...options,
-    enabled,
-  });
+  return useApiQuery(
+    [ROOT, 'stock', params],
+    (http, signal) => getStockReport(http, params, signal),
+    {
+      ...options,
+      enabled,
+    },
+  );
 }
 
 export function useBatchReport(params: Params, enabled = true) {
-  return useApiQuery([ROOT, 'batches', params], (http, signal) => getBatchReport(http, params, signal), {
-    ...options,
-    enabled,
-  });
+  return useApiQuery(
+    [ROOT, 'batches', params],
+    (http, signal) => getBatchReport(http, params, signal),
+    {
+      ...options,
+      enabled,
+    },
+  );
 }
 
 export function useExpiryExceptions(params: Params, enabled = true) {
@@ -70,15 +78,23 @@ export function useExpiryExceptions(params: Params, enabled = true) {
 }
 
 export function useHmisReport(params: Params, enabled = true) {
-  return useApiQuery([ROOT, 'hmis-105', params], (http, signal) => getHmisReport(http, params, signal), {
-    ...options,
-    enabled,
-  });
+  return useApiQuery(
+    [ROOT, 'hmis-105', params],
+    (http, signal) => getHmisReport(http, params, signal),
+    {
+      ...options,
+      enabled,
+    },
+  );
 }
 
 export function useHotspotReport(params: Params, enabled = true) {
-  return useApiQuery([ROOT, 'hotspots', params], (http, signal) => getHotspotReport(http, params, signal), {
-    ...options,
-    enabled,
-  });
+  return useApiQuery(
+    [ROOT, 'hotspots', params],
+    (http, signal) => getHotspotReport(http, params, signal),
+    {
+      ...options,
+      enabled,
+    },
+  );
 }

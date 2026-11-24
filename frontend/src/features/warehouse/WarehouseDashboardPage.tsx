@@ -282,8 +282,14 @@ function RecentCharts({ storeId }: { storeId: string }) {
     store_id: storeId,
     warehouse_store_id: storeId,
   });
-  const supply = useSupplyReport({ from: daysAgo(29), to: kampalaToday(), warehouse_store_id: storeId });
-  const dispatched = trendRows(trend.data, (bucket) => ({ pieces: bucket.stock.dispatched_pieces }));
+  const supply = useSupplyReport({
+    from: daysAgo(29),
+    to: kampalaToday(),
+    warehouse_store_id: storeId,
+  });
+  const dispatched = trendRows(trend.data, (bucket) => ({
+    pieces: bucket.stock.dispatched_pieces,
+  }));
   return (
     <div className="gap-section grid @2xl:grid-cols-2">
       <ColumnChart

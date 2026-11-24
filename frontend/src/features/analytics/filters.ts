@@ -207,7 +207,10 @@ export function resolvePeriod(state: ReportFilterState, today: string = kampalaT
 }
 
 /** The interval a trend uses: the chosen one, or days up to a month, weeks up to a quarter, else months. */
-export function resolveInterval(state: ReportFilterState, period: Period): Exclude<Interval, 'auto'> {
+export function resolveInterval(
+  state: ReportFilterState,
+  period: Period,
+): Exclude<Interval, 'auto'> {
   if (state.interval !== 'auto') return state.interval;
   const days = (Date.parse(period.to) - Date.parse(period.from)) / 86_400_000 + 1;
   return days <= 31 ? 'day' : days <= 92 ? 'week' : 'month';
@@ -269,6 +272,8 @@ export function bucketLabel(start: string, interval: Exclude<Interval, 'auto'>):
   const date = new Date(`${start}T00:00:00Z`);
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',
-    ...(interval === 'month' ? { month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' }),
+    ...(interval === 'month'
+      ? { month: 'short', year: 'numeric' }
+      : { day: 'numeric', month: 'short' }),
   }).format(date);
 }

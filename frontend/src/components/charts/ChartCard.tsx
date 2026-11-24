@@ -250,7 +250,11 @@ export function ChartCard({
         {isLoading ? (
           <div role="status" className="flex h-[200px] items-end gap-2" aria-label="Loading">
             {[56, 80, 44, 92, 68, 74, 50, 86].map((height, index) => (
-              <Skeleton key={index} className="flex-1 rounded-b-none" style={{ height: `${height}%` }} />
+              <Skeleton
+                key={index}
+                className="flex-1 rounded-b-none"
+                style={{ height: `${height}%` }}
+              />
             ))}
             <span className="sr-only">Loading {title.toLowerCase()}…</span>
           </div>

@@ -12,6 +12,7 @@ import { formatNumber } from '@/lib/format';
 import { apiParams } from '../filters';
 import { useHmisReport } from '../queries';
 import type { ReportFilters } from '../useReportFilters';
+import { piecesValue } from './shared';
 
 /** HMIS 105 condom figures prepared from acknowledged receipts, not yet sent to DHIS2. */
 export function HmisView({ filters }: { filters: ReportFilters }) {
@@ -29,8 +30,8 @@ export function HmisView({ filters }: { filters: ReportFilters }) {
       <Alert variant="warning">
         <AlertTitle>Prepared, not submitted to DHIS2</AlertTitle>
         <AlertDescription>
-          These are acknowledged receipts at hotspots: evidence of supply, not condoms dispensed. Submission stays off until the
-          programme approves how they are counted.{' '}
+          These are acknowledged receipts at hotspots: evidence of supply, not condoms dispensed.
+          Submission stays off until the programme approves how they are counted.{' '}
           <Button
             variant="link"
             size="sm"
@@ -53,20 +54,50 @@ export function HmisView({ filters }: { filters: ReportFilters }) {
         </AlertDescription>
       </Alert>
       <StatCardGrid>
-        <StatCard label="105-CT11 Female condoms" value={data ? `${formatNumber(data.total.ct11_female_pieces)} pcs` : ''} icon={Package} accent="violet" isLoading={loading} />
-        <StatCard label="105-CT12 Male condoms" value={data ? `${formatNumber(data.total.ct12_male_pieces)} pcs` : ''} icon={Package} accent="info" isLoading={loading} />
-        <StatCard label="Acknowledgements" value={formatNumber(data?.total.acknowledgements)} icon={BadgeCheck} accent="positive" isLoading={loading} detail={data ? `From ${formatNumber(data.total.hotspots)} hotspots` : undefined} />
-        <StatCard label="Delivered, not acknowledged" value={formatNumber(data?.total.unacknowledged_lines)} icon={Hourglass} accent="caution" isLoading={loading} detail="Delivery lines not counted until acknowledged" />
+        <StatCard
+          label="105-CT11 Female condoms"
+          value={data ? piecesValue(data.total.ct11_female_pieces) : ''}
+          icon={Package}
+          accent="violet"
+          isLoading={loading}
+        />
+        <StatCard
+          label="105-CT12 Male condoms"
+          value={data ? piecesValue(data.total.ct12_male_pieces) : ''}
+          icon={Package}
+          accent="info"
+          isLoading={loading}
+        />
+        <StatCard
+          label="Acknowledgements"
+          value={formatNumber(data?.total.acknowledgements)}
+          icon={BadgeCheck}
+          accent="positive"
+          isLoading={loading}
+          detail={data ? `From ${formatNumber(data.total.hotspots)} hotspots` : undefined}
+        />
+        <StatCard
+          label="Delivered, not acknowledged"
+          value={formatNumber(data?.total.unacknowledged_lines)}
+          icon={Hourglass}
+          accent="caution"
+          isLoading={loading}
+          detail="Delivery lines not counted until acknowledged"
+        />
       </StatCardGrid>
       <BarChart
         title="By district and subcounty"
-        description={data ? `Pieces acknowledged in ${data.month}, by data element.` : 'Pieces acknowledged in the month, by data element.'}
+        description={
+          data
+            ? `Pieces acknowledged in ${data.month}, by data element.`
+            : 'Pieces acknowledged in the month, by data element.'
+        }
         categoryLabel="District and subcounty"
         series={[
           { key: 'female', label: '105-CT11 Female', color: 'var(--chart-3)' },
           { key: 'male', label: '105-CT12 Male', color: 'var(--chart-1)' },
         ]}
-        rows={rows.filter((row) => (row.values.female ?? 0) + (row.values.male ?? 0) > 0)}
+        rows={rows.filter((row) => row.values.female + row.values.male > 0)}
         limit={15}
         isLoading={loading}
         error={report.error}

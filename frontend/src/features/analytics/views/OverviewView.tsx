@@ -1,6 +1,15 @@
 'use client';
 
-import { CalendarClock, Megaphone, PackageCheck, Store, Timer, Truck, Warehouse, MapPin } from 'lucide-react';
+import {
+  CalendarClock,
+  Megaphone,
+  PackageCheck,
+  Store,
+  Timer,
+  Truck,
+  Warehouse,
+  MapPin,
+} from 'lucide-react';
 
 import { BarChart } from '@/components/charts/BarChart';
 import { ColumnChart } from '@/components/charts/ColumnChart';
@@ -35,6 +44,7 @@ import {
   trendRows,
   VisualGrid,
   type AnalyticsWorkspace,
+  piecesValue,
 } from './shared';
 
 interface OverviewViewProps {
@@ -53,18 +63,33 @@ interface OverviewViewProps {
  * may see, so the same view serves MOH (national), a DCFP (their district) and
  * a warehouse (its own store).
  */
-export function OverviewView({ filters, workspace, storeId, showHotspots = true }: OverviewViewProps) {
+export function OverviewView({
+  filters,
+  workspace,
+  storeId,
+  showHotspots = true,
+}: OverviewViewProps) {
   const { state } = filters;
   const hotspotSide = workspace !== 'warehouse';
   const store: Record<string, string> = storeId ? { store_id: storeId } : {};
   const warehouse: Record<string, string> = storeId ? { warehouse_store_id: storeId } : {};
 
   const trend = useTrends({
-    ...apiParams(state, ['from', 'to', 'interval', 'district_id', 'category', 'warehouse_store_id']),
+    ...apiParams(state, [
+      'from',
+      'to',
+      'interval',
+      'district_id',
+      'category',
+      'warehouse_store_id',
+    ]),
     ...warehouse,
     ...store,
   });
-  const notifications = useNotificationReport(apiParams(state, ['from', 'to', 'district_id', 'category']), hotspotSide);
+  const notifications = useNotificationReport(
+    apiParams(state, ['from', 'to', 'district_id', 'category']),
+    hotspotSide,
+  );
   const supply = useSupplyReport({
     ...apiParams(state, ['from', 'to', 'district_id', 'category', 'warehouse_store_id']),
     ...warehouse,
@@ -72,20 +97,39 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
   const stockParams = { ...apiParams(state, ['district_id', 'category', 'store_type']), ...store };
   const stock = useStockReport(stockParams);
   const batches = useBatchReport(stockParams);
-  const hotspots = useHotspotReport(apiParams(state, ['region_id', 'district_id']), hotspotSide && showHotspots);
+  const hotspots = useHotspotReport(
+    apiParams(state, ['region_id', 'district_id']),
+    hotspotSide && showHotspots,
+  );
 
   const interval = trend.data?.interval ?? filters.interval;
   const caption = `vs ${INTERVAL_WORD[interval]}`;
   const n = notifications.data;
-  const usablePieces = stock.data ? stock.data.lines.reduce((sum, line) => sum + (line.usable_pieces ?? 0), 0) : undefined;
-  const transitPieces = stock.data ? stock.data.lines.reduce((sum, line) => sum + (line.in_transit_pieces ?? 0), 0) : 0;
+  const usablePieces = stock.data
+    ? stock.data.lines.reduce((sum, line) => sum + (line.usable_pieces ?? 0), 0)
+    : undefined;
+  const transitPieces = stock.data
+    ? stock.data.lines.reduce((sum, line) => sum + (line.in_transit_pieces ?? 0), 0)
+    : 0;
   const expiringPieces = batches.data
     ? batches.data.lines
-        .filter((line) => line.band === 'expired' || line.band === 'under_1_month' || line.band === 'under_3_months')
+        .filter(
+          (line) =>
+            line.band === 'expired' ||
+            line.band === 'under_1_month' ||
+            line.band === 'under_3_months',
+        )
         .reduce((sum, line) => sum + (line.pieces ?? 0), 0)
     : undefined;
   const deliveredPieces = trend.data
-    ? trend.data.buckets.reduce((sum, bucket) => sum + bucket.deliveries.male_pieces + bucket.deliveries.female_pieces, 0)
+    ? trend.data.buckets.reduce(
+        (sum, bucket) => sum + bucket.deliveries.male_pieces + bucket.deliveries.female_pieces,
+        0,
+      )
+    : undefined;
+
+  const dispatchedPieces = trend.data
+    ? trend.data.buckets.reduce((sum, bucket) => sum + bucket.stock.dispatched_pieces, 0)
     : undefined;
 
   const requestRows = trendRows(trend.data, (bucket) => ({
@@ -98,7 +142,11 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
     delivered: bucket.stock.delivered_pieces,
   }));
   const total = supply.data?.total;
-  const bandPieces = sumBy(batches.data?.lines ?? [], (line) => line.band, (line) => line.pieces);
+  const bandPieces = sumBy(
+    batches.data?.lines ?? [],
+    (line) => line.band,
+    (line) => line.pieces,
+  );
   const byStore = sumBy(
     stock.data?.lines ?? [],
     (line) => (workspace === 'moh' ? line.store : line.product),
@@ -106,7 +154,10 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
   );
   const districtRows = (n?.districts ?? [])
     .filter((row) => row.fulfilment_rate !== null)
-    .map((row) => ({ label: row.district ?? 'No district', values: { rate: row.fulfilment_rate } }));
+    .map((row) => ({
+      label: row.district ?? 'No district',
+      values: { rate: row.fulfilment_rate },
+    }));
 
   return (
     <div className="gap-section flex flex-col">
@@ -119,7 +170,11 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
               icon={Megaphone}
               accent="info"
               isLoading={notifications.isPending}
-              detail={n ? `${formatNumber(n.notifications_fulfilled)} fulfilled · ${formatNumber(n.response.pending)} open` : undefined}
+              detail={
+                n
+                  ? `${formatNumber(n.notifications_fulfilled)} fulfilled · ${formatNumber(n.response.pending)} open`
+                  : undefined
+              }
               trend={
                 trend.data && trend.data.buckets.length > 1
                   ? { series: series(trend.data, (b) => b.notifications.raised), caption }
@@ -140,7 +195,13 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
             />
             <StatCard
               label="Median time to fulfil"
-              value={n ? (n.response.median_hours === null ? 'Not applicable' : hoursLabel(n.response.median_hours)) : ''}
+              value={
+                n
+                  ? n.response.median_hours === null
+                    ? 'Not applicable'
+                    : hoursLabel(n.response.median_hours)
+                  : ''
+              }
               icon={Timer}
               isLoading={notifications.isPending}
               detail={
@@ -151,14 +212,17 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
             />
             <StatCard
               label="Delivered to hotspots"
-              value={deliveredPieces === undefined ? '' : `${formatNumber(deliveredPieces)} pcs`}
+              value={deliveredPieces === undefined ? '' : piecesValue(deliveredPieces)}
               icon={Truck}
               accent="violet"
               isLoading={trend.isPending}
               trend={
                 trend.data && trend.data.buckets.length > 1
                   ? {
-                      series: series(trend.data, (b) => b.deliveries.male_pieces + b.deliveries.female_pieces),
+                      series: series(
+                        trend.data,
+                        (b) => b.deliveries.male_pieces + b.deliveries.female_pieces,
+                      ),
                       caption,
                       goodDirection: 'up',
                     }
@@ -167,8 +231,26 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
             />
           </>
         ) : null}
+        {!hotspotSide ? (
+          <StatCard
+            label="Dispatched to districts"
+            value={dispatchedPieces === undefined ? '' : piecesValue(dispatchedPieces)}
+            icon={Truck}
+            accent="violet"
+            isLoading={trend.isPending}
+            trend={
+              trend.data && trend.data.buckets.length > 1
+                ? {
+                    series: series(trend.data, (b) => b.stock.dispatched_pieces),
+                    caption,
+                    goodDirection: 'up',
+                  }
+                : undefined
+            }
+          />
+        ) : null}
         <StatCard
-          label="District orders to warehouses"
+          label={hotspotSide ? 'District orders to warehouses' : 'District orders'}
           value={formatNumber(total?.requests)}
           icon={Warehouse}
           accent="info"
@@ -181,15 +263,19 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
         />
         <StatCard
           label="Usable stock"
-          value={usablePieces === undefined ? '' : `${formatNumber(usablePieces)} pcs`}
+          value={usablePieces === undefined ? '' : piecesValue(usablePieces)}
           icon={Store}
           accent="positive"
           isLoading={stock.isPending}
-          detail={transitPieces > 0 ? `${formatNumber(transitPieces)} pcs in transit` : 'Nothing in transit'}
+          detail={
+            transitPieces > 0
+              ? `${formatNumber(transitPieces)} pcs in transit`
+              : 'Nothing in transit'
+          }
         />
         <StatCard
           label="Expiring within 3 months"
-          value={expiringPieces === undefined ? '' : `${formatNumber(expiringPieces)} pcs`}
+          value={expiringPieces === undefined ? '' : piecesValue(expiringPieces)}
           icon={CalendarClock}
           accent="caution"
           isLoading={batches.isPending}
@@ -210,122 +296,185 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
         ) : null}
       </StatCardGrid>
 
-      <ReportSection
-        title="Supply over time"
-        description="How requests, orders and stock moved through the period, by the interval chosen."
-      >
-        <VisualGrid>
-          {hotspotSide ? (
-            <ColumnChart
-              title="Stockout requests raised and fulfilled"
-              description="Hotspot requests by the day they were raised; fulfilled counts those fully acknowledged so far."
+      {hotspotSide ? (
+        <>
+          <ReportSection
+            title="Supply over time"
+            description="How requests, orders and stock moved through the period, by the interval chosen."
+          >
+            <VisualGrid>
+              <ColumnChart
+                title="Stockout requests raised and fulfilled"
+                description="Hotspot requests by the day they were raised; fulfilled counts those fully acknowledged so far."
+                categoryLabel="Period"
+                series={[
+                  { key: 'raised', label: 'Raised', color: 'var(--chart-1)' },
+                  { key: 'fulfilled', label: 'Fulfilled', color: 'var(--chart-2)' },
+                ]}
+                rows={isFlat(requestRows) ? [] : requestRows}
+                isLoading={trend.isPending}
+                error={trend.error}
+                onRetry={() => void trend.refetch()}
+                emptyMessage="No stockout requests were raised in this period."
+              />
+              <TrendChart
+                title="Stock flow through the supply chain"
+                description="Pieces received from suppliers, dispatched by warehouses to districts and delivered to hotspots."
+                categoryLabel="Period"
+                kind="line"
+                series={[
+                  { key: 'received', label: 'Received from suppliers', color: 'var(--chart-1)' },
+                  { key: 'dispatched', label: 'Dispatched to districts', color: 'var(--chart-3)' },
+                  { key: 'delivered', label: 'Delivered to hotspots', color: 'var(--chart-2)' },
+                ]}
+                rows={isFlat(flowRows) ? [] : flowRows}
+                isLoading={trend.isPending}
+                error={trend.error}
+                onRetry={() => void trend.refetch()}
+                emptyMessage="No stock moved in this period."
+                footer="Quantities in another unit than the product's catalogue unit cannot be converted to pieces and are left out."
+              />
+            </VisualGrid>
+          </ReportSection>
+
+          <ReportSection
+            title="Fulfilment"
+            description="How far orders and requests raised in the period got, and where they are stuck."
+          >
+            <VisualGrid>
+              <FunnelChart
+                title="Warehouse order pipeline"
+                description="District orders to NMS and JMS raised in the period, in pieces, stage by stage."
+                unit="Pieces"
+                stages={
+                  total && total.requests > 0
+                    ? [
+                        { label: 'Requested', value: total.requested_pieces },
+                        { label: 'Approved', value: total.approved_pieces },
+                        { label: 'Issued', value: total.issued_pieces },
+                        { label: 'Received by district', value: total.acknowledged_pieces },
+                      ]
+                    : []
+                }
+                isLoading={supply.isPending}
+                error={supply.error}
+                onRetry={() => void supply.refetch()}
+                emptyMessage="No district orders to the warehouses in this period."
+                footer={
+                  total && total.awaiting_unit > 0
+                    ? `${formatNumber(total.awaiting_unit)} order${total.awaiting_unit === 1 ? '' : 's'} name only a category; the warehouse sets the product and unit at review, so their pieces are not counted yet.`
+                    : undefined
+                }
+              />
+              {n ? (
+                <SegmentedBar
+                  title="Stockout request status"
+                  description="Where each request raised in the period stands now."
+                  totalLabel="Requests raised"
+                  segments={n.notifications_raised > 0 ? statusSegments(n) : []}
+                  emptyMessage="No stockout requests were raised in this period."
+                />
+              ) : (
+                <SegmentedBar
+                  title="Stockout request status"
+                  description="Where each request raised in the period stands now."
+                  totalLabel="Requests raised"
+                  segments={[]}
+                  isLoading={notifications.isPending}
+                  error={notifications.error}
+                  onRetry={() => void notifications.refetch()}
+                />
+              )}
+              {workspace === 'moh' ? (
+                <BarChart
+                  title="Fulfilment rate by district"
+                  description="Requests raised in the period and fully acknowledged, as a percentage."
+                  categoryLabel="District"
+                  series={{ key: 'rate', label: 'Fulfilment rate', color: 'var(--chart-1)' }}
+                  rows={districtRows}
+                  valueFormat={percentLabel}
+                  xMax={100}
+                  reference={
+                    n
+                      ? {
+                          value: n.deadline.target_percent,
+                          label: `Target ${n.deadline.target_percent}%`,
+                        }
+                      : undefined
+                  }
+                  isLoading={notifications.isPending}
+                  error={notifications.error}
+                  onRetry={() => void notifications.refetch()}
+                  emptyMessage="No district had stockout requests in this period."
+                />
+              ) : null}
+            </VisualGrid>
+          </ReportSection>
+        </>
+      ) : (
+        <ReportSection
+          title="Supply and fulfilment"
+          description="Stock moved through the period, and how far the district orders raised in it got."
+        >
+          <VisualGrid>
+            <TrendChart
+              title="Stock flow through the supply chain"
+              description="Pieces received from suppliers, dispatched by warehouses to districts and delivered to hotspots."
               categoryLabel="Period"
+              kind="line"
               series={[
-                { key: 'raised', label: 'Raised', color: 'var(--chart-1)' },
-                { key: 'fulfilled', label: 'Fulfilled', color: 'var(--chart-2)' },
+                { key: 'received', label: 'Received from suppliers', color: 'var(--chart-1)' },
+                { key: 'dispatched', label: 'Dispatched to districts', color: 'var(--chart-3)' },
+                { key: 'delivered', label: 'Delivered to hotspots', color: 'var(--chart-2)' },
               ]}
-              rows={isFlat(requestRows) ? [] : requestRows}
+              rows={isFlat(flowRows) ? [] : flowRows}
               isLoading={trend.isPending}
               error={trend.error}
               onRetry={() => void trend.refetch()}
-              emptyMessage="No stockout requests were raised in this period."
+              emptyMessage="No stock moved in this period."
+              footer="Quantities in another unit than the product's catalogue unit cannot be converted to pieces and are left out."
             />
-          ) : null}
-          <TrendChart
-            title="Stock flow through the supply chain"
-            description="Pieces received from suppliers, dispatched by warehouses to districts and delivered to hotspots."
-            categoryLabel="Period"
-            kind="line"
-            series={[
-              { key: 'received', label: 'Received from suppliers', color: 'var(--chart-1)' },
-              { key: 'dispatched', label: 'Dispatched to districts', color: 'var(--chart-3)' },
-              { key: 'delivered', label: 'Delivered to hotspots', color: 'var(--chart-2)' },
-            ]}
-            rows={isFlat(flowRows) ? [] : flowRows}
-            isLoading={trend.isPending}
-            error={trend.error}
-            onRetry={() => void trend.refetch()}
-            emptyMessage="No stock moved in this period."
-            footer="Quantities in another unit than the product's catalogue unit cannot be converted to pieces and are left out."
-          />
-        </VisualGrid>
-      </ReportSection>
+            <FunnelChart
+              title="Warehouse order pipeline"
+              description="District orders to NMS and JMS raised in the period, in pieces, stage by stage."
+              unit="Pieces"
+              stages={
+                total && total.requests > 0
+                  ? [
+                      { label: 'Requested', value: total.requested_pieces },
+                      { label: 'Approved', value: total.approved_pieces },
+                      { label: 'Issued', value: total.issued_pieces },
+                      { label: 'Received by district', value: total.acknowledged_pieces },
+                    ]
+                  : []
+              }
+              isLoading={supply.isPending}
+              error={supply.error}
+              onRetry={() => void supply.refetch()}
+              emptyMessage="No district orders to the warehouses in this period."
+              footer={
+                total && total.awaiting_unit > 0
+                  ? `${formatNumber(total.awaiting_unit)} order${total.awaiting_unit === 1 ? '' : 's'} name only a category; the warehouse sets the product and unit at review, so their pieces are not counted yet.`
+                  : undefined
+              }
+            />
+          </VisualGrid>
+        </ReportSection>
+      )}
 
       <ReportSection
-        title="Fulfilment"
-        description="How far orders and requests raised in the period got, and where they are stuck."
+        title="Stock and expiry"
+        description="Stock held today, whatever the period chosen."
       >
-        <VisualGrid>
-          <FunnelChart
-            title="Warehouse order pipeline"
-            description="District orders to NMS and JMS raised in the period, in pieces, stage by stage."
-            unit="Pieces"
-            stages={
-              total && total.requests > 0
-                ? [
-                    { label: 'Requested', value: total.requested_pieces },
-                    { label: 'Approved', value: total.approved_pieces },
-                    { label: 'Issued', value: total.issued_pieces },
-                    { label: 'Received by district', value: total.acknowledged_pieces },
-                  ]
-                : []
-            }
-            isLoading={supply.isPending}
-            error={supply.error}
-            onRetry={() => void supply.refetch()}
-            emptyMessage="No district orders to the warehouses in this period."
-            footer={
-              total && total.awaiting_unit > 0
-                ? `${formatNumber(total.awaiting_unit)} order${total.awaiting_unit === 1 ? '' : 's'} name only a category; the warehouse sets the product and unit at review, so their pieces are not counted yet.`
-                : undefined
-            }
-          />
-          {hotspotSide && n ? (
-            <SegmentedBar
-              title="Stockout request status"
-              description="Where each request raised in the period stands now."
-              totalLabel="Requests raised"
-              segments={n.notifications_raised > 0 ? statusSegments(n) : []}
-              emptyMessage="No stockout requests were raised in this period."
-            />
-          ) : hotspotSide ? (
-            <SegmentedBar
-              title="Stockout request status"
-              description="Where each request raised in the period stands now."
-              totalLabel="Requests raised"
-              segments={[]}
-              isLoading={notifications.isPending}
-              error={notifications.error}
-              onRetry={() => void notifications.refetch()}
-            />
-          ) : null}
-          {workspace === 'moh' ? (
-            <BarChart
-              title="Fulfilment rate by district"
-              description="Requests raised in the period and fully acknowledged, as a percentage."
-              categoryLabel="District"
-              series={{ key: 'rate', label: 'Fulfilment rate', color: 'var(--chart-1)' }}
-              rows={districtRows}
-              valueFormat={percentLabel}
-              xMax={100}
-              reference={n ? { value: n.deadline.target_percent, label: `Target ${n.deadline.target_percent}%` } : undefined}
-              isLoading={notifications.isPending}
-              error={notifications.error}
-              onRetry={() => void notifications.refetch()}
-              emptyMessage="No district had stockout requests in this period."
-            />
-          ) : null}
-        </VisualGrid>
-      </ReportSection>
-
-      <ReportSection title="Stock and expiry" description="Stock held today, whatever the period chosen.">
         <VisualGrid>
           <BarChart
             title={workspace === 'moh' ? 'Usable stock by store' : 'Usable stock by product'}
             description="Physical stock less expired, unknown-expiry and reserved stock, in pieces."
             categoryLabel={workspace === 'moh' ? 'Store' : 'Product'}
             series={{ key: 'pieces', label: 'Usable pieces', color: 'var(--chart-2)' }}
-            rows={[...byStore.entries()].filter(([, v]) => v > 0).map(([label, v]) => ({ label, values: { pieces: v } }))}
+            rows={[...byStore.entries()]
+              .filter(([, v]) => v > 0)
+              .map(([label, v]) => ({ label, values: { pieces: v } }))}
             isLoading={stock.isPending}
             error={stock.error}
             onRetry={() => void stock.refetch()}
@@ -360,12 +509,13 @@ export function OverviewView({ filters, workspace, storeId, showHotspots = true 
                 { key: 'active', label: 'Active', color: 'var(--chart-1)' },
                 { key: 'inactive', label: 'Not active', color: 'var(--chart-4)' },
               ]}
-              rows={(workspace === 'moh' ? (hotspots.data?.by_region ?? []) : (hotspots.data?.by_type ?? [])).map(
-                (group) => ({
-                  label: group.name ?? 'Not recorded',
-                  values: { active: group.active, inactive: group.total - group.active },
-                }),
-              )}
+              rows={(workspace === 'moh'
+                ? (hotspots.data?.by_region ?? [])
+                : (hotspots.data?.by_type ?? [])
+              ).map((group) => ({
+                label: group.name ?? 'Not recorded',
+                values: { active: group.active, inactive: group.total - group.active },
+              }))}
               isLoading={hotspots.isPending}
               error={hotspots.error}
               onRetry={() => void hotspots.refetch()}

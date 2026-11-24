@@ -34,6 +34,14 @@ function collect(target: HTMLElement) {
     detail: node.dataset.kpiDetail || undefined,
   }));
   const visuals = [...target.querySelectorAll<HTMLElement>('[data-visual]')];
+  // Lists that print as tables (a dashboard's watch list), in page order.
+  const tables = [...target.querySelectorAll<HTMLElement>('[data-pdf-table]')].flatMap((node) => {
+    try {
+      return [JSON.parse(node.dataset.pdfTable ?? '') as PdfTable];
+    } catch {
+      return [];
+    }
+  });
   const filters: [string, string][] = [];
   const period = document.querySelector<HTMLElement>('[data-filter-period]')?.dataset.filterPeriod;
   if (period) filters.push(['Period', period]);
@@ -41,7 +49,7 @@ function collect(target: HTMLElement) {
     .filter((node) => node.dataset.filterChip !== 'Period')
     .map((node) => `${node.dataset.filterChip}: ${node.dataset.filterValue ?? ''}`);
   filters.push(['Filters', chips.length > 0 ? chips.join(' · ') : 'None (everything you can see)']);
-  return { kpis: kpis.filter((kpi) => kpi.value), visuals, filters };
+  return { kpis: kpis.filter((kpi) => kpi.value), visuals, filters, tables };
 }
 
 /**
@@ -72,9 +80,13 @@ export function PdfButton({
       ]);
       const found = collect(target);
       const shots = await snapshotElements(found.visuals);
-      const seal = await imageDataUrl(typeof mohSeal === 'string' ? mohSeal : (mohSeal as { src: string }).src);
+      const seal = await imageDataUrl(
+        typeof mohSeal === 'string' ? mohSeal : (mohSeal as { src: string }).src,
+      );
       const generatedAt = new Date();
-      const name = user ? [user.firstname, user.lastname].filter(Boolean).join(' ') || user.username : null;
+      const name = user
+        ? [user.firstname, user.lastname].filter(Boolean).join(' ') || user.username
+        : null;
       const blob = await buildReportPdf({
         title,
         subtitle,
@@ -84,7 +96,8 @@ export function PdfButton({
           ...shot,
           title: found.visuals[index]?.dataset.visualTitle ?? '',
         })),
-        tables: typeof tables === 'function' ? tables() : tables,
+        tables: [...found.tables, ...(typeof tables === 'function' ? tables() : tables)],
+        layoutWidth: target.getBoundingClientRect().width,
         notes,
         seal,
         generatedAt,
@@ -101,7 +114,11 @@ export function PdfButton({
 
   return (
     <Button variant="outline" onClick={() => void download()} disabled={disabled || busy}>
-      {busy ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <FileDown data-icon="inline-start" />}
+      {busy ? (
+        <Spinner data-icon="inline-start" aria-hidden="true" />
+      ) : (
+        <FileDown data-icon="inline-start" />
+      )}
       {busy ? 'Preparing PDF…' : 'Download PDF'}
     </Button>
   );

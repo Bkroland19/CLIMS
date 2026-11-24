@@ -10,7 +10,12 @@ import { PageActions } from '@/components/PageActions';
 import { PdfButton } from '@/components/reports/PdfButton';
 import { Button } from '@/components/ui/button';
 import { FilterBar } from '@/features/analytics/FilterBar';
-import { apiParams, filterQuery, type ApiParam, type FilterField } from '@/features/analytics/filters';
+import {
+  apiParams,
+  filterQuery,
+  type ApiParam,
+  type FilterField,
+} from '@/features/analytics/filters';
 import { useReportFilters, type ReportFilters } from '@/features/analytics/useReportFilters';
 import { BatchesView, ExceptionsView } from '@/features/analytics/views/BatchesView';
 import { HmisView } from '@/features/analytics/views/HmisView';
@@ -24,7 +29,7 @@ import { useCurrentWarehouse } from '@/features/warehouse/orderQueries';
 import { StoreSwitch } from '@/features/warehouse/StoreSwitch';
 
 import { queryString, type ReportKind, type ReportTable } from './api';
-import { displayCell } from './files';
+import { printCell } from './files';
 import { useReportTable } from './queries';
 import { DownloadButtons, ReportMeta, ReportTableView } from './ReportTableView';
 import { ApproveVersionButton, VersionsView } from './VersionsView';
@@ -56,7 +61,14 @@ const VIEWS: Record<ReportsWorkspace, readonly View[]> = {
     'hmis-105',
     'versions',
   ],
-  warehouse: ['overview', 'warehouse-requests', 'stock', 'batches', 'expiry-exceptions', 'versions'],
+  warehouse: [
+    'overview',
+    'warehouse-requests',
+    'stock',
+    'batches',
+    'expiry-exceptions',
+    'versions',
+  ],
 };
 
 const VIEW_LABELS: Record<View, string> = {
@@ -74,7 +86,8 @@ const VIEW_LABELS: Record<View, string> = {
 /** What each report is, for the PDF's subtitle. */
 const VIEW_PURPOSE: Record<Exclude<View, 'versions'>, string> = {
   overview: 'The programme at a glance: requests, orders, stock, expiry and hotspots.',
-  notifications: 'Hotspot stockout requests and how completely and quickly districts supplied them.',
+  notifications:
+    'Hotspot stockout requests and how completely and quickly districts supplied them.',
   'warehouse-requests': 'District orders to the national warehouses, from request to receipt.',
   stock: 'Stock held at warehouses and district stores, and how long it lasts.',
   batches: 'Batches in stock by the time left before they expire.',
@@ -88,15 +101,32 @@ function fieldsFor(view: Exclude<View, 'versions'>, workspace: ReportsWorkspace)
   const district: FilterField[] = workspace === 'dcfp' ? [] : ['district'];
   switch (view) {
     case 'overview':
-      return ['period', 'interval', ...district, 'category', ...(workspace === 'moh' ? (['region'] as const) : [])];
+      return [
+        'period',
+        'interval',
+        ...district,
+        'category',
+        ...(workspace === 'moh' ? (['region'] as const) : []),
+      ];
     case 'notifications':
       return ['period', 'interval', ...district, 'category', 'status'];
     case 'warehouse-requests':
-      return ['period', 'interval', ...district, ...(workspace === 'warehouse' ? [] : (['warehouse'] as const)), 'category'];
+      return [
+        'period',
+        'interval',
+        ...district,
+        ...(workspace === 'warehouse' ? [] : (['warehouse'] as const)),
+        'category',
+      ];
     case 'stock':
       return [...district, 'category', ...(workspace === 'moh' ? (['storeType'] as const) : [])];
     case 'batches':
-      return [...district, 'category', 'band', ...(workspace === 'moh' ? (['storeType'] as const) : [])];
+      return [
+        ...district,
+        'category',
+        'band',
+        ...(workspace === 'moh' ? (['storeType'] as const) : []),
+      ];
     case 'expiry-exceptions':
       return ['period', ...district, 'category'];
     case 'hotspots':
@@ -155,7 +185,13 @@ export default function ProgrammeReportsPage({ workspace }: { workspace: Reports
           hrefFor={(id) => `${base}${queryString({ view: 'versions', version: id ?? '' })}`}
         />
       ) : workspace === 'warehouse' && !storeId ? null : (
-        <ReportView key={view} view={view} workspace={workspace} filters={filters} storeId={storeId} />
+        <ReportView
+          key={view}
+          view={view}
+          workspace={workspace}
+          filters={filters}
+          storeId={storeId}
+        />
       )}
     </div>
   );
@@ -176,7 +212,11 @@ function ReportView({ view, workspace, filters, storeId }: ReportViewProps) {
   const tableFilters = exportKeys
     ? {
         ...apiParams(filters.state, exportKeys),
-        ...(storeId ? (view === 'warehouse-requests' ? { warehouse_store_id: storeId } : { store_id: storeId }) : {}),
+        ...(storeId
+          ? view === 'warehouse-requests'
+            ? { warehouse_store_id: storeId }
+            : { store_id: storeId }
+          : {}),
       }
     : null;
   const fields = fieldsFor(view, workspace);
@@ -217,7 +257,9 @@ function ReportView({ view, workspace, filters, storeId }: ReportViewProps) {
 
   return (
     <div className="gap-section flex flex-col">
-      {fields.length > 0 ? <FilterBar filters={filters} fields={fields} inline={inlineFor(fields)} /> : null}
+      {fields.length > 0 ? (
+        <FilterBar filters={filters} fields={fields} inline={inlineFor(fields)} />
+      ) : null}
       {tableFilters ? (
         <ExportedReport
           report={view as ReportKind}
@@ -235,10 +277,17 @@ function ReportView({ view, workspace, filters, storeId }: ReportViewProps) {
         <>
           <PageActions>
             <Button variant="ghost" onClick={refresh} disabled={fetching}>
-              <RefreshCw data-icon="inline-start" className={fetching ? 'animate-spin' : undefined} />
+              <RefreshCw
+                data-icon="inline-start"
+                className={fetching ? 'animate-spin' : undefined}
+              />
               Refresh
             </Button>
-            <PdfButton title={VIEW_LABELS[view]} subtitle={VIEW_PURPOSE[view]} targetRef={contentRef} />
+            <PdfButton
+              title={VIEW_LABELS[view]}
+              subtitle={VIEW_PURPOSE[view]}
+              targetRef={contentRef}
+            />
           </PageActions>
           <div ref={contentRef} className="gap-section flex flex-col">
             {visuals}
@@ -251,7 +300,16 @@ function ReportView({ view, workspace, filters, storeId }: ReportViewProps) {
 
 /** The bar shows the period and up to two more slicers; the rest wait in the pane. */
 function inlineFor(fields: readonly FilterField[]): FilterField[] {
-  const order: FilterField[] = ['period', 'month', 'district', 'category', 'warehouse', 'band', 'status', 'region'];
+  const order: FilterField[] = [
+    'period',
+    'month',
+    'district',
+    'category',
+    'warehouse',
+    'band',
+    'status',
+    'region',
+  ];
   return order.filter((field) => fields.includes(field)).slice(0, 3);
 }
 
@@ -308,7 +366,9 @@ function ExportedReport({
           table={table.data}
           csvPath={`/reports/export/${report}${queryString(filters, { format: 'csv' })}`}
         />
-        {canApprove ? <ApproveVersionButton report={report} filters={filters} table={table.data} /> : null}
+        {canApprove ? (
+          <ApproveVersionButton report={report} filters={filters} table={table.data} />
+        ) : null}
       </PageActions>
       <div ref={contentRef} className="gap-section flex flex-col">
         {children}
@@ -339,19 +399,23 @@ function pdfMeta(table: ReportTable): [string, string][] {
   return [
     ['Scope', table.scope],
     ['Product', table.product],
-    ['Data as of', displayCell('data_updated_at', table.data_updated_at)],
+    ['Data as of', printCell('data_updated_at', table.data_updated_at)],
     ['Rule version', table.rule_version],
   ];
 }
 
 function pdfTable(table: ReportTable) {
   const rows = table.rows.slice(0, PDF_ROWS);
+  // Record IDs fill a printed page without telling a reader anything; the CSV keeps them.
+  const columns = table.columns.filter(
+    (column) => !column.header.endsWith(' ID') && column.key !== 'id',
+  );
   return {
     title:
       table.rows.length > PDF_ROWS
         ? `Records (first ${PDF_ROWS} of ${table.rows.length}; the CSV holds them all)`
         : `Records (${table.rows.length})`,
-    columns: table.columns.map((column) => column.header),
-    rows: rows.map((row) => table.columns.map(({ key }) => displayCell(key, row[key] ?? null))),
+    columns: columns.map((column) => column.header),
+    rows: rows.map((row) => columns.map(({ key }) => printCell(key, row[key] ?? null))),
   };
 }

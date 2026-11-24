@@ -2,6 +2,7 @@ import { Children, type ReactNode } from 'react';
 
 import type { ChartRow } from '@/components/charts/ChartCard';
 import type { Segment } from '@/components/charts/SegmentedBar';
+import { axisNumber } from '@/components/charts/format';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +28,9 @@ export function ReportSection({
     <section className={cn('flex flex-col gap-3', className)}>
       <div>
         <h2 className="text-base font-semibold">{title}</h2>
-        {description ? <p className="text-muted-foreground text-sm text-pretty">{description}</p> : null}
+        {description ? (
+          <p className="text-muted-foreground text-sm text-pretty">{description}</p>
+        ) : null}
       </div>
       {children}
     </section>
@@ -40,9 +43,15 @@ export function ReportSection({
  */
 export function VisualGrid({ children, columns }: { children: ReactNode; columns?: 2 | 3 }) {
   const count = Children.toArray(children).filter(Boolean).length;
-  const three = (columns ?? (count >= 3 ? 3 : 2)) === 3;
+  // Four go two by two; three, five or six go three across.
+  const three = (columns ?? (count === 3 || count >= 5 ? 3 : 2)) === 3;
   return (
-    <div className={cn('gap-section grid items-start', three ? 'lg:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2')}>
+    <div
+      className={cn(
+        'gap-section grid items-start',
+        three ? 'lg:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-2',
+      )}
+    >
       {children}
     </div>
   );
@@ -66,7 +75,10 @@ export function isFlat(rows: readonly ChartRow[]): boolean {
 }
 
 /** The last two buckets' values of a measure, oldest first, for a stat card's change and sparkline. */
-export function series(trend: TrendReport | undefined, pick: (bucket: TrendBucket) => number): number[] {
+export function series(
+  trend: TrendReport | undefined,
+  pick: (bucket: TrendBucket) => number,
+): number[] {
   return trend ? trend.buckets.map(pick) : [];
 }
 
@@ -75,8 +87,20 @@ export const INTERVAL_WORD = { day: 'yesterday', week: 'last week', month: 'last
 /** The notification statuses as parts of a whole, in workflow order, in status colours. */
 export function statusSegments(report: NotificationReport): Segment[] {
   return [
-    { key: 'fulfilled', label: 'Fulfilled', value: report.notifications_fulfilled, color: 'var(--success)', ink: 'surface' },
-    { key: 'partly_received', label: 'Partly received', value: report.partly_received, color: 'var(--info)', ink: 'surface' },
+    {
+      key: 'fulfilled',
+      label: 'Fulfilled',
+      value: report.notifications_fulfilled,
+      color: 'var(--success)',
+      ink: 'surface',
+    },
+    {
+      key: 'partly_received',
+      label: 'Partly received',
+      value: report.partly_received,
+      color: 'var(--info)',
+      ink: 'surface',
+    },
     {
       key: 'awaiting_acknowledgement',
       label: 'Awaiting acknowledgement',
@@ -84,8 +108,19 @@ export function statusSegments(report: NotificationReport): Segment[] {
       color: 'var(--warning)',
       ink: 'surface',
     },
-    { key: 'awaiting_supply', label: 'Awaiting supply', value: report.awaiting_supply, color: 'var(--destructive)', ink: 'surface' },
-    { key: 'rejected', label: 'Rejected', value: report.notifications_rejected, color: 'var(--role-system)' },
+    {
+      key: 'awaiting_supply',
+      label: 'Awaiting supply',
+      value: report.awaiting_supply,
+      color: 'var(--destructive)',
+      ink: 'surface',
+    },
+    {
+      key: 'rejected',
+      label: 'Rejected',
+      value: report.notifications_rejected,
+      color: 'var(--role-system)',
+    },
   ];
 }
 
@@ -101,7 +136,10 @@ export const BAND_LABELS: Record<ExpiryBand, string> = {
 /** Expiry bands are states, from critical to safe, so they take status colours. */
 export const BAND_COLORS: Record<ExpiryBand, { color: string; ink?: 'surface' }> = {
   expired: { color: 'var(--destructive)', ink: 'surface' },
-  under_1_month: { color: 'color-mix(in oklab, var(--destructive) 70%, var(--warning))', ink: 'surface' },
+  under_1_month: {
+    color: 'color-mix(in oklab, var(--destructive) 70%, var(--warning))',
+    ink: 'surface',
+  },
   under_3_months: { color: 'var(--warning)', ink: 'surface' },
   under_6_months: { color: 'var(--info)', ink: 'surface' },
   ok: { color: 'var(--success)', ink: 'surface' },
@@ -114,8 +152,17 @@ export const MAX_MONTHS = 3;
 export const GUIDELINE_NOTE =
   'Guideline: keep between 2 and 3 months of stock; below 2 months is low stock (Condom Distribution Guidelines 2022, pp. 13, 19).';
 
+/**
+ * A headline count of pieces, in display units from 100,000 as Power BI's cards
+ * show them ("519.6K pcs"), so a card's figure stays on one line; the exact
+ * figure is in the table view and the downloads.
+ */
+export function piecesValue(value: number): string {
+  return `${value >= 100_000 ? axisNumber(value) : formatNumber(value)} pcs`;
+}
+
 export function piecesLabel(value: number | null | undefined): string {
-  return value === null || value === undefined ? '—' : `${formatNumber(value)}`;
+  return value === null || value === undefined ? '—' : formatNumber(value);
 }
 
 /** "3 of 8" style share in words. */
@@ -128,7 +175,11 @@ export function percentOrNa(value: number | null | undefined): string {
 }
 
 /** Sums by a key: e.g. pieces by store from stock lines. */
-export function sumBy<T>(items: readonly T[], key: (item: T) => string, value: (item: T) => number | null) {
+export function sumBy<T>(
+  items: readonly T[],
+  key: (item: T) => string,
+  value: (item: T) => number | null,
+) {
   const out = new Map<string, number>();
   for (const item of items) {
     const v = value(item);

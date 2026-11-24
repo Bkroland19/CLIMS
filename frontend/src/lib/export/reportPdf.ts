@@ -30,6 +30,8 @@ export interface PdfReport {
   visuals: readonly (Snapshot & { title: string })[];
   tables: readonly PdfTable[];
   notes: readonly string[];
+  /** Width in CSS pixels of the page area the visuals came from; visuals under 62% of it go two to a row. */
+  layoutWidth?: number | undefined;
   /** The seal as a data URL, or null to leave it out. */
   seal: string | null;
   generatedAt: Date;
@@ -55,7 +57,10 @@ function stamp(date: Date): string {
 }
 
 export async function buildReportPdf(report: PdfReport): Promise<Blob> {
-  const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const [{ jsPDF }, { autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
   doc.setProperties({
     title: report.title,
@@ -65,9 +70,11 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
   });
   let y = PAGE.margin;
 
+  const pageWidth = () => doc.internal.pageSize.getWidth();
+  const pageHeight = () => doc.internal.pageSize.getHeight();
   const ensure = (height: number) => {
-    if (y + height > PAGE.height - PAGE.margin - 8) {
-      doc.addPage();
+    if (y + height > pageHeight() - PAGE.margin - 8) {
+      doc.addPage('a4', pageWidth() > pageHeight() ? 'landscape' : 'portrait');
       y = PAGE.margin;
     }
   };
@@ -75,7 +82,12 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
     value: string,
     x: number,
     size: number,
-    options: { bold?: boolean; color?: readonly number[]; maxWidth?: number; align?: 'left' | 'right' | 'center' } = {},
+    options: {
+      bold?: boolean;
+      color?: readonly number[];
+      maxWidth?: number;
+      align?: 'left' | 'right' | 'center';
+    } = {},
   ) => {
     doc.setFont('helvetica', options.bold ? 'bold' : 'normal');
     doc.setFontSize(size);
@@ -117,7 +129,11 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
       startY: y,
       margin: { left: PAGE.margin, right: PAGE.margin },
       theme: 'plain',
-      styles: { fontSize: 8.5, cellPadding: { top: 1, bottom: 1, left: 0, right: 3 }, textColor: [...INK] },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: { top: 1, bottom: 1, left: 0, right: 3 },
+        textColor: [...INK],
+      },
       columnStyles: { 0: { cellWidth: 32, textColor: [...MUTED] } },
       body: report.meta.map(([label, value]) => [label, value]),
     });
@@ -156,7 +172,7 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
   const half = (CONTENT - 4) / 2;
   let pendingRight: { x: number; height: number } | null = null;
   for (const visual of report.visuals) {
-    const narrow = visual.width < 560;
+    const narrow = visual.width < (report.layoutWidth ?? 900) * 0.62;
     const width = narrow ? half : CONTENT;
     const height = (visual.height / visual.width) * width;
     if (narrow && pendingRight) {
@@ -176,19 +192,39 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
   }
   if (pendingRight) y += pendingRight.height + 4;
 
-  // Tables.
+  // Tables. A wide table (a report's records) gets landscape pages of its own, with its columns
+  // split across pages when they still do not fit, the first column repeated.
   for (const table of report.tables) {
-    ensure(20);
-    y += text(table.title, PAGE.margin, 11, { bold: true }) + 1;
+    const wide = table.columns.length > 7;
+    if (wide) {
+      doc.addPage('a4', 'landscape');
+      y = PAGE.margin;
+    } else {
+      ensure(20);
+    }
+    y +=
+      text(table.title, PAGE.margin, 11, { bold: true, maxWidth: pageWidth() - PAGE.margin * 2 }) +
+      1;
     autoTable(doc, {
       startY: y,
       margin: { left: PAGE.margin, right: PAGE.margin, bottom: PAGE.margin + 8 },
       head: [table.columns.map(String)],
       body: table.rows.map((row) => row.map((cell) => (cell === null ? '—' : String(cell)))),
-      styles: { fontSize: 7.5, cellPadding: 1.4, textColor: [...INK], lineColor: [...HAIRLINE], lineWidth: 0.1 },
+      styles: {
+        fontSize: wide ? 6.5 : 7.5,
+        cellPadding: 1.2,
+        textColor: [...INK],
+        lineColor: [...HAIRLINE],
+        lineWidth: 0.1,
+        overflow: 'linebreak',
+        minCellWidth: wide ? 16 : 10,
+      },
       headStyles: { fillColor: [...HEAD_FILL], textColor: [...INK], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [250, 250, 251] },
       theme: 'grid',
+      rowPageBreak: 'avoid',
+      horizontalPageBreak: wide,
+      ...(wide ? { horizontalPageBreakRepeat: 0 } : {}),
     });
     y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
   }
@@ -199,7 +235,11 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
     y += text('Definitions and notes', PAGE.margin, 10, { bold: true }) + 1;
     for (const note of report.notes) {
       ensure(8);
-      y += text(`• ${note}`, PAGE.margin, 7.5, { color: MUTED }) + 0.8;
+      y +=
+        text(`• ${note}`, PAGE.margin, 7.5, {
+          color: MUTED,
+          maxWidth: pageWidth() - PAGE.margin * 2,
+        }) + 0.8;
     }
   }
 
@@ -207,14 +247,16 @@ export async function buildReportPdf(report: PdfReport): Promise<Blob> {
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
     doc.setPage(page);
+    const width = pageWidth();
+    const height = pageHeight();
     doc.setDrawColor(...HAIRLINE);
     doc.setLineWidth(0.2);
-    doc.line(PAGE.margin, PAGE.height - PAGE.margin - 3, PAGE.width - PAGE.margin, PAGE.height - PAGE.margin - 3);
+    doc.line(PAGE.margin, height - PAGE.margin - 3, width - PAGE.margin, height - PAGE.margin - 3);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
-    doc.text(`CLIMS · ${report.title}`, PAGE.margin, PAGE.height - PAGE.margin, { baseline: 'top' });
-    doc.text(`Page ${page} of ${pages}`, PAGE.width - PAGE.margin, PAGE.height - PAGE.margin, {
+    doc.text(`CLIMS · ${report.title}`, PAGE.margin, height - PAGE.margin, { baseline: 'top' });
+    doc.text(`Page ${page} of ${pages}`, width - PAGE.margin, height - PAGE.margin, {
       baseline: 'top',
       align: 'right',
     });

@@ -31,12 +31,14 @@ export function csvCell(value: string | number | null | undefined): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+const BOM = String.fromCharCode(0xfeff);
+
 /** A CSV document with a byte order mark, so Excel reads it as UTF-8. */
 export function toCsv(
   header: readonly string[],
   rows: readonly (readonly (string | number | null | undefined)[])[],
 ): string {
-  return `﻿${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+  return `${BOM}${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
 }
 
 export function downloadCsvText(text: string, name: string): void {

@@ -29,7 +29,9 @@ export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: Or
   const stores = useStores(links.national === true);
   const district = useDistrictContext()?.district ?? null;
   const storeName = useMemo(() => {
-    const byId = new Map((stores.data ?? []).map((store) => [store.id, store.district_name ?? store.name]));
+    const byId = new Map(
+      (stores.data ?? []).map((store) => [store.id, store.district_name ?? store.name]),
+    );
     return (id: string) => byId.get(id) ?? '';
   }, [stores.data]);
   const router = useRouter();
@@ -164,9 +166,7 @@ export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: Or
             options={statusOptions}
             onValueChange={(next) => {
               router.replace(
-                next === 'all'
-                  ? links.list
-                  : `${links.list}?status=${encodeURIComponent(next)}`,
+                next === 'all' ? links.list : `${links.list}?status=${encodeURIComponent(next)}`,
                 { scroll: false },
               );
             }}
