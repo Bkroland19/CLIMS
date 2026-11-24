@@ -214,7 +214,9 @@ export function StockoutScreen({ id }: { id: string }) {
           setD(fresh);
           setLoad("ok");
           // The phone's copy (and its chip in the request lists) follows what the district did.
-          updateApiOrder(toLocalOrder(fresh, me.name, me.role === "hm" ? "Hotspot manager" : "VHT"));
+          updateApiOrder(
+            toLocalOrder(fresh, me.name, me.role === "hm" ? "Hotspot manager" : "VHT"),
+          );
         })
         .catch((e: unknown) => {
           if (!live) return;
