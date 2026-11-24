@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactElement, type ReactNode } from 'react';
 
 import { FilterSelect } from '@/components/FilterSelect';
 import { useSession } from '@/features/auth/hooks';
@@ -16,8 +16,20 @@ const DistrictContext = createContext<{
   districtId: string | null;
 } | null>(null);
 
+/** The district menu when the page places it itself (the warehouse pages). */
+const DistrictSelectContext = createContext<ReactElement | null>(null);
+
 export function useDistrictContext() {
   return useContext(DistrictContext);
+}
+
+/**
+ * The district menu, for a warehouse page to put in its toolbar row beside the
+ * warehouse's name rather than on a row of its own. Renders nothing on a page
+ * that has no district filter.
+ */
+export function DistrictSelect() {
+  return useContext(DistrictSelectContext);
 }
 
 export function DistrictContextProvider({ children }: { children: ReactNode }) {
@@ -68,27 +80,33 @@ export function DistrictContextProvider({ children }: { children: ReactNode }) {
       pathname,
     );
 
+  const selector = showSelector ? (
+    <FilterSelect
+      label="District"
+      value={district ?? ALL}
+      disabled={isWarehouse ? locations.isPending : locations.isPending && stores.isPending}
+      options={[
+        { value: ALL, label: 'All districts' },
+        ...options.map((name) => ({ value: name, label: name })),
+      ]}
+      onValueChange={(value) => {
+        writeJson(storage, storageKey, value);
+        const next = new URLSearchParams(params.toString());
+        next.delete('district_id');
+        next.set('district', value);
+        router.push(`${pathname}?${next}`);
+      }}
+    />
+  ) : null;
+
+  // The warehouse pages already open on a row naming the warehouse, so they put
+  // the menu at its end with `DistrictSelect`; elsewhere it gets a row of its own.
   return (
     <DistrictContext.Provider value={isMoh || isWarehouse ? { district, districtId } : null}>
-      {showSelector && (
-        <FilterSelect
-          label="District"
-          value={district ?? ALL}
-          disabled={isWarehouse ? locations.isPending : locations.isPending && stores.isPending}
-          options={[
-            { value: ALL, label: 'All districts' },
-            ...options.map((name) => ({ value: name, label: name })),
-          ]}
-          onValueChange={(value) => {
-            writeJson(storage, storageKey, value);
-            const next = new URLSearchParams(params.toString());
-            next.delete('district_id');
-            next.set('district', value);
-            router.push(`${pathname}?${next}`);
-          }}
-        />
-      )}
-      {children}
+      <DistrictSelectContext.Provider value={isWarehouse ? selector : null}>
+        {isWarehouse ? null : selector}
+        {children}
+      </DistrictSelectContext.Provider>
     </DistrictContext.Provider>
   );
 }

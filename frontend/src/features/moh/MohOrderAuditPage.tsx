@@ -22,7 +22,7 @@ export default function MohOrderAuditPage() {
   const { id } = useParams<{ id: string }>();
   const order = useNationalOrder(id);
   return (
-    <div className="flex flex-col gap-4">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="The order and its audit trail" />
       <RecordView
         query={order}

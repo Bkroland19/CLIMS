@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
-import { ActivityTimeline } from '@/components/ActivityTimeline';
+import { ActivityTimeline, ActivityTimelineSkeleton } from '@/components/ActivityTimeline';
 import { ShareList } from '@/components/charts/ShareList';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
@@ -370,10 +370,7 @@ function RecentActivity({ district }: { district: string | null }) {
       </CardHeader>
       <CardContent>
         {activity.isPending ? (
-          <div role="status">
-            <Skeleton className="h-32 w-full" />
-            <span className="sr-only">Loading recent activity…</span>
-          </div>
+          <ActivityTimelineSkeleton label="Loading recent activity…" />
         ) : activity.isError ? (
           <ErrorState
             title="Could not load recent activity"

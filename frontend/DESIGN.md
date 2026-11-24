@@ -62,12 +62,20 @@ numbers that are compared use `tabular-nums`.
 | Table cells  | 6 × 12px (2px in the View menu's compact rows; header 6 × 12px), 16px at the edges    |
 | Status chips | 22px pill (`status-chip`), 10.5px bold capitals, a dot, a hairline of its own colour  |
 
-Spacing runs on a 4px scale with three steps that carry the rhythm: 16px between a page's
-sections and side-by-side columns (`gap-section`), 16px padding inside a card (`Card`,
-`StatCard`, `ChartCard`), and 12px between groups inside a card. Density comes from spacing and
-control height, not from shrinking what people read: body text, table cells and inputs stay
-14px. Only supporting text steps down (13px sidebar items and page descriptions, 11px table
-header capitals).
+Spacing runs on a 4px scale, and 12px carries the rhythm. It is the gap between a page's
+sections and side-by-side columns (`gap-section`), and the same 12px as the gaps between stat
+cards, so a row of cards and the columns under it share gutters. Cards (`Card`, `StatCard`,
+`ChartCard`, `ShareList`) pad 16px at the sides and 12px at top and bottom, with 12px between
+groups inside them. A page wrapper uses `gap-section`, never its own `gap-4` or `gap-6`. Density
+comes from spacing and control height, not from shrinking what people read: body text, table
+cells and inputs stay 14px. Only supporting text steps down (13px sidebar items and page
+descriptions, 11px table header capitals).
+
+Fill the space a short list leaves rather than stretching its card. A card in a grid takes the
+height of its content (`items-start`), and the section below moves up into the gap, as the
+warehouse dashboard's charts sit under its task list. A page's filters share one row with what
+the page is about: the warehouse pages put the district menu (`DistrictSelect`) at the end of
+the row naming the warehouse.
 
 ### Three rules that are easy to get wrong
 
@@ -148,6 +156,7 @@ Reach for these before writing markup.
 | Any table                  | `components/data-table/DataTable`: the only table. See "Tables" below                                            |
 | Per-row actions            | `components/data-table/RowActions` (`ROW_ACTION_SEPARATOR` groups items)                                         |
 | A headline figure          | `components/StatCard` in a `StatCardGrid` (`trend` adds change and line; `detail` one line of what is behind it) |
+| A stock figure             | No unit, since stock is in pieces: `formatStock`, `productName` (warehouse `summary.ts`) name any other unit     |
 | An amount in several units | `StatCard` `extra`: the unit holding most is the figure, the rest one quieter line under it; never add units     |
 | Things to do               | `components/TaskList` (status, title, detail, a button to where it is done; lays out by its own width)           |
 | A record's ID and status   | `components/DetailHeader` (progress goes in its band)                                                            |
@@ -157,7 +166,7 @@ Reach for these before writing markup.
 | A create or edit form      | `components/form/FormDialog` with `TextField` and `SelectField`                                                  |
 | A choice from hundreds     | `components/form/ComboboxField` (a select with a search box; label + hint)                                       |
 | Confirming a deletion      | `components/ConfirmDialog` (an alert dialog, never a plain dialog)                                               |
-| A page still loading       | `components/states/PageSkeleton` (`table`, `dashboard`, `detail`, `form`)                                        |
+| A page still loading       | `components/states/PageSkeleton` (`table`, `dashboard`, `detail`, `form`, `stockout`)                                        |
 | Nothing to show            | `components/states/EmptyState`                                                                                   |
 | Failed to load             | `components/states/ErrorState` (says what failed, offers retry)                                                  |
 | A status word              | `components/StatusBadge` (`tone` overrides the word's lookup)                                                    |
@@ -211,7 +220,8 @@ primitive only to align it with the tokens above, and keep the edit small so
 - Colour comes last, in the fixed `chart-1…5` order. A series keeps its colour when others are
   filtered out. Red is not a series colour; it is reserved for `destructive`.
 - 2px lines, area fill at 10%, columns at most 24px wide with a 4px rounded top, solid hairline
-  grid, one y-axis.
+  grid, one y-axis as wide as its longest label (`width="auto"`, so "60,000" is never clipped).
+  The plot is 200px tall.
 - Two or more series get a legend; one series is named by the card title.
 - Every chart has a tooltip and a table view (`ChartCard` provides the switch), so no value is
   reachable only by hovering.

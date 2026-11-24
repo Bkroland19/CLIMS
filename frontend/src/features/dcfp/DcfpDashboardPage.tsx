@@ -39,7 +39,7 @@ export default function DcfpDashboardPage() {
   const loadingOrders = allOrders.isPending || names.isPending;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <StatCardGrid>
         <StatCard
           label="Stockouts this week"
@@ -75,7 +75,7 @@ export default function DcfpDashboardPage() {
         />
       </StatCardGrid>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="gap-section grid items-start lg:grid-cols-[minmax(0,1fr)_22rem]">
         <TaskList
           title="Needs your action"
           tasks={

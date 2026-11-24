@@ -5,6 +5,7 @@ import { useId } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -57,7 +58,16 @@ export function DistrictFilter({ value, hrefFor }: DistrictFilterProps) {
             className="bg-card min-w-44"
             aria-describedby={stores.isError ? errorId : undefined}
           >
-            <SelectValue placeholder="Loading…" />
+            {stores.isPending ? (
+              <>
+                <span role="status" className="sr-only">
+                  Loading districts…
+                </span>
+                <Skeleton aria-hidden="true" className="h-3.5 w-24" />
+              </>
+            ) : (
+              <SelectValue placeholder="All districts" />
+            )}
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={EVERY_DISTRICT}>All districts</SelectItem>

@@ -10,7 +10,10 @@ export interface ApiQueryOptions {
   /** False holds the request back, e.g. until the screen that needs it is open. Defaults to true. */
   enabled?: boolean;
   /** Refetch this often, in ms, while the query is in use, e.g. to check for new notifications. */
-  refetchInterval?: number;
+  refetchInterval?: number | false;
+  /** Keep an in-progress editor stable until its own writes complete. */
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
 }
 
 /**

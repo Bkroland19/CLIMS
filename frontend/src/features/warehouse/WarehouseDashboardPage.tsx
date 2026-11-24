@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDistrictContext } from '@/features/district/DistrictContext';
+import { DistrictSelect, useDistrictContext } from '@/features/district/DistrictContext';
 import type { Order } from '@/features/orders/api';
 import { formatNumber, formatTimestamp } from '@/lib/format';
 
@@ -37,6 +37,7 @@ import { SAMPLE_REQUESTS_BY_DISTRICT, SAMPLE_WEEKLY_DISPATCHES } from './sampleC
 import { MOVEMENT_LABEL, movementBatch, signed } from './stock';
 import { useStoreMovements } from './stockQueries';
 import { StoreSwitch } from './StoreSwitch';
+import { isPieces, productName, unitSuffix } from './summary';
 import { warehouseTasks } from './tasks';
 
 const RECENT_EVENTS = 6;
@@ -76,18 +77,25 @@ export default function WarehouseDashboardPage() {
     .slice(0, RECENT_EVENTS)
     .map((movement) => ({
       id: movement.id,
-      text: `${MOVEMENT_LABEL[movement.reason].label}: ${signed(movement.quantity)} ${movement.unit}${
+      text: `${MOVEMENT_LABEL[movement.reason].label}: ${signed(movement.quantity)}${unitSuffix(movement.unit)}${
         movementBatch(movement) ? ` · ${movementBatch(movement) ?? ''}` : ''
       }`,
-      meta: `${movement.product} · ${formatTimestamp(movement.created_at)}`,
+      meta: `${productName(movement.product, movement.unit)} · ${formatTimestamp(movement.created_at)}`,
       role: 'warehouse',
     }));
 
   return (
     <div className="gap-section flex flex-col">
-      <StoreSwitch store={code} hrefFor={(other) => withStore(WAREHOUSE_PATHS.dashboard, other)} />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <StoreSwitch
+          store={code}
+          hrefFor={(other) => withStore(WAREHOUSE_PATHS.dashboard, other)}
+        />
+        <DistrictSelect />
+      </div>
 
-      <StatCardGrid>
+      {/* The last card is as wide as the stock column under it, so the edges line up. */}
+      <StatCardGrid className="xl:grid-cols-[1fr_1fr_1fr_22rem]">
         <StatCard
           label="New orders"
           value={countOf(visibleOrders, 'queued')}
@@ -122,8 +130,15 @@ export default function WarehouseDashboardPage() {
         />
       </StatCardGrid>
 
-      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_22rem]">
+      {/*
+        Tasks, then the sample charts under them, with the warehouse's stock beside
+        both. The task card is only as tall as its tasks, so the charts take the
+        space a short list leaves. On a narrow screen the stock comes before the
+        charts, since it is live and they are not.
+      */}
+      <div className="gap-section grid items-start lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
         <TaskList
+          className="lg:col-start-1 lg:row-start-1"
           title="Needs your action"
           tasks={
             visibleOrders && batches.data
@@ -155,7 +170,7 @@ export default function WarehouseDashboardPage() {
           }
         />
 
-        <div className="gap-section flex min-w-0 flex-col">
+        <div className="gap-section flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <Card>
             <CardHeader>
               <CardTitle>Stock at {code}</CardTitle>
@@ -198,7 +213,9 @@ export default function WarehouseDashboardPage() {
                             ),
                           )}
                         </span>{' '}
-                        <span className="text-muted-foreground">{balance.unit} free</span>
+                        <span className="text-muted-foreground">
+                          {isPieces(balance.unit) ? 'free' : `${balance.unit} free`}
+                        </span>
                       </span>
                     </li>
                   ))}
@@ -236,30 +253,32 @@ export default function WarehouseDashboardPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
 
-      {!district && (
-        <div className="gap-section grid lg:grid-cols-2">
-          <ColumnChart
-            title="Male condoms dispatched"
-            description="Pieces dispatched to district stores per week, last 8 weeks"
-            categoryLabel="Week"
-            series={{ key: 'male', label: 'Male condoms', color: 'var(--chart-1)' }}
-            rows={SAMPLE_WEEKLY_DISPATCHES}
-            isSample
-          />
-          <ShareList
-            title="Requests by district"
-            description="District requests received in the last 30 days"
-            totalLabel="Requests"
-            shares={SAMPLE_REQUESTS_BY_DISTRICT.map((share, index) => ({
-              ...share,
-              color: SHARE_COLOURS[index % SHARE_COLOURS.length] ?? 'var(--chart-1)',
-            }))}
-            isSample
-          />
-        </div>
-      )}
+        {!district && (
+          <div className="@container min-w-0 lg:col-start-1 lg:row-start-2">
+            <div className="gap-section grid @2xl:grid-cols-2">
+              <ColumnChart
+                title="Male condoms dispatched"
+                description="Pieces dispatched to district stores per week, last 8 weeks"
+                categoryLabel="Week"
+                series={{ key: 'male', label: 'Male condoms', color: 'var(--chart-1)' }}
+                rows={SAMPLE_WEEKLY_DISPATCHES}
+                isSample
+              />
+              <ShareList
+                title="Requests by district"
+                description="District requests received in the last 30 days"
+                totalLabel="Requests"
+                shares={SAMPLE_REQUESTS_BY_DISTRICT.map((share, index) => ({
+                  ...share,
+                  color: SHARE_COLOURS[index % SHARE_COLOURS.length] ?? 'var(--chart-1)',
+                }))}
+                isSample
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -102,7 +102,7 @@ export default function MohOrdersPage() {
   const isFiltered = filter.value !== 'all' || district !== null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="gap-section flex flex-col">
       <SampleDataNotice subject="The orders" />
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <FilterTabs

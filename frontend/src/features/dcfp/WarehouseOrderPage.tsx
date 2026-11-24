@@ -82,7 +82,7 @@ function OrderDetail({
     order.quantity_received !== null && order.quantity_received !== order.quantity_issued;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="gap-section flex flex-col">
       <DetailHeader
         title={`${names.product(order.condom_id, order.condom_category)} from ${names.warehouseLabel(order.ordered_from_store_id)}`}
         status={<StatusBadge status={status.label} tone={status.tone} />}
@@ -98,8 +98,8 @@ function OrderDetail({
         />
       </DetailHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="gap-section grid lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="gap-section flex min-w-0 flex-col">
           {order.order_status === 'dispatched' && order.quantity_issued !== null ? (
             <WriteAction>
               <ReceiveCard order={order} issued={order.quantity_issued} names={names} />

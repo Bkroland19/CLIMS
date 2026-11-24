@@ -147,7 +147,7 @@ export default function ProgrammeReportsPage({ workspace }: { workspace: Reports
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="gap-section flex flex-col">
       <FilterTabs
         label="Choose a report"
         value={view}
@@ -178,7 +178,7 @@ function ReportView({ report, filters, setFilter }: ReportViewProps) {
   const refresh = () => void table.refetch();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="gap-section flex flex-col">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Filters report={report} filters={filters} setFilter={setFilter} />
         <PageActions>

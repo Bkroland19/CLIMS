@@ -14,7 +14,6 @@ import {
   Tags,
   Truck,
   Users,
-  UsersRound,
   Warehouse,
 } from 'lucide-react';
 
@@ -331,7 +330,7 @@ export const workspaces: readonly Workspace[] = [
               },
             ],
             details: [
-              { path: '/dcfp/stockouts/[id]', label: 'Stockout request', layout: 'detail' },
+              { path: '/dcfp/stockouts/[id]', label: 'Stockout request', layout: 'stockout' },
             ],
           },
           {
@@ -485,33 +484,5 @@ export const workspaces: readonly Workspace[] = [
       },
     ],
   },
-  {
-    // The prototype puts VHTs in the mobile app only; this web page is their hotspot submissions.
-    id: 'vht',
-    label: 'Village health team',
-    icon: UsersRound,
-    basePath: '/vht',
-    sections: [
-      {
-        label: 'Network',
-        items: [
-          {
-            id: 'hotspots',
-            label: 'My hotspots',
-            icon: MapPin,
-            pages: [
-              {
-                path: '/vht',
-                tab: 'My hotspots',
-                title: 'My hotspots',
-                description:
-                  'Hotspots you identified, and where each one is in district verification.',
-                layout: 'table',
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
+  // VHTs, hotspot managers and delivery agents have no workspace: they use the mobile app only.
 ];

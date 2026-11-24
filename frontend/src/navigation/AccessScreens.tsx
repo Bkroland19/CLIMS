@@ -28,7 +28,7 @@ const NO_WORKSPACE_COPY: Record<
   mobile: {
     title: 'Use the CLIMS mobile app',
     body: (roles) =>
-      `Your role (${roles}) does its work in the field app: reporting stockouts, confirming deliveries and recording drops. Sign in on your phone with this same account.`,
+      `Your role (${roles}) works in the field app, not on the web: mapping hotspots, reporting stockouts, confirming deliveries and recording drops. Sign in on your phone with this same account.`,
   },
   unassigned: {
     title: 'Your account has no web workspace yet',

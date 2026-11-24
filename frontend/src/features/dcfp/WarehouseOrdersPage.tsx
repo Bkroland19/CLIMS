@@ -2,16 +2,18 @@
 
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
+import { FilterSelect } from '@/components/FilterSelect';
 import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
 import { formatNumber, formatTimestamp } from '@/lib/format';
 
-import type { Order } from './api';
+import type { Order, OrderStatus } from './api';
 import { DCFP_PATHS, ORDER_STATUS, warehouseOrders } from './orders';
 import { useOrders } from './queries';
 import { UNIT_PENDING, useOrderNames } from './useOrderNames';
@@ -20,11 +22,29 @@ import { UNIT_PENDING, useOrderNames } from './useOrderNames';
 export default function WarehouseOrdersPage() {
   const orders = useOrders();
   const names = useOrderNames();
+  const router = useRouter();
+  // `?status=dispatched` (from "Receive warehouse delivery") opens the consignments to receive.
+  const requested = useSearchParams().get('status');
+  const status =
+    requested !== null && requested in ORDER_STATUS ? (requested as OrderStatus) : null;
 
-  const rows = useMemo(
+  const all = useMemo(
     () =>
       orders.data && names.warehouses ? warehouseOrders(orders.data, names.warehouses) : undefined,
     [orders.data, names.warehouses],
+  );
+  const rows = useMemo(
+    () => (all && status ? all.filter((order) => order.order_status === status) : all),
+    [all, status],
+  );
+  const statusOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All statuses' },
+      ...(Object.keys(ORDER_STATUS) as OrderStatus[])
+        .filter((value) => value === status || all?.some((order) => order.order_status === value))
+        .map((value) => ({ value, label: ORDER_STATUS[value].label })),
+    ],
+    [all, status],
   );
 
   const columns = useMemo<DataTableColumn<Order>[]>(
@@ -98,7 +118,7 @@ export default function WarehouseOrdersPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="gap-section flex flex-col">
       <PageActions>{newOrder}</PageActions>
       <DataTable
         label="Warehouse orders"
@@ -114,9 +134,28 @@ export default function WarehouseOrdersPage() {
         }}
         isRetrying={orders.isRefetching}
         searchPlaceholder="Search orders…"
-        emptyTitle="No warehouse orders yet"
-        emptyDescription="Order condoms from NMS or JMS when the district store runs low or a hotspot reports a stockout."
-        emptyAction={newOrder}
+        toolbar={
+          <FilterSelect
+            label="Status"
+            value={status ?? 'all'}
+            options={statusOptions}
+            onValueChange={(next) => {
+              router.replace(
+                next === 'all'
+                  ? DCFP_PATHS.orders
+                  : `${DCFP_PATHS.orders}?status=${encodeURIComponent(next)}`,
+                { scroll: false },
+              );
+            }}
+          />
+        }
+        emptyTitle={status ? 'No orders with this status' : 'No warehouse orders yet'}
+        emptyDescription={
+          status
+            ? 'Choose All statuses to see every order.'
+            : 'Order condoms from NMS or JMS when the district store runs low or a hotspot reports a stockout.'
+        }
+        emptyAction={status ? undefined : newOrder}
         defaultSort={{ columnId: 'ordered', direction: 'desc' }}
       />
     </div>

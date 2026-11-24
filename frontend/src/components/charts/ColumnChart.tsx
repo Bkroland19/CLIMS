@@ -28,12 +28,12 @@ export function ColumnChart({ series, rows, ...card }: ColumnChartProps) {
 
   return (
     <ChartCard series={[series]} rows={rows} {...card}>
-      <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
+      <ChartContainer config={config} className="aspect-auto h-[200px] w-full">
         <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
           <YAxis
-            width={40}
+            width="auto"
             tickLine={false}
             axisLine={false}
             tickMargin={4}

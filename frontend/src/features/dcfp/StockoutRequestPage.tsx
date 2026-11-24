@@ -52,7 +52,7 @@ export default function StockoutRequestPage() {
   return (
     <RecordView
       query={report}
-      layout="detail"
+      layout="stockout"
       noun="stockout request"
       back={{ href: DCFP_PATHS.stockouts, label: 'Back to stockouts' }}
     >
@@ -126,7 +126,9 @@ function RequestDetail({
         <div className="gap-section flex min-w-0 flex-col">
           <Alert ref={bannerRef} tabIndex={-1} variant={banner.variant} role="status">
             <AlertTitle>{banner.title}</AlertTitle>
-            <AlertDescription className="break-words">{banner.body}</AlertDescription>
+            {banner.body ? (
+              <AlertDescription className="break-words">{banner.body}</AlertDescription>
+            ) : null}
           </Alert>
           {canSend && storeId ? (
             status === 'awaiting_supply' ? (
@@ -190,13 +192,15 @@ function RequestDetail({
           ) : null}
         </div>
 
-        <div className="gap-section flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        {/* One card for the request and who to call: the hotspot's place is already in the header. */}
+        <div className="flex min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <Card>
             <CardHeader>
               <CardTitle>Request</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-3">
               <DetailList
+                className="wrap-anywhere"
                 items={[
                   { label: 'Asked for', value: capitalise(report.product) },
                   { label: 'Message', value: report.comment || 'No message' },
@@ -204,36 +208,28 @@ function RequestDetail({
                   ...(report.repeat_count && report.last_reported_at
                     ? [{ label: 'Last reported', value: formatTimestamp(report.last_reported_at) }]
                     : []),
+                  { label: 'Contact', value: contact ?? 'No contact recorded' },
                 ]}
               />
-              {!readOnly && can('orders:replenish') && !closed ? (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={DCFP_PATHS.newOrderFor(report.selection)}>
-                    <PackagePlus aria-hidden="true" />
-                    Order from a warehouse
-                  </Link>
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm wrap-anywhere">
-              <div>
-                <p className="font-medium">
-                  {report.hot_spot.contact_name?.trim() || 'No contact recorded'}
-                </p>
-                <p className="text-muted-foreground">{placeOf(report) || '—'}</p>
-              </div>
-              {phone ? (
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`tel:${phone.replace(/\s+/g, '')}`}>
-                    <Phone aria-hidden="true" />
-                    Call {phone}
-                  </a>
-                </Button>
+              {phone || (!readOnly && can('orders:replenish') && !closed) ? (
+                <div className="flex flex-col gap-2">
+                  {phone ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`tel:${phone.replace(/\s+/g, '')}`}>
+                        <Phone aria-hidden="true" />
+                        Call {phone}
+                      </a>
+                    </Button>
+                  ) : null}
+                  {!readOnly && can('orders:replenish') && !closed ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={DCFP_PATHS.newOrderFor(report.selection)}>
+                        <PackagePlus aria-hidden="true" />
+                        Order from a warehouse
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
               ) : null}
             </CardContent>
           </Card>
@@ -252,7 +248,11 @@ function bannerFor(
   status: ReturnType<typeof stockoutStatus>,
   contact: string | null,
   canSend: boolean,
-): { variant: 'info' | 'success' | 'warning' | 'destructive'; title: string; body: string } {
+): {
+  variant: 'info' | 'success' | 'warning' | 'destructive';
+  title: string;
+  body: string | null;
+} {
   // Who confirms receipt, to start a sentence.
   const subject = contact ?? 'The hotspot manager';
   switch (status) {
@@ -260,9 +260,8 @@ function bannerFor(
       return {
         variant: 'warning',
         title: `${report.hot_spot.name} is out of ${report.product}`,
-        body: canSend
-          ? `Send what you can from the district store below, or reject the request if the district cannot supply it. ${subject} confirms what arrives.`
-          : 'Waiting for the district store to send stock.',
+        // The send form right below says what to do, so the banner only names the need.
+        body: canSend ? null : 'Waiting for the district store to send stock.',
       };
     case 'rejected': {
       const by = report.rejected_by?.trim();
