@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { useRef } from 'react';
 
+import { ChartHeadingLevel } from '@/components/charts/ChartCard';
 import { PdfButton } from '@/components/reports/PdfButton';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { TaskList } from '@/components/TaskList';
@@ -194,7 +195,9 @@ function DistrictPerformance() {
       </div>
       <FilterBar filters={filters} fields={PERFORMANCE_FIELDS} inline={PERFORMANCE_FIELDS} />
       <div ref={contentRef} className="gap-section flex flex-col">
-        <OverviewView filters={filters} workspace="dcfp" />
+        <ChartHeadingLevel.Provider value={4}>
+          <OverviewView filters={filters} workspace="dcfp" />
+        </ChartHeadingLevel.Provider>
       </div>
     </section>
   );

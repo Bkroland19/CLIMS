@@ -7,6 +7,7 @@ import { useRef } from 'react';
 import { ActivityTimeline, type ActivityEntry } from '@/components/ActivityTimeline';
 import { ColumnChart } from '@/components/charts/ColumnChart';
 import { BarChart } from '@/components/charts/BarChart';
+import { ChartHeadingLevel } from '@/components/charts/ChartCard';
 import { PdfButton } from '@/components/reports/PdfButton';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { ErrorState } from '@/components/states/ErrorState';
@@ -354,7 +355,9 @@ function WarehousePerformance({ storeId, name }: { storeId: string; name: string
       </div>
       <FilterBar filters={filters} fields={PERFORMANCE_FIELDS} />
       <div ref={contentRef} className="gap-section flex flex-col">
-        <OverviewView filters={filters} workspace="warehouse" storeId={storeId} />
+        <ChartHeadingLevel.Provider value={4}>
+          <OverviewView filters={filters} workspace="warehouse" storeId={storeId} />
+        </ChartHeadingLevel.Provider>
       </div>
     </section>
   );

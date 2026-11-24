@@ -4,7 +4,7 @@ import {
   Bar,
   BarChart as RechartsBarChart,
   CartesianGrid,
-  Cell,
+  Rectangle,
   LabelList,
   ReferenceLine,
   XAxis,
@@ -50,6 +50,17 @@ interface BarChartProps extends Omit<ChartCardProps, 'children' | 'legendShape' 
 }
 
 const ROW_HEIGHT = 28;
+
+/** What recharts hands a bar's shape: its geometry and the row it draws. */
+interface BarShapeProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  radius?: number | [number, number, number, number];
+  payload?: { __highlight?: string | undefined };
+}
 const LABEL_LIMIT = 22;
 
 function total(row: ChartRow, series: readonly ChartSeries[]): number {
@@ -94,6 +105,7 @@ export function BarChart({
       label: row.label,
       ...row.values,
       __total: total(row, series),
+      __highlight: highlight?.(row),
     }));
     // Room at the bar ends for the longest value printed there (about 6.5px a character at 11px).
     const longest = Math.max(1, ...data.map((row) => valueFormat(row.__total).length));
@@ -174,12 +186,15 @@ export function BarChart({
               maxBarSize={18}
               // A zero still shows as a sliver with its value, so "0%" is not mistaken for "no data".
               minPointSize={index === last ? 2 : 0}
+              // Conditional formatting: a highlighted bar takes its own fill.
+              {...(highlight && !stacked
+                ? {
+                    shape: (props: BarShapeProps) => (
+                      <Rectangle {...props} fill={props.payload?.__highlight ?? props.fill} />
+                    ),
+                  }
+                : {})}
             >
-              {highlight && !stacked
-                ? shown.map((row) => (
-                    <Cell key={row.label} fill={highlight(row) ?? `var(--color-${item.key})`} />
-                  ))
-                : null}
               {index === last ? (
                 <LabelList
                   dataKey={stacked ? '__total' : item.key}

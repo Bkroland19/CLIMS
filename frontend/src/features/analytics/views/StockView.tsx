@@ -159,9 +159,7 @@ export function StockView({
       <ReportSection
         title="What is held"
         description={
-          report.data
-            ? `Stock as of ${asOf(report.data.stock_date)}, in pieces.`
-            : undefined
+          report.data ? `Stock as of ${asOf(report.data.stock_date)}, in pieces.` : undefined
         }
       >
         <VisualGrid>

@@ -9,7 +9,7 @@ import {
   Table2,
   TriangleAlert,
 } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { DataTable } from '@/components/data-table/DataTable';
@@ -49,6 +49,12 @@ export interface ChartRow {
   values: Readonly<Record<string, number | null>>;
 }
 
+/**
+ * The heading level a chart card takes when it is not given one: 2 on its own, one below the
+ * heading of the report section it sits in (`ReportSection` provides it).
+ */
+export const ChartHeadingLevel = createContext<2 | 3 | 4>(2);
+
 /** Where a chart is drawn: in its card, or enlarged in focus mode. */
 export type ChartMode = 'card' | 'focus';
 
@@ -64,8 +70,8 @@ export interface ChartCardProps {
   categoryLabel: string;
   isSample?: boolean;
   className?: string;
-  /** The heading level; a card inside a section that has its own h2 passes 3. */
-  headingLevel?: 2 | 3;
+  /** The heading level; by default one below the report section's heading (`ChartHeadingLevel`). */
+  headingLevel?: 2 | 3 | 4;
   /** Formats values in the table view and the CSV; defaults to whole numbers. */
   valueFormat?: (value: number) => string;
   /** Legend keys: a short line for line charts, a square for bars. */
@@ -100,7 +106,7 @@ export function ChartCard({
   categoryLabel,
   isSample = false,
   className,
-  headingLevel = 2,
+  headingLevel,
   valueFormat = formatNumber,
   legendShape = 'line',
   legend = series.length > 1,
@@ -114,7 +120,9 @@ export function ChartCard({
   const [isTable, setIsTable] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
-  const Heading = headingLevel === 3 ? 'h3' : 'h2';
+  const contextLevel = useContext(ChartHeadingLevel);
+  const level = headingLevel ?? contextLevel;
+  const Heading = level === 4 ? 'h4' : level === 3 ? 'h3' : 'h2';
   const hasError = error !== undefined && error !== null;
   const isEmpty = !isLoading && !hasError && rows.length === 0;
   const ready = !isLoading && !hasError && !isEmpty;

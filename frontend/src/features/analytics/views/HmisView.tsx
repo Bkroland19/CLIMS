@@ -1,7 +1,7 @@
 'use client';
 
 import { BadgeCheck, Hourglass, Package } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { BarChart } from '@/components/charts/BarChart';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
@@ -20,6 +20,7 @@ export function HmisView({ filters }: { filters: ReportFilters }) {
   const data = report.data;
   const loading = report.isPending;
   const [showDecisions, setShowDecisions] = useState(false);
+  const decisionsId = useId();
   const rows = (data?.rows ?? []).map((row) => ({
     label: [row.district ?? 'No district', row.subcounty].filter(Boolean).join(' · '),
     values: { female: row.ct11_female_pieces, male: row.ct12_male_pieces },
@@ -38,6 +39,7 @@ export function HmisView({ filters }: { filters: ReportFilters }) {
             type="button"
             className="h-auto px-0 text-current underline"
             aria-expanded={showDecisions}
+            aria-controls={decisionsId}
             onClick={() => {
               setShowDecisions((open) => !open);
             }}
@@ -45,7 +47,7 @@ export function HmisView({ filters }: { filters: ReportFilters }) {
             {showDecisions ? 'Hide' : 'Show'} pending decisions
           </Button>
           {showDecisions && data ? (
-            <ul className="mt-2 list-disc pl-5">
+            <ul id={decisionsId} className="mt-2 list-disc pl-5">
               {data.pending_decisions.map((text) => (
                 <li key={text}>{text}</li>
               ))}

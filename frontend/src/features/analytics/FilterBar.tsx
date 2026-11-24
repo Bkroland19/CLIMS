@@ -140,14 +140,14 @@ export function FilterBar({
             key={chip.key}
             data-filter-chip={chip.label}
             data-filter-value={chip.value}
-            className="bg-secondary text-foreground inline-flex h-6 items-center gap-1 rounded-full pr-0.5 pl-2.5 text-xs"
+            className="bg-secondary text-foreground inline-flex h-6 items-center gap-1 rounded-full pl-2.5 text-xs"
           >
             <span className="text-muted-foreground">{chip.label}:</span>
             <span className="max-w-48 truncate font-medium">{chip.value}</span>
             <Button
               variant="ghost"
               size="icon-xs"
-              className="hover:bg-background ml-0.5 size-5 rounded-full"
+              className="hover:bg-background size-6 rounded-full"
               aria-label={`Remove filter ${chip.label}: ${chip.value}`}
               onClick={() => {
                 filters.update(chip.clear);

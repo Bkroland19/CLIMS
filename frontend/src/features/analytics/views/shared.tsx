@@ -1,4 +1,6 @@
-import { Children, type ReactNode } from 'react';
+import { Children, useContext, type ReactNode } from 'react';
+
+import { ChartHeadingLevel } from '@/components/charts/ChartCard';
 
 import type { ChartRow } from '@/components/charts/ChartCard';
 import type { Segment } from '@/components/charts/SegmentedBar';
@@ -24,15 +26,21 @@ export function ReportSection({
   children: ReactNode;
   className?: string;
 }) {
+  // A section's heading sits one level above its charts' (h2 and h3 on a page, h3 and h4 under a
+  // dashboard section that has its own h2).
+  const chartLevel = useContext(ChartHeadingLevel);
+  const Heading = chartLevel === 4 ? 'h3' : 'h2';
   return (
     <section className={cn('flex flex-col gap-3', className)}>
       <div>
-        <h2 className="text-base font-semibold">{title}</h2>
+        <Heading className="text-base font-semibold">{title}</Heading>
         {description ? (
           <p className="text-muted-foreground text-sm text-pretty">{description}</p>
         ) : null}
       </div>
-      {children}
+      <ChartHeadingLevel.Provider value={chartLevel === 4 ? 4 : 3}>
+        {children}
+      </ChartHeadingLevel.Provider>
     </section>
   );
 }
