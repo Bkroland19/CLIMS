@@ -326,7 +326,7 @@ export const workspaces: readonly Workspace[] = [
                 tab: 'Stockouts',
                 title: 'Stockout notifications',
                 description:
-                  'Hotspots that have run out. Open one to send stock from your district store, or order more from NMS or JMS.',
+                  'Hotspots that have run out. Open one to send stock from your district store or reject it with a reason, and order more from NMS or JMS.',
                 layout: 'table',
               },
             ],

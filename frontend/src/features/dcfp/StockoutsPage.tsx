@@ -18,6 +18,7 @@ import type { StockoutReport } from './api';
 import {
   contactOf,
   DCFP_PATHS,
+  isStockoutClosed,
   matchesStockoutFilter,
   placeOf,
   STOCKOUT_FILTERS,
@@ -48,6 +49,11 @@ const EMPTY: Record<StockoutFilter, { title: string; description: string }> = {
   fulfilled: {
     title: 'No fulfilled requests yet',
     description: 'A request is fulfilled once the hotspot confirms everything it asked for.',
+  },
+  rejected: {
+    title: 'No rejected requests',
+    description:
+      'A request you cannot supply can be rejected with a reason before any stock goes. The hotspot is told why.',
   },
   all: {
     title: 'No stockouts reported',
@@ -179,7 +185,7 @@ export default function StockoutsPage() {
           const manage =
             canSend &&
             report.district_store_id === storeId &&
-            stockoutStatus(report) !== 'fulfilled';
+            !isStockoutClosed(stockoutStatus(report));
           return (
             <Button variant={manage ? 'outline' : 'ghost'} size="sm" asChild>
               <Link

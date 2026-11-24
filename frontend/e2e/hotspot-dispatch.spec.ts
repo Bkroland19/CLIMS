@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { expectNoSeriousA11yViolations } from './support/axe';
+
 import { aReport, FEMALE } from '../src/test/dcfpFixtures';
 import { aProductSummary, aStoreSummary } from '../src/test/warehouseOrderFixtures';
 
@@ -93,4 +95,107 @@ test('opens a stockout request, sends stock from it and shows it on its way', as
     true,
   );
   await page.screenshot({ path: 'test-results/hotspot-dispatch-mobile.png', fullPage: true });
+});
+
+test('rejects a stockout request with a reason instead of sending stock', async ({
+  page,
+}, testInfo) => {
+  const storeId = 'store-kampala';
+  const user = {
+    id: 'district-user',
+    username: 'district',
+    firstname: 'District',
+    lastname: 'Officer',
+    roleNames: ['dfcp'],
+    permissions: ['orders:read', 'orders:supply_hotspots', 'orders:replenish', 'inventory:read'],
+    store_id: storeId,
+  };
+  const reason = 'The hotspot was supplied recently and should still have stock.';
+  let rejected = false;
+  let rejections = 0;
+  const report = aReport({ district_store_id: storeId });
+  const current = () =>
+    rejected
+      ? {
+          ...report,
+          status: 'rejected',
+          rejected_at: '2026-11-23T09:00:00Z',
+          rejected_by: 'District Officer',
+          rejection_reason: reason,
+        }
+      : { ...report, status: 'awaiting_supply' };
+  await page.addInitScript((user) => {
+    localStorage.setItem('clims.session', JSON.stringify({ token: 'browser-test', user }));
+  }, user);
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
+    let data: unknown = [];
+    if (path === '/auth/me') data = user;
+    if (path === '/catalogue/products') data = [FEMALE];
+    if (path === '/orders/stockouts') data = [current()];
+    if (path === `/orders/stockouts/${report.id}/rejection`) {
+      expect(route.request().postDataJSON()).toEqual({ reason });
+      rejections += 1;
+      rejected = true;
+    }
+    if (path === `/orders/stockouts/${report.id}` || path.endsWith('/rejection'))
+      data = {
+        ...current(),
+        deliveries: [],
+        events: rejected
+          ? [
+              {
+                id: 'e1',
+                action: 'rejected',
+                selection: 'female',
+                data: { reason },
+                created_at: '2026-11-23T09:00:00Z',
+              },
+            ]
+          : [],
+      };
+    if (path === '/inventory/store-summary')
+      data = aStoreSummary({
+        store_id: storeId,
+        store_type: 'district',
+        products: [aProductSummary({ usable: 5, next_expiry: '2028-06-30' })],
+      });
+    await route.fulfill({ json: { success: true, data } });
+  });
+
+  await page.goto('/dcfp/stockouts');
+  await page.getByRole('link', { name: 'Manage Kisenyi Landing' }).click();
+  await expect(page.getByRole('textbox', { name: 'Engabu · Female · Free' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reject request…' }).click();
+  const panel = page.getByRole('region', { name: 'Reject this request' });
+  await expect(panel.getByRole('textbox', { name: 'Why can’t you supply it?' })).toBeFocused();
+  await panel.getByRole('button', { name: reason }).click();
+  await expect(panel.getByRole('button', { name: reason })).toHaveAttribute('aria-pressed', 'true');
+  await expectNoSeriousA11yViolations(page, testInfo, 'stockout-reject-panel');
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Every common reason wraps inside the card; nothing scrolls sideways.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  for (const chip of await panel
+    .getByRole('group', { name: 'Common reasons' })
+    .getByRole('button')
+    .all()) {
+    const [box, card] = await Promise.all([chip.boundingBox(), panel.boundingBox()]);
+    expect(box && card && box.x + box.width <= card.x + card.width).toBe(true);
+  }
+  await page.screenshot({ path: 'test-results/hotspot-reject-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await panel.getByRole('button', { name: 'Reject and tell Kisenyi Landing' }).click();
+
+  await expect(page.getByText('This request was rejected')).toBeVisible();
+  await expect(page.getByText(/Rejected the request — “The hotspot was supplied/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Send|Reject request/ })).toHaveCount(0);
+  expect(rejections).toBe(1);
+  await expectNoSeriousA11yViolations(page, testInfo, 'stockout-rejected');
+
+  await page.goto('/dcfp/stockouts?status=rejected');
+  await expect(
+    page.getByRole('row', { name: /Kisenyi Landing/ }).getByText('Rejected'),
+  ).toBeVisible();
 });

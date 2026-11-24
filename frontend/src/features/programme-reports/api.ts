@@ -56,6 +56,8 @@ export const notificationSummarySchema = z.object({
   partly_received: z.number(),
   awaiting_acknowledgement: z.number(),
   awaiting_supply: z.number(),
+  /** Closed by the district without stock: neither fulfilled nor pending. */
+  notifications_rejected: z.number().optional(),
   fulfilment_rate: rate,
   acknowledgements_through: z.string(),
   acknowledgement_overdue: z.number(),

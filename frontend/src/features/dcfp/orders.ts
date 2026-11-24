@@ -31,22 +31,32 @@ export const STOCKOUT_STATUS: Record<
   awaiting_acknowledgement: { label: 'Awaiting receipt', tone: 'info' },
   partly_received: { label: 'Partly received', tone: 'caution' },
   fulfilled: { label: 'Fulfilled', tone: 'positive' },
+  rejected: { label: 'Rejected', tone: 'negative' },
 };
 
 export type StockoutStatus = keyof typeof STOCKOUT_STATUS;
+
+/** Fulfilled and rejected requests are closed: nothing more is sent against them. */
+export function isStockoutClosed(status: StockoutStatus): boolean {
+  return status === 'fulfilled' || status === 'rejected';
+}
 
 /** A report's status; one from before statuses existed has had nothing sent. */
 export function stockoutStatus(report: Pick<StockoutReport, 'status'>): StockoutStatus {
   return report.status ?? 'awaiting_supply';
 }
 
-/** The stockout list's filters. "Open" is everything the hotspot has not confirmed in full. */
+/**
+ * The stockout list's filters. "Open" is everything the hotspot has not confirmed in full and the
+ * district has not rejected.
+ */
 export const STOCKOUT_FILTERS = [
   { value: 'open', label: 'Open' },
   { value: 'awaiting_supply', label: 'Awaiting supply' },
   { value: 'awaiting_acknowledgement', label: 'Awaiting receipt' },
   { value: 'partly_received', label: 'Partly received' },
   { value: 'fulfilled', label: 'Fulfilled' },
+  { value: 'rejected', label: 'Rejected' },
   { value: 'all', label: 'All' },
 ] as const;
 
@@ -55,15 +65,23 @@ export type StockoutFilter = (typeof STOCKOUT_FILTERS)[number]['value'];
 export function matchesStockoutFilter(report: StockoutReport, filter: StockoutFilter): boolean {
   const status = stockoutStatus(report);
   if (filter === 'all') return true;
-  if (filter === 'open') return status !== 'fulfilled';
+  if (filter === 'open') return !isStockoutClosed(status);
   return status === filter;
 }
 
 /**
  * A request's progress: the hotspot reported, the district sent stock, the hotspot confirmed it.
  * Partly received marks the last step for attention: something sent has not been confirmed in full.
+ * A rejected request stops at the district's decision, marked for attention, as a rejected order
+ * does.
  */
 export function stockoutSteps(status: StockoutStatus): Step[] {
+  if (status === 'rejected') {
+    return [
+      { id: 'reported', label: 'Reported', state: 'done' },
+      { id: 'sent', label: 'Rejected', state: 'attention' },
+    ];
+  }
   const sent = status !== 'awaiting_supply';
   return [
     { id: 'reported', label: 'Reported', state: 'done' },

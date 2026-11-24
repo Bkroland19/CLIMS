@@ -4,7 +4,8 @@
  * - `GET/POST /orders/stockouts`: hotspot stockout reports. A report notifies the district's
  *   DCFPs; it is not an order. `GET /orders/stockouts/:id` adds deliveries and history,
  *   `GET /orders/stockouts/:id/riders` lists the delivery agents, and
- *   `POST /orders/stockouts/:id/deliveries` sends stock from the district store.
+ *   `POST /orders/stockouts/:id/deliveries` sends stock from the district store, and
+ *   `POST /orders/stockouts/:id/rejection` rejects a request before any stock goes.
  * - `POST /orders/warehouse-requests`: the DCFP orders a condom category and quantity from NMS or JMS,
  *   with no unit; the warehouse chooses the product and the order takes that product's unit.
  * - `POST /orders/district-dispatches`: NMS or JMS sends free stock to a district store before it
@@ -95,7 +96,11 @@ interface Report {
   comment: string | null;
   repeat_count: number;
   last_reported_at: string;
-  status: 'awaiting_supply' | 'awaiting_acknowledgement' | 'partly_received' | 'fulfilled';
+  status:
+    'awaiting_supply' | 'awaiting_acknowledgement' | 'partly_received' | 'fulfilled' | 'rejected';
+  rejected_at: string | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
   created_at: string;
 }
 
@@ -131,9 +136,13 @@ interface HotspotDelivery {
 
 interface ReportEvent {
   id: string;
-  action: 'raised' | 'repeated' | 'selection_changed' | 'delivered' | 'acknowledged';
+  action: 'raised' | 'repeated' | 'selection_changed' | 'delivered' | 'acknowledged' | 'rejected';
   selection: string;
-  data: { comment?: string | null; lines?: { category: 'male' | 'female'; pieces: number }[] };
+  data: {
+    comment?: string | null;
+    lines?: { category: 'male' | 'female'; pieces: number }[];
+    reason?: string;
+  };
   created_at: string;
 }
 
@@ -283,6 +292,9 @@ function report(n: number, values: Partial<Report>, hours: number): Report {
     repeat_count: 0,
     last_reported_at: hoursAgo(hours),
     status: 'awaiting_supply',
+    rejected_at: null,
+    rejected_by: null,
+    rejection_reason: null,
     created_at: hoursAgo(hours),
     ...values,
   };
@@ -290,6 +302,7 @@ function report(n: number, values: Partial<Report>, hours: number): Report {
 
 /** Where a report stands from its deliveries, as the Go API derives it. */
 function statusOf(r: Report): Report['status'] {
+  if (r.rejected_at) return 'rejected';
   const lines = (state.deliveries.get(r.id) ?? []).flatMap((d) => d.lines);
   if (lines.length === 0) return 'awaiting_supply';
   if (lines.some((line) => line.acknowledged_at === null)) return 'awaiting_acknowledgement';
@@ -517,6 +530,24 @@ export function seedDcfp(dataset: string): void {
       },
       24 * 12,
     ),
+    report(
+      4,
+      {
+        hot_spot: {
+          name: 'Mpererwe Lodge',
+          village: 'Mpererwe',
+          subcounty: 'Kira Municipality',
+          district: 'Wakiso',
+          contact_name: 'Ruth Achieng',
+          contact_phone: '0753 444210',
+        },
+        selection: 'male',
+        product: 'male condoms',
+        reported_by: 'Ruth Achieng',
+        comment: 'Need more for the weekend',
+      },
+      24 * 6,
+    ),
   ];
   if (dataset === 'worst') {
     state.reports.unshift(
@@ -567,6 +598,14 @@ export function seedDcfp(dataset: string): void {
       { product: 'FC2 Free Female', category: 'female', quantity: 3, perUnit: 100, received: 300 },
     ]);
   }
+  // Mpererwe was supplied the week before, so the district rejected its request.
+  const mpererwe = state.reports.find((r) => r.id === id(2, 4));
+  if (mpererwe)
+    rejectReport(
+      mpererwe,
+      'The hotspot was supplied last week and should still have stock.',
+      24 * 5,
+    );
   state.events = state.orders.flatMap(historyOf);
   state.shipments = new Map();
   // Confirmed orders hold their reservations at the warehouse.
@@ -951,6 +990,12 @@ function deliverToHotspot(r: Report, body: Body): Reply {
   const reference = text(body.client_reference);
   if (reference && state.deliveryRefs.has(reference)) return ok(r, 201);
   if (r.status === 'fulfilled') return fail(409, 'the report is already fulfilled');
+  if (r.status === 'rejected') {
+    return fail(
+      409,
+      'this request was rejected; the hotspot reports the stockout again if it still needs stock',
+    );
+  }
   const lines = Array.isArray(body.lines) ? (body.lines as Body[]) : [];
   if (lines.length === 0 || lines.length > 20) return fail(422, 'send between 1 and 20 lines');
   const reason = text(body.expiry_exception_reason);
@@ -1029,6 +1074,47 @@ function deliverToHotspot(r: Report, body: Body): Reply {
   return ok(r, 201);
 }
 
+function rejectReport(r: Report, reason: string, hours = 0): void {
+  r.rejected_at = hoursAgo(hours);
+  r.rejected_by = 'Sarah Nakato';
+  r.rejection_reason = reason;
+  r.status = statusOf(r);
+  addReportEvent(r, { action: 'rejected', data: { reason }, created_at: r.rejected_at });
+}
+
+function stockoutDetail(r: Report): Reply {
+  return ok({
+    ...r,
+    deliveries: state.deliveries.get(r.id) ?? [],
+    events: state.reportEvents.get(r.id) ?? [],
+  });
+}
+
+/**
+ * `POST /orders/stockouts/:id/rejection`: the district rejects a request it will not supply, with a
+ * reason, before any stock has gone. Rejecting it again returns it unchanged.
+ */
+function rejectStockout(r: Report, body: Body): Reply {
+  const reason = text(body.reason);
+  if (!reason) {
+    return fail(422, 'say why the request is rejected', {
+      reason: 'say why the request is rejected',
+    });
+  }
+  if (reason.length > 1000) {
+    return fail(422, 'reason must be at most 1000 characters', {
+      reason: 'reason must be at most 1000 characters',
+    });
+  }
+  if (r.status === 'rejected') return stockoutDetail(r);
+  if (r.status === 'fulfilled') return fail(409, 'this notification is already fulfilled');
+  if ((state.deliveries.get(r.id) ?? []).length > 0) {
+    return fail(409, 'stock was already sent for this request, so it can no longer be rejected');
+  }
+  rejectReport(r, reason);
+  return stockoutDetail(r);
+}
+
 function inbox(method: string, parts: string[], query: URLSearchParams): Reply {
   const [, target, action] = parts;
   if (method === 'GET' && target === undefined) {
@@ -1063,24 +1149,25 @@ export function handleDcfp(
   const [resource, target, segment, action] = parts;
   if (resource === 'notifications') return inbox(method, parts, query);
   if (resource !== 'orders') return null;
+  // Lists page as the Go API does (limit default 50, at most 100), so clients reading every page stop.
+  const page = <T,>(items: T[]): T[] => {
+    const limit = Math.min(Math.max(Number(query.get('limit') ?? 50) || 50, 1), 100);
+    const offset = Math.max(Number(query.get('offset') ?? 0) || 0, 0);
+    return items.slice(offset, offset + limit);
+  };
   if (target === undefined)
-    return method === 'GET' ? ok(state.orders) : fail(405, 'Method not allowed');
+    return method === 'GET' ? ok(page(state.orders)) : fail(405, 'Method not allowed');
   if (target === 'stockouts') {
     if (segment === undefined) {
-      if (method === 'GET') return ok(state.reports);
+      if (method === 'GET') return ok(page(state.reports));
       if (method === 'POST') return reportStockout(body);
       return fail(405, 'Method not allowed');
     }
     const r = state.reports.find((candidate) => candidate.id === segment);
     if (!r) return fail(404, 'stockout report not found');
-    if (method === 'GET' && action === undefined) {
-      return ok({
-        ...r,
-        deliveries: state.deliveries.get(r.id) ?? [],
-        events: state.reportEvents.get(r.id) ?? [],
-      });
-    }
+    if (method === 'GET' && action === undefined) return stockoutDetail(r);
     if (method === 'POST' && action === 'deliveries') return deliverToHotspot(r, body);
+    if (method === 'POST' && action === 'rejection') return rejectStockout(r, body);
     if (method === 'GET' && action === 'riders') return ok(riders());
     return fail(405, 'Method not allowed');
   }

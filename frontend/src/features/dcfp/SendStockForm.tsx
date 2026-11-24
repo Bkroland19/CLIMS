@@ -2,7 +2,7 @@
 
 import { AlertTriangle, PackagePlus, PackageX } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type Ref, type SyntheticEvent } from 'react';
 
 import { SelectField } from '@/components/form/SelectField';
 import { InlineMessage } from '@/components/InlineMessage';
@@ -24,6 +24,7 @@ import { ugandaToday } from '@/features/warehouse/receiving';
 import { useStoreSummary } from '@/features/warehouse/stockQueries';
 import { periodRange } from '@/features/warehouse/summary';
 import { getErrorMessage, toApiError } from '@/lib/api';
+import { newClientReference } from '@/lib/clientReference';
 import { formatDate, formatNumber } from '@/lib/format';
 import { useReadOnly } from '@/navigation/useAccess';
 
@@ -56,6 +57,12 @@ interface Props {
   /** Shown when stock has already gone, so sending more is a choice the DCFP opened. */
   onCancel?: () => void;
   onSent?: () => void;
+  /**
+   * Offered while nothing has been sent: the DCFP rejects the request instead. `rejectRef` lets the
+   * page return focus to the button when rejecting is cancelled.
+   */
+  onReject?: () => void;
+  rejectRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -63,7 +70,7 @@ interface Props {
  * of the requested type the store holds is listed with what is available; the DCFP types how many
  * of each to send, in the product's unit, and sees the total in single pieces as they go.
  */
-export function SendStockForm({ report, storeId, onCancel, onSent }: Props) {
+export function SendStockForm({ report, storeId, onCancel, onSent, onReject, rejectRef }: Props) {
   // Opened by "Send more stock", which it replaces: focus moves here rather than to the page.
   const cardRef = useRef<HTMLDivElement>(null);
   // Decided once, on opening; later renders leave focus where the user put it.
@@ -92,22 +99,34 @@ export function SendStockForm({ report, storeId, onCancel, onSent }: Props) {
       </CardHeader>
       <CardContent>
         {can('inventory:read') ? (
-          <SendStockFields report={report} storeId={storeId} onCancel={onCancel} onSent={onSent} />
+          <SendStockFields
+            report={report}
+            storeId={storeId}
+            onCancel={onCancel}
+            onSent={onSent}
+            onReject={onReject}
+            rejectRef={rejectRef}
+          />
         ) : (
-          <Alert variant="info">
-            <AlertTitle>District stock is hidden from you</AlertTitle>
-            <AlertDescription>
-              Sending stock needs inventory access to see what the district store holds. Ask an
-              administrator to add it to your role.
-            </AlertDescription>
-          </Alert>
+          <div className="flex flex-col gap-3">
+            <Alert variant="info">
+              <AlertTitle>District stock is hidden from you</AlertTitle>
+              <AlertDescription>
+                Sending stock needs inventory access to see what the district store holds. Ask an
+                administrator to add it to your role.
+              </AlertDescription>
+            </Alert>
+            {onReject ? (
+              <RejectButton onClick={onReject} buttonRef={rejectRef} className="self-start" />
+            ) : null}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function SendStockFields({ report, storeId, onCancel, onSent }: Props) {
+function SendStockFields({ report, storeId, onCancel, onSent, onReject, rejectRef }: Props) {
   const can = useCan();
   const readOnly = useReadOnly();
   const products = useProducts();
@@ -118,7 +137,7 @@ function SendStockFields({ report, storeId, onCancel, onSent }: Props) {
   const riders = useStockoutRiders(report.id);
   const formId = useId();
   const [now] = useState(() => new Date());
-  const [reference] = useState(() => crypto.randomUUID());
+  const [reference] = useState(newClientReference);
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [riderId, setRiderId] = useState(NO_RIDER);
   const [note, setNote] = useState('');
@@ -263,13 +282,18 @@ function SendStockFields({ report, storeId, onCancel, onSent }: Props) {
         title={`The district store has no ${report.product} to send`}
         description="Order more from NMS or JMS. Once it arrives and you record the receipt, it shows here."
         action={
-          canOrder ? (
-            <Button asChild>
-              <Link href={DCFP_PATHS.newOrderFor(report.selection)}>
-                <PackagePlus aria-hidden="true" />
-                Order from a warehouse
-              </Link>
-            </Button>
+          canOrder || onReject ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {canOrder ? (
+                <Button asChild>
+                  <Link href={DCFP_PATHS.newOrderFor(report.selection)}>
+                    <PackagePlus aria-hidden="true" />
+                    Order from a warehouse
+                  </Link>
+                </Button>
+              ) : null}
+              {onReject ? <RejectButton onClick={onReject} buttonRef={rejectRef} /> : null}
+            </div>
           ) : undefined
         }
       />
@@ -479,12 +503,41 @@ function SendStockFields({ report, storeId, onCancel, onSent }: Props) {
               Cancel
             </Button>
           ) : null}
+          {onReject ? (
+            <RejectButton onClick={onReject} buttonRef={rejectRef} disabled={busy || uncertain} />
+          ) : null}
           <Button type="submit" disabled={busy || readOnly}>
             {busy ? 'Sending…' : total > 0 ? `Send ${formatNumber(total)} pieces` : 'Send stock'}
           </Button>
         </div>
       </div>
     </form>
+  );
+}
+
+/** Opens the rejection in the send form's place. */
+function RejectButton({
+  onClick,
+  buttonRef,
+  disabled,
+  className,
+}: {
+  onClick: () => void;
+  buttonRef?: Ref<HTMLButtonElement>;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <Button
+      ref={buttonRef}
+      type="button"
+      variant="outline"
+      onClick={onClick}
+      disabled={disabled}
+      className={className}
+    >
+      Reject request…
+    </Button>
   );
 }
 

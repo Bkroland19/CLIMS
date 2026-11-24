@@ -382,6 +382,142 @@ describe('Stockout request', () => {
     expect(screen.queryByRole('button', { name: /Send/ })).not.toBeInTheDocument();
   });
 
+  it('rejects the request with a reason instead of sending, and shows why afterwards', async () => {
+    const user = userEvent.setup();
+    let rejectedWith: unknown = null;
+    const reason = 'The district store has no stock to send right now.';
+    const rejected = detail({
+      status: 'rejected',
+      rejected_at: '2026-11-23T09:00:00Z',
+      rejected_by: 'Sarah Nakato',
+      rejection_reason: reason,
+      events: [
+        ...detail().events,
+        {
+          id: 'e2',
+          action: 'rejected',
+          selection: 'female',
+          data: { reason },
+          created_at: '2026-11-23T09:00:00Z',
+        },
+      ],
+    });
+    const { requests } = renderApp(<StockoutRequestPage />, {
+      route,
+      session: session(),
+      replies: [
+        (request) => {
+          if (request.method === 'POST' && request.url.endsWith('/rejection')) {
+            rejectedWith = request.body;
+            return { status: 200, body: { success: true, data: rejected } };
+          }
+          return rejectedWith ? api(rejected)(request) : api()(request);
+        },
+      ],
+    });
+
+    // Sending and rejecting are offered side by side.
+    await screen.findByRole('textbox', { name: 'Engabu · Female · Free' });
+    await user.click(screen.getByRole('button', { name: 'Reject request…' }));
+    const panel = screen.getByRole('region', { name: 'Reject this request' });
+    const box = within(panel).getByRole('textbox', { name: 'Why can’t you supply it?' });
+    expect(box).toHaveFocus();
+    // The send form is hidden, not gone, so cancelling keeps what was typed.
+    expect(screen.queryByRole('textbox', { name: 'Engabu · Female · Free' })).toBeNull();
+    expect(
+      screen.getByRole('textbox', { name: 'Engabu · Female · Free', hidden: true }),
+    ).not.toBeVisible();
+
+    // An empty reason is refused without posting.
+    await user.click(
+      within(panel).getByRole('button', { name: 'Reject and tell Kisenyi Landing' }),
+    );
+    expect(within(panel).getByText('Say why the request is rejected.')).toBeInTheDocument();
+    expect(box).toHaveFocus();
+    expect(requests.filter((r) => r.method === 'POST')).toHaveLength(0);
+
+    // A common reason fills the box, where it can still be edited.
+    await user.click(within(panel).getByRole('button', { name: reason }));
+    expect(box).toHaveValue(reason);
+    await user.click(
+      within(panel).getByRole('button', { name: 'Reject and tell Kisenyi Landing' }),
+    );
+
+    await waitFor(() => {
+      expect(rejectedWith).toEqual({ reason });
+    });
+    expect(await screen.findByText('This request was rejected')).toBeInTheDocument();
+    expect(screen.getByText(/Rejected by Sarah Nakato/)).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(reason.replace('.', '\\.'))).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Rejected the request — “The district store/)).toBeInTheDocument();
+    // A rejected request is closed: nothing more to send, reject or order from it.
+    expect(screen.queryByRole('button', { name: /Send|Reject/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Order from a warehouse' })).not.toBeInTheDocument();
+  });
+
+  it('keeps what was typed when rejecting is cancelled, and returns focus to the button', async () => {
+    const user = userEvent.setup();
+    renderApp(<StockoutRequestPage />, { route, session: session(), replies: [api()] });
+
+    await user.type(await screen.findByRole('textbox', { name: 'Engabu · Female · Free' }), '2');
+    await user.click(screen.getByRole('button', { name: 'Reject request…' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('region', { name: 'Reject this request' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Engabu · Female · Free' })).toHaveValue('2');
+    expect(screen.getByRole('button', { name: 'Reject request…' })).toHaveFocus();
+  });
+
+  it('says why a rejection was refused, and keeps the reason', async () => {
+    const user = userEvent.setup();
+    renderApp(<StockoutRequestPage />, {
+      route,
+      session: session(),
+      replies: [
+        (request) =>
+          request.method === 'POST'
+            ? {
+                status: 409,
+                body: {
+                  success: false,
+                  message:
+                    'stock was already sent for this request, so it can no longer be rejected',
+                },
+              }
+            : api()(request),
+      ],
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Reject request…' }));
+    const box = screen.getByRole('textbox', { name: 'Why can’t you supply it?' });
+    await user.type(box, 'Out of stock');
+    await user.click(screen.getByRole('button', { name: 'Reject and tell Kisenyi Landing' }));
+    expect(await screen.findByText('The request was not rejected')).toBeInTheDocument();
+    expect(box).toHaveValue('Out of stock');
+  });
+
+  it('offers rejecting beside a warehouse order when the store has none of the type', async () => {
+    renderApp(<StockoutRequestPage />, {
+      route,
+      session: session(),
+      replies: [api(detail(), stockOf(0))],
+    });
+    const form = await screen.findByRole('region', { name: 'Send stock to Kisenyi Landing' });
+    expect(
+      await within(form).findByText('The district store has no female condoms to send'),
+    ).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Reject request…' })).toBeInTheDocument();
+  });
+
+  it('offers no rejection once stock has gone', async () => {
+    renderApp(<StockoutRequestPage />, {
+      route,
+      session: session(),
+      replies: [api(detail({ status: 'awaiting_acknowledgement', deliveries: [delivery] }))],
+    });
+    expect(await screen.findByRole('button', { name: 'Send more stock' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reject request…' })).not.toBeInTheDocument();
+  });
+
   it('says so when the request does not exist', async () => {
     renderApp(<StockoutRequestPage />, {
       route,

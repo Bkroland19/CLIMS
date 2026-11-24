@@ -92,12 +92,16 @@ const CATEGORY_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Every status' },
-  ...['fulfilled', 'partly_received', 'awaiting_acknowledgement', 'awaiting_supply'].map(
-    (value) => ({
-      value,
-      label: humanize(value),
-    }),
-  ),
+  ...[
+    'fulfilled',
+    'partly_received',
+    'awaiting_acknowledgement',
+    'awaiting_supply',
+    'rejected',
+  ].map((value) => ({
+    value,
+    label: humanize(value),
+  })),
 ];
 
 const BAND_OPTIONS = [
@@ -336,6 +340,9 @@ function NotificationCards({ filters }: { filters: ReportFilters }) {
           ).
           {data.acknowledgement_overdue > 0
             ? ` Quality issue: ${formatNumber(data.acknowledgement_overdue)} with a delivery not acknowledged in time.`
+            : ''}
+          {data.notifications_rejected
+            ? ` ${formatNumber(data.notifications_rejected)} rejected by the district, counted as not fulfilled.`
             : ''}
         </p>
       ) : null}
