@@ -137,6 +137,46 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 	}
 	alert(inactive, 403)
 	alert(elsewhere, 403)
+
+	// RF12: the map shows each hotspot's open notification, and can be filtered by it. The VHT sees where
+	// a district hotspot is only to the subcounty, without its village, coordinates or contact; national
+	// users, and the VHT who submitted it, see them.
+	exec(`UPDATE hot_spots SET latitude = 0.3476, longitude = 32.5825, village = 'Precision village' WHERE id = $1`, active)
+	exec(`INSERT INTO contact_persons (hot_spot_id, name, phone_number) VALUES ($1, 'Precision contact', '0700000001')`, active)
+	defer exec(`DELETE FROM contact_persons WHERE name = 'Precision contact'`)
+	seen := func(token string) map[string]any {
+		t.Helper()
+		return request("GET", "/hotspots/"+active, nil, token, 200)["data"].(map[string]any)
+	}
+	if h := seen(vht); h["location_precision"] != "subcounty" || h["latitude"] != nil || h["longitude"] != nil ||
+		h["village"] != nil || h["contact_person"] != nil || h["subcounty"].(map[string]any)["id"] != subcounty ||
+		h["notification_status"] != "awaiting_supply" {
+		t.Fatalf("a district VHT should see the hotspot to the subcounty only: %v", h)
+	}
+	if h := seen(admin); h["location_precision"] != "exact" || h["latitude"] != 0.3476 || h["village"] != "Precision village" ||
+		h["contact_person"].(map[string]any)["name"] != "Precision contact" || h["notification_status"] != "awaiting_supply" {
+		t.Fatalf("national users see the exact location and contact: %v", h)
+	}
+	listed := func(query string) map[string]bool {
+		t.Helper()
+		out := map[string]bool{}
+		for _, item := range request("GET", "/hotspots?limit=100&"+query, nil, vht, 200)["data"].([]any) {
+			out[item.(map[string]any)["id"].(string)] = true
+		}
+		return out
+	}
+	if !listed("notification_status=awaiting_supply")[active] || listed("notification_status=none")[active] {
+		t.Fatal("the notification_status filter should find the hotspot by its open notification")
+	}
+	request("GET", "/hotspots?notification_status=fulfilled", nil, vht, 400)
+	var vhtID, submitter string
+	scalar(&vhtID, `SELECT id FROM users WHERE username = 'district-vht'`)
+	scalar(&submitter, `SELECT coalesce(submitted_by_id::text, '') FROM hot_spots WHERE id = $1`, active)
+	exec(`UPDATE hot_spots SET submitted_by_id = $2 WHERE id = $1`, active, vhtID)
+	if h := seen(vht); h["location_precision"] != "exact" || h["latitude"] != 0.3476 {
+		t.Fatalf("the VHT who submitted the hotspot sees where it is: %v", h)
+	}
+	exec(`UPDATE hot_spots SET submitted_by_id = nullif($2, '')::uuid WHERE id = $1`, active, submitter)
 	// The VHT follows the request they sent without orders:read, but lists nothing.
 	reportPath := "/orders/stockouts/" + raised["id"].(string)
 	if seen := request("GET", reportPath, nil, vht, 200)["data"].(map[string]any); seen["id"] != raised["id"] {

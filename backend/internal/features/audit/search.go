@@ -58,6 +58,9 @@ type Filter struct {
 	Outcome     string
 	SubjectType string
 	SubjectID   string
+	// ClientEntryID keeps entries written by requests the field app tagged with
+	// that sync log entry (see ClientEntryHeader).
+	ClientEntryID string
 	// Domains keeps and ExcludeDomains leaves out actions by the part before
 	// the dot, e.g. "hotspot" for hotspot.activated.
 	Domains        []string
@@ -89,8 +92,10 @@ func (r *Repository) search(ctx context.Context, f Filter, limit, offset int32) 
 			AND ($6 = '' OR a.id IN (SELECT audit_id FROM audit_log_subjects WHERE subject_type = $6 AND subject_id = $7))
 			AND (cardinality($8::text[]) = 0 OR split_part(a.action, '.', 1) = ANY($8))
 			AND NOT split_part(a.action, '.', 1) = ANY($9::text[])
+			AND ($12 = '' OR (a.details ? 'client_entry_id' AND a.details->>'client_entry_id' = $12))
 		ORDER BY a.occurred_at DESC, a.id DESC LIMIT $10 OFFSET $11`,
-		f.ActorID, f.Action, f.Outcome, f.From, f.To, f.SubjectType, f.SubjectID, f.Domains, f.ExcludeDomains, limit, offset)
+		f.ActorID, f.Action, f.Outcome, f.From, f.To, f.SubjectType, f.SubjectID, f.Domains, f.ExcludeDomains, limit, offset,
+		f.ClientEntryID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +151,11 @@ func (h *Handler) search(c fiber.Ctx) error {
 		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
 	}
 	f := Filter{Action: c.Query("action"), Outcome: c.Query("outcome"),
-		SubjectType: c.Query("subject_type"), SubjectID: c.Query("subject_id")}
+		SubjectType: c.Query("subject_type"), SubjectID: c.Query("subject_id"),
+		ClientEntryID: c.Query("client_entry_id")}
+	if f.ClientEntryID != "" && !clientEntryPattern.MatchString(f.ClientEntryID) {
+		return response.Error(c, 400, "client_entry_id must be 8 to 64 letters, digits, - or _", nil)
+	}
 	for name, target := range map[string]*[]string{"domain": &f.Domains, "exclude_domain": &f.ExcludeDomains} {
 		domains, ok := parseDomains(c.Query(name))
 		if !ok {

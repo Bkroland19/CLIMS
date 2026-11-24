@@ -4,7 +4,8 @@ import { isAwaitingWarehouse } from '@/features/fulfilment/status';
 
 /** Paths of the MOH oversight screens. */
 export const MOH_PATHS = {
-  dashboard: '/moh',
+  /** Analytics, MOH's home: the national overview and every report as a tab. */
+  analytics: '/moh',
   orders: '/moh/orders',
   requests: '/moh/orders/warehouse',
   order: (id: string) => `/moh/orders/${encodeURIComponent(id)}`,

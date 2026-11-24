@@ -122,7 +122,11 @@ func write(ctx context.Context, db executor, entry Entry) error {
 			return fmt.Errorf("encode audit changes: %w", err)
 		}
 	}
-	details, err := json.Marshal(scrub(entry.Details))
+	clean := scrub(entry.Details)
+	if _, set := clean["client_entry_id"]; !set && req.clientEntryID != "" {
+		clean["client_entry_id"] = req.clientEntryID
+	}
+	details, err := json.Marshal(clean)
 	if err != nil {
 		return fmt.Errorf("encode audit details: %w", err)
 	}

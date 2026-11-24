@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isAxiosError } from "axios";
+import { entryHeaders } from "./syncLog";
 import { api } from "./api";
 import type { Hotspot } from "./types";
 
@@ -163,8 +164,12 @@ export function toSubmission(f: MapForm): HotspotSubmission {
 }
 
 /** POST /hotspots. */
-export async function submitHotspot(body: HotspotSubmission): Promise<ApiHotspot> {
-  const { data } = await api.post<{ data: ApiHotspot }>("/hotspots", body);
+/** POST /hotspots. `entryId` tags the request with its sync log entry (see syncLog.ts). */
+export async function submitHotspot(
+  body: HotspotSubmission,
+  entryId?: string,
+): Promise<ApiHotspot> {
+  const { data } = await api.post<{ data: ApiHotspot }>("/hotspots", body, entryHeaders(entryId));
   return data.data;
 }
 

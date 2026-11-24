@@ -111,6 +111,7 @@ type RequestGroup struct {
 // period, by condom type, warehouse and district (RF06).
 type SupplyReport struct {
 	Period        Period           `json:"period"`
+	DateBasis     string           `json:"date_basis"`
 	DataUpdatedAt time.Time        `json:"data_updated_at"`
 	Total         RequestTotals    `json:"total"`
 	ByType        []RequestGroup   `json:"by_type"`
@@ -142,7 +143,7 @@ var unrequestedCTE = func() string {
 
 func (r *Repository) supplyReport(ctx context.Context, s scope, f SupplyFilter, now time.Time) (SupplyReport, error) {
 	args := f.requestArgs(s)
-	out := SupplyReport{Period: periodOf(f.Filter), DataUpdatedAt: now}
+	out := SupplyReport{Period: periodOf(f.Filter), DateBasis: requestedBasis, DataUpdatedAt: now}
 	if err := scanTotals(r.db.QueryRow(ctx, requestsCTE+` SELECT `+totalsSQL+` FROM q`, args...), &out.Total); err != nil {
 		return SupplyReport{}, err
 	}

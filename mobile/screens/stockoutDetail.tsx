@@ -33,6 +33,7 @@ import {
 } from "@/lib/orders";
 import { useMe } from "@/lib/session";
 import { usePending, useStore } from "@/lib/store";
+import { newEntryId } from "@/lib/syncLog";
 
 type Load = "loading" | "ok" | "offline" | "forbidden" | "missing" | "error";
 
@@ -117,7 +118,7 @@ function AcknowledgeForm({
   onDone: (d: StockoutDetail | null) => void;
 }) {
   const me = useMe();
-  const { send, queue, offline } = useStore();
+  const { send, queue, track, offline } = useStore();
   const [vals, setVals] = useState<Record<string, string>>({});
   const [counted, setCounted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -130,14 +131,20 @@ function AcknowledgeForm({
 
   const submit = async () => {
     setErr("");
+    const entry = newEntryId();
     const saveForLater = () => {
-      queue("acknowledge", { id: d.id, request, hotspot }, label);
+      queue("acknowledge", { id: d.id, request, hotspot }, label, entry);
       onDone(null);
     };
     if (offline) return saveForLater();
     setBusy(true);
     try {
-      const next = await acknowledgeStockout(d.id, request);
+      const next = await track(
+        entry,
+        "acknowledge",
+        (id) => acknowledgeStockout(d.id, request, id),
+        () => d.id,
+      );
       send("acknowledge", { order: toLocalOrder(next, me.name, "Hotspot manager") }, label);
       onDone(next);
     } catch (e) {

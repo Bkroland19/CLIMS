@@ -32,6 +32,7 @@ type BatchLine struct {
 // BatchReport lists batches in stock, earliest expiry first, with the expiry bands of the draft rules.
 type BatchReport struct {
 	StockDate   time.Time   `json:"stock_date"`
+	DateBasis   string      `json:"date_basis"`
 	RuleVersion string      `json:"rule_version"`
 	Lines       []BatchLine `json:"lines"`
 }
@@ -42,7 +43,7 @@ const productSQL = `concat_ws(' ', (SELECT pb.name FROM brands pb WHERE pb.id = 
 
 func (r *Repository) batchReport(ctx context.Context, s scope, f SupplyFilter, band string, now time.Time) (BatchReport, error) {
 	today := stock.Today(now)
-	out := BatchReport{StockDate: now, RuleVersion: stock.RuleVersion, Lines: []BatchLine{}}
+	out := BatchReport{StockDate: now, DateBasis: stockDateBasis, RuleVersion: stock.RuleVersion, Lines: []BatchLine{}}
 	rows, err := r.db.Query(ctx, `SELECT sb.id, sb.store_id, s.name, s.store_type, s.district_id, sb.condom_id, `+productSQL+`,
 			c.category, sb.unit_of_measure_id, um.name, sb.batch_number, sb.expiry_date, sb.on_hand,
 			CASE WHEN c.pieces_per_unit IS NOT NULL AND sb.unit_of_measure_id = c.unit_id THEN sb.on_hand * c.pieces_per_unit END

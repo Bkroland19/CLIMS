@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,6 +33,10 @@ func testExportsAndVersions(t *testing.T, pool *pgxpool.Pool,
 	if float64(len(exported["rows"].([]any))) != summary["notifications_raised"].(float64) || exported["scope"] != "National" ||
 		exported["product"] != "Male and female condoms" || exported["filters"].(map[string]any)["from"] != summary["period"].(map[string]any)["from"] {
 		t.Fatalf("notification export does not match the report: %v", exported)
+	}
+	// Each report names the date that places a record in its period.
+	if exported["date_basis"] != summary["date_basis"] || !strings.HasPrefix(exported["date_basis"].(string), "Date the notification was first raised") {
+		t.Fatalf("notification export date basis: %v, report: %v", exported["date_basis"], summary["date_basis"])
 	}
 	if hmis := data("GET", "/reports/export/hmis-105?format=json", nil, admin, 200); male(hmis) != 290 {
 		t.Fatalf("HMIS export: %v", hmis)

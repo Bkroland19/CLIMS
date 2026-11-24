@@ -135,6 +135,8 @@ export interface OutboxItem {
   label: string;
   role: AppRole;
   at: number;
+  /** Its sync log entry (lib/syncLog.ts). Items saved by older versions use `id` instead. */
+  logId?: string;
 }
 
 export type ActionType =

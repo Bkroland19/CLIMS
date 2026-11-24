@@ -12,7 +12,7 @@ The audit log records who did what, to which record, when and from where. Entrie
 - **Target and related records (`subjects`):** the record acted on and the other records the action concerns. Searching by a subject returns entries where it is the target or a related record, which isolates the history of one hotspot, order, district, store or user. Search results give each user record its current `name` (the username) for display; the entry itself stores only the ID, so a deleted account's name is null.
 - **Changes:** for data changes, only the fields that changed, before and after.
 - **Details:** other facts, such as the identifier typed at a failed login.
-- **Context:** the client's IP address, user agent, request ID (matching the server log line) and session.
+- **Context:** the client's IP address, user agent, request ID (matching the server log line) and session. A request that sends `X-Client-Entry-Id` also leaves that field phone's [sync log](sync-log.md) entry as `details.client_entry_id`; a malformed value is ignored.
 
 Passwords, password hashes and tokens are never recorded. `audit.Diff` and the details writer drop any field whose name contains a word such as `password`, `token`, `secret` or `hash`.
 
@@ -81,16 +81,17 @@ Name actions `<domain>.<event>` and keep them as constants in the feature. Add t
 
 `GET /api/v1/audit` returns entries newest first. It requires the `audit:read` permission, which migration 29 grants to `admin`; grant it to auditors through the RBAC API. Every search is itself recorded as `audit.searched`.
 
-| Filter                        | Matches                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `actor_id`                    | Entries by one user                                                                 |
-| `action`                      | One action, e.g. `auth.login_failed`                                                |
-| `domain`                      | Actions in these domains (before the dot), comma-separated, e.g. `user,role`        |
-| `exclude_domain`              | Leaves out these domains, comma-separated, e.g. `audit` to hide searches of the log |
-| `outcome`                     | `success` or `failure`                                                              |
-| `subject_type` + `subject_id` | Entries whose target or related records include that record                         |
-| `from`, `to`                  | A date (`2026-11-21`, from its start in UTC) or an RFC 3339 time; `to` is exclusive |
-| `limit` (max 100), `offset`   | Pagination                                                                          |
+| Filter                        | Matches                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `actor_id`                    | Entries by one user                                                                      |
+| `action`                      | One action, e.g. `auth.login_failed`                                                     |
+| `domain`                      | Actions in these domains (before the dot), comma-separated, e.g. `user,role`             |
+| `exclude_domain`              | Leaves out these domains, comma-separated, e.g. `audit` to hide searches of the log      |
+| `outcome`                     | `success` or `failure`                                                                   |
+| `subject_type` + `subject_id` | Entries whose target or related records include that record                              |
+| `client_entry_id`             | Entries written by requests a field phone tagged with that [sync log](sync-log.md) entry |
+| `from`, `to`                  | A date (`2026-11-21`, from its start in UTC) or an RFC 3339 time; `to` is exclusive      |
+| `limit` (max 100), `offset`   | Pagination                                                                               |
 
 ## Storage and protection
 

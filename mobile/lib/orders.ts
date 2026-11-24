@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isAxiosError } from "axios";
+import { entryHeaders } from "./syncLog";
 import { api } from "./api";
 import type { Order, OrderStatus } from "./types";
 
@@ -30,11 +31,7 @@ export interface StockoutRequest {
 
 /** Where a notification is in its fulfilment. A rejected one is closed without stock. */
 export type StockoutStatus =
-  | "awaiting_supply"
-  | "awaiting_acknowledgement"
-  | "partly_received"
-  | "fulfilled"
-  | "rejected";
+  "awaiting_supply" | "awaiting_acknowledgement" | "partly_received" | "fulfilled" | "rejected";
 
 /** `StockoutReport`, the fields the app reads. */
 export interface StockoutReport {
@@ -111,8 +108,13 @@ export const STOCKOUT_MESSAGE_MAX_BYTES = 4000;
  */
 export async function reportStockout(
   body: StockoutRequest,
+  entryId?: string,
 ): Promise<{ report: StockoutReport; repeated: boolean }> {
-  const res = await api.post<{ data: StockoutReport }>("/orders/stockouts", body);
+  const res = await api.post<{ data: StockoutReport }>(
+    "/orders/stockouts",
+    body,
+    entryHeaders(entryId),
+  );
   return { report: res.data.data, repeated: res.status === 200 };
 }
 
@@ -142,10 +144,12 @@ function saveStockout(d: StockoutDetail) {
 export async function acknowledgeStockout(
   id: string,
   body: AcknowledgementRequest,
+  entryId?: string,
 ): Promise<StockoutDetail> {
   const { data } = await api.post<{ data: StockoutDetail }>(
     `/orders/stockouts/${id}/acknowledgements`,
     body,
+    entryHeaders(entryId),
   );
   saveStockout(data.data);
   return data.data;

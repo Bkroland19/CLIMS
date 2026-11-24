@@ -80,6 +80,7 @@ func (s scope) args(f Filter) []any {
 // NotificationSummary holds the notification measures for a period (reporting requirements, measures).
 type NotificationSummary struct {
 	Period                  Period           `json:"period"`
+	DateBasis               string           `json:"date_basis"`
 	DataUpdatedAt           time.Time        `json:"data_updated_at"`
 	AcknowledgementsThrough time.Time        `json:"acknowledgements_through"`
 	Category                *string          `json:"category"`
@@ -98,6 +99,8 @@ type NotificationSummary struct {
 	Backlog                Backlog              `json:"backlog"`
 	AcknowledgementOverdue int64                `json:"acknowledgement_overdue"`
 	Districts              []DistrictRow        `json:"districts"`
+	Receipts               ReceiptActivity      `json:"receipts"`
+	FieldSync              FieldSync            `json:"field_sync"`
 	// Settings are the review cycle, deadline and target in effect; request parameters may override them.
 	Settings ResponseSettings `json:"settings"`
 }
@@ -146,6 +149,20 @@ type DistrictRow struct {
 	FulfilmentRate *float64 `json:"fulfilment_rate"`
 }
 
+// ReceiptActivity is what hotspot managers acknowledged during the period, whenever the notification
+// was raised: receipt activity, as opposed to the fulfilment of notifications raised in the period.
+// With a category filter it counts that type's lines only.
+type ReceiptActivity struct {
+	DateBasis string `json:"date_basis"`
+	// Acknowledged delivery lines, including those acknowledged with zero pieces.
+	Acknowledgements int64 `json:"acknowledgements"`
+	Notifications    int64 `json:"notifications"`
+	// Of those notifications, the ones raised before the period.
+	RaisedBeforePeriod int64 `json:"raised_before_period"`
+	MalePieces         int64 `json:"male_pieces"`
+	FemalePieces       int64 `json:"female_pieces"`
+}
+
 // rate is part of whole as a percentage to one decimal, or nil when whole is zero (Not applicable).
 func rate(part, whole int64) *float64 {
 	if whole == 0 {
@@ -162,10 +179,10 @@ func (r *Repository) notificationSummary(ctx context.Context, s scope, f Filter,
 	// Still waiting for the district: neither fulfilled nor rejected.
 	open := `fulfilled_at IS NULL AND rejected_at IS NULL`
 	out := NotificationSummary{
-		Period:        Period{From: f.From.In(Kampala).Format(time.DateOnly), To: f.To.In(Kampala).AddDate(0, 0, -1).Format(time.DateOnly)},
-		DataUpdatedAt: now, AcknowledgementsThrough: now, BySelection: map[string]int64{},
-		Districts: []DistrictRow{},
-		Deadline:  DeadlineProgress{Days: f.DeadlineDays, TargetPercent: f.Target},
+		Period:    Period{From: f.From.In(Kampala).Format(time.DateOnly), To: f.To.In(Kampala).AddDate(0, 0, -1).Format(time.DateOnly)},
+		DateBasis: raisedBasis, DataUpdatedAt: now, AcknowledgementsThrough: now, BySelection: map[string]int64{},
+		Districts: []DistrictRow{}, Receipts: ReceiptActivity{DateBasis: acknowledgedBasis},
+		Deadline: DeadlineProgress{Days: f.DeadlineDays, TargetPercent: f.Target},
 	}
 	var male, female, both, componentFulfilled int64
 	var component string
@@ -227,6 +244,22 @@ func (r *Repository) notificationSummary(ctx context.Context, s scope, f Filter,
 		d.FulfilmentRate = rate(d.Fulfilled, d.Raised)
 		return d, err
 	})
+	if err != nil {
+		return NotificationSummary{}, err
+	}
+	err = r.db.QueryRow(ctx, notificationsCTE+`
+		SELECT count(l.id), count(DISTINCT n.id), count(DISTINCT n.id) FILTER (WHERE n.created_at < $9),
+			coalesce(sum(l.acknowledged_pieces) FILTER (WHERE l.category = 'male'), 0),
+			coalesce(sum(l.acknowledged_pieces) FILTER (WHERE l.category = 'female'), 0)
+		FROM n JOIN hotspot_deliveries hd ON hd.stockout_report_id = n.id
+		JOIN hotspot_delivery_lines l ON l.delivery_id = hd.id
+		WHERE l.acknowledged_at >= $9 AND l.acknowledged_at < $10 AND ($8 = '' OR l.category = $8)`,
+		args[:10]...).Scan(&out.Receipts.Acknowledgements, &out.Receipts.Notifications,
+		&out.Receipts.RaisedBeforePeriod, &out.Receipts.MalePieces, &out.Receipts.FemalePieces)
+	if err != nil {
+		return NotificationSummary{}, err
+	}
+	out.FieldSync, err = r.fieldSync(ctx, s, f.DistrictID, f.HotSpotID, notificationActions, f.From, f.To)
 	return out, err
 }
 

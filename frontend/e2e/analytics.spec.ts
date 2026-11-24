@@ -16,7 +16,7 @@ test.beforeEach(async ({ request }) => {
 test('the overview shows figures and charts for the period, and the filters live in the address', async ({
   page,
 }) => {
-  await open(page, '/moh/programme-reports', 'Reports and analytics');
+  await open(page, '/moh', 'Reports and analytics');
   await expect(page.getByRole('link', { name: 'Overview' })).toHaveAttribute(
     'aria-current',
     'true',
@@ -47,7 +47,7 @@ test('the overview shows figures and charts for the period, and the filters live
 });
 
 test('every chart opens as a table and in focus mode, and downloads its data', async ({ page }) => {
-  await open(page, '/moh/programme-reports?view=notifications', 'Reports and analytics');
+  await open(page, '/moh?view=notifications', 'Reports and analytics');
   const title = 'Raised and fulfilled';
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
 
@@ -72,7 +72,7 @@ test('every chart opens as a table and in focus mode, and downloads its data', a
 test('a report downloads as a PDF with its records, and as CSV from the server', async ({
   page,
 }) => {
-  await open(page, '/moh/programme-reports?view=warehouse-requests', 'Reports and analytics');
+  await open(page, '/moh?view=warehouse-requests', 'Reports and analytics');
   await expect(page.getByRole('heading', { name: 'From request to receipt' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Records' })).toBeVisible();
 
@@ -100,21 +100,23 @@ test('each report tab loads its own visuals', async ({ page }) => {
     ['hmis-105', 'By district and subcounty'],
   ];
   for (const [view, heading] of tabs) {
-    await open(page, `/moh/programme-reports?view=${view}`, 'Reports and analytics');
+    await open(page, `/moh?view=${view}`, 'Reports and analytics');
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     await expect(page.getByText('This chart could not be loaded')).toHaveCount(0);
   }
 });
 
-test('the MOH dashboard lists what needs watching and downloads as a PDF', async ({ page }) => {
-  await open(page, '/moh', 'MOH dashboard');
+test('MOH Analytics lists what needs watching on its overview and downloads as a PDF', async ({
+  page,
+}) => {
+  await open(page, '/moh', 'Reports and analytics');
   await expect(page.getByText('Needs watching')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fulfilment rate by district' })).toBeVisible();
   const [pdf] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Download PDF' }).click(),
   ]);
-  expect(pdf.suggestedFilename()).toMatch(/^clims-moh-dashboard-.*\.pdf$/);
+  expect(pdf.suggestedFilename()).toMatch(/^clims-overview-.*\.pdf$/);
 });
 
 test('the district and warehouse dashboards add a performance section with its own PDF', async ({

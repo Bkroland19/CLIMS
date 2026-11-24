@@ -51,6 +51,7 @@ type StockLine struct {
 // StockReport is the current dated stock view, separating expired and unknown-expiry stock (RF10).
 type StockReport struct {
 	StockDate      time.Time   `json:"stock_date"`
+	DateBasis      string      `json:"date_basis"`
 	CoverageWindow Period      `json:"coverage_window"`
 	CoverageMethod string      `json:"coverage_method"`
 	ExpiryTracked  bool        `json:"expiry_tracked"`
@@ -68,6 +69,7 @@ func (r *Repository) stockReport(ctx context.Context, s scope, f SupplyFilter, n
 	start, end := coverageWindow(now)
 	out := StockReport{
 		StockDate:      now,
+		DateBasis:      stockDateBasis,
 		CoverageWindow: Period{From: start.Format(time.DateOnly), To: end.AddDate(0, 0, -1).Format(time.DateOnly)},
 		ExpiryTracked:  true,
 		CoverageMethod: "Usable stock divided by average monthly outward issues (warehouse dispatches to districts, district deliveries to hotspots) over the coverage window. Issue-based coverage; it does not measure consumption.",

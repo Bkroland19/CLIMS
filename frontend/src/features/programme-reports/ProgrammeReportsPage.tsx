@@ -25,6 +25,7 @@ import { OverviewView } from '@/features/analytics/views/OverviewView';
 import { StockView } from '@/features/analytics/views/StockView';
 import { SupplyView } from '@/features/analytics/views/SupplyView';
 import { useCan } from '@/features/auth/queries';
+import { MohWatchList } from '@/features/moh/MohWatchList';
 import { useCurrentWarehouse } from '@/features/warehouse/orderQueries';
 import { StoreSwitch } from '@/features/warehouse/StoreSwitch';
 
@@ -149,8 +150,9 @@ const EXPORT_PARAMS: Partial<Record<View, readonly ApiParam[]>> = {
 /** A PDF prints this many table rows at most; the CSV and Excel files hold them all. */
 const PDF_ROWS = 300;
 
+/** MOH's Analytics is its home page; the other workspaces keep it beside their dashboard. */
 export function reportPath(workspace: ReportsWorkspace) {
-  return `/${workspace}/programme-reports`;
+  return workspace === 'moh' ? '/moh' : `/${workspace}/programme-reports`;
 }
 
 export default function ProgrammeReportsPage({ workspace }: { workspace: ReportsWorkspace }) {
@@ -230,7 +232,12 @@ function ReportView({ view, workspace, filters, storeId }: ReportViewProps) {
   let visuals: ReactNode;
   switch (view) {
     case 'overview':
-      visuals = <OverviewView filters={filters} workspace={workspace} storeId={storeId} />;
+      visuals = (
+        <>
+          {workspace === 'moh' ? <MohWatchList filters={filters} /> : null}
+          <OverviewView filters={filters} workspace={workspace} storeId={storeId} />
+        </>
+      );
       break;
     case 'notifications':
       visuals = <NotificationsView filters={filters} workspace={workspace} />;

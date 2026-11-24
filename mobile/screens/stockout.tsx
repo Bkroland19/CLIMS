@@ -30,6 +30,7 @@ import {
 } from "@/lib/orders";
 import { useMe } from "@/lib/session";
 import { useStore } from "@/lib/store";
+import { newEntryId } from "@/lib/syncLog";
 import type { Hotspot } from "@/lib/types";
 import { matches } from "./common";
 
@@ -50,7 +51,7 @@ export function StockoutForm({
 }) {
   const nav = useNav();
   const me = useMe();
-  const { s, send, queue, offline } = useStore();
+  const { s, send, queue, track, offline } = useStore();
 
   // Hotspots: the API's active list, a page at a time, falling back to what the phone already has.
   const cached = s.hotspots.filter((h) => h.source === "api" && h.status === "Active");
@@ -162,14 +163,20 @@ export function StockoutForm({
       return;
     }
     setBusy(true);
+    const entry = newEntryId();
     try {
-      const { report, repeated } = await reportStockout(request);
+      const { report, repeated } = await track(
+        entry,
+        "stockout",
+        (id) => reportStockout(request, id),
+        (r) => r.report.id,
+      );
       const byRole = fixed ? "Hotspot manager" : "VHT";
       send("stockout", { order: toLocalOrder(report, me.name, byRole) }, label);
       setDone(repeated ? "repeated" : "sent");
     } catch (e) {
       if (isNetworkError(e)) {
-        queue("stockout", { request, ...names }, label);
+        queue("stockout", { request, ...names }, label, entry);
         setDone("queued");
       } else {
         setRefused(stockoutErrorMessage(e));

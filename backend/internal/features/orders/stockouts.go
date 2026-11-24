@@ -86,7 +86,17 @@ type StockoutReport struct {
 	RejectedBy      *string         `json:"rejected_by"`
 	RejectionReason *string         `json:"rejection_reason"`
 	CreatedAt       time.Time       `json:"created_at"`
+	// DistrictID is the hotspot's district.
+	DistrictID *string `json:"district_id"`
+	// Pieces delivered against the notification and acknowledged by the hotspot's manager, per type.
+	DeliveredMalePieces   int64 `json:"delivered_male_pieces"`
+	DeliveredFemalePieces int64 `json:"delivered_female_pieces"`
+	ReceivedMalePieces    int64 `json:"received_male_pieces"`
+	ReceivedFemalePieces  int64 `json:"received_female_pieces"`
 }
+
+// StockoutStatuses are the statuses a notification can have, from NotificationStatus.
+var StockoutStatuses = []string{"awaiting_supply", "awaiting_acknowledgement", "partly_received", "fulfilled", "rejected"}
 
 // StockoutHotSpot is what a DCFP needs to know about the hotspot to follow up the report.
 type StockoutHotSpot struct {
@@ -125,7 +135,8 @@ const reportColumns = `r.id, r.hot_spot_id, coalesce(h.name, 'a hotspot'), h.vil
 	cp.phone_number, r.selection, r.condom_id, ` + productLabel + `, r.district_store_id, r.reported_by_id,
 	coalesce(nullif(btrim(concat_ws(' ', u.firstname, u.lastname)), ''), u.username, 'someone'),
 	r.comment, r.repeat_count, r.last_reported_at, ` + NotificationStatus + `, r.fulfilled_at, r.rejected_at,
-	coalesce(nullif(btrim(concat_ws(' ', rj.firstname, rj.lastname)), ''), rj.username), r.rejection_reason, r.created_at`
+	coalesce(nullif(btrim(concat_ws(' ', rj.firstname, rj.lastname)), ''), rj.username), r.rejection_reason, r.created_at,
+	h.district_id, f.delivered_male, f.delivered_female, f.received_male, f.received_female`
 
 const reportTables = ` FROM stockout_reports r
 	JOIN hot_spots h ON h.id = r.hot_spot_id
@@ -155,7 +166,8 @@ func scanReport(row pgx.Row) (StockoutReport, error) {
 	err := row.Scan(&s.ID, &s.HotSpotID, &s.HotSpot.Name, &s.HotSpot.Village, &s.HotSpot.Subcounty,
 		&s.HotSpot.District, &s.HotSpot.ContactName, &s.HotSpot.ContactPhone, &s.Selection, &s.CondomID, &s.Product,
 		&s.DistrictStoreID, &s.ReportedByID, &s.ReportedBy, &s.Comment, &s.RepeatCount, &s.LastReportedAt,
-		&s.Status, &s.FulfilledAt, &s.RejectedAt, &s.RejectedBy, &s.RejectionReason, &s.CreatedAt)
+		&s.Status, &s.FulfilledAt, &s.RejectedAt, &s.RejectedBy, &s.RejectionReason, &s.CreatedAt,
+		&s.DistrictID, &s.DeliveredMalePieces, &s.DeliveredFemalePieces, &s.ReceivedMalePieces, &s.ReceivedFemalePieces)
 	if s.Product == "" {
 		s.Product = selectionLabel(s.Selection)
 	}
@@ -310,11 +322,26 @@ func stockoutData(s StockoutReport) map[string]any {
 
 // listStockouts returns the reports the user can see, newest first: their district store's, their
 // hotspot's, or the ones they sent. orders:all_stores sees every report.
-func (r *Repository) listStockouts(ctx context.Context, access scope, hotSpotID *string, limit, offset int32) ([]StockoutReport, error) {
+// StockoutFilter narrows the list within what the user can already see; empty fields match everything.
+type StockoutFilter struct {
+	HotSpotID  *string
+	DistrictID *string // the hotspot's district
+	Statuses   []string
+	// Search matches the hotspot's name, village, subcounty or district, ignoring case.
+	Search string
+}
+
+func (r *Repository) listStockouts(ctx context.Context, access scope, f StockoutFilter, limit, offset int32) ([]StockoutReport, error) {
+	if f.Statuses == nil {
+		f.Statuses = []string{}
+	}
 	rows, err := r.db.Query(ctx, `SELECT `+reportColumns+reportTables+`
-		WHERE `+visibleReports+` AND ($5::uuid IS NULL OR r.hot_spot_id = $5)
-		ORDER BY r.created_at DESC, r.id DESC LIMIT $6 OFFSET $7`,
-		access.allStores, access.storeID, access.hotSpotID, access.userID, hotSpotID, limit, offset)
+		WHERE `+visibleReports+` AND ($5::uuid IS NULL OR r.hot_spot_id = $5) AND ($6::uuid IS NULL OR h.district_id = $6)
+			AND (cardinality($7::text[]) = 0 OR `+NotificationStatus+` = ANY($7))
+			AND ($10 = '' OR h.name ILIKE $10 OR h.village ILIKE $10 OR sc.name ILIKE $10 OR d.name ILIKE $10)
+		ORDER BY r.created_at DESC, r.id DESC LIMIT $8 OFFSET $9`,
+		access.allStores, access.storeID, access.hotSpotID, access.userID, f.HotSpotID, f.DistrictID, f.Statuses, limit, offset,
+		containsPattern(f.Search))
 	if err != nil {
 		return nil, err
 	}
