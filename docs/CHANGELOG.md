@@ -24,6 +24,10 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   permission (it held only `catalogue:manage`, so MOH accounts could open almost nothing), and NMS and
   JMS `reports:read`. The web app opens every workspace read-only for MOH, whose Orders tabs now show
   every district's real hotspot requests and district orders.
+- **Geography with counts.** `GET /api/v1/locations/geography` returns every region, district and
+  subcounty with the stores and hotspots in each, and the hotspots no district or subcounty holds,
+  for holders of `hotspots:all_districts`;
+  see [locations](modules/locations.md#geography).
 - **Order lists filter on the server.** `GET /api/v1/orders/stockouts` takes `district_id` and
   `status`, and each report carries its district and the pieces delivered and acknowledged per type.
   `GET /api/v1/orders` takes `type=warehouse_request`, `district_id`, `warehouse_store_id` and

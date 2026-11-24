@@ -2302,6 +2302,36 @@
         ]
       }
     },
+    "/api/v1/locations/geography": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "getGeography",
+        "summary": "Regions, districts and subcounties with their stores and hotspots",
+        "description": "Requires hotspots:all_districts: the counts cover every district, including inactive and rejected hotspots. Every region with its districts and their subcounties, ordered by name, with the stores and hotspots (all and active) in each. A district also counts its hotspots with no subcounty, and counts.hotspots_without_district those no district holds. The places carry DHIS2 UIDs; migration 16 loaded them from the legacy organisation units and CLIMS does not sync them.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeographyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["hotspots:all_districts"]
+      }
+    },
     "/api/v1/hotspots": {
       "get": {
         "tags": ["Hotspots"],
@@ -12633,6 +12663,154 @@
             "items": {
               "$ref": "#/components/schemas/HotspotStatusRecord"
             }
+          }
+        }
+      },
+      "GeographySubcounty": {
+        "type": "object",
+        "required": ["id", "name", "hotspot_count", "active_hotspot_count"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hotspot_count": {
+            "type": "integer",
+            "description": "Every hotspot recorded in the place."
+          },
+          "active_hotspot_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "GeographyDistrict": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "store_count",
+          "hotspot_count",
+          "active_hotspot_count",
+          "hotspots_without_subcounty",
+          "subcounties"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "store_count": {
+            "type": "integer"
+          },
+          "hotspot_count": {
+            "type": "integer",
+            "description": "Every hotspot recorded in the place."
+          },
+          "active_hotspot_count": {
+            "type": "integer"
+          },
+          "hotspots_without_subcounty": {
+            "type": "integer",
+            "description": "Hotspots in the district with no subcounty, mostly converted legacy records."
+          },
+          "subcounties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeographySubcounty"
+            }
+          }
+        }
+      },
+      "GeographyRegion": {
+        "type": "object",
+        "required": ["id", "name", "districts"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeographyDistrict"
+            }
+          }
+        }
+      },
+      "Geography": {
+        "type": "object",
+        "required": ["source", "counts", "regions"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Where the places come from. There is no DHIS2 sync: they change only through migrations."
+          },
+          "counts": {
+            "type": "object",
+            "required": [
+              "regions",
+              "districts",
+              "subcounties",
+              "stores",
+              "hotspot_count",
+              "active_hotspot_count",
+              "hotspots_without_district"
+            ],
+            "properties": {
+              "regions": {
+                "type": "integer"
+              },
+              "districts": {
+                "type": "integer"
+              },
+              "subcounties": {
+                "type": "integer"
+              },
+              "stores": {
+                "type": "integer"
+              },
+              "hotspot_count": {
+                "type": "integer",
+                "description": "Every hotspot recorded in the place."
+              },
+              "active_hotspot_count": {
+                "type": "integer"
+              },
+              "hotspots_without_district": {
+                "type": "integer",
+                "description": "Hotspots with no district, which no district counts."
+              }
+            }
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeographyRegion"
+            }
+          }
+        }
+      },
+      "GeographyResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Geography"
           }
         }
       }

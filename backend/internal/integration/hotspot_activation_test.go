@@ -310,4 +310,52 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	request("GET", "/locations/subcounties", nil, vht, 400)
 	request("GET", "/locations/districts?region_id=nope", nil, vht, 400)
 	request("GET", "/locations/regions", nil, dcfp, 200) // Any signed-in user can read locations.
+
+	// The geography tree counts the stores and hotspots in each place, and says where it comes from.
+	// The counts are national, so a VHT or a district's DCFP may not read them.
+	request("GET", "/locations/geography", nil, vht, 403)
+	request("GET", "/locations/geography", nil, dcfp, 403)
+	geography := request("GET", "/locations/geography", nil, national, 200)["data"].(map[string]any)
+	counts := geography["counts"].(map[string]any)
+	var regions, districts, subcounties, hotspots, withoutDistrict, inDistrict, inSubcounty, withoutSubcounty float64
+	if err := pool.QueryRow(context.Background(), `SELECT (SELECT count(*) FROM regions), (SELECT count(*) FROM districts),
+		(SELECT count(*) FROM subcounties), (SELECT count(*) FROM hot_spots),
+		(SELECT count(*) FROM hot_spots WHERE district_id IS NULL),
+		(SELECT count(*) FROM hot_spots WHERE district_id = $1),
+		(SELECT count(*) FROM hot_spots WHERE subcounty_id = $2),
+		(SELECT count(*) FROM hot_spots WHERE district_id = $1 AND subcounty_id IS NULL)`, district, subcounty).
+		Scan(&regions, &districts, &subcounties, &hotspots, &withoutDistrict, &inDistrict, &inSubcounty, &withoutSubcounty); err != nil {
+		t.Fatal(err)
+	}
+	if counts["regions"] != regions || counts["districts"] != districts || counts["subcounties"] != subcounties ||
+		counts["hotspot_count"] != hotspots || counts["hotspots_without_district"] != withoutDistrict ||
+		!strings.Contains(geography["source"].(string), "does not sync") {
+		t.Fatalf("geography counts: %v", counts)
+	}
+	var placed map[string]any
+	seenDistricts := 0.0
+	for _, r := range geography["regions"].([]any) {
+		for _, d := range r.(map[string]any)["districts"].([]any) {
+			seenDistricts++
+			if d := d.(map[string]any); d["id"] == district {
+				placed = d
+				if r.(map[string]any)["id"] != region {
+					t.Fatalf("district %s listed under the wrong region", district)
+				}
+			}
+		}
+	}
+	if seenDistricts != districts || placed == nil || placed["hotspot_count"] != inDistrict ||
+		placed["hotspots_without_subcounty"] != withoutSubcounty {
+		t.Fatalf("district in the tree: %v (%v of %v districts)", placed, seenDistricts, districts)
+	}
+	var sub map[string]any
+	for _, s := range placed["subcounties"].([]any) {
+		if s.(map[string]any)["id"] == subcounty {
+			sub = s.(map[string]any)
+		}
+	}
+	if sub == nil || sub["hotspot_count"] != inSubcounty {
+		t.Fatalf("subcounty in the tree: %v, want %v hotspots", sub, inSubcounty)
+	}
 }
