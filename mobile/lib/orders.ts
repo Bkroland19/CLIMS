@@ -30,11 +30,7 @@ export interface StockoutRequest {
 
 /** Where a notification is in its fulfilment. A rejected one is closed without stock. */
 export type StockoutStatus =
-  | "awaiting_supply"
-  | "awaiting_acknowledgement"
-  | "partly_received"
-  | "fulfilled"
-  | "rejected";
+  "awaiting_supply" | "awaiting_acknowledgement" | "partly_received" | "fulfilled" | "rejected";
 
 /** `StockoutReport`, the fields the app reads. */
 export interface StockoutReport {
