@@ -13,6 +13,7 @@ The backend is a single Go service with feature packages under `backend/internal
 | [locations](locations.md)         | Region, district and subcounty lookups shared by every feature                    | PostgreSQL geography tables                                        |
 | [notifications](notifications.md) | Shared notification service and every user's inbox                                | PostgreSQL; users, roles, permissions and stores                   |
 | [audit](audit.md)                 | The append-only audit log: recording entries and searching them                   | PostgreSQL; RBAC permission gate and request context               |
+| [synclog](sync-log.md)            | What field phones report about sending their saved actions                        | PostgreSQL; users and the RBAC permission gate                     |
 | [inventory](inventory.md)         | Stock balances, movement ledger, hotspot supply and national stock reports        | PostgreSQL; orders tables and the RBAC permission gate             |
 | [reports](reports.md)             | Programme reports calculated from source records, scoped by role and area         | PostgreSQL; orders notification facts and the RBAC permission gate |
 | [catalogue](catalogue.md)         | Condom products, brands and units of measure; retiring records in use             | PostgreSQL; RBAC permission gate                                   |

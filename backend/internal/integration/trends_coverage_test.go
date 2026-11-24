@@ -98,7 +98,7 @@ func assertReportAccess(t *testing.T, pool *pgxpool.Pool) {
 	}
 	moh := strings.Join(grants("moh"), ",")
 	want := "audit:read,hotspots:all_districts,hotspots:read,hotspots:read_district,inventory:read,orders:all_stores," +
-		"orders:read,reports:read,roles:read,users:read"
+		"orders:read,reports:read,roles:read,sync_logs:read,users:read" // migration 41 adds sync_logs:read
 	if moh != want {
 		t.Errorf("moh has %s, want %s", moh, want)
 	}

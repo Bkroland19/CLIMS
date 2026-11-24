@@ -37,6 +37,18 @@ import {
   toInboxEvent,
 } from "./notifications";
 import { createSeed, DEFAULT_PERSONAS, HM_HOTSPOT } from "./seed";
+import {
+  begin,
+  device,
+  LOCAL_ONLY,
+  markUploaded,
+  newEntryId,
+  recordAttempt,
+  savedOnPhone,
+  type SyncEntry,
+  toUpload,
+  uploadSyncLog,
+} from "./syncLog";
 import { useMe } from "./session";
 import type {
   ActionType,
@@ -84,8 +96,22 @@ interface StoreCtx {
    * page loads, so lists show its current status. An order the phone does not hold is left out.
    */
   updateApiOrder: (order: DomainState["orders"][number]) => void;
-  /** Save an action to the outbox even when online, e.g. after a request failed on the network. */
-  queue: (type: ActionType, payload: any, label: string) => void;
+  /**
+   * Save an action to the outbox even when online, e.g. after a request failed on the network.
+   * Pass the `entryId` that `track` used, so the failed try and the later send share one entry.
+   */
+  queue: (type: ActionType, payload: any, label: string, entryId?: string) => void;
+  /**
+   * Make one API submission on behalf of a sync log entry and record how it went. `call` gets the
+   * entry ID to tag the request with; `recordId` names the record the API created or changed.
+   * The call's error is rethrown, so the screen still explains a refusal.
+   */
+  track: <T>(
+    entryId: string,
+    type: ActionType,
+    call: (entryId: string) => Promise<T>,
+    recordId: (result: T) => string | undefined,
+  ) => Promise<T>;
   /** Mark every notification read: local ones up to now, and the API's on the server. */
   markRead: (role: AppRole) => void;
   /** Mark one API notification read, e.g. when it is opened. */
@@ -381,6 +407,49 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(key, JSON.stringify(s)).catch(() => {});
   }, [s, key, ready]);
 
+  // The sync log (lib/syncLog.ts) is stored apart from the domain state, so resetting sample data
+  // leaves it alone. Sample sign-ins send nothing to the API and keep no log.
+  const keepLog = !me.demo;
+  const logKey = `clims.synclog.v1.${me.id}`;
+  const [log, setLog] = useState<SyncEntry[]>([]);
+  const [logReady, setLogReady] = useState(false);
+  const logRef = useRef(log);
+  const changeLog = useCallback(
+    (change: (log: SyncEntry[]) => SyncEntry[]) => {
+      if (!keepLog) return;
+      logRef.current = change(logRef.current);
+      setLog(logRef.current);
+    },
+    [keepLog],
+  );
+
+  useEffect(() => {
+    let live = true;
+    setLogReady(false);
+    logRef.current = [];
+    setLog([]);
+    if (!keepLog) return;
+    AsyncStorage.getItem(logKey)
+      .then((raw) => {
+        if (!live || !raw) return;
+        // Changes made while the saved log was loading are kept on top of it.
+        const saved: SyncEntry[] = JSON.parse(raw);
+        const fresh = logRef.current.filter((e) => !saved.some((x) => x.id === e.id));
+        logRef.current = [...saved, ...fresh];
+        setLog(logRef.current);
+      })
+      .catch(() => {})
+      .finally(() => live && setLogReady(true));
+    return () => {
+      live = false;
+    };
+  }, [logKey, keepLog]);
+
+  useEffect(() => {
+    if (!logReady) return;
+    AsyncStorage.setItem(logKey, JSON.stringify(log)).catch(() => {});
+  }, [log, logKey, logReady]);
+
   const flushing = useRef(false);
 
   /**
@@ -398,14 +467,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...st,
           outbox: st.outbox.filter((x) => x.id !== it.id),
         });
+        const logId = it.logId ?? it.id;
+        changeLog((l) => begin(l, logId, it.type, it.at));
+        // Records one try at sending this item; a network failure leaves it waiting to retry.
+        const tried = (err?: unknown, serverRecordId?: string) =>
+          changeLog((l) =>
+            recordAttempt(
+              l,
+              logId,
+              err === undefined
+                ? { status: "sent", serverRecordId }
+                : // Whatever the outbox will try again is retrying, not refused.
+                  { status: retryLater(err) ? "retrying" : "refused", err },
+              Date.now(),
+            ),
+          );
         if (it.type === "mapHotspot" && it.payload?.request) {
           try {
-            const res = await submitHotspot(it.payload.request);
+            const res = await submitHotspot(it.payload.request, logId);
+            tried(undefined, res.id);
             const hotspot = toLocalHotspot(res, me.name, it.payload.request.comment);
             commit(
               apply(drop(ref.current), it.type, { hotspot }, it.role, me.name, Date.now()).next,
             );
           } catch (err) {
+            tried(err);
             if (retryLater(err)) break;
             // Refused (duplicate name, mismatched place…): tell the VHT so they can map it again.
             const cur = drop(ref.current);
@@ -431,7 +517,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (it.type === "stockout" && it.payload?.request) {
           const { request, hotspot, product } = it.payload;
           try {
-            const { report } = await reportStockout(currentStockoutRequest(request, product));
+            const { report } = await reportStockout(
+              currentStockoutRequest(request, product),
+              logId,
+            );
+            tried(undefined, report.id);
             const order = toLocalOrder(
               report,
               me.name,
@@ -439,6 +529,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             );
             commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
           } catch (err) {
+            tried(err);
             if (retryLater(err)) break;
             const cur = drop(ref.current);
             const now = Date.now();
@@ -463,10 +554,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (it.type === "acknowledge" && it.payload?.request) {
           const { id, request, hotspot } = it.payload;
           try {
-            const d = await acknowledgeStockout(id, request);
+            const d = await acknowledgeStockout(id, request, logId);
+            tried(undefined, id);
             const order = toLocalOrder(d, me.name, "Hotspot manager");
             commit(apply(drop(ref.current), it.type, { order }, it.role, me.name, Date.now()).next);
           } catch (err) {
+            tried(err);
             if (retryLater(err)) break;
             const cur = drop(ref.current);
             const now = Date.now();
@@ -488,12 +581,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           }
           continue;
         }
+        // No endpoint for this action yet: it changes only the phone's copy.
+        changeLog((l) => savedOnPhone(l, logId, Date.now()));
         commit(apply(drop(ref.current), it.type, it.payload, it.role, me.name, Date.now()).next);
       }
     } finally {
       flushing.current = false;
     }
-  }, [commit, me.name]);
+  }, [commit, changeLog, me.name]);
 
   // Anything queued in an earlier session goes out as soon as this one has loaded.
   useEffect(() => {
@@ -527,19 +622,51 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [ready, offline, waiting, flush]);
 
   const queue = useCallback(
-    (type: ActionType, payload: any, label: string) => {
+    (type: ActionType, payload: any, label: string, entryId?: string) => {
       const cur = ref.current;
+      const now = Date.now();
+      const logId = entryId ?? newEntryId(now);
+      changeLog((l) => begin(l, logId, type, now));
       const item: OutboxItem = {
-        id: `OB-${Date.now()}`,
+        id: `OB-${now}`,
         type,
         payload,
         label,
         role: me.role,
-        at: Date.now(),
+        at: now,
+        logId,
       };
       commit({ ...cur, outbox: [...cur.outbox, item] });
     },
-    [commit, me.role],
+    [commit, changeLog, me.role],
+  );
+
+  const track = useCallback(
+    async <T,>(
+      entryId: string,
+      type: ActionType,
+      call: (entryId: string) => Promise<T>,
+      recordId: (result: T) => string | undefined,
+    ): Promise<T> => {
+      changeLog((l) => begin(l, entryId, type, Date.now()));
+      try {
+        const result = await call(entryId);
+        changeLog((l) =>
+          recordAttempt(
+            l,
+            entryId,
+            { status: "sent", serverRecordId: recordId(result) },
+            Date.now(),
+          ),
+        );
+        return result;
+      } catch (err) {
+        const status = isNetworkError(err) ? "retrying" : "refused";
+        changeLog((l) => recordAttempt(l, entryId, { status, err }, Date.now()));
+        throw err;
+      }
+    },
+    [changeLog],
   );
 
   const send = useCallback(
@@ -549,12 +676,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         queue(type, payload, label);
         return { queued: true };
       }
-      const { next, id } = apply(cur, type, payload, me.role, me.name, Date.now());
+      const now = Date.now();
+      const { next, id } = apply(cur, type, payload, me.role, me.name, now);
+      if (LOCAL_ONLY.includes(type)) {
+        const logId = newEntryId(now);
+        changeLog((l) => savedOnPhone(begin(l, logId, type, now), logId, now));
+      }
       commit(next);
       return { queued: false, id };
     },
-    [offline, commit, queue, me.role, me.name],
+    [offline, commit, changeLog, queue, me.role, me.name],
   );
+
+  // Upload what the server does not have yet: shortly after the log changes, on reconnecting and
+  // when the app returns to the foreground. One upload runs at a time; a change made meanwhile is
+  // sent once it ends.
+  const uploading = useRef(false);
+  const uploadAgain = useRef(false);
+  const [uploadNudge, setUploadNudge] = useState(0);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") setUploadNudge((n) => n + 1);
+    });
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    const phone = device();
+    if (!keepLog || !logReady || offline || !phone || toUpload(log).length === 0) return;
+    const timer = setTimeout(async () => {
+      if (uploading.current) {
+        uploadAgain.current = true;
+        return;
+      }
+      uploading.current = true;
+      const batch = toUpload(logRef.current);
+      try {
+        if (batch.length) {
+          await uploadSyncLog(batch, phone);
+          changeLog((l) => markUploaded(l, batch));
+        }
+      } catch (err) {
+        // A refused upload would be refused again; let it go rather than retry forever. Network
+        // failures, server errors and expired sign-ins are retried on the next change or reconnect.
+        const status = isAxiosError(err) ? err.response?.status : undefined;
+        if (status && status >= 400 && status < 500 && status !== 401 && status !== 429) {
+          changeLog((l) => markUploaded(l, batch));
+        }
+      } finally {
+        uploading.current = false;
+        if (uploadAgain.current) {
+          uploadAgain.current = false;
+          setUploadNudge((n) => n + 1);
+        }
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [log, logReady, offline, keepLog, uploadNudge, changeLog]);
 
   /** API notifications are the signed-in user's own; sample sign-ins have none. */
   const liveNotices = !me.demo;
@@ -717,6 +894,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       offline,
       send,
       queue,
+      track,
       refreshHotspots,
       loadMoreHotspots,
       syncApiOrders,
@@ -733,6 +911,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       offline,
       send,
       queue,
+      track,
       refreshHotspots,
       loadMoreHotspots,
       syncApiOrders,

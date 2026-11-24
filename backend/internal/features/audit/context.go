@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"log/slog"
+	"regexp"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
@@ -12,11 +13,21 @@ import (
 // permission it refused, so Middleware can record the denial.
 const DeniedPermissionKey = "audit.denied_permission"
 
+// ClientEntryHeader names the field app's sync log entry behind a request. Entries
+// the request writes keep it as details.client_entry_id, so the phone's report in
+// mobile_sync_log can be matched to what the server recorded.
+const ClientEntryHeader = "X-Client-Entry-Id"
+
+// clientEntryPattern matches mobile_sync_log.client_entry_id; anything else is ignored.
+var clientEntryPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
+
 type contextKey struct{}
 
 // requestInfo is what an entry needs to know about the request that caused it.
 type requestInfo struct {
 	ip, userAgent, requestID string
+	// clientEntryID is the field app's sync log entry, from ClientEntryHeader.
+	clientEntryID string
 	// system names an automated job acting without a person.
 	system string
 	// The signed-in user and session are read when an entry is written: the
@@ -46,10 +57,15 @@ func Middleware(auditor Auditor) fiber.Handler {
 				return value
 			}
 		}
+		clientEntry := c.Get(ClientEntryHeader)
+		if !clientEntryPattern.MatchString(clientEntry) {
+			clientEntry = ""
+		}
 		c.SetContext(context.WithValue(c.Context(), contextKey{}, &requestInfo{
-			ip:        c.IP(),
-			userAgent: c.Get(fiber.HeaderUserAgent),
-			requestID: requestid.FromContext(c),
+			ip:            c.IP(),
+			userAgent:     c.Get(fiber.HeaderUserAgent),
+			requestID:     requestid.FromContext(c),
+			clientEntryID: clientEntry,
 			// Set by the JWT middleware for authenticated requests.
 			actorID:   local("user_id"),
 			sessionID: local("session_id"),

@@ -18,7 +18,7 @@ import { ApiError, parseBody, parseList, readAllPages, type HttpClient } from '@
 
 const text = z.string().nullable();
 
-const stockoutReportSchema = z.object({
+export const stockoutReportSchema = z.object({
   id: z.string(),
   hot_spot_id: z.string(),
   hot_spot: z.object({
@@ -57,6 +57,8 @@ const stockoutReportSchema = z.object({
   rejected_by: z.string().nullish(),
   /** Why the district rejected it; the hotspot reads this. */
   rejection_reason: z.string().nullish(),
+  /** The hotspot's district, on lists. */
+  district_id: z.string().nullish(),
 });
 
 export type StockoutReport = z.infer<typeof stockoutReportSchema>;

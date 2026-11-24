@@ -8,7 +8,7 @@ import { sessionEnded } from '@/features/auth/authSlice';
 import { AppUnderTest, routedPaths } from '@/test/AppUnderTest';
 import type { RecordedRequest } from '@/test/fakeAdapter';
 import { testRouter } from '@/test/navigation';
-import { renderApp, sessionWith } from '@/test/renderApp';
+import { ADMIN_PERMISSIONS, renderApp, sessionWith } from '@/test/renderApp';
 
 import { signInHref } from './guards';
 import { allPaths } from './navigation';
@@ -55,7 +55,9 @@ describe('route guard', () => {
 
   it('does not follow a return address that leaves the app', async () => {
     renderApp(routes, { route: '/sign-in?from=%2F%2Fevil.example', signedIn: true });
-    expect(await screen.findByRole('heading', { name: 'MOH dashboard' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Reports and analytics' }),
+    ).toBeInTheDocument();
     expect(testRouter.location).toBe('/moh');
   });
 
@@ -66,7 +68,9 @@ describe('route guard', () => {
 
   it('sends a signed-in user away from the sign-in page', async () => {
     renderApp(routes, { route: '/sign-in', signedIn: true });
-    expect(await screen.findByRole('heading', { name: 'MOH dashboard' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Reports and analytics' }),
+    ).toBeInTheDocument();
   });
 
   it('returns to sign-in the moment the session ends', async () => {
@@ -297,10 +301,21 @@ describe('app shell', () => {
     );
   });
 
-  it('shows no tabs for a section with one page', async () => {
-    renderApp(routes, { route: '/moh/audit', signedIn: true });
+  it('shows no tabs when the user may open only one page of a section', async () => {
+    const session = sessionWith(ADMIN_PERMISSIONS.filter((code) => code !== 'sync_logs:read'));
+    renderApp(routes, { route: '/moh/audit', session });
     await screen.findByRole('heading', { level: 1, name: 'Audit log' });
     expect(screen.queryByRole('navigation', { name: /pages$/ })).not.toBeInTheDocument();
+  });
+
+  it('puts the sync log beside the audit log under Audit', async () => {
+    renderApp(routes, { route: '/moh/audit', signedIn: true });
+    await screen.findByRole('heading', { level: 1, name: 'Audit log' });
+    const tabs = screen.getByRole('navigation', { name: 'Audit pages' });
+    expect(within(tabs).getByRole('link', { name: 'Sync log' })).toHaveAttribute(
+      'href',
+      '/moh/audit/sync-log',
+    );
   });
 
   it("moves between a section's pages with its tabs, each at its own address", async () => {

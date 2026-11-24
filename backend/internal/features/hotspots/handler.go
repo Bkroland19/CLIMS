@@ -45,7 +45,11 @@ func (h *Handler) list(c fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, 400, "limit must be between 1 and 100 and offset must be nonnegative", nil)
 	}
-	filter := Filter{Status: c.Query("status"), ReviewStatus: c.Query("review_status")}
+	filter := Filter{Status: c.Query("status"), ReviewStatus: c.Query("review_status"),
+		NotificationStatus: c.Query("notification_status")}
+	if filter.NotificationStatus != "" && !slices.Contains(NotificationStatuses, filter.NotificationStatus) {
+		return response.Error(c, 400, "notification_status must be none, awaiting_supply, awaiting_acknowledgement or partly_received", nil)
+	}
 	if !slices.Contains([]string{"", StatusActive, StatusInactive}, filter.Status) {
 		return response.Error(c, 400, "status must be active or inactive", nil)
 	}

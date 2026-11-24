@@ -23,6 +23,8 @@ export const AUDIT_PATH = '/moh/audit';
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SUBJECT = /^([a-z][a-z0-9_]*):(.+)$/;
+/** A field phone's sync log entry ID, as the API accepts it. */
+export const CLIENT_ENTRY = /^[A-Za-z0-9_-]{8,64}$/;
 
 function isArea(value: string | null): value is AuditArea {
   return AUDIT_AREAS.some((area) => area === value);
@@ -41,13 +43,14 @@ const day = (value: string | null): string | null => (value && DAY.test(value) ?
 
 /**
  * Reads the filters from the address:
- * `?area=&outcome=&from=YYYY-MM-DD&to=YYYY-MM-DD&actor=<user id>&subject=<type>:<id>`.
+ * `?area=&outcome=&from=YYYY-MM-DD&to=YYYY-MM-DD&actor=<user id>&subject=<type>:<id>&entry=<phone entry>`.
  * Anything malformed is left out.
  */
 export function auditFiltersFrom(params: URLSearchParams): AuditFilters {
   const area = params.get('area');
   const outcome = params.get('outcome');
   const actor = params.get('actor');
+  const entry = params.get('entry');
   return {
     area: isArea(area) ? area : null,
     outcome: isOutcome(outcome) ? outcome : null,
@@ -55,12 +58,13 @@ export function auditFiltersFrom(params: URLSearchParams): AuditFilters {
     to: day(params.get('to')),
     actor: actor && UUID.test(actor) ? actor : null,
     subject: parseSubject(params.get('subject')),
+    clientEntry: entry && CLIENT_ENTRY.test(entry) ? entry : null,
   };
 }
 
 /** The audit log address for a set of filters, leaving out the defaults. */
 export function auditHref(filters: Partial<AuditFilters> = {}): string {
-  const { area, outcome, from, to, actor, subject } = { ...NO_FILTERS, ...filters };
+  const { area, outcome, from, to, actor, subject, clientEntry } = { ...NO_FILTERS, ...filters };
   const params = new URLSearchParams();
   if (area) params.set('area', area);
   if (outcome) params.set('outcome', outcome);
@@ -68,6 +72,7 @@ export function auditHref(filters: Partial<AuditFilters> = {}): string {
   if (to) params.set('to', to);
   if (actor) params.set('actor', actor);
   if (subject) params.set('subject', `${subject.type}:${subject.id}`);
+  if (clientEntry) params.set('entry', clientEntry);
   const query = params.toString();
   return query ? `${AUDIT_PATH}?${query}` : AUDIT_PATH;
 }

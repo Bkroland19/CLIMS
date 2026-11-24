@@ -21,6 +21,7 @@ import { useMe } from "@/lib/session";
 import { ago, chip, num, toInt } from "@/lib/format";
 import { TAB_LABEL, useNav } from "@/lib/nav";
 import { usePending, useStore } from "@/lib/store";
+import { newEntryId } from "@/lib/syncLog";
 import { call } from "./common";
 
 type Load = "loading" | "ok" | "offline" | "forbidden" | "error";
@@ -171,7 +172,7 @@ function AgentAcknowledgeForm({
   onDone: (queued: boolean) => void;
 }) {
   const me = useMe();
-  const { send, queue, offline, refreshDeliveries } = useStore();
+  const { send, queue, track, offline, refreshDeliveries } = useStore();
   const [vals, setVals] = useState<Record<string, string>>({});
   const [counted, setCounted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -183,14 +184,25 @@ function AgentAcknowledgeForm({
 
   const submit = async () => {
     setErr("");
+    const entry = newEntryId();
     const saveForLater = () => {
-      queue("acknowledge", { id: d.stockout_report_id, request, hotspot: d.hot_spot.name }, label);
+      queue(
+        "acknowledge",
+        { id: d.stockout_report_id, request, hotspot: d.hot_spot.name },
+        label,
+        entry,
+      );
       onDone(true);
     };
     if (offline) return saveForLater();
     setBusy(true);
     try {
-      const next = await acknowledgeStockout(d.stockout_report_id, request);
+      const next = await track(
+        entry,
+        "acknowledge",
+        (id) => acknowledgeStockout(d.stockout_report_id, request, id),
+        () => d.stockout_report_id,
+      );
       send("acknowledge", { order: toLocalOrder(next, me.name, "Delivery agent") }, label);
       await refreshDeliveries();
       onDone(false);

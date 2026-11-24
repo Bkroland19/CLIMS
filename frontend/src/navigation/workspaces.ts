@@ -129,11 +129,12 @@ export const workspaces: readonly Workspace[] = [
     sections: [
       {
         label: 'Overview',
+        // MOH's home is Analytics: what needs watching and the national overview, then every
+        // report as a tab. It replaced a separate dashboard that showed the same overview.
         items: [
-          dashboard(
+          programmeReports(
             HOME_PATH,
-            'MOH dashboard',
-            'National view of condom stock, hotspot orders and deliveries.',
+            'National analytics: stockout requests, warehouse orders, stock, expiry, hotspot coverage and HMIS 105, with filters, PDF, CSV and Excel downloads and approved versions.',
           ),
         ],
       },
@@ -185,10 +186,6 @@ export const workspaces: readonly Workspace[] = [
             ],
             details: [{ path: '/moh/reports/[id]', label: 'Report', layout: 'detail' }],
           },
-          programmeReports(
-            '/moh/programme-reports',
-            'National analytics: stockout requests, warehouse orders, stock, expiry, hotspot coverage and HMIS 105, with filters, PDF, CSV and Excel downloads and approved versions.',
-          ),
           // Distribution, procurement and the hotspot map predate the prototype, which has no
           // equivalent for them. They stay until it is decided whether MOH still needs them.
           {
@@ -285,7 +282,7 @@ export const workspaces: readonly Workspace[] = [
           },
           {
             id: 'audit',
-            label: 'Audit log',
+            label: 'Audit',
             icon: ShieldCheck,
             pages: [
               {
@@ -296,6 +293,15 @@ export const workspaces: readonly Workspace[] = [
                   'Sign-ins, account changes and every change to records: who, what, when and from where.',
                 layout: 'table',
                 permission: 'audit:read',
+              },
+              {
+                path: '/moh/audit/sync-log',
+                tab: 'Sync log',
+                title: 'Sync log',
+                description:
+                  'What field phones report about sending the actions their users saved, online or offline.',
+                layout: 'table',
+                permission: 'sync_logs:read',
               },
             ],
           },

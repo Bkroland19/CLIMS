@@ -2,7 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable';
@@ -28,6 +28,7 @@ import {
   type OrderScope,
   type StockoutFilter,
 } from './orders';
+import { useNationalStockouts } from './national';
 import { useStockouts } from './queries';
 
 const EMPTY: Record<StockoutFilter, { title: string; description: string }> = {
@@ -70,27 +71,50 @@ const EMPTY: Record<StockoutFilter, { title: string; description: string }> = {
  */
 export default function StockoutsPage({ scope = 'district' }: { scope?: OrderScope }) {
   const links = stockoutLinks(scope);
-  const reports = useStockouts();
-  const district = useDistrictContext()?.district ?? null;
+  const national = links.national === true;
+  const router = useRouter();
   const params = useSearchParams();
+  const districtId = useDistrictContext()?.districtId ?? null;
+  const search = params.get('q') ?? '';
   const readOnly = useReadOnly();
   const can = useCan();
   const storeId = useCurrentUser()?.store_id;
   const filter: StockoutFilter =
     STOCKOUT_FILTERS.find((item) => item.value === params.get('status'))?.value ?? 'open';
-  // MOH's national list follows the district menu above it.
-  const inDistrict =
-    links.national && district
-      ? reports.data?.filter((report) => report.hot_spot.district === district)
-      : reports.data;
-  const rows = inDistrict?.filter((report) => matchesStockoutFilter(report, filter));
+  // A district's own requests load at once and filter here; MOH's national list asks the server for
+  // one district (from the district menu), one tab and the search, a page at a time.
+  const local = useStockouts({ enabled: !national });
+  const remote = useNationalStockouts({ districtId, filter, search }, national);
+  const reports = national
+    ? {
+        data: remote.data?.pages.flat(),
+        isPending: remote.isPending,
+        error: remote.error,
+        refetch: remote.refetch,
+        isRefetching: remote.isRefetching,
+      }
+    : local;
+  const rows = national
+    ? reports.data
+    : reports.data?.filter((report) => matchesStockoutFilter(report, filter));
+  // Counts need every request loaded, which only the district list has.
   const tabs = STOCKOUT_FILTERS.map((tab) => ({
     ...tab,
-    count: inDistrict?.filter((report) => matchesStockoutFilter(report, tab.value)).length,
+    ...(national
+      ? {}
+      : {
+          count: reports.data?.filter((report) => matchesStockoutFilter(report, tab.value)).length,
+        }),
   }));
+  const listHref = (status: StockoutFilter, q: string) => {
+    const query = new URLSearchParams({ status });
+    if (q) query.set('q', q);
+    return `${links.list}?${query.toString()}`;
+  };
   const canSend = !readOnly && !links.national && can('orders:supply_hotspots');
   // With no reports at all, say so whatever the filter; otherwise say what the filter keeps.
-  const empty = reports.data?.length === 0 ? EMPTY.all : EMPTY[filter];
+  // A national list holds only what its filters asked for, so its emptiness says nothing about the rest.
+  const empty = !national && reports.data?.length === 0 ? EMPTY.all : EMPTY[filter];
 
   const columns = useMemo<DataTableColumn<StockoutReport>[]>(
     () => [
@@ -185,7 +209,7 @@ export default function StockoutsPage({ scope = 'district' }: { scope?: OrderSco
         label="Filter stockouts by status"
         tabs={tabs}
         value={filter}
-        hrefFor={(value) => `${links.list}?status=${value}`}
+        hrefFor={(value) => listHref(value, search)}
       />
       <DataTable
         label="Stockout notifications"
@@ -197,7 +221,25 @@ export default function StockoutsPage({ scope = 'district' }: { scope?: OrderSco
         error={reports.error}
         onRetry={() => void reports.refetch()}
         isRetrying={reports.isRefetching}
-        searchPlaceholder="Search hotspots, products, messages…"
+        searchPlaceholder={
+          national ? 'Search hotspots and places…' : 'Search hotspots, products, messages…'
+        }
+        {...(national
+          ? {
+              serverSearch: {
+                value: search,
+                onChange: (q: string) => {
+                  router.replace(listHref(filter, q), { scroll: false });
+                },
+              },
+              more: {
+                hasMore: remote.hasNextPage,
+                isLoading: remote.isFetchingNextPage,
+                onLoadMore: () => void remote.fetchNextPage(),
+                noun: 'requests',
+              },
+            }
+          : {})}
         emptyTitle={empty.title}
         emptyDescription={empty.description}
         rowActions={(report) => {

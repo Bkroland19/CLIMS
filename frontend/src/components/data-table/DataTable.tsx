@@ -144,8 +144,22 @@ interface DataTableProps<Row> {
   rowTone?: (row: Row) => DataTableRowTone;
   /** For a list the server pages: offers to load the next batch, and says the count is partial. */
   more?: DataTableMore;
+  /**
+   * For a list the server pages: the search box searches on the server instead of the loaded rows.
+   * `value` is the search the list was loaded with; `onChange` gets the box's text, trimmed, once
+   * typing pauses.
+   */
+  serverSearch?: DataTableServerSearch;
   className?: string;
 }
+
+export interface DataTableServerSearch {
+  value: string;
+  onChange: (query: string) => void;
+}
+
+/** How long typing pauses before a server search is sent. */
+const SERVER_SEARCH_DELAY_MS = 300;
 
 const isHideable = (column: {
   hideable?: boolean;
@@ -247,15 +261,31 @@ export function DataTable<Row>({
   expandLabel,
   rowTone,
   more,
+  serverSearch,
   className,
 }: DataTableProps<Row>) {
   const embedded = variant === 'embedded';
   const tableId = useId();
   const searchId = useId();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(serverSearch?.value ?? '');
   const [filters, setFilters] = useState<ColumnFilter[]>([]);
   // Typing stays responsive on a long list: the filter catches up a frame later.
   const searched = useDeferredValue(query);
+  // A server search sends the box's text once typing pauses; the server's rows are not searched again.
+  const searchesServer = serverSearch !== undefined;
+  const sendSearch = serverSearch?.onChange;
+  const sentSearch = serverSearch?.value;
+  useEffect(() => {
+    if (!sendSearch) return;
+    const next = query.trim();
+    if (next === sentSearch) return;
+    const timer = setTimeout(() => {
+      sendSearch(next);
+    }, SERVER_SEARCH_DELAY_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [query, sendSearch, sentSearch]);
   const [sort, setSort] = useState<SortState | null>(defaultSort ?? null);
   const [requestedPage, setRequestedPage] = useState(1);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -322,7 +352,7 @@ export function DataTable<Row>({
   const matching = useMemo(
     () =>
       sortRows(
-        index.search(searched).filter((row) =>
+        index.search(searchesServer ? '' : searched).filter((row) =>
           filters.every((filter) => {
             const column = columns.find(
               (item) => item.id === filter.columnId && item.filter !== false,
@@ -333,7 +363,7 @@ export function DataTable<Row>({
         sort,
         (row, columnId) => columns.find((column) => column.id === columnId)?.value?.(row),
       ),
-    [index, searched, sort, columns, filters],
+    [index, searched, searchesServer, sort, columns, filters],
   );
   const page = embedded
     ? paginate(matching, 1, Math.max(1, matching.length))

@@ -33,6 +33,7 @@ export const ADMIN_PERMISSIONS = [
   'roles:assign',
   'roles:manage',
   'roles:read',
+  'sync_logs:read',
   'users:create',
   'users:read',
   'users:update',

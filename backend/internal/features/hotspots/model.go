@@ -58,7 +58,22 @@ type HotSpot struct {
 	ContactPerson      *ContactPerson `json:"contact_person"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
+	// LocationPrecision is exact, or subcounty when the reader may not see the village, coordinates
+	// and contact, which are then null.
+	LocationPrecision string `json:"location_precision"`
+	// NotificationStatus is none, or the status of the open stockout notification: awaiting_supply,
+	// awaiting_acknowledgement or partly_received.
+	NotificationStatus string `json:"notification_status"`
 }
+
+// Location precisions.
+const (
+	PrecisionExact     = "exact"
+	PrecisionSubcounty = "subcounty"
+)
+
+// NotificationStatuses are the values of the notification_status filter.
+var NotificationStatuses = []string{"none", "awaiting_supply", "awaiting_acknowledgement", "partly_received"}
 
 // Comment actions: a plain comment, or the reason recorded with a DCFP decision.
 const (

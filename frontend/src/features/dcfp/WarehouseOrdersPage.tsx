@@ -17,17 +17,25 @@ import { EMPTY_VALUE, formatNumber, formatTimestamp } from '@/lib/format';
 
 import type { Order, OrderStatus } from './api';
 import { orderLinks, DCFP_PATHS, ORDER_STATUS, warehouseOrders, type OrderScope } from './orders';
+import { useNationalOrders } from './national';
 import { useOrders } from './queries';
 import { UNIT_PENDING, useOrderNames } from './useOrderNames';
+
+/** Statuses no warehouse order takes: alert orders from before stockouts became reports, and others. */
+const NOT_WAREHOUSE_ORDERS: ReadonlySet<OrderStatus> = new Set([
+  'pending',
+  'fulfilled',
+  'delivered',
+]);
 
 /** The DCFP's orders to NMS and JMS, and the consignments waiting to be received. */
 export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: OrderScope }) {
   const links = orderLinks(scope);
-  const orders = useOrders();
+  const national = links.national === true;
   const names = useOrderNames();
-  // MOH's national list names each order's district store and follows the district menu.
-  const stores = useStores(links.national === true);
-  const district = useDistrictContext()?.district ?? null;
+  // MOH's national list names each order's district store.
+  const stores = useStores(national);
+  const districtId = useDistrictContext()?.districtId ?? null;
   const storeName = useMemo(() => {
     const byId = new Map(
       (stores.data ?? []).map((store) => [store.id, store.district_name ?? store.name]),
@@ -35,30 +43,56 @@ export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: Or
     return (id: string) => byId.get(id) ?? '';
   }, [stores.data]);
   const router = useRouter();
+  const params = useSearchParams();
   // `?status=dispatched` (from "Receive warehouse delivery") opens the consignments to receive.
-  const requested = useSearchParams().get('status');
+  const requested = params.get('status');
   const status =
     requested !== null && requested in ORDER_STATUS ? (requested as OrderStatus) : null;
+  const search = params.get('q') ?? '';
+  const listHref = (next: OrderStatus | null, q: string) => {
+    const query = new URLSearchParams();
+    if (next) query.set('status', next);
+    if (q) query.set('q', q);
+    const text = query.toString();
+    return text ? `${links.list}?${text}` : links.list;
+  };
 
+  // A district's own orders load at once and filter here; MOH's national list asks the server for
+  // one district (from the district menu), one status and the search, a page at a time.
+  const local = useOrders({ enabled: !national });
+  const remote = useNationalOrders({ districtId, status, search }, national);
+  const orders = national
+    ? {
+        data: remote.data?.pages.flat(),
+        isPending: remote.isPending,
+        error: remote.error,
+        refetch: remote.refetch,
+        isRefetching: remote.isRefetching,
+      }
+    : local;
   const all = useMemo(() => {
-    const placed =
-      orders.data && names.warehouses ? warehouseOrders(orders.data, names.warehouses) : undefined;
-    return links.national && district && placed
-      ? placed.filter((order) => storeName(order.ordered_for_store_id) === district)
-      : placed;
-  }, [orders.data, names.warehouses, links.national, district, storeName]);
+    if (national) return orders.data;
+    return orders.data && names.warehouses
+      ? warehouseOrders(orders.data, names.warehouses)
+      : undefined;
+  }, [national, orders.data, names.warehouses]);
   const rows = useMemo(
-    () => (all && status ? all.filter((order) => order.order_status === status) : all),
-    [all, status],
+    () => (!national && all && status ? all.filter((order) => order.order_status === status) : all),
+    [national, all, status],
   );
   const statusOptions = useMemo(
     () => [
       { value: 'all', label: 'All statuses' },
       ...(Object.keys(ORDER_STATUS) as OrderStatus[])
-        .filter((value) => value === status || all?.some((order) => order.order_status === value))
+        // The national list has not loaded every order, so it offers every warehouse-order status.
+        .filter((value) =>
+          national
+            ? !NOT_WAREHOUSE_ORDERS.has(value)
+            : value === status || all?.some((order) => order.order_status === value),
+        )
         .map((value) => ({ value, label: ORDER_STATUS[value].label })),
     ],
-    [all, status],
+    [national, all, status],
   );
 
   const columns = useMemo<DataTableColumn<Order>[]>(
@@ -158,17 +192,32 @@ export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: Or
           names.refetch();
         }}
         isRetrying={orders.isRefetching}
-        searchPlaceholder="Search orders…"
+        searchPlaceholder={national ? 'Search district stores…' : 'Search orders…'}
+        {...(national
+          ? {
+              serverSearch: {
+                value: search,
+                onChange: (q: string) => {
+                  router.replace(listHref(status, q), { scroll: false });
+                },
+              },
+              more: {
+                hasMore: remote.hasNextPage,
+                isLoading: remote.isFetchingNextPage,
+                onLoadMore: () => void remote.fetchNextPage(),
+                noun: 'orders',
+              },
+            }
+          : {})}
         toolbar={
           <FilterSelect
             label="Status"
             value={status ?? 'all'}
             options={statusOptions}
             onValueChange={(next) => {
-              router.replace(
-                next === 'all' ? links.list : `${links.list}?status=${encodeURIComponent(next)}`,
-                { scroll: false },
-              );
+              router.replace(listHref(next === 'all' ? null : (next as OrderStatus), search), {
+                scroll: false,
+              });
             }}
           />
         }

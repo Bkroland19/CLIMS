@@ -7,7 +7,7 @@ import (
 )
 
 func TestWriteCSV(t *testing.T) {
-	table := Table{Title: "Store stock", Period: "Stock on 2026-11-22", Scope: "National", Product: "Male condoms",
+	table := Table{Title: "Store stock", Period: "Stock on 2026-11-22", DateBasis: stockDateBasis, Scope: "National", Product: "Male condoms",
 		RuleVersion: "v", DataUpdatedAt: time.Date(2026, 11, 22, 9, 30, 0, 0, time.UTC), Definitions: []string{blankRule},
 		Columns: cols("store", "Store", "usable", "Usable", "months_of_stock", "Months of stock", "reconciled", "Reconciled",
 			"expiry_date", "Expiry date", "received_at", "Acknowledged"),
@@ -21,7 +21,7 @@ func TestWriteCSV(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{
-		"Data updated,2026-11-22 12:30\n", // Kampala time
+		"Period,Stock on 2026-11-22\nDate basis,Stock held on the stock date; not limited to a reporting period.\nData updated,2026-11-22 12:30\n", // Kampala time
 		"Store,Usable,Months of stock,Reconciled,Expiry date,Acknowledged\n",
 		// formula text is neutralised, zero stays 0, null is blank, the date keeps its day, times are Kampala
 		"\"'=HYPERLINK(\"\"x\"\")\",0,,Yes,2027-01-31,2026-11-22 01:15\n",

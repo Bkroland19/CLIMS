@@ -71,7 +71,7 @@ describe('audit log filters', () => {
     expect(
       auditFiltersFrom(
         new URLSearchParams(
-          `area=hotspots&outcome=failure&from=2026-11-01&to=2026-11-20&actor=${SARAH}&subject=hotspot:${HOTSPOT}`,
+          `area=hotspots&outcome=failure&from=2026-11-01&to=2026-11-20&actor=${SARAH}&subject=hotspot:${HOTSPOT}&entry=SL-m3x9k2-ab12cd`,
         ),
       ),
     ).toEqual({
@@ -81,12 +81,25 @@ describe('audit log filters', () => {
       to: '2026-11-20',
       actor: SARAH,
       subject: { type: 'hotspot', id: HOTSPOT },
+      clientEntry: 'SL-m3x9k2-ab12cd',
     });
     expect(
       auditFiltersFrom(
-        new URLSearchParams('area=DROP&outcome=maybe&from=yesterday&actor=nope&subject=nope'),
+        new URLSearchParams(
+          'area=DROP&outcome=maybe&from=yesterday&actor=nope&subject=nope&entry=not%20an%20id',
+        ),
       ),
     ).toEqual(NO_FILTERS);
+  });
+
+  it("finds what the server recorded for a phone's sync log entry", () => {
+    expect(auditHref({ clientEntry: 'SL-m3x9k2-ab12cd' })).toBe(
+      '/moh/audit?entry=SL-m3x9k2-ab12cd',
+    );
+    expect(
+      auditQuery({ ...NO_FILTERS, clientEntry: 'SL-m3x9k2-ab12cd' }).get('client_entry_id'),
+    ).toBe('SL-m3x9k2-ab12cd');
+    expect(auditQuery(NO_FILTERS).has('client_entry_id')).toBe(false);
   });
 
   it('leaves defaults out of the address', () => {

@@ -3,6 +3,7 @@ package orders
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"clims-backend/internal/features/audit"
@@ -92,10 +93,52 @@ func scanOrder(row pgx.Row) (Order, error) {
 
 const visibleOrders = `($1::boolean OR $2::uuid IN (ordered_for_store_id, ordered_from_store_id) OR hot_spot_id = $3::uuid OR rider_id = $4::uuid)`
 
-func (r *Repository) list(ctx context.Context, access scope, limit, offset int32, status string) ([]Order, error) {
-	rows, err := r.db.Query(ctx, `SELECT `+columns+` FROM orders WHERE `+visibleOrders+
-		` AND ($7 = '' OR order_status = $7) ORDER BY created_at DESC, id DESC LIMIT $5 OFFSET $6`,
-		access.allStores, access.storeID, access.hotSpotID, access.userID, limit, offset, status)
+// OrderStatuses are every order_status.
+var OrderStatuses = []string{"pending", "fulfilled", "queued", "reviewed", "on_hold", "confirmed", "rejected",
+	"dispatched", "received", "delivered"}
+
+// TypeWarehouseRequest selects a district's orders to a national warehouse, including stock the
+// warehouse sent without an order: no hotspot, a national supplier, and not an alert order from
+// before stockouts became reports (pending or fulfilled).
+const TypeWarehouseRequest = "warehouse_request"
+
+// OrderFilter narrows a list within what the user can already see; empty fields match everything.
+type OrderFilter struct {
+	Statuses    []string
+	Type        string
+	DistrictID  *string // the district of the store the order is for
+	WarehouseID *string // the store the order is placed with
+	// Search matches the name of the store the order is for, ignoring case.
+	Search string
+}
+
+// MaxSearch is the longest search a list accepts.
+const MaxSearch = 100
+
+// containsPattern is an ILIKE pattern matching text that contains search, with LIKE's own wildcards
+// taken literally; "" for no search.
+func containsPattern(search string) string {
+	if search == "" {
+		return ""
+	}
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search)
+	return "%" + escaped + "%"
+}
+
+func (r *Repository) list(ctx context.Context, access scope, f OrderFilter, limit, offset int32) ([]Order, error) {
+	if f.Statuses == nil {
+		f.Statuses = []string{}
+	}
+	rows, err := r.db.Query(ctx, `SELECT `+columns+` FROM orders WHERE `+visibleOrders+`
+			AND (cardinality($7::text[]) = 0 OR order_status = ANY($7))
+			AND ($8 = '' OR (hot_spot_id IS NULL AND order_status NOT IN ('pending', 'fulfilled')
+				AND ordered_from_store_id IN (SELECT id FROM stores WHERE store_type = 'national')))
+			AND ($9::uuid IS NULL OR ordered_for_store_id IN (SELECT id FROM stores WHERE district_id = $9))
+			AND ($10::uuid IS NULL OR ordered_from_store_id = $10)
+			AND ($11 = '' OR ordered_for_store_id IN (SELECT id FROM stores WHERE name ILIKE $11))
+		ORDER BY created_at DESC, id DESC LIMIT $5 OFFSET $6`,
+		access.allStores, access.storeID, access.hotSpotID, access.userID, limit, offset, f.Statuses, f.Type,
+		f.DistrictID, f.WarehouseID, containsPattern(f.Search))
 	if err != nil {
 		return nil, err
 	}

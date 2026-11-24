@@ -46,6 +46,10 @@
       "name": "Audit"
     },
     {
+      "name": "Sync log",
+      "description": "What field phones report about sending the actions they saved offline or online. Entries are the phone's account; audit entries written by the same requests carry the phone's entry as details.client_entry_id."
+    },
+    {
       "name": "Health"
     }
   ],
@@ -60,7 +64,7 @@
         "tags": ["Orders"],
         "operationId": "listStockoutReports",
         "summary": "List stockout reports",
-        "description": "Requires orders:read. Newest first. A hotspot manager (a user assigned a hotspot) sees that hotspot's reports and no others, whatever else their account holds. Anyone else sees the reports sent to their assigned district store or sent by them; orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot.",
+        "description": "Requires orders:read. Newest first. A hotspot manager (a user assigned a hotspot) sees that hotspot's reports and no others, whatever else their account holds. Anyone else sees the reports sent to their assigned district store or sent by them; orders:all_stores sees every report. Filter by hot_spot_id, district_id (the hotspot's district) and status; filters only narrow what you can already see. `q` searches the list on the server.",
         "responses": {
           "200": {
             "description": "Success",
@@ -92,6 +96,33 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "The hotspot's district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "One or more statuses separated by commas, such as awaiting_supply,awaiting_acknowledgement,partly_received for the open requests.",
+            "schema": {
+              "type": "string",
+              "pattern": "^(awaiting_supply|awaiting_acknowledgement|partly_received|fulfilled|rejected)(,(awaiting_supply|awaiting_acknowledgement|partly_received|fulfilled|rejected))*$"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Text the hotspot's name, village, subcounty or district contains, ignoring case; % and _ match themselves.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
             }
           },
           {
@@ -405,7 +436,7 @@
         "tags": ["Orders"],
         "operationId": "listOrders",
         "summary": "List orders",
-        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access.",
+        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access. Filter by status, type, district_id and warehouse_store_id; filters only narrow what you can already see. `q` searches the list on the server.",
         "responses": {
           "200": {
             "description": "Success",
@@ -435,9 +466,46 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^(pending|fulfilled|queued|reviewed|on_hold|confirmed|rejected|dispatched|received|delivered)(,(pending|fulfilled|queued|reviewed|on_hold|confirmed|rejected|dispatched|received|delivered))*$"
             },
-            "description": "Filter by order_status, e.g. on_hold or rejected."
+            "description": "One or more order statuses separated by commas, such as queued,reviewed,on_hold,confirmed."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "warehouse_request: a district's orders to a national warehouse (NMS or JMS), including stock sent without an order; not hotspot orders, nor alert orders from before stockouts became reports.",
+            "schema": {
+              "type": "string",
+              "enum": ["warehouse_request"]
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "The district of the store the order is for.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "warehouse_store_id",
+            "in": "query",
+            "description": "The store the order is placed with.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Text the name of the store the order is for contains, ignoring case; % and _ match themselves.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
           },
           {
             "name": "limit",
@@ -2323,12 +2391,42 @@
         ]
       }
     },
+    "/api/v1/locations/geography": {
+      "get": {
+        "tags": ["Locations"],
+        "operationId": "getGeography",
+        "summary": "Regions, districts and subcounties with their stores and hotspots",
+        "description": "Requires hotspots:all_districts: the counts cover every district, including inactive and rejected hotspots. Every region with its districts and their subcounties, ordered by name, with the stores and hotspots (all and active) in each. A district also counts its hotspots with no subcounty, and counts.hotspots_without_district those no district holds. The places carry DHIS2 UIDs; migration 16 loaded them from the legacy organisation units and CLIMS does not sync them.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeographyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["hotspots:all_districts"]
+      }
+    },
     "/api/v1/hotspots": {
       "get": {
         "tags": ["Hotspots"],
         "operationId": "listHotspots",
         "summary": "List hotspots",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Most recently updated first; comments count as updates. Filters narrow the hotspots you can already see; use review_status=submitted for the DCFP review queue. With hotspots:all_districts, submitted_by_id and district_id work nationally. `notification_status` finds hotspots by their open stockout notification, for the map (none for no open notification). Village, coordinates and contact are shown only where location_precision is exact.",
         "responses": {
           "200": {
             "description": "Success",
@@ -2379,6 +2477,15 @@
               "format": "uuid"
             },
             "description": "Only hotspots in this district."
+          },
+          {
+            "name": "notification_status",
+            "in": "query",
+            "description": "The hotspot's open stockout notification: none, awaiting_supply, awaiting_acknowledgement or partly_received.",
+            "schema": {
+              "type": "string",
+              "enum": ["none", "awaiting_supply", "awaiting_acknowledgement", "partly_received"]
+            }
           },
           {
             "name": "limit",
@@ -2489,7 +2596,7 @@
         "tags": ["Hotspots"],
         "operationId": "getHotspot",
         "summary": "Get a hotspot",
-        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread.",
+        "description": "Requires hotspots:read. VHTs (hotspots:submit) see hotspots they submitted; with hotspots:read_district they also see the active hotspots in the district they work in (assigned store's district, or else assigned subcounty's); DCFPs (hotspots:activate) see hotspots in the district of their assigned store; hotspots:all_districts sees every hotspot. Includes the comment thread. Village, coordinates and contact are shown only where location_precision is exact.",
         "responses": {
           "200": {
             "description": "Success",
@@ -5182,7 +5289,8 @@
                 "stock",
                 "batches",
                 "expiry-exceptions",
-                "hmis-105"
+                "hmis-105",
+                "hotspot-status"
               ]
             }
           },
@@ -5245,7 +5353,8 @@
                 "stock",
                 "batches",
                 "expiry-exceptions",
-                "hmis-105"
+                "hmis-105",
+                "hotspot-status"
               ]
             }
           },
@@ -5465,7 +5574,7 @@
         "tags": ["Audit"],
         "operationId": "searchAuditLog",
         "summary": "Search the audit log",
-        "description": "Requires audit:read. Newest first. Filters combine; subject_type with subject_id matches an entry's target or any related record, which isolates one hotspot, order, district, store or user. Every search is itself recorded as audit.searched.",
+        "description": "Requires audit:read. Newest first. Filters combine; subject_type with subject_id matches an entry's target or any related record, which isolates one hotspot, order, district, store or user. Every search is itself recorded as audit.searched. Any request may send X-Client-Entry-Id (8 to 64 letters, digits, - or _); entries it writes keep it as details.client_entry_id, and a malformed value is ignored.",
         "x-required-permissions": ["audit:read"],
         "parameters": [
           {
@@ -5524,6 +5633,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "client_entry_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{8,64}$"
+            },
+            "description": "Only entries written by requests the field app tagged with this sync log entry (the X-Client-Entry-Id header)."
           },
           {
             "name": "from",
@@ -5715,6 +5833,310 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RiderDeliveryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/sync-log": {
+      "get": {
+        "tags": ["Sync log"],
+        "operationId": "searchSyncLog",
+        "summary": "Search what phones report about sending",
+        "description": "Requires sync_logs:read. Most recently saved first. Filters combine.",
+        "x-required-permissions": ["sync_logs:read"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "notify",
+                "stockout",
+                "acknowledge",
+                "mapHotspot",
+                "confirmReceipt",
+                "pickup",
+                "deliver"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["waiting", "retrying", "sent", "refused", "saved_on_phone"]
+            }
+          },
+          {
+            "name": "client_entry_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{8,64}$"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "When the action was saved: a date (2026-11-21, from its start in UTC) or an RFC 3339 time."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exclusive and after from; a date or an RFC 3339 time."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncLogEntryListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sync log"],
+        "operationId": "uploadSyncLog",
+        "summary": "Report this phone's sync log entries",
+        "description": "Any signed-in user, for their own entries. The field app sends metadata only: no payloads, and errors as short codes. Entries are stored by (user, client_entry_id); a version whose changed_at is older than the stored one is ignored, so retries and out-of-order uploads are safe. Times may run up to a day ahead of the server, as phone clocks drift. The whole upload is saved or refused.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncLogUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncLogUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/hotspot-status": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "getHotspotStatusReport",
+        "summary": "Hotspot status by district",
+        "description": "Requires reports:read. Current hotspots by status (active, pending review, inactive, rejected) in total and by district, contact-only hotspots, and the submissions and decisions made in the period. Last field check and a separate duplicate status are not recorded and are listed in not_recorded. orders:all_stores sees every hotspot; others see those of the district they work in, their own hotspot and those they submitted. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period for decisions and field sync, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotStatusReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/reports/hotspot-status/records": {
+      "get": {
+        "tags": ["Reports"],
+        "operationId": "listHotspotStatusRecords",
+        "summary": "Hotspots behind the report counts",
+        "description": "Requires reports:read. The hotspots behind /reports/hotspot-status by district and name, with each one's status, when it was set and by which event. Coordinates and contact details are left out. orders:all_stores sees every hotspot; others see those of the district they work in, their own hotspot and those they submitted. Filters only narrow that.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First Kampala day of the period for decisions and field sync, YYYY-MM-DD. Defaults to the first of the current month.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last Kampala day of the period, included. Defaults to today.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "district_id",
+            "in": "query",
+            "description": "One district.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "One status.",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "pending_review", "inactive", "rejected"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotspotStatusRecordListResponse"
                 }
               }
             }
@@ -7616,7 +8038,9 @@
           "submitted_by_id",
           "contact_person",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "location_precision",
+          "notification_status"
         ],
         "properties": {
           "id": {
@@ -7707,6 +8131,16 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "location_precision": {
+            "type": "string",
+            "enum": ["exact", "subcounty"],
+            "description": "exact for national users (hotspots:all_districts), the DCFPs of its district, the VHT who submitted it and its manager. Others who may see it, such as VHTs choosing a district hotspot, get subcounty: village, latitude, longitude and contact_person are then null."
+          },
+          "notification_status": {
+            "type": "string",
+            "enum": ["none", "awaiting_supply", "awaiting_acknowledgement", "partly_received"],
+            "description": "none, or the status of the hotspot's open stockout notification."
           }
         }
       },
@@ -8723,7 +9157,12 @@
           "fulfilled_at",
           "rejected_at",
           "rejected_by",
-          "rejection_reason"
+          "rejection_reason",
+          "district_id",
+          "delivered_male_pieces",
+          "delivered_female_pieces",
+          "received_male_pieces",
+          "received_female_pieces"
         ],
         "properties": {
           "id": {
@@ -8847,6 +9286,28 @@
             "nullable": true,
             "maxLength": 1000,
             "description": "Why the district rejected the request; the hotspot reads it."
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "The hotspot's district."
+          },
+          "delivered_male_pieces": {
+            "type": "integer",
+            "description": "Male pieces delivered against the notification."
+          },
+          "delivered_female_pieces": {
+            "type": "integer",
+            "description": "Female pieces delivered."
+          },
+          "received_male_pieces": {
+            "type": "integer",
+            "description": "Male pieces the hotspot's manager acknowledged."
+          },
+          "received_female_pieces": {
+            "type": "integer",
+            "description": "Female pieces acknowledged."
           }
         }
       },
@@ -9133,6 +9594,10 @@
               }
             }
           },
+          "date_basis": {
+            "type": "string",
+            "description": "The date that places a notification in the period: when it was first raised, in Africa/Kampala."
+          },
           "data_updated_at": {
             "type": "string",
             "format": "date-time"
@@ -9318,6 +9783,12 @@
                 }
               }
             }
+          },
+          "receipts": {
+            "$ref": "#/components/schemas/ReceiptActivity"
+          },
+          "field_sync": {
+            "$ref": "#/components/schemas/FieldSync"
           },
           "settings": {
             "$ref": "#/components/schemas/ResponseSettings"
@@ -9531,6 +10002,10 @@
                 "format": "date"
               }
             }
+          },
+          "date_basis": {
+            "type": "string",
+            "description": "The date that places a request in the period: when the district raised it, in Africa/Kampala."
           },
           "data_updated_at": {
             "type": "string",
@@ -9851,6 +10326,10 @@
             "format": "date-time",
             "description": "When the balances were read, separate from any reporting period."
           },
+          "date_basis": {
+            "type": "string",
+            "description": "Stock is held on the stock date, not limited to a reporting period."
+          },
           "coverage_window": {
             "type": "object",
             "properties": {
@@ -9977,6 +10456,10 @@
           "stock_date": {
             "type": "string",
             "format": "date-time"
+          },
+          "date_basis": {
+            "type": "string",
+            "description": "Batches are held on the stock date, not limited to a reporting period."
           },
           "rule_version": {
             "type": "string"
@@ -10306,6 +10789,9 @@
             "items": {
               "$ref": "#/components/schemas/HMISRow"
             }
+          },
+          "field_sync": {
+            "$ref": "#/components/schemas/FieldSync"
           }
         }
       },
@@ -10335,7 +10821,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "title": {
@@ -10344,6 +10831,10 @@
           "period": {
             "type": "string",
             "example": "2026-11-01 to 2026-11-22"
+          },
+          "date_basis": {
+            "type": "string",
+            "description": "The report's date basis, also written to the CSV header. Versions saved before it was recorded have none."
           },
           "data_updated_at": {
             "type": "string",
@@ -10426,7 +10917,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "title": {
@@ -10506,7 +10998,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "title": {
@@ -10626,7 +11119,8 @@
               "stock",
               "batches",
               "expiry-exceptions",
-              "hmis-105"
+              "hmis-105",
+              "hotspot-status"
             ]
           },
           "filters": {
@@ -11729,6 +12223,755 @@
           },
           "data": {
             "$ref": "#/components/schemas/HotspotReport"
+          }
+        }
+      },
+      "SyncLogAttempt": {
+        "type": "object",
+        "required": ["at", "http_status", "error"],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Phone clock."
+          },
+          "http_status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599,
+            "nullable": true,
+            "description": "Null when no response arrived."
+          },
+          "error": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,100}$",
+            "nullable": true,
+            "description": "A short code such as network or http_409, never free text; null on success."
+          }
+        }
+      },
+      "SyncLogDevice": {
+        "type": "object",
+        "required": ["platform"],
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": ["android", "ios"]
+          },
+          "os_version": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._+-]{0,40}$"
+          },
+          "app_version": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._+-]{0,40}$"
+          }
+        }
+      },
+      "SyncLogEntryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "client_entry_id",
+          "action",
+          "status",
+          "queued_at",
+          "changed_at",
+          "attempt_count",
+          "attempts"
+        ],
+        "properties": {
+          "client_entry_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "description": "The phone's ID for the entry, unique per user."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "notify",
+              "stockout",
+              "acknowledge",
+              "mapHotspot",
+              "confirmReceipt",
+              "pickup",
+              "deliver"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["waiting", "retrying", "sent", "refused", "saved_on_phone"],
+            "description": "waiting: saved, not tried yet; retrying: the last try did not reach the server; sent: the API accepted it; refused: the API rejected it; saved_on_phone: the API has no endpoint for this action yet, so only the phone's copy changed."
+          },
+          "server_record_id": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "description": "The record the API created or changed, once sent."
+          },
+          "queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the action was saved (phone clock)."
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the entry last changed (phone clock); an older version never replaces a newer one."
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "All attempts, including ones no longer listed."
+          },
+          "attempts": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/SyncLogAttempt"
+            },
+            "description": "The latest ten attempts, oldest first."
+          }
+        }
+      },
+      "SyncLogUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["device", "entries"],
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/SyncLogDevice"
+          },
+          "entries": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/SyncLogEntryInput"
+            }
+          }
+        }
+      },
+      "SyncLogUploadResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": ["saved"],
+            "properties": {
+              "saved": {
+                "type": "integer",
+                "description": "Entries in the upload."
+              }
+            }
+          }
+        }
+      },
+      "SyncLogEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "client_entry_id",
+          "user",
+          "action",
+          "status",
+          "server_record_id",
+          "queued_at",
+          "changed_at",
+          "attempt_count",
+          "attempts",
+          "last_error",
+          "device",
+          "received_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_entry_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "description": "The phone's ID for the entry, unique per user."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "notify",
+              "stockout",
+              "acknowledge",
+              "mapHotspot",
+              "confirmReceipt",
+              "pickup",
+              "deliver"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["waiting", "retrying", "sent", "refused", "saved_on_phone"],
+            "description": "waiting: saved, not tried yet; retrying: the last try did not reach the server; sent: the API accepted it; refused: the API rejected it; saved_on_phone: the API has no endpoint for this action yet, so only the phone's copy changed."
+          },
+          "server_record_id": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true,
+            "description": "The record the API created or changed, once sent."
+          },
+          "queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the action was saved (phone clock)."
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the entry last changed (phone clock); an older version never replaces a newer one."
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "All attempts, including ones no longer listed."
+          },
+          "attempts": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/SyncLogAttempt"
+            },
+            "description": "The latest ten attempts, oldest first."
+          },
+          "user": {
+            "type": "object",
+            "required": ["id", "username", "roles"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "username": {
+                "type": "string"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The user's current roles."
+              }
+            }
+          },
+          "last_error": {
+            "type": "string",
+            "nullable": true,
+            "description": "The latest attempt's error code."
+          },
+          "device": {
+            "$ref": "#/components/schemas/SyncLogDevice"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the server last received the entry."
+          }
+        }
+      },
+      "SyncLogEntryListResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncLogEntry"
+            }
+          }
+        }
+      },
+      "ReceiptActivity": {
+        "type": "object",
+        "description": "What hotspot managers acknowledged during the period, whenever the notification was raised. With a category filter, that type's lines only.",
+        "required": [
+          "date_basis",
+          "acknowledgements",
+          "notifications",
+          "raised_before_period",
+          "male_pieces",
+          "female_pieces"
+        ],
+        "properties": {
+          "date_basis": {
+            "type": "string",
+            "description": "When the hotspot manager acknowledged receipt, in Africa/Kampala."
+          },
+          "acknowledgements": {
+            "type": "integer",
+            "description": "Delivery lines acknowledged in the period, including those acknowledged with zero pieces."
+          },
+          "notifications": {
+            "type": "integer",
+            "description": "Notifications with an acknowledgement in the period."
+          },
+          "raised_before_period": {
+            "type": "integer",
+            "description": "Of those notifications, the ones raised before the period."
+          },
+          "male_pieces": {
+            "type": "integer"
+          },
+          "female_pieces": {
+            "type": "integer"
+          }
+        }
+      },
+      "FieldSync": {
+        "type": "object",
+        "description": "What field phones in the report's area have reported about sending their saved actions (docs/modules/sync-log.md). Counts only; reading it needs no sync_logs:read.",
+        "required": [
+          "note",
+          "pending",
+          "oldest_pending_queued_at",
+          "refused",
+          "phone_only",
+          "last_received_at"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "How to read these counts and their limits."
+          },
+          "pending": {
+            "type": "integer",
+            "description": "Entries for this report's actions waiting or retrying now, whenever they were saved. The server dates them when they arrive."
+          },
+          "oldest_pending_queued_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the oldest pending entry was saved, by the phone's clock."
+          },
+          "refused": {
+            "type": "integer",
+            "description": "Entries for this report's actions saved in the period and refused by the server."
+          },
+          "phone_only": {
+            "type": "integer",
+            "description": "Entries saved in the period that only the phone holds, because the API has no endpoint for them yet."
+          },
+          "last_received_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When a phone in the area last uploaded its log."
+          }
+        }
+      },
+      "HotspotStatusCounts": {
+        "type": "object",
+        "description": "Hotspots in each report status. Contact-only hotspots have a contact person and no active account for the hotspot yet, whatever their status.",
+        "required": ["total", "active", "pending_review", "inactive", "rejected", "contact_only"],
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "integer"
+          },
+          "pending_review": {
+            "type": "integer"
+          },
+          "inactive": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          },
+          "contact_only": {
+            "type": "integer"
+          }
+        }
+      },
+      "HotspotStatusDistrict": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/HotspotStatusCounts"
+          },
+          {
+            "type": "object",
+            "required": ["district_id", "district"],
+            "properties": {
+              "district_id": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true
+              },
+              "district": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "HotspotStatusDecisions": {
+        "type": "object",
+        "description": "Submissions and district decisions made in the period, from the hotspots' history.",
+        "required": ["submitted", "resubmitted", "activated", "rejected", "deactivated"],
+        "properties": {
+          "submitted": {
+            "type": "integer"
+          },
+          "resubmitted": {
+            "type": "integer"
+          },
+          "activated": {
+            "type": "integer"
+          },
+          "rejected": {
+            "type": "integer"
+          },
+          "deactivated": {
+            "type": "integer"
+          }
+        }
+      },
+      "HotspotStatusReport": {
+        "type": "object",
+        "description": "Current hotspot status by district (RF13), with the period's decisions.",
+        "required": [
+          "status_date",
+          "period",
+          "date_basis",
+          "total",
+          "districts",
+          "decisions",
+          "not_recorded",
+          "field_sync"
+        ],
+        "properties": {
+          "status_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "period": {
+            "type": "object",
+            "description": "The period of the decisions and field sync counts; the statuses are current.",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "date_basis": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/HotspotStatusCounts"
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotStatusDistrict"
+            }
+          },
+          "decisions": {
+            "$ref": "#/components/schemas/HotspotStatusDecisions"
+          },
+          "not_recorded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Measures the draft asks for that no record holds yet."
+          },
+          "field_sync": {
+            "$ref": "#/components/schemas/FieldSync"
+          }
+        }
+      },
+      "HotspotStatusRecord": {
+        "type": "object",
+        "description": "One hotspot behind the counts. Coordinates and contact details are left out.",
+        "required": [
+          "id",
+          "name",
+          "village",
+          "district_id",
+          "district",
+          "subcounty_id",
+          "subcounty",
+          "status",
+          "review_status",
+          "effective_event",
+          "effective_at",
+          "contact_only",
+          "manager_accounts",
+          "submitted_by",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "village": {
+            "type": "string",
+            "nullable": true
+          },
+          "district_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "district": {
+            "type": "string",
+            "nullable": true
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "subcounty": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "pending_review", "inactive", "rejected"]
+          },
+          "review_status": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["submitted", "rejected", "active", "deactivated"]
+          },
+          "effective_event": {
+            "type": "string",
+            "nullable": true,
+            "description": "The event that set the current status; null when none is recorded and effective_at is when the hotspot was recorded.",
+            "enum": ["submitted", "resubmitted", "activated", "rejected", "deactivated"]
+          },
+          "effective_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contact_only": {
+            "type": "boolean"
+          },
+          "manager_accounts": {
+            "type": "integer"
+          },
+          "submitted_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HotspotStatusReportResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotspotStatusReport"
+          }
+        }
+      },
+      "HotspotStatusRecordListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotspotStatusRecord"
+            }
+          }
+        }
+      },
+      "GeographySubcounty": {
+        "type": "object",
+        "required": ["id", "name", "hotspot_count", "active_hotspot_count"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hotspot_count": {
+            "type": "integer",
+            "description": "Every hotspot recorded in the place."
+          },
+          "active_hotspot_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "GeographyDistrict": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "store_count",
+          "hotspot_count",
+          "active_hotspot_count",
+          "hotspots_without_subcounty",
+          "subcounties"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "store_count": {
+            "type": "integer"
+          },
+          "hotspot_count": {
+            "type": "integer",
+            "description": "Every hotspot recorded in the place."
+          },
+          "active_hotspot_count": {
+            "type": "integer"
+          },
+          "hotspots_without_subcounty": {
+            "type": "integer",
+            "description": "Hotspots in the district with no subcounty, mostly converted legacy records."
+          },
+          "subcounties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeographySubcounty"
+            }
+          }
+        }
+      },
+      "GeographyRegion": {
+        "type": "object",
+        "required": ["id", "name", "districts"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeographyDistrict"
+            }
+          }
+        }
+      },
+      "Geography": {
+        "type": "object",
+        "required": ["source", "counts", "regions"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Where the places come from. There is no DHIS2 sync: they change only through migrations."
+          },
+          "counts": {
+            "type": "object",
+            "required": [
+              "regions",
+              "districts",
+              "subcounties",
+              "stores",
+              "hotspot_count",
+              "active_hotspot_count",
+              "hotspots_without_district"
+            ],
+            "properties": {
+              "regions": {
+                "type": "integer"
+              },
+              "districts": {
+                "type": "integer"
+              },
+              "subcounties": {
+                "type": "integer"
+              },
+              "stores": {
+                "type": "integer"
+              },
+              "hotspot_count": {
+                "type": "integer",
+                "description": "Every hotspot recorded in the place."
+              },
+              "active_hotspot_count": {
+                "type": "integer"
+              },
+              "hotspots_without_district": {
+                "type": "integer",
+                "description": "Hotspots with no district, which no district counts."
+              }
+            }
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeographyRegion"
+            }
+          }
+        }
+      },
+      "GeographyResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Geography"
           }
         }
       }

@@ -49,10 +49,14 @@ Lists return the hotspots directly as `data`, most recently updated first; a com
 - `review_status`: for example `submitted` for the DCFP's review queue
 - `submitted_by_id`: one VHT's hotspots
 - `district_id`: one district's hotspots
+- `notification_status`: the hotspot's open stockout notification, `none`, `awaiting_supply`, `awaiting_acknowledgement` or `partly_received`, for the map
+
+Every hotspot carries its `notification_status`, and a `location_precision` (see the rules).
 
 ## Rules
 
-- **Visibility:** a VHT (`hotspots:submit`) sees the hotspots they submitted. With `hotspots:read_district` they also see the **active** hotspots in the district they work in (their assigned store's district, or else their assigned subcounty's), to choose one when requesting stock; this does not let them comment on or edit those hotspots. A DCFP (`hotspots:activate`) sees every hotspot in the district of their assigned store (`users.store_id`). `hotspots:all_districts` sees every hotspot, for national users. Anything else returns HTTP 404.
+- **Visibility:** a VHT (`hotspots:submit`) sees the hotspots they submitted. With `hotspots:read_district` they also see the **active** hotspots in the district they work in (their assigned store's district, or else their assigned subcounty's), to choose one when requesting stock; this does not let them comment on or edit those hotspots. `hotspots:all_districts` lets national users read every hotspot and its thread, but comment only if they also hold `hotspots:submit` or `hotspots:activate`, so MOH, which only reads, cannot write in a thread (HTTP 404). A DCFP (`hotspots:activate`) sees every hotspot in the district of their assigned store (`users.store_id`). `hotspots:all_districts` sees every hotspot, for national users. Anything else returns HTTP 404.
+- **Location precision (RF12):** the village, latitude, longitude and contact person are shown to national users (`hotspots:all_districts`), the DCFPs of the hotspot's district, the VHT who submitted it and its manager (`users.hot_spot_id`), with `location_precision: exact`. Anyone else who can see the hotspot, such as a VHT choosing one of the district's active hotspots, gets `location_precision: subcounty`: the region, district and subcounty, with the village, coordinates and contact person null.
 - **Submission:** these fields are required:
   - name and type
   - `region_id`, `district_id` and `subcounty_id`
@@ -89,6 +93,8 @@ District notifications go only to people with `hotspots:activate` in the distric
 The web map (`/moh/hotspot-map`, `/dcfp/hotspot-map`; `frontend/src/features/hotspots/map/`) draws every hotspot the user can see on OpenStreetMap with MapLibre GL. It reads only the endpoints above:
 
 - **Loading.** A user with `hotspots:all_districts` and no district chosen loads `GET /hotspots?district_id=` for each district from `GET /locations/districts`, six requests at a time, and the map fills in as districts arrive. One district's pages come from the `(district_id, updated_at)` index in milliseconds; paging the whole table instead costs a sort of every row for each page, over half a second at the deepest pages with 18,000 hotspots. Hotspots with no district are in no district's list, so the national map cannot show them. A DCFP or VHT has one list, read six pages at a time. A district chosen in the MOH top bar loads that district only.
+- **Notification status.** Each hotspot's `notification_status` gives the state of its open stockout notification, and the `notification_status` filter lists one state, so the map can show where stock is awaited.
+- **Precision.** A hotspot whose `location_precision` is `subcounty` has no position and is listed under **Not on the map**.
 - **Selection.** `GET /hotspots/{id}` and `GET /hotspots/{id}/events` fill the detail panel.
 - **Positions.** A hotspot is drawn only if its recorded position is in Uganda: inside the country's border (Natural Earth 1:10m, simplified to about 1 km, including Uganda's part of the lakes) or within 3 km of it, for border towns. Everything else is left off and listed under **Not on the map** with the position as recorded, so it can be corrected at the source: no position (or (0, 0)), latitude and longitude swapped, or outside Uganda. The export's _Position check_ column says which. The database is not changed. In the dev database 49 positions are outside Uganda: 17 at an Android emulator's default location in California (37.4221, -122.0839), 9 at a web map's corner (85.0511, -180), a few swapped, and the rest in other countries. All 28 hotspots just outside the drawn border were within 2.3 km of it.
 - **Uganda in focus.** The map cannot be panned far past the border, everything outside it is dimmed, and the national map opens on the whole country. A map button brings it back.

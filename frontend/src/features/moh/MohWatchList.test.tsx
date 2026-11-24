@@ -11,13 +11,13 @@ import {
 } from '@/test/analyticsFixtures';
 import { renderApp, sessionWith } from '@/test/renderApp';
 
-import MohDashboardPage from './MohDashboardPage';
+import ProgrammeReportsPage from '@/features/programme-reports/ProgrammeReportsPage';
 
 const MOH = sessionWith(['reports:read', 'orders:read', 'orders:all_stores'], ['moh']);
 
-describe('MohDashboardPage', () => {
+describe('MOH Analytics overview', () => {
   it('lists what needs watching, each linked to the report behind it', async () => {
-    renderApp(<MohDashboardPage />, {
+    renderApp(<ProgrammeReportsPage workspace="moh" />, {
       route: '/moh',
       session: MOH,
       replies: [routes(analyticsApi())],
@@ -32,12 +32,12 @@ describe('MohDashboardPage', () => {
     expect(within(list).getByText('1 stock line below 2 months of stock')).toBeInTheDocument();
     expect(within(list).getAllByRole('link', { name: 'See requests' })[0]).toHaveAttribute(
       'href',
-      '/moh/programme-reports?view=notifications&status=awaiting_supply',
+      '/moh?view=notifications&status=awaiting_supply',
     );
   });
 
   it('shows the national figures and charts from the reports API, with a PDF download', async () => {
-    renderApp(<MohDashboardPage />, {
+    renderApp(<ProgrammeReportsPage workspace="moh" />, {
       route: '/moh',
       session: MOH,
       replies: [routes(analyticsApi())],
@@ -55,7 +55,7 @@ describe('MohDashboardPage', () => {
   });
 
   it('says so when nothing needs watching', async () => {
-    renderApp(<MohDashboardPage />, {
+    renderApp(<ProgrammeReportsPage workspace="moh" />, {
       route: '/moh',
       session: MOH,
       replies: [
@@ -78,7 +78,7 @@ describe('MohDashboardPage', () => {
   });
 
   it('says a failed report failed, rather than that nothing needs watching', async () => {
-    renderApp(<MohDashboardPage />, {
+    renderApp(<ProgrammeReportsPage workspace="moh" />, {
       route: '/moh',
       session: MOH,
       replies: [routes(analyticsApi({ '/reports/warehouse-requests': new Error('boom') }))],

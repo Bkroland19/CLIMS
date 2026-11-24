@@ -16,8 +16,8 @@ describe('PageLoader', () => {
 
   it('uses the matched page shape for another workspace', () => {
     const { container } = render(<PageLoader pathname="/moh" />);
-    expect(container.querySelector('[data-layout="dashboard"]')).not.toBeNull();
-    expect(container).toHaveTextContent('MOH dashboard');
+    expect(container.querySelector('[data-layout="table"]')).not.toBeNull();
+    expect(container).toHaveTextContent('Reports and analytics');
   });
 
   it('keeps the signed-out page in its own frame', () => {
