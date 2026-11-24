@@ -277,6 +277,11 @@ func (r *Repository) comment(ctx context.Context, access scope, id, text string)
 	// Seeing a district's active hotspots is for requesting stock; it doesn't open their threads,
 	// which stay between the submitter and the DCFP (9).
 	access.readDistrict = false
+	// Seeing every district is for oversight: MOH reads every thread but writes in none. Only someone
+	// who also submits or reviews hotspots may comment beyond their own.
+	if !access.submit && !access.activate {
+		access.allDistricts = false
+	}
 	return pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
 		var submittedBy *string
 		if err := tx.QueryRow(ctx, `SELECT h.submitted_by_id FROM hot_spots h WHERE `+visibleHotSpots+

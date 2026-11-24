@@ -287,6 +287,12 @@ func testHotSpotActivation(t *testing.T, pool *pgxpool.Pool,
 	}
 	request("GET", path, nil, national, 200)
 	request("POST", path+"/deactivate", reason, national, 403)
+	// A national reader sees every thread and writes in none: hotspots:read alone opens no comment.
+	before := len(data(request("GET", path, nil, national, 200))["comments"].([]any))
+	request("POST", path+"/comments", map[string]any{"comment": "MOH was here"}, national, 404)
+	if after := len(data(request("GET", path, nil, national, 200))["comments"].([]any)); after != before {
+		t.Fatalf("a national reader added a comment: %d comments, had %d", after, before)
+	}
 	request("GET", "/hotspots?review_status=verified", nil, dcfp, 400)
 	request("GET", "/hotspots?district_id=kampala", nil, national, 400)
 
