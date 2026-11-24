@@ -8,7 +8,7 @@ import (
 )
 
 // testNationalOrderLists checks what MOH reads on its Orders page, signed in with the moh role's
-// default grants (migration 40): every district's stockout notifications and warehouse requests,
+// default grants (migrations 39 and 40): every district's stockout notifications and warehouse requests,
 // narrowed on the server by district, status, type and warehouse, and no way to act on them.
 // The moh role is reset to those defaults first. openReport is the notification the fulfilment checks completed: 300 male and 200 female pieces
 // delivered, 290 and 100 acknowledged.
@@ -31,8 +31,8 @@ func testNationalOrderLists(t *testing.T, pool *pgxpool.Pool,
 	}
 	// Earlier checks change the moh role; put back the defaults the suite checked at the start.
 	request("PUT", "/roles/"+mohRole+"/permissions", map[string]any{"permissions": []string{"audit:read",
-		"catalogue:manage", "hotspots:all_districts", "hotspots:read", "inventory:read", "orders:all_stores",
-		"orders:read", "reports:read", "sync_logs:read"}}, admin, 200)
+		"hotspots:all_districts", "hotspots:read", "hotspots:read_district", "inventory:read", "orders:all_stores",
+		"orders:read", "reports:read", "roles:read", "sync_logs:read", "users:read"}}, admin, 200)
 	request("POST", "/users", map[string]any{"username": "workflow-moh", "email": "workflow-moh@example.test",
 		"password": "test-password-123", "role_ids": []string{mohRole}}, admin, 201)
 	moh := login("workflow-moh@example.test", "test-password-123", 200)
@@ -105,5 +105,8 @@ func testNationalOrderLists(t *testing.T, pool *pgxpool.Pool,
 	request("POST", "/orders/stockouts/"+openReport+"/deliveries", map[string]any{"lines": []map[string]any{}}, moh, 403)
 	request("POST", "/orders/warehouse-requests", map[string]any{"warehouse_store_id": warehouse,
 		"condom_category": "male", "quantity": 1}, moh, 403)
-	request("GET", "/users", nil, moh, 403)
+	// MOH reads accounts (migration 39) but cannot change one.
+	request("GET", "/users", nil, moh, 200)
+	request("POST", "/users", map[string]any{"username": "moh-made", "email": "moh-made@example.test",
+		"password": "test-password-123"}, moh, 403)
 }
