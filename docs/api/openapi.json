@@ -64,7 +64,7 @@
         "tags": ["Orders"],
         "operationId": "listStockoutReports",
         "summary": "List stockout reports",
-        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot. Filter by hot_spot_id, district_id (the hotspot's district) and status; filters only narrow what you can already see.",
+        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot. Filter by hot_spot_id, district_id (the hotspot's district) and status; filters only narrow what you can already see. `q` searches the list on the server.",
         "responses": {
           "200": {
             "description": "Success",
@@ -120,6 +120,15 @@
                 "fulfilled",
                 "rejected"
               ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Text the hotspot's name, village, subcounty or district contains, ignoring case; % and _ match themselves.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
             }
           },
           {
@@ -433,7 +442,7 @@
         "tags": ["Orders"],
         "operationId": "listOrders",
         "summary": "List orders",
-        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access. Filter by status, type, district_id and warehouse_store_id; filters only narrow what you can already see.",
+        "description": "Requires orders:read. Returns newest orders first for the requesting or supplying store, assigned hotspot, or assigned rider. Add orders:all_stores for cross-store access. Filter by status, type, district_id and warehouse_store_id; filters only narrow what you can already see. `q` searches the list on the server.",
         "responses": {
           "200": {
             "description": "Success",
@@ -493,6 +502,15 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Text the name of the store the order is for contains, ignoring case; % and _ match themselves.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
             }
           },
           {

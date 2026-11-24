@@ -32,7 +32,7 @@ Notable changes to CLIMS. The format follows [Keep a Changelog](https://keepacha
   `status`, and each report carries its district and the pieces delivered and acknowledged per type.
   `GET /api/v1/orders` takes `type=warehouse_request`, `district_id`, `warehouse_store_id` and
   several statuses separated by commas, so national lists page on the server instead of loading every
-  order.
+  order. Both take `q`, a search the server runs over the whole list.
 - **Sync log of what field phones send.** The field app records each action it saves (mapping a
   hotspot, requesting stock, counting a delivery and the rest): every try to send it and whether it
   was sent, refused, is retrying after a network failure or changed only the phone because the API

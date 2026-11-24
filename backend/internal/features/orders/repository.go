@@ -3,6 +3,7 @@ package orders
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"clims-backend/internal/features/audit"
@@ -107,6 +108,21 @@ type OrderFilter struct {
 	Type        string
 	DistrictID  *string // the district of the store the order is for
 	WarehouseID *string // the store the order is placed with
+	// Search matches the name of the store the order is for, ignoring case.
+	Search string
+}
+
+// MaxSearch is the longest search a list accepts.
+const MaxSearch = 100
+
+// containsPattern is an ILIKE pattern matching text that contains search, with LIKE's own wildcards
+// taken literally; "" for no search.
+func containsPattern(search string) string {
+	if search == "" {
+		return ""
+	}
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search)
+	return "%" + escaped + "%"
 }
 
 func (r *Repository) list(ctx context.Context, access scope, f OrderFilter, limit, offset int32) ([]Order, error) {
@@ -119,9 +135,10 @@ func (r *Repository) list(ctx context.Context, access scope, f OrderFilter, limi
 				AND ordered_from_store_id IN (SELECT id FROM stores WHERE store_type = 'national')))
 			AND ($9::uuid IS NULL OR ordered_for_store_id IN (SELECT id FROM stores WHERE district_id = $9))
 			AND ($10::uuid IS NULL OR ordered_from_store_id = $10)
+			AND ($11 = '' OR ordered_for_store_id IN (SELECT id FROM stores WHERE name ILIKE $11))
 		ORDER BY created_at DESC, id DESC LIMIT $5 OFFSET $6`,
 		access.allStores, access.storeID, access.hotSpotID, access.userID, limit, offset, f.Statuses, f.Type,
-		f.DistrictID, f.WarehouseID)
+		f.DistrictID, f.WarehouseID, containsPattern(f.Search))
 	if err != nil {
 		return nil, err
 	}

@@ -324,14 +324,18 @@ type StockoutFilter struct {
 	HotSpotID  *string
 	DistrictID *string // the hotspot's district
 	Status     string
+	// Search matches the hotspot's name, village, subcounty or district, ignoring case.
+	Search string
 }
 
 func (r *Repository) listStockouts(ctx context.Context, access scope, f StockoutFilter, limit, offset int32) ([]StockoutReport, error) {
 	rows, err := r.db.Query(ctx, `SELECT `+reportColumns+reportTables+`
 		WHERE `+visibleReports+` AND ($5::uuid IS NULL OR r.hot_spot_id = $5) AND ($6::uuid IS NULL OR h.district_id = $6)
 			AND ($7 = '' OR `+NotificationStatus+` = $7)
+			AND ($10 = '' OR h.name ILIKE $10 OR h.village ILIKE $10 OR sc.name ILIKE $10 OR d.name ILIKE $10)
 		ORDER BY r.created_at DESC, r.id DESC LIMIT $8 OFFSET $9`,
-		access.allStores, access.storeID, access.hotSpotID, access.userID, f.HotSpotID, f.DistrictID, f.Status, limit, offset)
+		access.allStores, access.storeID, access.hotSpotID, access.userID, f.HotSpotID, f.DistrictID, f.Status, limit, offset,
+		containsPattern(f.Search))
 	if err != nil {
 		return nil, err
 	}

@@ -216,6 +216,10 @@ func (h *Handler) stockouts(c fiber.Ctx) error {
 		return response.Error(c, 400, pageError, nil)
 	}
 	filter := StockoutFilter{Status: c.Query("status")}
+	filter.Search = strings.TrimSpace(c.Query("q"))
+	if len(filter.Search) > MaxSearch {
+		return response.Error(c, 400, "q must be at most 100 characters", nil)
+	}
 	if filter.Status != "" && !slices.Contains(StockoutStatuses, filter.Status) {
 		return response.Error(c, 400, "status must be awaiting_supply, awaiting_acknowledgement, partly_received, fulfilled or rejected", nil)
 	}

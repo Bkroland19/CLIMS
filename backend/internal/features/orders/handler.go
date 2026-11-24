@@ -57,6 +57,10 @@ func (h *Handler) list(c fiber.Ctx) error {
 		return response.Error(c, 400, pageError, nil)
 	}
 	filter := OrderFilter{Type: c.Query("type")}
+	filter.Search = strings.TrimSpace(c.Query("q"))
+	if len(filter.Search) > MaxSearch {
+		return response.Error(c, 400, "q must be at most 100 characters", nil)
+	}
 	if filter.Type != "" && filter.Type != TypeWarehouseRequest {
 		return response.Error(c, 400, "type must be warehouse_request", nil)
 	}

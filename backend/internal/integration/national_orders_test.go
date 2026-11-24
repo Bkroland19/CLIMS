@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -70,6 +72,31 @@ func testNationalOrderLists(t *testing.T, pool *pgxpool.Pool,
 			t.Fatalf("status filter: %v", row)
 		}
 	}
+	// Search matches the hotspot's name, village, subcounty or district, ignoring case.
+	var hotSpotName, storeName string
+	if err := pool.QueryRow(ctx, `SELECT h.name, s.name FROM stockout_reports r JOIN hot_spots h ON h.id = r.hot_spot_id
+		JOIN stores s ON s.id = $2 WHERE r.id = $1`, openReport, district).Scan(&hotSpotName, &storeName); err != nil {
+		t.Fatal(err)
+	}
+	searched := func(path string) map[string]bool {
+		t.Helper()
+		ids := map[string]bool{}
+		for _, row := range list(path) {
+			ids[row["id"].(string)] = true
+		}
+		return ids
+	}
+	if !searched("/orders/stockouts?limit=100&q=" + url.QueryEscape(strings.ToUpper(hotSpotName[:4])))[openReport] {
+		t.Fatalf("searching for %q did not find its request", hotSpotName[:4])
+	}
+	if len(searched("/orders/stockouts?limit=100&q=no-such-hotspot-anywhere")) != 0 {
+		t.Fatal("a search matching nothing returned requests")
+	}
+	// LIKE's wildcards are taken literally.
+	if len(searched("/orders/stockouts?limit=100&q=%25")) != 0 {
+		t.Fatal("% should match a literal percent sign, not everything")
+	}
+	request("GET", "/orders/stockouts?q="+strings.Repeat("a", 101), nil, moh, 400)
 	request("GET", "/orders/stockouts?status=closed", nil, moh, 400)
 	request("GET", "/orders/stockouts?district_id=nope", nil, moh, 400)
 
@@ -97,6 +124,15 @@ func testNationalOrderLists(t *testing.T, pool *pgxpool.Pool,
 	}
 	if rejected := list("/orders?limit=100&type=warehouse_request&status=rejected"); len(rejected) == 0 {
 		t.Fatal("the rejection checks left a rejected request to find")
+	}
+	// Search matches the name of the district store the order is for.
+	for _, row := range list("/orders?limit=100&type=warehouse_request&q=" + url.QueryEscape(strings.ToLower(storeName))) {
+		if row["ordered_for_store_id"] != district {
+			t.Fatalf("store search returned another store's order: %v", row)
+		}
+	}
+	if len(list("/orders?limit=100&type=warehouse_request&q="+url.QueryEscape(storeName))) == 0 {
+		t.Fatalf("searching for %q found none of its orders", storeName)
 	}
 	request("GET", "/orders?type=hotspot", nil, moh, 400)
 	request("GET", "/orders?status=queued,lost", nil, moh, 400)
