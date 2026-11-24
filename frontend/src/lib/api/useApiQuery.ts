@@ -1,4 +1,4 @@
-import { useQuery, type QueryKey } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type QueryKey } from '@tanstack/react-query';
 
 import type { ApiError } from './errors';
 import type { HttpClient } from './http';
@@ -14,6 +14,11 @@ export interface ApiQueryOptions {
   /** Keep an in-progress editor stable until its own writes complete. */
   refetchOnWindowFocus?: boolean;
   refetchOnReconnect?: boolean;
+  /**
+   * Keep showing the previous result while a new key loads (a changed filter),
+   * so a chart dims instead of flashing back to its skeleton.
+   */
+  keepPrevious?: boolean;
 }
 
 /**
@@ -23,7 +28,7 @@ export interface ApiQueryOptions {
 export function useApiQuery<Data>(
   queryKey: QueryKey,
   fetcher: (http: HttpClient, signal: AbortSignal) => Promise<Data>,
-  options: ApiQueryOptions = {},
+  { keepPrevious = false, ...options }: ApiQueryOptions = {},
 ) {
   const http = useHttp();
   // `http` is deliberately not part of the key: it is the one client for the
@@ -32,6 +37,7 @@ export function useApiQuery<Data>(
   return useQuery<Data, ApiError>({
     queryKey,
     queryFn: ({ signal }) => fetcher(http, signal),
+    ...(keepPrevious ? { placeholderData: keepPreviousData } : {}),
     ...options,
   });
 }

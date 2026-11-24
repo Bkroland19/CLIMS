@@ -142,6 +142,10 @@ export function StatCard({
   );
 
   const cardClasses = cn('bg-card rounded-card flex flex-col gap-1.5 border px-4 py-3', className);
+  // PDF reports read the headline figures from these.
+  const kpi = isLoading
+    ? {}
+    : { 'data-kpi': '', 'data-kpi-label': label, 'data-kpi-value': extra ? `${value} (${extra})` : value, 'data-kpi-detail': detail };
   if (href) {
     return (
       <Link
@@ -150,12 +154,17 @@ export function StatCard({
           cardClasses,
           'hover:bg-accent focus-visible:ring-ring outline-none focus-visible:ring-2',
         )}
+        {...kpi}
       >
         {body}
       </Link>
     );
   }
-  return <div className={cardClasses}>{body}</div>;
+  return (
+    <div className={cardClasses} {...kpi}>
+      {body}
+    </div>
+  );
 }
 
 function TrendIcon({ direction }: { direction: 'up' | 'down' | 'flat' }) {

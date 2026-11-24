@@ -2,10 +2,12 @@
 
 import { ClockAlert, Inbox, PackageCheck, Truck } from 'lucide-react';
 import Link from 'next/link';
+import { useRef } from 'react';
 
 import { ActivityTimeline, type ActivityEntry } from '@/components/ActivityTimeline';
 import { ColumnChart } from '@/components/charts/ColumnChart';
-import { ShareList } from '@/components/charts/ShareList';
+import { BarChart } from '@/components/charts/BarChart';
+import { PdfButton } from '@/components/reports/PdfButton';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { ErrorState } from '@/components/states/ErrorState';
 import { TaskList } from '@/components/TaskList';
@@ -21,6 +23,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { DistrictSelect, useDistrictContext } from '@/features/district/DistrictContext';
 import type { Order } from '@/features/orders/api';
+import { FilterBar } from '@/features/analytics/FilterBar';
+import { kampalaToday, type FilterField } from '@/features/analytics/filters';
+import { useSupplyReport, useTrends } from '@/features/analytics/queries';
+import { useReportFilters } from '@/features/analytics/useReportFilters';
+import { isFlat, trendRows } from '@/features/analytics/views/shared';
+import { OverviewView } from '@/features/analytics/views/OverviewView';
+import { useCan } from '@/features/auth/queries';
 import { formatNumber, formatTimestamp } from '@/lib/format';
 
 import {
@@ -33,7 +42,6 @@ import {
 import { WAREHOUSE_PATHS, withStore } from './paths';
 import { reservable } from './picking';
 import { REQUEST_FILTERS } from './requests';
-import { SAMPLE_REQUESTS_BY_DISTRICT, SAMPLE_WEEKLY_DISPATCHES } from './sampleCharts';
 import { MOVEMENT_LABEL, movementBatch, signed } from './stock';
 import { useStoreMovements } from './stockQueries';
 import { StoreSwitch } from './StoreSwitch';
@@ -41,13 +49,6 @@ import { isPieces, productName, unitSuffix } from './summary';
 import { warehouseTasks } from './tasks';
 
 const RECENT_EVENTS = 6;
-const SHARE_COLOURS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-] as const;
 
 type FilterValue = (typeof REQUEST_FILTERS)[number]['value'];
 
@@ -131,10 +132,10 @@ export default function WarehouseDashboardPage() {
       </StatCardGrid>
 
       {/*
-        Tasks, then the sample charts under them, with the warehouse's stock beside
+        Tasks, then the recent charts under them, with the warehouse's stock beside
         both. The task card is only as tall as its tasks, so the charts take the
         space a short list leaves. On a narrow screen the stock comes before the
-        charts, since it is live and they are not.
+        charts.
       */}
       <div className="gap-section grid items-start lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
         <TaskList
@@ -254,31 +255,101 @@ export default function WarehouseDashboardPage() {
           </Card>
         </div>
 
-        {!district && (
+        {!district && warehouse ? (
           <div className="@container min-w-0 lg:col-start-1 lg:row-start-2">
-            <div className="gap-section grid @2xl:grid-cols-2">
-              <ColumnChart
-                title="Male condoms dispatched"
-                description="Pieces dispatched to district stores per week, last 8 weeks"
-                categoryLabel="Week"
-                series={{ key: 'male', label: 'Male condoms', color: 'var(--chart-1)' }}
-                rows={SAMPLE_WEEKLY_DISPATCHES}
-                isSample
-              />
-              <ShareList
-                title="Requests by district"
-                description="District requests received in the last 30 days"
-                totalLabel="Requests"
-                shares={SAMPLE_REQUESTS_BY_DISTRICT.map((share, index) => ({
-                  ...share,
-                  color: SHARE_COLOURS[index % SHARE_COLOURS.length] ?? 'var(--chart-1)',
-                }))}
-                isSample
-              />
-            </div>
+            <RecentCharts storeId={warehouse.id} />
           </div>
-        )}
+        ) : null}
       </div>
+
+      {warehouse ? <WarehousePerformance storeId={warehouse.id} name={warehouse.name} /> : null}
     </div>
+  );
+}
+
+/** Day `days` before today in Kampala, as YYYY-MM-DD. */
+function daysAgo(days: number): string {
+  const today = kampalaToday();
+  return new Date(Date.parse(`${today}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** The last eight weeks of dispatches and the last 30 days of orders, for the warehouse at a glance. */
+function RecentCharts({ storeId }: { storeId: string }) {
+  const trend = useTrends({
+    from: daysAgo(7 * 7 + 6),
+    to: kampalaToday(),
+    interval: 'week',
+    store_id: storeId,
+    warehouse_store_id: storeId,
+  });
+  const supply = useSupplyReport({ from: daysAgo(29), to: kampalaToday(), warehouse_store_id: storeId });
+  const dispatched = trendRows(trend.data, (bucket) => ({ pieces: bucket.stock.dispatched_pieces }));
+  return (
+    <div className="gap-section grid @2xl:grid-cols-2">
+      <ColumnChart
+        title="Pieces dispatched to districts"
+        description="Per week, last 8 weeks, in pieces."
+        categoryLabel="Week"
+        series={{ key: 'pieces', label: 'Pieces dispatched', color: 'var(--chart-1)' }}
+        rows={isFlat(dispatched) ? [] : dispatched}
+        isLoading={trend.isPending}
+        error={trend.error}
+        onRetry={() => void trend.refetch()}
+        emptyMessage="Nothing was dispatched in the last 8 weeks."
+      />
+      <BarChart
+        title="Orders by district"
+        description="District orders received in the last 30 days."
+        categoryLabel="District"
+        series={{ key: 'orders', label: 'Orders', color: 'var(--chart-3)' }}
+        rows={(supply.data?.by_district ?? []).map((group) => ({
+          label: group.name ?? 'Not recorded',
+          values: { orders: group.requests },
+        }))}
+        limit={6}
+        isLoading={supply.isPending}
+        error={supply.error}
+        onRetry={() => void supply.refetch()}
+        emptyMessage="No district ordered in the last 30 days."
+      />
+    </div>
+  );
+}
+
+const PERFORMANCE_FIELDS: readonly FilterField[] = ['period', 'interval', 'district', 'category'];
+
+/** The warehouse's performance for a period, from the reports API, with a PDF of it. */
+function WarehousePerformance({ storeId, name }: { storeId: string; name: string }) {
+  const can = useCan();
+  const filters = useReportFilters();
+  const contentRef = useRef<HTMLDivElement>(null);
+  if (!can('reports:read')) return null;
+  return (
+    <section className="gap-section flex flex-col" aria-labelledby="warehouse-performance">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-4">
+        <div>
+          <h2 id="warehouse-performance" className="text-lg font-semibold">
+            {name} performance
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Orders from districts, stock moved and held, and expiry, for the period chosen.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="ghost">
+            <Link href="/warehouse/programme-reports">All reports</Link>
+          </Button>
+          <PdfButton
+            title={`${name} performance`}
+            subtitle="District orders, stock flow, stock held and expiry for the warehouse."
+            targetRef={contentRef}
+          />
+        </div>
+      </div>
+      <FilterBar filters={filters} fields={PERFORMANCE_FIELDS} />
+      <div ref={contentRef} className="gap-section flex flex-col">
+        <OverviewView filters={filters} workspace="warehouse" storeId={storeId} />
+      </div>
+    </section>
   );
 }

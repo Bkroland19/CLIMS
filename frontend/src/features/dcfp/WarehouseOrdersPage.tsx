@@ -11,28 +11,40 @@ import { PageActions } from '@/components/PageActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { WriteAction } from '@/components/WriteAction';
-import { formatNumber, formatTimestamp } from '@/lib/format';
+import { useDistrictContext } from '@/features/district/DistrictContext';
+import { useStores } from '@/features/geography/queries';
+import { EMPTY_VALUE, formatNumber, formatTimestamp } from '@/lib/format';
 
 import type { Order, OrderStatus } from './api';
-import { DCFP_PATHS, ORDER_STATUS, warehouseOrders } from './orders';
+import { orderLinks, DCFP_PATHS, ORDER_STATUS, warehouseOrders, type OrderScope } from './orders';
 import { useOrders } from './queries';
 import { UNIT_PENDING, useOrderNames } from './useOrderNames';
 
 /** The DCFP's orders to NMS and JMS, and the consignments waiting to be received. */
-export default function WarehouseOrdersPage() {
+export default function WarehouseOrdersPage({ scope = 'district' }: { scope?: OrderScope }) {
+  const links = orderLinks(scope);
   const orders = useOrders();
   const names = useOrderNames();
+  // MOH's national list names each order's district store and follows the district menu.
+  const stores = useStores(links.national === true);
+  const district = useDistrictContext()?.district ?? null;
+  const storeName = useMemo(() => {
+    const byId = new Map((stores.data ?? []).map((store) => [store.id, store.district_name ?? store.name]));
+    return (id: string) => byId.get(id) ?? '';
+  }, [stores.data]);
   const router = useRouter();
   // `?status=dispatched` (from "Receive warehouse delivery") opens the consignments to receive.
   const requested = useSearchParams().get('status');
   const status =
     requested !== null && requested in ORDER_STATUS ? (requested as OrderStatus) : null;
 
-  const all = useMemo(
-    () =>
-      orders.data && names.warehouses ? warehouseOrders(orders.data, names.warehouses) : undefined,
-    [orders.data, names.warehouses],
-  );
+  const all = useMemo(() => {
+    const placed =
+      orders.data && names.warehouses ? warehouseOrders(orders.data, names.warehouses) : undefined;
+    return links.national && district && placed
+      ? placed.filter((order) => storeName(order.ordered_for_store_id) === district)
+      : placed;
+  }, [orders.data, names.warehouses, links.national, district, storeName]);
   const rows = useMemo(
     () => (all && status ? all.filter((order) => order.order_status === status) : all),
     [all, status],
@@ -55,13 +67,24 @@ export default function WarehouseOrdersPage() {
         value: (order) => names.product(order.condom_id, order.condom_category),
         cell: (order) => (
           <Link
-            href={DCFP_PATHS.order(order.id)}
+            href={links.detail(order.id)}
             className="font-medium underline-offset-4 hover:underline"
           >
             {names.product(order.condom_id, order.condom_category)}
           </Link>
         ),
       },
+      ...(links.national
+        ? [
+            {
+              id: 'district',
+              filter: 'select' as const,
+              header: 'District',
+              value: (order: Order) => storeName(order.ordered_for_store_id),
+              cell: (order: Order) => storeName(order.ordered_for_store_id) || EMPTY_VALUE,
+            },
+          ]
+        : []),
       {
         id: 'quantity',
         header: 'Quantity ordered',
@@ -103,10 +126,10 @@ export default function WarehouseOrdersPage() {
         ),
       },
     ],
-    [names],
+    [names, links, storeName],
   );
 
-  const newOrder = (
+  const newOrder = links.national ? null : (
     <WriteAction>
       <Button asChild>
         <Link href={DCFP_PATHS.newOrder}>
@@ -142,8 +165,8 @@ export default function WarehouseOrdersPage() {
             onValueChange={(next) => {
               router.replace(
                 next === 'all'
-                  ? DCFP_PATHS.orders
-                  : `${DCFP_PATHS.orders}?status=${encodeURIComponent(next)}`,
+                  ? links.list
+                  : `${links.list}?status=${encodeURIComponent(next)}`,
                 { scroll: false },
               );
             }}

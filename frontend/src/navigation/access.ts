@@ -47,9 +47,10 @@ interface RoleAccess {
  */
 const ROLE_ACCESS: Readonly<Record<string, RoleAccess>> = {
   admin: { workspaces: ALL_FULL, warehouses: WAREHOUSES },
-  // MOH oversees everything: its own workspace, and every other one read-only.
+  // MOH oversees the whole programme and changes nothing: every workspace opens read-only, its
+  // own included (decided 2026-11-24; migration 39 grants it every read permission and no write).
   moh: {
-    workspaces: { moh: 'full', dcfp: 'read', warehouse: 'read' },
+    workspaces: { moh: 'read', dcfp: 'read', warehouse: 'read' },
     warehouses: WAREHOUSES,
   },
   dfcp: { workspaces: { dcfp: 'full' } },

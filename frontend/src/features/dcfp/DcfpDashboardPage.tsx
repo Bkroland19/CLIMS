@@ -3,11 +3,19 @@
 import { AlertTriangle, PackageCheck, Truck, Warehouse } from 'lucide-react';
 import Link from 'next/link';
 
+import { useRef } from 'react';
+
+import { PdfButton } from '@/components/reports/PdfButton';
 import { StatCard, StatCardGrid } from '@/components/StatCard';
 import { TaskList } from '@/components/TaskList';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FilterBar } from '@/features/analytics/FilterBar';
+import type { FilterField } from '@/features/analytics/filters';
+import { useReportFilters } from '@/features/analytics/useReportFilters';
+import { OverviewView } from '@/features/analytics/views/OverviewView';
+import { useCan } from '@/features/auth/queries';
 import { EMPTY_VALUE, formatNumber, formatTimestamp } from '@/lib/format';
 
 import {
@@ -144,6 +152,50 @@ export default function DcfpDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <DistrictPerformance />
     </div>
+  );
+}
+
+const PERFORMANCE_FIELDS: readonly FilterField[] = ['period', 'interval', 'category'];
+
+/**
+ * The district's performance for a period: stockout requests answered, orders
+ * from the warehouses, stock and expiry, and its hotspots, from the reports
+ * API (limited by the server to the DCFP's district), with a PDF of it.
+ */
+function DistrictPerformance() {
+  const can = useCan();
+  const filters = useReportFilters();
+  const contentRef = useRef<HTMLDivElement>(null);
+  if (!can('reports:read')) return null;
+  return (
+    <section className="gap-section flex flex-col" aria-labelledby="district-performance">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-4">
+        <div>
+          <h2 id="district-performance" className="text-lg font-semibold">
+            District performance
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            How the district supplied its hotspots and was supplied, for the period chosen.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="ghost">
+            <Link href="/dcfp/programme-reports">All reports</Link>
+          </Button>
+          <PdfButton
+            title="District performance"
+            subtitle="Stockout requests, warehouse orders, stock, expiry and hotspots for the district."
+            targetRef={contentRef}
+          />
+        </div>
+      </div>
+      <FilterBar filters={filters} fields={PERFORMANCE_FIELDS} inline={PERFORMANCE_FIELDS} />
+      <div ref={contentRef} className="gap-section flex flex-col">
+        <OverviewView filters={filters} workspace="dcfp" />
+      </div>
+    </section>
   );
 }

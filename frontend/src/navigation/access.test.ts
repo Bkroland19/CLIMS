@@ -6,7 +6,7 @@ import { workspaces } from './workspaces';
 describe('webAccessFor', () => {
   it.each([
     ['admin', { moh: 'full', dcfp: 'full', warehouse: 'full' }, ['NMS', 'JMS']],
-    ['moh', { moh: 'full', dcfp: 'read', warehouse: 'read' }, ['NMS', 'JMS']],
+    ['moh', { moh: 'read', dcfp: 'read', warehouse: 'read' }, ['NMS', 'JMS']],
     ['dfcp', { dcfp: 'full' }, []],
     ['dcfp', { dcfp: 'full' }, []],
     ['jms', { warehouse: 'full' }, ['JMS']],
@@ -21,7 +21,7 @@ describe('webAccessFor', () => {
   it('gives the widest access any held role gives, workspace by workspace', () => {
     const access = webAccessFor(['moh', 'dfcp', 'jms']);
     expect(access.workspaces).toEqual({
-      moh: 'full',
+      moh: 'read',
       dcfp: 'full',
       warehouse: 'full',
     });
@@ -102,7 +102,7 @@ describe('navigationFor', () => {
   it('keeps only the workspaces a role opens, marking those it may only look at', () => {
     const nav = navigationFor(workspaces, webAccessFor(['moh']), () => true);
     expect(ids(nav)).toEqual(['moh', 'dcfp', 'warehouse']);
-    expect(nav.map((workspace) => workspace.readOnly)).toEqual([false, true, true]);
+    expect(nav.map((workspace) => workspace.readOnly)).toEqual([true, true, true]);
     expect(ids(navigationFor(workspaces, webAccessFor(['jms']), () => true))).toEqual([
       'warehouse',
     ]);

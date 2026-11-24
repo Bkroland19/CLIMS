@@ -23,6 +23,8 @@ import { useReadOnly } from '@/navigation/useAccess';
 import type { StockoutDetail } from './api';
 import {
   DCFP_PATHS,
+  stockoutLinks,
+  type OrderScope,
   isStockoutClosed,
   placeOf,
   STOCKOUT_STATUS,
@@ -38,7 +40,8 @@ import { repeatsLabel } from './StockoutsPage';
  * One hotspot's stockout request: what it asked for, sending it stock (or rejecting it before any
  * goes), and what it confirmed.
  */
-export default function StockoutRequestPage() {
+export default function StockoutRequestPage({ scope = 'district' }: { scope?: OrderScope }) {
+  const links = stockoutLinks(scope);
   const { id } = useParams<{ id: string }>();
   const report = useStockout(id);
   // Sending replaces the form (or closes it); focus goes to the banner that says what is true now.
@@ -54,7 +57,7 @@ export default function StockoutRequestPage() {
       query={report}
       layout="stockout"
       noun="stockout request"
-      back={{ href: DCFP_PATHS.stockouts, label: 'Back to stockouts' }}
+      back={{ href: links.list, label: links.national ? 'Back to hotspot requests' : 'Back to stockouts' }}
     >
       {(data) => (
         <RequestDetail
