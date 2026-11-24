@@ -23,6 +23,9 @@ var (
 	errAckChanged       = errors.New("this line was already acknowledged with a different count")
 	errNotManager       = errors.New("only the hotspot's manager, or the delivery agent who carried it, can acknowledge a delivery")
 	errRiderNotEligible = errors.New("the delivery agent must be an active delivery agent working in the hotspot's district")
+	errRequestRejected  = errors.New("this request was rejected; the hotspot reports the stockout again if it still needs stock")
+	errRejectAfterSend  = errors.New("stock was already sent for this request, so it can no longer be rejected")
+	errStockoutReason   = errors.New("say why the request is rejected")
 )
 
 // Selections a notification can carry. A hotspot notification names the type it is out of and no quantity.
@@ -62,7 +65,8 @@ func selectionLabel(selection string) string {
 
 // StockoutReport is a hotspot's notification that it has run out of Male, Female or Both condoms. It
 // carries no quantity: the district decides what to deliver, and the hotspot's manager acknowledges
-// what arrived. It is fulfilled once every selected type has a positive acknowledgement.
+// what arrived. It is fulfilled once every selected type has a positive acknowledgement. Before any
+// stock goes, the district may reject it with a reason instead; a rejected request is closed.
 type StockoutReport struct {
 	ID              string          `json:"id"`
 	HotSpotID       string          `json:"hot_spot_id"`
@@ -78,6 +82,9 @@ type StockoutReport struct {
 	LastReportedAt  time.Time       `json:"last_reported_at"`
 	Status          string          `json:"status"`
 	FulfilledAt     *time.Time      `json:"fulfilled_at"`
+	RejectedAt      *time.Time      `json:"rejected_at"`
+	RejectedBy      *string         `json:"rejected_by"`
+	RejectionReason *string         `json:"rejection_reason"`
 	CreatedAt       time.Time       `json:"created_at"`
 }
 
@@ -107,8 +114,9 @@ const NotificationFacts = ` LEFT JOIN LATERAL (SELECT
 	WHERE d.stockout_report_id = r.id) f ON true`
 
 // NotificationStatus derives a notification's status from r and NotificationFacts f:
-// fulfilled, partly_received, awaiting_acknowledgement or awaiting_supply.
+// fulfilled, rejected, partly_received, awaiting_acknowledgement or awaiting_supply.
 const NotificationStatus = `CASE WHEN r.fulfilled_at IS NOT NULL THEN 'fulfilled'
+	WHEN r.rejected_at IS NOT NULL THEN 'rejected'
 	WHEN f.acked_male OR f.acked_female THEN 'partly_received'
 	WHEN f.lines > 0 THEN 'awaiting_acknowledgement'
 	ELSE 'awaiting_supply' END`
@@ -116,20 +124,24 @@ const NotificationStatus = `CASE WHEN r.fulfilled_at IS NOT NULL THEN 'fulfilled
 const reportColumns = `r.id, r.hot_spot_id, coalesce(h.name, 'a hotspot'), h.village, sc.name, d.name, cp.name,
 	cp.phone_number, r.selection, r.condom_id, ` + productLabel + `, r.district_store_id, r.reported_by_id,
 	coalesce(nullif(btrim(concat_ws(' ', u.firstname, u.lastname)), ''), u.username, 'someone'),
-	r.comment, r.repeat_count, r.last_reported_at, ` + NotificationStatus + `, r.fulfilled_at, r.created_at`
+	r.comment, r.repeat_count, r.last_reported_at, ` + NotificationStatus + `, r.fulfilled_at, r.rejected_at,
+	coalesce(nullif(btrim(concat_ws(' ', rj.firstname, rj.lastname)), ''), rj.username), r.rejection_reason, r.created_at`
 
 const reportTables = ` FROM stockout_reports r
 	JOIN hot_spots h ON h.id = r.hot_spot_id
 	LEFT JOIN condoms c ON c.id = r.condom_id
 	JOIN users u ON u.id = r.reported_by_id
+	LEFT JOIN users rj ON rj.id = r.rejected_by_id
 	LEFT JOIN districts d ON d.id = h.district_id
 	LEFT JOIN subcounties sc ON sc.id = h.subcounty_id
 	LEFT JOIN LATERAL (SELECT name, phone_number FROM contact_persons
 		WHERE hot_spot_id = h.id ORDER BY created_at DESC, id DESC LIMIT 1) cp ON true` + NotificationFacts
 
-// visibleReports limits reports to the user's district store, their hotspot, or the ones they sent;
-// orders:all_stores sees every report. $1 all stores, $2 store, $3 hotspot, $4 user.
-const visibleReports = `($1::boolean OR r.district_store_id = $2::uuid OR r.hot_spot_id = $3::uuid OR r.reported_by_id = $4::uuid)`
+// visibleReports limits reports to the user's district store, their hotspot, or the ones they sent,
+// including an open report their own repeat was added to; orders:all_stores sees every report.
+// $1 all stores, $2 store, $3 hotspot, $4 user.
+const visibleReports = `($1::boolean OR r.district_store_id = $2::uuid OR r.hot_spot_id = $3::uuid OR r.reported_by_id = $4::uuid
+	OR EXISTS (SELECT 1 FROM stockout_report_events e WHERE e.report_id = r.id AND e.actor_id = $4::uuid))`
 
 type rowQuerier interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
@@ -140,7 +152,7 @@ func scanReport(row pgx.Row) (StockoutReport, error) {
 	err := row.Scan(&s.ID, &s.HotSpotID, &s.HotSpot.Name, &s.HotSpot.Village, &s.HotSpot.Subcounty,
 		&s.HotSpot.District, &s.HotSpot.ContactName, &s.HotSpot.ContactPhone, &s.Selection, &s.CondomID, &s.Product,
 		&s.DistrictStoreID, &s.ReportedByID, &s.ReportedBy, &s.Comment, &s.RepeatCount, &s.LastReportedAt,
-		&s.Status, &s.FulfilledAt, &s.CreatedAt)
+		&s.Status, &s.FulfilledAt, &s.RejectedAt, &s.RejectedBy, &s.RejectionReason, &s.CreatedAt)
 	if s.Product == "" {
 		s.Product = selectionLabel(s.Selection)
 	}
@@ -154,7 +166,8 @@ func getReport(ctx context.Context, q rowQuerier, id string) (StockoutReport, er
 // reportStockout records a hotspot's stockout and notifies the DCFPs at its district's store. A hotspot
 // with an open notification does not raise a second one: the message is counted against the open
 // notification, whose selection widens if a new type is named (Male then Female is Both). The second
-// result is true for such a repeat.
+// result is true for such a repeat. A fulfilled or rejected notification is closed, so the next
+// report raises a new one.
 func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, selection string, comment *string) (StockoutReport, bool, error) {
 	var report StockoutReport
 	var repeated bool
@@ -172,7 +185,8 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, sel
 		}
 		var id, openSelection string
 		err = tx.QueryRow(ctx, `SELECT id, selection FROM stockout_reports
-			WHERE hot_spot_id = $1 AND fulfilled_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 1`,
+			WHERE hot_spot_id = $1 AND fulfilled_at IS NULL AND rejected_at IS NULL
+			ORDER BY created_at DESC, id DESC LIMIT 1`,
 			hotSpotID).Scan(&id, &openSelection)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -221,13 +235,28 @@ func (r *Repository) reportStockout(ctx context.Context, actorID, hotSpotID, sel
 		if err = r.audit.Record(ctx, tx, entry); err != nil {
 			return err
 		}
+		data := stockoutData(report)
+		if repeated {
+			// The report keeps its first message and reporter; a repeat is told in its own words, by
+			// whoever sent it.
+			data["message"] = ""
+			if comment != nil {
+				data["message"] = strings.TrimSpace(*comment)
+			}
+			var reporter string
+			if err = tx.QueryRow(ctx, `SELECT coalesce(nullif(btrim(concat_ws(' ', firstname, lastname)), ''), username, 'someone')
+				FROM users WHERE id = $1`, actorID).Scan(&reporter); err != nil {
+				return err
+			}
+			data["reporter"] = reporter
+		}
 		return r.notifier.Notify(ctx, tx, notifications.Message{
 			Type: "order.stockout_reported",
 			// DCFPs are the people at the district store who can order from the warehouse.
 			Targets:        []notifications.Target{{Permission: "orders:replenish", StoreID: report.DistrictStoreID}},
 			ActorID:        &actorID,
 			Resource:       &notifications.Resource{Type: "hotspot", ID: report.HotSpotID},
-			Data:           stockoutData(report),
+			Data:           data,
 			IdempotencyKey: fmt.Sprintf("%s:%d", report.ID, report.RepeatCount),
 		})
 	})
@@ -415,9 +444,10 @@ func (r *Repository) recordDelivery(ctx context.Context, access scope, reportID 
 	created := true
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
 		var storeID, hotSpotID, selection string
-		var fulfilledAt *time.Time
-		err := tx.QueryRow(ctx, `SELECT district_store_id, hot_spot_id, selection, fulfilled_at
-			FROM stockout_reports WHERE id = $1 FOR UPDATE`, reportID).Scan(&storeID, &hotSpotID, &selection, &fulfilledAt)
+		var fulfilledAt, rejectedAt *time.Time
+		err := tx.QueryRow(ctx, `SELECT district_store_id, hot_spot_id, selection, fulfilled_at, rejected_at
+			FROM stockout_reports WHERE id = $1 FOR UPDATE`, reportID).Scan(&storeID, &hotSpotID, &selection, &fulfilledAt,
+			&rejectedAt)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errReportNotFound
 		}
@@ -440,6 +470,9 @@ func (r *Repository) recordDelivery(ctx context.Context, access scope, reportID 
 		if created {
 			if fulfilledAt != nil {
 				return errAlreadyFulfilled
+			}
+			if rejectedAt != nil {
+				return errRequestRejected
 			}
 			if deliveryID, err = r.deliver(ctx, tx, access.userID, reportID, storeID, selection, in); err != nil {
 				return err
@@ -708,4 +741,101 @@ func (r *Repository) acknowledge(ctx context.Context, access scope, reportID str
 		})
 	})
 	return detail, err
+}
+
+// RejectionInput is why the district will not supply a request; the hotspot reads it.
+type RejectionInput struct {
+	Reason *string `json:"reason"`
+}
+
+// rejectStockout closes a request the district will not supply, with the DCFP's reason, and tells the
+// hotspot why. Only a request no stock has gone to can be rejected: once stock is on its way, the
+// hotspot confirms what arrived instead. Rejecting a rejected request again changes nothing, so a
+// retried send is safe; the second result is false then.
+func (r *Repository) rejectStockout(ctx context.Context, access scope, reportID, reason string) (StockoutDetail, bool, error) {
+	var detail StockoutDetail
+	changed := true
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		// Deliveries lock the report too, so a send and a rejection cannot both go through.
+		var storeID string
+		var fulfilledAt, rejectedAt *time.Time
+		err := tx.QueryRow(ctx, `SELECT district_store_id, fulfilled_at, rejected_at FROM stockout_reports
+			WHERE id = $1 FOR UPDATE`, reportID).Scan(&storeID, &fulfilledAt, &rejectedAt)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errReportNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if !access.allStores && !assigned(access.storeID, storeID) {
+			return errReportNotFound
+		}
+		switch {
+		case rejectedAt != nil:
+			changed = false
+		case fulfilledAt != nil:
+			return errAlreadyFulfilled
+		default:
+			var sent bool
+			if err = tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM hotspot_deliveries WHERE stockout_report_id = $1)`,
+				reportID).Scan(&sent); err != nil {
+				return err
+			}
+			if sent {
+				return errRejectAfterSend
+			}
+			if _, err = tx.Exec(ctx, `UPDATE stockout_reports SET rejected_at = CURRENT_TIMESTAMP, rejected_by_id = $2,
+				rejection_reason = $3 WHERE id = $1`, reportID, access.userID, reason); err != nil {
+				return err
+			}
+		}
+		report, err := getReport(ctx, tx, reportID)
+		if err != nil {
+			return err
+		}
+		if changed {
+			if err = addReportEvent(ctx, tx, reportID, access.userID, "rejected", report.Selection,
+				map[string]any{"reason": reason}); err != nil {
+				return err
+			}
+		}
+		if detail, err = r.detail(ctx, tx, report); err != nil || !changed {
+			return err
+		}
+		if err = r.audit.Record(ctx, tx, audit.Entry{Action: "stockout.rejected",
+			Target:  &audit.Subject{Type: "stockout_report", ID: report.ID},
+			Related: []audit.Subject{{Type: "hotspot", ID: report.HotSpotID}, {Type: "store", ID: report.DistrictStoreID}},
+			Details: map[string]any{"selection": report.Selection, "reason": reason}}); err != nil {
+			return err
+		}
+		return r.notifyRejection(ctx, tx, access.userID, report)
+	})
+	return detail, changed, err
+}
+
+// notifyRejection tells the hotspot's manager accounts, and whoever sent the report (a VHT, say), that
+// the district will not supply it, and why. People without an active account hear nothing.
+func (r *Repository) notifyRejection(ctx context.Context, tx pgx.Tx, actorID string, report StockoutReport) error {
+	rows, err := tx.Query(ctx, `SELECT id FROM users WHERE (hot_spot_id = $1 OR id = $2) AND status = 'active'
+		AND id <> $3`, report.HotSpotID, report.ReportedByID, actorID)
+	if err != nil {
+		return err
+	}
+	people, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil || len(people) == 0 {
+		return err
+	}
+	data := stockoutData(report)
+	data["reason"] = ""
+	if report.RejectionReason != nil {
+		data["reason"] = *report.RejectionReason
+	}
+	return r.notifier.Notify(ctx, tx, notifications.Message{
+		Type:           "order.stockout_rejected",
+		Targets:        []notifications.Target{{UserIDs: people}},
+		ActorID:        &actorID,
+		Resource:       &notifications.Resource{Type: "hotspot", ID: report.HotSpotID},
+		Data:           data,
+		IdempotencyKey: report.ID + ":rejected",
+	})
 }

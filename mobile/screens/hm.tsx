@@ -6,6 +6,7 @@ import { Banner, Btn, Hero, List, Row, SkeletonList } from "@/components/m/kit";
 import { isNetworkError } from "@/lib/hotspots";
 import {
   getStockout,
+  isClosedOrder,
   listStockouts,
   savedStockout,
   toLocalOrder,
@@ -53,7 +54,7 @@ function HmHomeSample() {
   const mine = s.orders
     .filter((o) => o.hotspotId === h.id)
     .sort((a, b) => b.createdAt - a.createdAt);
-  const o = mine.find((x) => x.status !== "received");
+  const o = mine.find((x) => !isClosedOrder(x.status));
   const queued = s.outbox.some((it) => it.type === "notify" && it.payload.hotspotId === h.id);
   return (
     <Screen title="Home" root>
@@ -248,8 +249,11 @@ function HmHomeLive() {
   const nav = useNav();
   const me = useMe();
   const { orders, queued, load } = useApiOrders();
-  // A delivered notification stays open until the manager acknowledges what arrived.
-  const open = orders.find((o) => o.status !== "received");
+  // A delivered notification stays open until the manager acknowledges what arrived; a rejected
+  // one is closed, so the manager can report again.
+  const open = orders.find((o) => !isClosedOrder(o.status));
+  const newest = orders[0];
+  const rejected = !open && newest?.status === "rejected" ? newest : undefined;
   const lastReceived = orders.find((o) => o.status === "received");
   const details = useRecentDetails(
     [open?.id, lastReceived?.id].filter((id): id is string => Boolean(id)),
@@ -303,6 +307,14 @@ function HmHomeLive() {
           tone="warning"
           title="Stockout saved on this phone"
           body="It sends to the district when you are back online."
+        />
+      ) : null}
+      {rejected && !queued.length ? (
+        <Banner
+          tone="danger"
+          title="The district rejected your last request"
+          body="Open it to read their reason. Report the stockout again if you still need stock."
+          act={{ label: "See why", onPress: () => nav.go(`stockout/${rejected.id}`) }}
         />
       ) : null}
       {load === "loading" && !orders.length ? (

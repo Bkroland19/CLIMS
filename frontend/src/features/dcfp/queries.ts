@@ -15,6 +15,7 @@ import {
   listStockouts,
   listWarehouses,
   receiveOrder,
+  rejectStockout,
   type ReceiptInput,
   type WarehouseOrderInput,
   type HotspotDeliveryInput,
@@ -101,6 +102,20 @@ export function useDeliverStock() {
   });
 }
 
+/** Reject a hotspot's request with a reason; the hotspot is told why. */
+export function useRejectStockout(reportId: string) {
+  const http = useHttp();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) => rejectStockout(http, reportId, reason),
+    onSuccess: async () => {
+      toast.success('Request rejected. The hotspot is told why.');
+      await queryClient.invalidateQueries({ queryKey: dcfpKeys.all });
+    },
+    meta: { handlesOwnErrors: true },
+  });
+}
+
 export function usePlaceOrder() {
   const http = useHttp();
   const invalidate = useInvalidateDcfp();
@@ -110,6 +125,8 @@ export function usePlaceOrder() {
       toast.success('Order sent to the warehouse');
       await invalidate();
     },
+    // The order form shows the failure beside its fields.
+    meta: { handlesOwnErrors: true },
   });
 }
 
@@ -127,5 +144,7 @@ export function useReceiveOrder(id: string) {
         queryClient.invalidateQueries({ queryKey: warehouseStockKeys.all }),
       ]);
     },
+    // The receipt form shows the failure in place.
+    meta: { handlesOwnErrors: true },
   });
 }

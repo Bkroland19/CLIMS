@@ -13,6 +13,7 @@ import {
   stockoutErrorMessage,
   stockoutMessageFits,
   stockoutProduct,
+  isClosedOrder,
   toLocalOrder,
   type StockoutDetail,
   type StockoutReport,
@@ -186,6 +187,13 @@ describe("toLocalOrder", () => {
     expect(st("awaiting_acknowledgement")).toBe("delivered");
     expect(st("partly_received")).toBe("delivered");
     expect(st("fulfilled")).toBe("received");
+    expect(st("rejected")).toBe("rejected");
+  });
+  it("treats received and rejected requests as closed, so the hotspot can report again", () => {
+    expect(isClosedOrder("received")).toBe(true);
+    expect(isClosedOrder("rejected")).toBe(true);
+    expect(isClosedOrder("queued")).toBe(false);
+    expect(isClosedOrder("delivered")).toBe(false);
   });
 });
 

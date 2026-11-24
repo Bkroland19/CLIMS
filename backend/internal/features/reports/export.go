@@ -138,9 +138,9 @@ func (h *Handler) build(ctx context.Context, user *users.User, report string, p 
 		s, category, district, hotSpot = sc, f.Category, f.DistrictID, f.HotSpotID
 		f.Status = p.get("status")
 		switch f.Status {
-		case "", "fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply":
+		case "", "fulfilled", "partly_received", "awaiting_acknowledgement", "awaiting_supply", "rejected":
 		default:
-			return nil, Table{}, errInvalid{errors.New("status must be fulfilled, partly_received, awaiting_acknowledgement or awaiting_supply")}
+			return nil, Table{}, errInvalid{errors.New("status must be fulfilled, partly_received, awaiting_acknowledgement, awaiting_supply or rejected")}
 		}
 		sum, err := h.repo.notificationSummary(ctx, s, f, h.now())
 		if err != nil {

@@ -143,6 +143,14 @@ func testDistrictStockouts(t *testing.T, pool *pgxpool.Pool,
 		t.Fatalf("the VHT's own report: %v", seen)
 	}
 	request("GET", "/orders/stockouts", nil, vht, 403)
+	// A second VHT reporting the same hotspot joins its open request, and can follow it too.
+	second := account("vht", "district-vht-2")
+	joined := request("POST", "/orders/stockouts", map[string]any{"hot_spot_id": active, "condom_category": "female",
+		"message": "Still out"}, second, 200)["data"].(map[string]any)
+	if joined["id"] != raised["id"] {
+		t.Fatalf("the second report should join the open request: %v", joined)
+	}
+	request("GET", reportPath, nil, second, 200)
 
 	// orders:stockout alone still means the assigned hotspot only.
 	request("PUT", "/roles/"+roleID("healthy facility")+"/permissions",

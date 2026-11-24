@@ -42,10 +42,21 @@ const EVENT_TEXT: Record<StockoutEvent["action"], (e: StockoutEvent) => string> 
   selection_changed: (e) => `Now asking for ${CATEGORY_LABEL[e.selection].toLowerCase()}`,
   delivered: () => "District recorded a delivery",
   acknowledged: () => "Hotspot manager confirmed what arrived",
+  rejected: () => "District rejected the request",
 };
 
 /** The request's progress, for its page and the hotspot manager's home. */
 export function stockoutSteps(d: StockoutDetail, you: boolean): StepItem[] {
+  if (d.status === "rejected") {
+    return [
+      { label: "Sent to district", st: "done", sub: ago(Date.parse(d.created_at)) },
+      {
+        label: "Rejected",
+        st: "warn",
+        sub: d.rejected_at ? ago(Date.parse(d.rejected_at)) : "",
+      },
+    ];
+  }
   const delivered = d.deliveries.length > 0;
   const firstDelivery = d.deliveries.map((x) => Date.parse(x.created_at)).sort()[0];
   return [
@@ -85,6 +96,10 @@ export function stockoutMessage(d: StockoutDetail, you: boolean, waiting: number
         : "Part of the request has arrived. The district can send more for what's still missing.";
     case "fulfilled":
       return `Closed${d.fulfilled_at ? ` ${ago(Date.parse(d.fulfilled_at))}` : ""}.`;
+    case "rejected":
+      return `The district rejected this request${
+        d.rejection_reason ? `: “${d.rejection_reason}”` : "."
+      } Report the stockout again if ${you ? "you still need" : "the hotspot still needs"} stock.`;
   }
 }
 

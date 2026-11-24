@@ -28,9 +28,13 @@ export interface StockoutRequest {
   message: string | null;
 }
 
-/** Where a notification is in its fulfilment. */
+/** Where a notification is in its fulfilment. A rejected one is closed without stock. */
 export type StockoutStatus =
-  "awaiting_supply" | "awaiting_acknowledgement" | "partly_received" | "fulfilled";
+  | "awaiting_supply"
+  | "awaiting_acknowledgement"
+  | "partly_received"
+  | "fulfilled"
+  | "rejected";
 
 /** `StockoutReport`, the fields the app reads. */
 export interface StockoutReport {
@@ -52,6 +56,11 @@ export interface StockoutReport {
   repeat_count: number;
   status: StockoutStatus;
   fulfilled_at: string | null;
+  /** Set when the district rejected the request instead of sending stock. */
+  rejected_at?: string | null;
+  rejected_by?: string | null;
+  /** Why the district rejected it, in the DCFP's words. */
+  rejection_reason?: string | null;
   created_at: string;
   last_reported_at: string;
 }
@@ -78,7 +87,7 @@ export interface HotspotDelivery {
 
 export interface StockoutEvent {
   id: string;
-  action: "raised" | "repeated" | "selection_changed" | "delivered" | "acknowledged";
+  action: "raised" | "repeated" | "selection_changed" | "delivered" | "acknowledged" | "rejected";
   selection: Category;
   created_at: string;
 }
@@ -195,7 +204,13 @@ const STATUS: Record<StockoutStatus, OrderStatus> = {
   awaiting_acknowledgement: "delivered",
   partly_received: "delivered",
   fulfilled: "received",
+  rejected: "rejected",
 };
+
+/** A received or rejected request is closed: the hotspot reports again for more stock. */
+export function isClosedOrder(status: OrderStatus): boolean {
+  return status === "received" || status === "rejected";
+}
 
 /** What a notification asks for: its product for older by-product notifications, else the selection. */
 export function stockoutProduct(r: Pick<StockoutReport, "condom_id" | "product" | "selection">) {

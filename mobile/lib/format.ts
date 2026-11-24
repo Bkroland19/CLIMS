@@ -68,6 +68,7 @@ const ORDER_CHIPS: Record<OrderStatus, ChipDef> = {
   in_transit: chip("On the way", "info"),
   delivered: chip("Delivered", "success"),
   received: chip("Received", "neutral"),
+  rejected: chip("Rejected", "danger"),
 };
 export const orderChip = (s: OrderStatus) => ORDER_CHIPS[s];
 

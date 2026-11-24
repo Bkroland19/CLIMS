@@ -21,12 +21,23 @@ import { formatNumber, formatTimestamp } from '@/lib/format';
 import { useReadOnly } from '@/navigation/useAccess';
 
 import type { StockoutDetail } from './api';
-import { DCFP_PATHS, placeOf, STOCKOUT_STATUS, stockoutStatus, stockoutSteps } from './orders';
+import {
+  DCFP_PATHS,
+  isStockoutClosed,
+  placeOf,
+  STOCKOUT_STATUS,
+  stockoutStatus,
+  stockoutSteps,
+} from './orders';
 import { useStockout } from './queries';
+import { RejectRequestPanel } from './RejectRequestPanel';
 import { SendStockForm } from './SendStockForm';
 import { repeatsLabel } from './StockoutsPage';
 
-/** One hotspot's stockout request: what it asked for, sending it stock, and what it confirmed. */
+/**
+ * One hotspot's stockout request: what it asked for, sending it stock (or rejecting it before any
+ * goes), and what it confirmed.
+ */
 export default function StockoutRequestPage() {
   const { id } = useParams<{ id: string }>();
   const report = useStockout(id);
@@ -74,9 +85,21 @@ function RequestDetail({
     if (wasSendingMore.current && !sendingMore) sendMoreRef.current?.focus();
     wasSendingMore.current = sendingMore;
   }, [sendingMore]);
+  // Rejecting hides the send form (keeping what was typed); cancelling brings it back, with focus
+  // on the button that opened the rejection.
+  const [rejecting, setRejecting] = useState(false);
+  const rejectRef = useRef<HTMLButtonElement>(null);
+  const wasRejecting = useRef(false);
+  useEffect(() => {
+    if (wasRejecting.current && !rejecting) rejectRef.current?.focus();
+    wasRejecting.current = rejecting;
+  }, [rejecting]);
   const status = stockoutStatus(report);
+  const closed = isStockoutClosed(status);
   const ownStore = storeId !== undefined && report.district_store_id === storeId;
-  const canSend = !readOnly && can('orders:supply_hotspots') && ownStore && status !== 'fulfilled';
+  const canSend = !readOnly && can('orders:supply_hotspots') && ownStore && !closed;
+  // A request can be rejected only before any stock has gone to it.
+  const canReject = canSend && status === 'awaiting_supply' && report.deliveries.length === 0;
   const contact = report.hot_spot.contact_name?.trim() || null;
   const phone = report.hot_spot.contact_phone?.trim();
   const banner = bannerFor(report, status, contact, canSend);
@@ -107,7 +130,30 @@ function RequestDetail({
           </Alert>
           {canSend && storeId ? (
             status === 'awaiting_supply' ? (
-              <SendStockForm report={report} storeId={storeId} />
+              <>
+                <div hidden={rejecting} className="min-w-0">
+                  <SendStockForm
+                    report={report}
+                    storeId={storeId}
+                    onReject={
+                      canReject
+                        ? () => {
+                            setRejecting(true);
+                          }
+                        : undefined
+                    }
+                    rejectRef={rejectRef}
+                  />
+                </div>
+                {rejecting ? (
+                  <RejectRequestPanel
+                    report={report}
+                    onCancel={() => {
+                      setRejecting(false);
+                    }}
+                  />
+                ) : null}
+              </>
             ) : sendingMore ? (
               <SendStockForm
                 report={report}
@@ -160,7 +206,7 @@ function RequestDetail({
                     : []),
                 ]}
               />
-              {!readOnly && can('orders:replenish') && status !== 'fulfilled' ? (
+              {!readOnly && can('orders:replenish') && !closed ? (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={DCFP_PATHS.newOrderFor(report.selection)}>
                     <PackagePlus aria-hidden="true" />
@@ -206,7 +252,7 @@ function bannerFor(
   status: ReturnType<typeof stockoutStatus>,
   contact: string | null,
   canSend: boolean,
-): { variant: 'info' | 'success' | 'warning'; title: string; body: string } {
+): { variant: 'info' | 'success' | 'warning' | 'destructive'; title: string; body: string } {
   // Who confirms receipt, to start a sentence.
   const subject = contact ?? 'The hotspot manager';
   switch (status) {
@@ -215,9 +261,26 @@ function bannerFor(
         variant: 'warning',
         title: `${report.hot_spot.name} is out of ${report.product}`,
         body: canSend
-          ? `Send what you can from the district store below. ${subject} confirms what arrives.`
+          ? `Send what you can from the district store below, or reject the request if the district cannot supply it. ${subject} confirms what arrives.`
           : 'Waiting for the district store to send stock.',
       };
+    case 'rejected': {
+      const by = report.rejected_by?.trim();
+      const when = report.rejected_at ? formatTimestamp(report.rejected_at) : null;
+      return {
+        variant: 'destructive',
+        title: 'This request was rejected',
+        body: [
+          report.rejection_reason
+            ? `Reason: “${report.rejection_reason}”`
+            : 'No reason was recorded.',
+          [by ? `Rejected by ${by}` : 'Rejected', when ? `on ${when}` : null]
+            .filter(Boolean)
+            .join(' ') + '.',
+          `The hotspot was told. If ${report.hot_spot.name} reports again, a new request opens.`,
+        ].join(' '),
+      };
+    }
     case 'awaiting_acknowledgement':
       return {
         variant: 'info',
@@ -255,13 +318,16 @@ function History({ report }: { report: StockoutDetail }) {
             ? `Reported again${quoted}`
             : event.action === 'acknowledged'
               ? `Confirmed ${formatNumber((event.data?.lines ?? []).reduce((sum, line) => sum + line.pieces, 0))} pieces received`
-              : event.action;
+              : event.action === 'rejected'
+                ? `Rejected the request${event.data?.reason ? ` — “${event.data.reason}”` : ''}`
+                : event.action;
+    const byDistrict = event.action === 'rejected';
     entries.push({
       id: event.id,
       at: event.created_at,
       text,
-      meta: `Hotspot · ${formatTimestamp(event.created_at)}`,
-      role: 'hotspot-manager',
+      meta: `${byDistrict ? report.rejected_by?.trim() || 'District store' : 'Hotspot'} · ${formatTimestamp(event.created_at)}`,
+      role: byDistrict ? 'dcfp' : 'hotspot-manager',
     });
   }
   if (report.events.length === 0) {
@@ -320,7 +386,8 @@ function History({ report }: { report: StockoutDetail }) {
       <CardHeader>
         <CardTitle>History</CardTitle>
         <CardDescription>
-          Reports from the hotspot, stock sent and what it confirmed, in single pieces.
+          Reports from the hotspot, stock sent or the rejection, and what it confirmed, in single
+          pieces.
         </CardDescription>
       </CardHeader>
       <CardContent>

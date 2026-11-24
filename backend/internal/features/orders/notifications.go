@@ -10,7 +10,7 @@ import (
 )
 
 // NotificationTypes are the order notifications; register them once at startup. A stockout report's
-// template receives the keys of stockoutData; the warehouse steps receive product, unit, quantity,
+// template receives the keys of stockoutData (a rejection adds reason); the warehouse steps receive product, unit, quantity,
 // quantity_ordered, quantity_dispatched, note, transport, from_store and to_store.
 func NotificationTypes() []notifications.Type {
 	inApp := []string{notifications.ChannelInApp}
@@ -31,6 +31,11 @@ func NotificationTypes() []notifications.Type {
 			PushBody: "Carry {{.pieces}} to {{.hotspot}}{{with .place}}, {{.}}{{end}}. Tap for the contact and details.",
 			Body: "Carry {{.pieces}} from the district store to {{.hotspot}}{{with .place}}, {{.}}{{end}}." +
 				"{{with .contact}} Contact: {{.}}.{{end}}"},
+		// The hotspot's people learn the district will not supply a request, and why.
+		{Name: "order.stockout_rejected", Channels: inAppAndPush,
+			Title: "Request for {{.product}} rejected",
+			Body: "The district rejected {{.hotspot}}'s request for {{.product}}. Reason: \"{{.reason}}\" " +
+				"Report the stockout again if the hotspot still needs stock."},
 		{Name: "order.delivery_acknowledged", Channels: inApp,
 			Title: "{{.hotspot}} acknowledged its delivery",
 			Body: "{{.hotspot}} has acknowledged {{.pieces}} received{{if index . \"by_agent\"}}, as confirmed by the delivery agent{{end}}." +

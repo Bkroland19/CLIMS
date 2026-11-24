@@ -6,8 +6,9 @@ import { ApiError, parseBody, parseList, readAllPages, type HttpClient } from '@
 /*
  * The DCFP's two flows against the Go API (docs/modules/orders.md):
  *
- * 1. Hotspots report stockouts. A report is a notification to the district's
- *    DCFPs, with the hotspot's details and a message; it is not an order.
+ * 1. Hotspots report stockouts. A report is a request to the district's DCFPs,
+ *    with the hotspot's details and a message. The DCFP sends district stock
+ *    against it, or rejects it with a reason before any stock goes.
  * 2. The DCFP orders a product and quantity from NMS or JMS. The warehouse
  *    approves it (review), checks stock and dispatches it, or rejects it with
  *    a reason; the DCFP records the receipt.
@@ -43,8 +44,19 @@ const stockoutReportSchema = z.object({
   last_reported_at: z.string().optional(),
   created_at: z.string(),
   status: z
-    .enum(['awaiting_supply', 'awaiting_acknowledgement', 'partly_received', 'fulfilled'])
+    .enum([
+      'awaiting_supply',
+      'awaiting_acknowledgement',
+      'partly_received',
+      'fulfilled',
+      'rejected',
+    ])
     .optional(),
+  /** Set when the district rejected the request instead of sending stock; it is then closed. */
+  rejected_at: z.string().nullish(),
+  rejected_by: z.string().nullish(),
+  /** Why the district rejected it; the hotspot reads this. */
+  rejection_reason: z.string().nullish(),
 });
 
 export type StockoutReport = z.infer<typeof stockoutReportSchema>;
@@ -68,6 +80,8 @@ const reportEventSchema = z.object({
     .object({
       comment: z.string().nullable().optional(),
       reported: z.string().optional(),
+      /** The district's reason, on a `rejected` event. */
+      reason: z.string().optional(),
       lines: z.array(eventLine).optional(),
     })
     .nullable(),
@@ -144,6 +158,25 @@ export async function deliverStock(
     stockoutReportSchema,
     await http.post(`/orders/stockouts/${encodeURIComponent(reportId)}/deliveries`, input),
     'hotspot delivery',
+  );
+}
+
+/** The API's limit on a rejection reason. */
+export const REJECTION_REASON_MAX = 1000;
+
+/**
+ * Reject a request the district will not supply, before any stock has gone to it. The hotspot is
+ * told the reason. Rejecting a rejected request again returns it unchanged.
+ */
+export async function rejectStockout(
+  http: HttpClient,
+  reportId: string,
+  reason: string,
+): Promise<StockoutDetail> {
+  return parseBody(
+    stockoutDetailSchema,
+    await http.post(`/orders/stockouts/${encodeURIComponent(reportId)}/rejection`, { reason }),
+    'stockout rejection',
   );
 }
 

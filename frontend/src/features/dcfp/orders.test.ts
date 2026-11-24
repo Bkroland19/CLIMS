@@ -7,11 +7,14 @@ import {
   dcfpCounts,
   dcfpTasks,
   DCFP_PATHS,
+  isStockoutClosed,
+  matchesStockoutFilter,
   orderSteps,
   parseCount,
   placeOf,
   receiptErrors,
   recentReports,
+  stockoutSteps,
   warehouseLabel,
   warehouseOrders,
 } from './orders';
@@ -173,5 +176,31 @@ describe('recentReports and dcfpCounts', () => {
       3,
     );
     expect(counts).toEqual({ [DCFP_PATHS.orders]: 1, [DCFP_PATHS.stockouts]: 3 });
+  });
+});
+
+describe('rejected stockout requests', () => {
+  const rejected = aReport({ status: 'rejected', rejection_reason: 'Supplied last week' });
+
+  it('are closed: not open, only under Rejected and All', () => {
+    expect(isStockoutClosed('rejected')).toBe(true);
+    expect(isStockoutClosed('awaiting_supply')).toBe(false);
+    expect(matchesStockoutFilter(rejected, 'open')).toBe(false);
+    expect(matchesStockoutFilter(rejected, 'rejected')).toBe(true);
+    expect(matchesStockoutFilter(rejected, 'all')).toBe(true);
+    expect(matchesStockoutFilter(aReport({ status: 'awaiting_supply' }), 'rejected')).toBe(false);
+  });
+
+  it('stop at the decision, marked for attention', () => {
+    expect(stockoutSteps('rejected')).toEqual([
+      { id: 'reported', label: 'Reported', state: 'done' },
+      { id: 'sent', label: 'Rejected', state: 'attention' },
+    ]);
+  });
+
+  it('are not a task for the DCFP', () => {
+    const names = { product: () => 'Engabu Free Female', warehouse: () => 'NMS' };
+    const reported = rejected.created_at;
+    expect(dcfpTasks([rejected], [], names, new Date(reported), (iso) => iso)).toHaveLength(0);
   });
 });

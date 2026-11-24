@@ -10,8 +10,10 @@ import { useProducts } from '@/features/catalogue/queries';
 import { productName } from '@/features/catalogue/api';
 import type { ProductSummary } from '@/features/inventory/api';
 import { getErrorMessage, toApiError } from '@/lib/api';
+import { newClientReference } from '@/lib/clientReference';
 import { formatNumber } from '@/lib/format';
 
+import { isStockoutClosed, stockoutStatus } from './orders';
 import { useDeliverStock, useStockoutRiders, useStockouts } from './queries';
 
 /** The picker's value for "nobody named"; the API takes no rider_id then. */
@@ -34,12 +36,12 @@ export function DeliverStockDialog({ storeId, stock, initialReportId = '', onClo
   const [note, setNote] = useState('');
   const [exception, setException] = useState('');
   const [riderId, setRiderId] = useState(NO_RIDER);
-  const [reference] = useState(() => crypto.randomUUID());
+  const [reference] = useState(newClientReference);
   const [tried, setTried] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const availableReports =
     reports.data?.filter(
-      (report) => report.district_store_id === storeId && report.status !== 'fulfilled',
+      (report) => report.district_store_id === storeId && !isStockoutClosed(stockoutStatus(report)),
     ) ?? [];
   const report = availableReports.find((item) => item.id === reportId);
   // Only delivery agents working in the hotspot's district are offered (and accepted by the API).

@@ -30,12 +30,20 @@ const RANK: Record<Order["status"], number> = {
   in_transit: 3,
   delivered: 4,
   received: 5,
+  // Closed at the district's decision; never on the way.
+  rejected: 0,
 };
 
 export function orderSteps(o: Order, you: boolean): StepItem[] {
   const dl = o.delivery;
   const st = o.status;
   const rank = RANK[st];
+  if (st === "rejected") {
+    return [
+      { label: "Sent to district", st: "done", sub: ago(o.createdAt) },
+      { label: "Rejected by district", st: "warn", sub: "" },
+    ];
+  }
   return [
     { label: "Sent to district", st: "done", sub: ago(o.createdAt) },
     st === "on_hold"
@@ -77,6 +85,7 @@ export function orderMsg(o: Order, you: boolean, contact: string) {
       ? "The rider has delivered. Count the stock and confirm what you received."
       : `Delivered. ${contact} needs to confirm receipt.`,
     received: `Closed ${o.receipt ? ago(o.receipt.at) : ""}.`,
+    rejected: `The district rejected this request. Report the stockout again if ${you ? "you still need" : "the hotspot still needs"} stock.`,
   }[o.status];
 }
 

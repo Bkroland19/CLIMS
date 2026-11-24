@@ -64,7 +64,7 @@ type Filter struct {
 // $5 district they work in, $6 district filter, $7 hotspot filter, $8 category filter.
 const notificationsCTE = `WITH n AS (
 	SELECT r.id, r.hot_spot_id, h.name AS hot_spot, h.district_id, d.name AS district, r.selection,
-		r.repeat_count, r.created_at, r.last_reported_at, r.fulfilled_at, f.*, ` + orders.NotificationStatus + ` AS status
+		r.repeat_count, r.created_at, r.last_reported_at, r.fulfilled_at, r.rejected_at, f.*, ` + orders.NotificationStatus + ` AS status
 	FROM stockout_reports r
 	JOIN hot_spots h ON h.id = r.hot_spot_id
 	LEFT JOIN districts d ON d.id = h.district_id` + orders.NotificationFacts + `
@@ -79,23 +79,25 @@ func (s scope) args(f Filter) []any {
 
 // NotificationSummary holds the notification measures for a period (reporting requirements, measures).
 type NotificationSummary struct {
-	Period                  Period               `json:"period"`
-	DataUpdatedAt           time.Time            `json:"data_updated_at"`
-	AcknowledgementsThrough time.Time            `json:"acknowledgements_through"`
-	Category                *string              `json:"category"`
-	Raised                  int64                `json:"notifications_raised"`
-	BySelection             map[string]int64     `json:"by_selection"`
-	Fulfilled               int64                `json:"notifications_fulfilled"`
-	PartlyReceived          int64                `json:"partly_received"`
-	AwaitingAcknowledgement int64                `json:"awaiting_acknowledgement"`
-	AwaitingSupply          int64                `json:"awaiting_supply"`
-	FulfilmentRate          *float64             `json:"fulfilment_rate"`
-	Component               *ComponentFulfilment `json:"component"`
-	Response                ResponseDuration     `json:"response"`
-	Deadline                DeadlineProgress     `json:"deadline"`
-	Backlog                 Backlog              `json:"backlog"`
-	AcknowledgementOverdue  int64                `json:"acknowledgement_overdue"`
-	Districts               []DistrictRow        `json:"districts"`
+	Period                  Period           `json:"period"`
+	DataUpdatedAt           time.Time        `json:"data_updated_at"`
+	AcknowledgementsThrough time.Time        `json:"acknowledgements_through"`
+	Category                *string          `json:"category"`
+	Raised                  int64            `json:"notifications_raised"`
+	BySelection             map[string]int64 `json:"by_selection"`
+	Fulfilled               int64            `json:"notifications_fulfilled"`
+	PartlyReceived          int64            `json:"partly_received"`
+	AwaitingAcknowledgement int64            `json:"awaiting_acknowledgement"`
+	AwaitingSupply          int64            `json:"awaiting_supply"`
+	// Rejected requests are closed without stock: neither fulfilled nor pending.
+	Rejected               int64                `json:"notifications_rejected"`
+	FulfilmentRate         *float64             `json:"fulfilment_rate"`
+	Component              *ComponentFulfilment `json:"component"`
+	Response               ResponseDuration     `json:"response"`
+	Deadline               DeadlineProgress     `json:"deadline"`
+	Backlog                Backlog              `json:"backlog"`
+	AcknowledgementOverdue int64                `json:"acknowledgement_overdue"`
+	Districts              []DistrictRow        `json:"districts"`
 	// Settings are the review cycle, deadline and target in effect; request parameters may override them.
 	Settings ResponseSettings `json:"settings"`
 }
@@ -157,6 +159,8 @@ func (r *Repository) notificationSummary(ctx context.Context, s scope, f Filter,
 	args := append(s.args(f), f.From, f.To, f.DeadlineDays)
 	inPeriod := `created_at >= $9 AND created_at < $10`
 	deadline := `make_interval(days => $11)`
+	// Still waiting for the district: neither fulfilled nor rejected.
+	open := `fulfilled_at IS NULL AND rejected_at IS NULL`
 	out := NotificationSummary{
 		Period:        Period{From: f.From.In(Kampala).Format(time.DateOnly), To: f.To.In(Kampala).AddDate(0, 0, -1).Format(time.DateOnly)},
 		DataUpdatedAt: now, AcknowledgementsThrough: now, BySelection: map[string]int64{},
@@ -179,17 +183,18 @@ func (r *Repository) notificationSummary(ctx context.Context, s scope, f Filter,
 			count(*) FILTER (WHERE `+inPeriod+` AND status = 'partly_received'),
 			count(*) FILTER (WHERE `+inPeriod+` AND status = 'awaiting_acknowledgement'),
 			count(*) FILTER (WHERE `+inPeriod+` AND status = 'awaiting_supply'),
+			count(*) FILTER (WHERE `+inPeriod+` AND status = 'rejected'),
 			count(*) FILTER (WHERE `+inPeriod+` AND `+component+`),
 			percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM fulfilled_at - created_at) / 3600)
 				FILTER (WHERE `+inPeriod+` AND fulfilled_at IS NOT NULL),
-			extract(epoch FROM now() - min(created_at) FILTER (WHERE `+inPeriod+` AND fulfilled_at IS NULL)) / 3600,
+			extract(epoch FROM now() - min(created_at) FILTER (WHERE `+inPeriod+` AND `+open+`)) / 3600,
 			count(*) FILTER (WHERE `+inPeriod+` AND fulfilled_at - created_at <= `+deadline+`),
-			count(*) FILTER (WHERE `+inPeriod+` AND fulfilled_at IS NULL AND now() - created_at > `+deadline+`),
-			count(*) FILTER (WHERE created_at < $9 AND fulfilled_at IS NULL),
-			min(created_at) FILTER (WHERE created_at < $9 AND fulfilled_at IS NULL),
+			count(*) FILTER (WHERE `+inPeriod+` AND `+open+` AND now() - created_at > `+deadline+`),
+			count(*) FILTER (WHERE created_at < $9 AND `+open+`),
+			min(created_at) FILTER (WHERE created_at < $9 AND `+open+`),
 			count(*) FILTER (WHERE `+inPeriod+` AND unacknowledged_lines > 0 AND now() - oldest_unacknowledged_at > `+deadline+`)
 		FROM n`, args...).Scan(&out.Raised, &male, &female, &both, &out.Fulfilled, &out.PartlyReceived,
-		&out.AwaitingAcknowledgement, &out.AwaitingSupply, &componentFulfilled, &out.Response.MedianHours,
+		&out.AwaitingAcknowledgement, &out.AwaitingSupply, &out.Rejected, &componentFulfilled, &out.Response.MedianHours,
 		&out.Response.OldestPendingHours, &out.Deadline.OnTime, &out.Deadline.LatePending, &out.Backlog.Open,
 		&out.Backlog.OldestRaisedAt, &out.AcknowledgementOverdue)
 	if err != nil {
@@ -198,7 +203,7 @@ func (r *Repository) notificationSummary(ctx context.Context, s scope, f Filter,
 	out.BySelection = map[string]int64{"male": male, "female": female, "both": both}
 	out.FulfilmentRate = rate(out.Fulfilled, out.Raised)
 	out.Response.FulfilledIncluded = out.Fulfilled
-	out.Response.Pending = out.Raised - out.Fulfilled
+	out.Response.Pending = out.Raised - out.Fulfilled - out.Rejected
 	out.Deadline.OnTimeRate = rate(out.Deadline.OnTime, out.Raised)
 	if out.Deadline.OnTimeRate != nil {
 		met := *out.Deadline.OnTimeRate >= float64(f.Target)

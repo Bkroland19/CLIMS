@@ -20,7 +20,9 @@ export type OrderStatus =
   | "dispatched"
   | "in_transit"
   | "delivered"
-  | "received";
+  | "received"
+  /** The district would not supply the request, and said why. */
+  | "rejected";
 
 export interface Hotspot {
   id: string;
