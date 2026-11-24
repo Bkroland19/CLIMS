@@ -140,7 +140,7 @@ func TestAuthRBACIntegration(t *testing.T) {
 		roleIDs[name] = roleID
 	}
 	adminRole, mohRole, hotspotRole := roleIDs["admin"], roleIDs["moh"], roleIDs["hotspot manager"]
-	// Before any test changes them: MOH reads the field app's sync log from the start (migration 40).
+	// Before any test changes them: MOH reads the field app's sync log from the start (migration 41).
 	var mohReadsSyncLog bool
 	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 		JOIN permissions p ON p.id = rp.permission_id WHERE r.name = 'moh' AND p.name = 'sync_logs:read')`).
@@ -451,6 +451,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 
 	testDistrictStockouts(t, pool, request, login, adminToken, condomID)
+	testDistrictAccounts(t, pool, request, login, adminToken)
+	testManagerVisibility(t, pool, request, login, adminToken)
 	testHotSpotActivation(t, pool, request, login, adminToken, destinationID)
 	testNotifications(t, pool, request, login, adminToken, destinationID)
 	testAudit(t, pool, repo, service, auditor, adminToken)
@@ -540,10 +542,11 @@ func TestAuthRBACIntegration(t *testing.T) {
 	}
 	// Migrations 18 and 23 grant catalogue:manage to moh, nms and jms, and migration 39 takes it back from
 	// moh, which becomes read-only. Migrations 31 and 38 give the warehouse and DCFP roles their order,
-	// inventory and (DCFP) report defaults, migration 35 gives delivery agents orders:deliver, and
-	// migration 39 gives moh every read permission and the warehouses reports:read. Every other non-admin
-	// grant is the custom one, which survives even though migration 39 makes moh read-only by default.
-	// Migration 40 gives moh sync_logs:read.
+	// inventory and (DCFP) report defaults, migration 35 gives delivery agents orders:deliver,
+	// migration 39 gives moh every read permission and the warehouses reports:read, migration 40 gives
+	// the DCFP role its district user permissions, and migration 41 gives moh sync_logs:read. Every other
+	// non-admin grant is the custom one, which survives even though migration 39 makes moh read-only by
+	// default.
 	var catalogueManagers string
 	if err = upgrade.QueryRow(ctx, `SELECT (SELECT count(*) FROM users),
 		(SELECT count(*) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
@@ -553,7 +556,8 @@ func TestAuthRBACIntegration(t *testing.T) {
 			AND NOT (r.name = 'moh' AND p.name IN ('audit:read', 'hotspots:all_districts', 'hotspots:read',
 				'hotspots:read_district', 'inventory:read', 'orders:all_stores', 'orders:read', 'reports:read',
 				'roles:read', 'sync_logs:read', 'users:read'))
-			AND NOT (r.name = 'delivery agent' AND p.name = 'orders:deliver')),
+			AND NOT (r.name = 'delivery agent' AND p.name = 'orders:deliver')
+			AND NOT (r.name = 'dfcp' AND p.name IN ('users:district_read', 'users:district_create'))),
 		(SELECT string_agg(r.name, ',' ORDER BY r.name) FROM role_permission rp JOIN roles r ON r.id = rp.role_id
 			JOIN permissions p ON p.id = rp.permission_id WHERE r.name<>'admin' AND p.name='catalogue:manage')`).Scan(
 		&userCount, &roleCount, &catalogueManagers); err != nil {

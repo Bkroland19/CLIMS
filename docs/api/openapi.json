@@ -64,7 +64,7 @@
         "tags": ["Orders"],
         "operationId": "listStockoutReports",
         "summary": "List stockout reports",
-        "description": "Requires orders:read. Newest first: the reports sent to your assigned district store, about your assigned hotspot, or sent by you. orders:all_stores sees every report. `hot_spot_id` narrows the list to one hotspot. Filter by hot_spot_id, district_id (the hotspot's district) and status; filters only narrow what you can already see. `q` searches the list on the server.",
+        "description": "Requires orders:read. Newest first. A hotspot manager (a user assigned a hotspot) sees that hotspot's reports and no others, whatever else their account holds. Anyone else sees the reports sent to their assigned district store or sent by them; orders:all_stores sees every report. Filter by hot_spot_id, district_id (the hotspot's district) and status; filters only narrow what you can already see. `q` searches the list on the server.",
         "responses": {
           "200": {
             "description": "Success",
@@ -152,7 +152,7 @@
         "tags": ["Orders"],
         "operationId": "reportOrderStockout",
         "summary": "Report a hotspot stockout to its district's DCFPs",
-        "description": "Requires orders:stockout and one of: the assigned hotspot; orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a condom category (`condom_category`: male, female or both), with an optional `message`, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the category, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. The notification names Male, Female or Both (returned as `selection`) and no product or quantity. If the hotspot already has an open notification, the message is counted against it (200): its repeat_count rises and its selection widens when a new type is named (Male then Female is Both), and the history keeps both.",
+        "description": "Requires orders:stockout and one of: the assigned hotspot (a hotspot manager may report for theirs only); orders:stockout_district and an active hotspot in the district you work in (your assigned store's district, or else your assigned subcounty's), which is how VHTs report for their district; or orders:all_stores. Records a stockout report for a condom category (`condom_category`: male, female or both), with an optional `message`, and notifies the people with orders:replenish at the store of the hotspot's district (its DCFPs) with an `order.stockout_reported` notification carrying the hotspot's name, place and contact, the category, the reporter and the message. The notification's resource is the hotspot. No order is created: ordering stock from NMS or JMS is the DCFP's separate step (`POST /api/v1/orders/warehouse-requests`). A hotspot without a district returns 422. The notification names Male, Female or Both (returned as `selection`) and no product or quantity. If the hotspot already has an open notification, the message is counted against it (200): its repeat_count rises and its selection widens when a new type is named (Male then Female is Both), and the history keeps both.",
         "responses": {
           "201": {
             "description": "Success",
@@ -799,6 +799,83 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/district": {
+      "get": {
+        "tags": ["Users"],
+        "operationId": "listDistrictUsers",
+        "summary": "List the field users in your district",
+        "description": "The VHT, hotspot manager and delivery agent accounts in the caller's district, newest first. The caller's district is their district store's, or else their subcounty's; a caller with neither gets 403. Requires all permissions: users:district_read.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistrictUsersResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["users:district_read"]
+      },
+      "post": {
+        "tags": ["Users"],
+        "operationId": "createDistrictUser",
+        "summary": "Create a field user in your district",
+        "description": "For district focal persons: creates a VHT, hotspot manager or delivery agent account in the caller's own district, and no other role. A VHT needs subcounty_id, a subcounty in the district. A hotspot manager needs hot_spot_id, an active hotspot in the district; their subcounty is the hotspot's. A delivery agent is assigned the district store. Other assignment fields are ignored. Identifiers must be unused, as for createUser (409). A caller with no district gets 403. Requires all permissions: users:district_create.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "x-required-permissions": ["users:district_create"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDistrictUserRequest"
               }
             }
           }
@@ -7139,6 +7216,78 @@
                 "$ref": "#/components/schemas/User"
               }
             }
+          }
+        }
+      },
+      "DistrictUsersResponse": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "required": ["users"],
+            "properties": {
+              "users": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CreateDistrictUserRequest": {
+        "type": "object",
+        "required": ["username", "email", "password", "role"],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 50
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 72
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "phone_number": {
+            "type": "string",
+            "maxLength": 15
+          },
+          "role": {
+            "type": "string",
+            "enum": ["vht", "hotspot manager", "delivery agent"]
+          },
+          "subcounty_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required for a VHT: a subcounty in your district."
+          },
+          "hot_spot_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required for a hotspot manager: an active hotspot in your district."
           }
         }
       },
