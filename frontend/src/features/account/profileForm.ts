@@ -100,7 +100,8 @@ export function profileFormSchema(initial: ProfileFormValues) {
       const { input, changesSignIn } = profileChanges(initial, values);
       const checkName = (field: 'first_name' | 'last_name', value: string | undefined) => {
         if (value === undefined) return;
-        if (value === '') problem(field, `Enter your ${field === 'first_name' ? 'first' : 'last'} name.`);
+        if (value === '')
+          problem(field, `Enter your ${field === 'first_name' ? 'first' : 'last'} name.`);
         else if (value.length > NAME_MAX_LENGTH)
           problem(field, `Use at most ${NAME_MAX_LENGTH} characters.`);
       };

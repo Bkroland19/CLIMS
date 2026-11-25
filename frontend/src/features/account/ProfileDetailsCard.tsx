@@ -55,8 +55,8 @@ export function ProfileDetailsCard({ profile }: { profile: Profile }) {
       <CardHeader>
         <CardTitle>Personal details</CardTitle>
         <CardDescription>
-          How colleagues reach you. You can sign in with your email address or phone number as
-          well as your username.
+          How colleagues reach you. You can sign in with your email address or phone number as well
+          as your username.
         </CardDescription>
       </CardHeader>
       <form

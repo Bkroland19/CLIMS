@@ -1638,13 +1638,20 @@ export function signedInUser(email: string | null = null) {
   };
 }
 
-const PROFILE_KEYS = new Set(['first_name', 'last_name', 'email', 'phone_number', 'current_password']);
+const PROFILE_KEYS = new Set([
+  'first_name',
+  'last_name',
+  'email',
+  'phone_number',
+  'current_password',
+]);
 
 /** Mirrors the Go API's `users.PasswordProblem`. */
 function passwordProblem(password: unknown): string | null {
   if (typeof password !== 'string' || password === '') return 'This field is required.';
   if (Array.from(password).length < 8) return 'Use at least 8 characters.';
-  if (new TextEncoder().encode(password).length > 72) return 'Use a shorter password: at most 72 bytes.';
+  if (new TextEncoder().encode(password).length > 72)
+    return 'Use a shorter password: at most 72 bytes.';
   if (!/\d/.test(password)) return 'Include at least one number.';
   return null;
 }
@@ -1732,9 +1739,13 @@ function changeMyPassword(body: Body): Reply {
   }
   const required = state.me.must_change_password;
   state.me = { ...state.me, must_change_password: false, password_changed_at: now };
-  record('auth.password_changed', { type: 'user', id: ACTOR.id }, {
-    details: { sessions_revoked: revoked, required },
-  });
+  record(
+    'auth.password_changed',
+    { type: 'user', id: ACTOR.id },
+    {
+      details: { sessions_revoked: revoked, required },
+    },
+  );
   return ok({ user: signedInUser(), sessions_revoked: revoked });
 }
 
@@ -1749,9 +1760,13 @@ function setTemporaryPassword(user: User, body: Body): Reply {
     session.revoked_at = now;
     revoked += 1;
   }
-  record('user.password_reset', { type: 'user', id: user.id }, {
-    details: { sessions_revoked: revoked },
-  });
+  record(
+    'user.password_reset',
+    { type: 'user', id: user.id },
+    {
+      details: { sessions_revoked: revoked },
+    },
+  );
   return ok({ sessions_revoked: revoked });
 }
 
@@ -1761,7 +1776,12 @@ const FIELD_ROLES = new Set(['vht', 'hotspot manager', 'delivery agent']);
  * `GET /users/district` and `PUT /users/district/:id/password`: the field
  * workers a DCFP looks after. The mock's district holds every field worker.
  */
-function handleDistrictUsers(method: string, id: string | undefined, sub: string | undefined, body: Body): Reply {
+function handleDistrictUsers(
+  method: string,
+  id: string | undefined,
+  sub: string | undefined,
+  body: Body,
+): Reply {
   const fieldWorkers = state.users.filter((user) =>
     state.roles.some((role) => user.role_ids.includes(role.id) && FIELD_ROLES.has(role.name)),
   );

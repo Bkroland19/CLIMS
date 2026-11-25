@@ -214,7 +214,9 @@ describe('profile page', () => {
       });
     });
     expect(
-      await screen.findByText('Password changed. 2 other devices signed out and will need the new password.'),
+      await screen.findByText(
+        'Password changed. 2 other devices signed out and will need the new password.',
+      ),
     ).toBeVisible();
   });
 });
@@ -255,7 +257,12 @@ describe('TemporaryPasswordDialog', () => {
   it('shows the server’s reason beside the field', async () => {
     const user = userEvent.setup();
     renderApp(
-      <TemporaryPasswordDialog userId="u-7" userName="Grace Atim" scope="admin" onClose={vi.fn()} />,
+      <TemporaryPasswordDialog
+        userId="u-7"
+        userName="Grace Atim"
+        scope="admin"
+        onClose={vi.fn()}
+      />,
       {
         signedIn: true,
         replies: [

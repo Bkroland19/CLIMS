@@ -6,7 +6,12 @@ import {
   requiredPasswordSchema,
   temporaryPasswordSchema,
 } from './passwordForm';
-import { profileChanges, profileFormSchema, samePhone, type ProfileFormValues } from './profileForm';
+import {
+  profileChanges,
+  profileFormSchema,
+  samePhone,
+  type ProfileFormValues,
+} from './profileForm';
 
 const initial: ProfileFormValues = {
   first_name: 'Sarah',
@@ -78,9 +83,9 @@ describe('profileFormSchema', () => {
     expect(issues(schema.safeParse({ ...initial, email: '', current_password: 'x' }))).toEqual([
       'email',
     ]);
-    expect(issues(schema.safeParse({ ...initial, email: 'nope', current_password: 'x' }))).toEqual(
-      ['email'],
-    );
+    expect(issues(schema.safeParse({ ...initial, email: 'nope', current_password: 'x' }))).toEqual([
+      'email',
+    ]);
     expect(issues(schema.safeParse({ ...initial, email: 'new@example.org' }))).toEqual([
       'current_password',
     ]);
